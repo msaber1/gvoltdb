@@ -41,7 +41,6 @@ import org.voltdb.catalog.ConnectorDestinationInfo;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
-import org.voltdb.regressionsuites.TestELTSuite;
 import org.voltdb.utils.JarReader;
 
 public class TestVoltCompiler extends TestCase {
@@ -78,45 +77,6 @@ public class TestVoltCompiler extends TestCase {
             final File jar = new File("/tmp/snapshot_settings_test.jar");
             jar.delete();
         }
-    }
-
-    // TestELTSuite tests most of these options end-to-end; however need to test
-    // that a disabled connector is really disabled and that auth data is correct.
-    public void testELTSetting() throws IOException {
-        final VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(TestELTSuite.class.getResource("sqltypessuite-ddl.sql"));
-        project.addProcedures(org.voltdb.regressionsuites.sqltypesprocs.Insert.class);
-        project.addPartitionInfo("NO_NULLS", "PKEY");
-        project.addPartitionInfo("ALLOW_NULLS", "PKEY");
-        project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
-        project.addPartitionInfo("WITH_NULL_DEFAULTS", "PKEY");
-        project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
-        project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
-        project.addELT("bob", "forapples",
-                       "org.voltdb.elt.processors.RawProcessor",
-                       "faraway", false);
-        project.addELTTable("ALLOW_NULLS", false);   // persistent table
-        project.addELTTable("WITH_DEFAULTS", true);  // streamed table
-        try {
-            assertTrue(project.compile("/tmp/eltsettingstest.jar"));
-            final String catalogContents =
-                JarReader.readFileFromJarfile("/tmp/eltsettingstest.jar", "catalog.txt");
-            final Catalog cat = new Catalog();
-            cat.execute(catalogContents);
-
-            Connector connector = cat.getClusters().get("cluster").getDatabases().
-                get("database").getConnectors().get("0");
-            assertFalse(connector.getEnabled());
-
-            ConnectorDestinationInfo dest = connector.getDestinfo().get("0");
-            assertTrue(dest.getUsername().equals("bob"));
-            assertTrue(dest.getPassword().equals("forapples"));
-            assertTrue(dest.getUrl().equals("faraway"));
-        } finally {
-            final File jar = new File("/tmp/eltsettingstest.jar");
-            jar.delete();
-        }
-
     }
 
     public void testBadPath() {
