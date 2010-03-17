@@ -105,6 +105,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_stats = new InitiatorStats("Initiator " + siteId + " stats", siteId);
         m_idManager = new TransactionIdManager(initiatorId);
         m_mailbox = mailbox;
+        m_hostId = hostId;
         m_siteId = siteId;
         m_siteTracker = VoltDB.instance().getSiteTracker();
         m_onBackPressure = onBackPressure;
@@ -161,12 +162,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
             for (int i = 1; i < allSiteIds.length; i++)
             {
-                // if this site is in the list of sites for this partition
+                // if this site is on the same host as the initiator
                 // then take over as the coordinator
-                if (allSiteIds[i] == m_siteId)
+                if (m_hostId == allSiteIds[i] / VoltDB.SITES_TO_HOST_DIVISOR)
                 {
                     otherSiteIds[i - 1] = coordinatorId;
-                    coordinatorId = m_siteId;
+                    coordinatorId = allSiteIds[i];
                 }
                 else
                 {
@@ -334,6 +335,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private int m_pendingTxnCount = 0;
     private final Mailbox m_mailbox;
     private final int m_siteId;
+    private final int m_hostId;
 
     /** Map of transaction ids to transaction information */
     private final PendingTxnList m_pendingTxns = new PendingTxnList();
