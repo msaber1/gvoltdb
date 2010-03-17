@@ -80,7 +80,7 @@ public class SimpleDtxnConnection extends SiteConnection {
     }
 
     // Messaging stuff
-    private Mailbox m_mailbox;
+    private final Mailbox m_mailbox;
 
     public ExecutionSite m_site;
 
@@ -209,14 +209,24 @@ public class SimpleDtxnConnection extends SiteConnection {
             throw new RuntimeException(msg.toString());
         }
 
-        m_transactionQueue.gotTransaction(notice.getInitiatorSiteId(), notice.getTxnId(), notice.isHeartBeat());
+        // Raw MembershipNotice is sent by initiator for MP transactions.
+        // MembershipNotice : InitiateNotice is sent by initiator for SP transactions.
+        // MembershipNotice : FragmentTask is NOT sent by an initiator. Don't
+        // count FragmentTasks as news from an initiator.
+        if (!(notice instanceof FragmentTask)) {
+            m_transactionQueue.gotTransaction(notice.getInitiatorSiteId(),
+                                              notice.getTxnId(),
+                                              notice.isHeartBeat());
+        }
 
         // ignore heartbeats
-        if (notice.isHeartBeat())
+        if (notice.isHeartBeat()) {
             return null;
+        }
 
-        if ((m_current != null) && (m_current.txnId == notice.getTxnId()))
+        if ((m_current != null) && (m_current.txnId == notice.getTxnId())) {
             return m_current;
+        }
 
         TransactionState state = m_transactionsById.get(notice.getTxnId());
         if (state == null) {
