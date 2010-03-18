@@ -310,6 +310,7 @@ public class BenchmarkController {
                          * there isn't a single full GC performed. They are all young gen GCs and there isn't
                          * anywhere near enough data to fill the tenured gen.
                          */
+                        "-XX:-ReduceInitialCardMarks",
                         "-Xmn" + String.valueOf((m_config.serverHeapSize / 4) * 3) + "m",
                         "-Xmx" + String.valueOf(m_config.serverHeapSize) + "m",
                         "-server",
@@ -366,7 +367,7 @@ public class BenchmarkController {
                 debugString = " -agentlib:jdwp=transport=dt_socket,address=8002,server=y,suspend=n ";
             }
             StringBuilder loaderCommand = new StringBuilder(4096);
-            loaderCommand.append("java -Xmx" + loaderheap + "m " + debugString +
+            loaderCommand.append("java -XX:-ReduceInitialCardMarks -Xmx" + loaderheap + "m " + debugString +
                     "-cp \"voltdbfat.jar:" + m_jarFileName +"\" " );
             loaderCommand.append(m_loaderClass.getCanonicalName());
             for (String host : m_config.hosts) {
@@ -415,7 +416,7 @@ public class BenchmarkController {
         if (m_config.listenForDebugger) {
             clArgs.add(""); //placeholder for agent lib
         }
-        clArgs.add("-Xmx" + String.valueOf(m_config.clientHeapSize) + "m");
+        clArgs.add("-XX:-ReduceInitialCardMarks -Xmx" + String.valueOf(m_config.clientHeapSize) + "m");
 
         String classpath = "voltdbfat.jar" + ":" + m_jarFileName;
         if (System.getProperty("java.class.path") != null) {
