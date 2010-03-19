@@ -99,6 +99,7 @@ SERVER & CLIENT TARGETS
         <jvmarg value="-Djava.library.path=../../voltdb" />
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
         <arg value="catalog"/>
         <arg value="auction.jar"/>
         <classpath refid='project.classpath' />
@@ -108,6 +109,7 @@ SERVER & CLIENT TARGETS
 
 <target name="client" description="Example: ant client    Run auction example client.">
     <java fork="yes" classname="com.auctionexample.Client" >
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>

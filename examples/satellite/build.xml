@@ -88,12 +88,12 @@ SERVER & CLIENT TARGETS
 ***************************************
 -->
 
-<target name="server"
-    description="Example: ant server    Start a VoltDB server with the satellite catalog.">
+<target name="server" description="Example: ant server    Start a VoltDB server with the satellite catalog.">
     <java fork="yes" classname="org.voltdb.VoltDB" >
         <jvmarg value="-Djava.library.path=../../voltdb" />
         <jvmarg value="-server" />
         <jvmarg value="-Xmx512m" />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
         <arg value="catalog"/>
         <arg value="${catalog_jar}"/>
         <classpath refid='project.classpath' />
@@ -101,20 +101,20 @@ SERVER & CLIENT TARGETS
     </java>
 </target>
 
-<target name="client"
-    description="Example: ant client    Run Satellite signal client.">
+<target name="client" description="Example: ant client    Run Satellite signal client.">
     <java fork="yes" classname="signal.Client" >
-     <arg value="5"/>    <!-- number of satellites -->
-    <arg value="usa"/>    <!-- country -->
-       <classpath refid='project.classpath' />
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
+        <arg value="5"/>    <!-- number of satellites -->
+        <arg value="usa"/>    <!-- country -->
+        <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
 </target>
 
 
-<target name="tracker"
-    description="Example: ant tracker    Run Satellite tracker client.">
+<target name="tracker" description="Example: ant tracker    Run Satellite tracker client.">
     <java fork="yes" classname="tracker.UserInterface" >
+        <jvmarg value="-XX:-ReduceInitialCardMarks" />
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>
     </java>
