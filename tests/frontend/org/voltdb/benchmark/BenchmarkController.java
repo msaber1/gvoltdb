@@ -305,6 +305,8 @@ public class BenchmarkController {
                         "-Djava.library.path=.",
                         "-Dlog4j.configuration=log.xml",
                         debugString,
+                        "-XX:+HeapDumpOnOutOfMemoryError",
+                        "-XX:HeapDumpPath=/tmp",
                         /*
                          * The vast majority of Volt heap usage is young generation. When running the benchmark
                          * there isn't a single full GC performed. They are all young gen GCs and there isn't
@@ -367,7 +369,7 @@ public class BenchmarkController {
                 debugString = " -agentlib:jdwp=transport=dt_socket,address=8002,server=y,suspend=n ";
             }
             StringBuilder loaderCommand = new StringBuilder(4096);
-            loaderCommand.append("java -XX:-ReduceInitialCardMarks -Xmx" + loaderheap + "m " + debugString +
+            loaderCommand.append("java -XX:-ReduceInitialCardMarks -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Xmx" + loaderheap + "m " + debugString +
                     "-cp \"voltdbfat.jar:" + m_jarFileName +"\" " );
             loaderCommand.append(m_loaderClass.getCanonicalName());
             for (String host : m_config.hosts) {
@@ -416,7 +418,7 @@ public class BenchmarkController {
         if (m_config.listenForDebugger) {
             clArgs.add(""); //placeholder for agent lib
         }
-        clArgs.add("-XX:-ReduceInitialCardMarks -Xmx" + String.valueOf(m_config.clientHeapSize) + "m");
+        clArgs.add("-XX:-ReduceInitialCardMarks -Xmx" + String.valueOf(m_config.clientHeapSize) + "m -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp");
 
         String classpath = "voltdbfat.jar" + ":" + m_jarFileName;
         if (System.getProperty("java.class.path") != null) {
