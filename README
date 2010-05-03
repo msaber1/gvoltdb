@@ -13,7 +13,7 @@ system in the world.
 What it is not?
 ===============
 VoltDB is not a general purpose database like MySQL or PostgreSQL, for
-example.
+example. VoltDB is intended for high throughput OLTP workloads.
 
 
 Getting Started
