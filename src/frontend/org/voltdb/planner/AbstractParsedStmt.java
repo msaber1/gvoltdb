@@ -397,6 +397,65 @@ public abstract class AbstractParsedStmt {
             expr.setRight(rightExpr);
         }
 
+        // remove expressions that we don't want to deal with
+        return filterNotNullColumns(expr);
+    }
+
+    /**
+     * There's a stupid feature in less-than index scans from HSQL
+     * that puts a AND(NOT(ISNULL(COLUMNREF)),BLAH) in the expression
+     * tree. This takes in that tree and returns BLAH. Need a better
+     * solution than this... TODO
+     */
+    AbstractExpression filterNotNullColumns(AbstractExpression expr) {
+        if (expr.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
+            AbstractExpression lexpr = expr.getLeft();
+            AbstractExpression rexpr = expr.getRight();
+
+            assert(lexpr != null);
+            assert(rexpr != null);
+
+            if (lexpr.getExpressionType() == ExpressionType.OPERATOR_NOT) {
+                AbstractExpression llexpr = lexpr.getLeft();
+                AbstractExpression lrexpr = lexpr.getRight();
+
+                assert(llexpr != null);
+                assert(lrexpr == null);
+
+                if (llexpr.getExpressionType() == ExpressionType.OPERATOR_ISNULL) {
+                    AbstractExpression lllexpr = llexpr.getLeft();
+                    AbstractExpression llrexpr = llexpr.getRight();
+
+                    assert(lllexpr != null);
+                    assert(llrexpr == null);
+
+                    if (lllexpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+                        return rexpr;
+                    }
+                }
+            }
+
+            if (rexpr.getExpressionType() == ExpressionType.OPERATOR_NOT) {
+                AbstractExpression rlexpr = rexpr.getLeft();
+                AbstractExpression rrexpr = rexpr.getRight();
+
+                assert(rlexpr != null);
+                assert(rrexpr == null);
+
+                if (rlexpr.getExpressionType() == ExpressionType.OPERATOR_ISNULL) {
+                    AbstractExpression rllexpr = rlexpr.getLeft();
+                    AbstractExpression rlrexpr = rlexpr.getRight();
+
+                    assert(rllexpr != null);
+                    assert(rlrexpr == null);
+
+                    if (rllexpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+                        return lexpr;
+                    }
+                }
+            }
+        }
+
         return expr;
     }
 

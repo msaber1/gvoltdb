@@ -335,7 +335,7 @@ public class PlannerTool {
             }
             inputLine = inputLine.trim();
 
-            log("recieved sql stmt: " + inputLine);
+            log("received sql stmt: " + inputLine);
 
             //////////////////////
             // PLAN THE STMT

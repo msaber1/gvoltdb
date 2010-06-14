@@ -42,12 +42,14 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     public TupleValueExpression() {
         super(ExpressionType.VALUE_TUPLE);
+        assert(m_type != null);
     }
 
     public TupleValueExpression(AbstractExpression left, AbstractExpression right) {
         super(ExpressionType.VALUE_TUPLE, null, null);
         assert(left == null);
         assert(right == null);
+        assert(m_type != null);
     }
 
     @Override
@@ -57,6 +59,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         clone.m_tableName = m_tableName;
         clone.m_columnName = m_columnName;
         clone.m_columnAlias = m_columnAlias;
+        assert(clone.m_type != null);
         return clone;
     }
 

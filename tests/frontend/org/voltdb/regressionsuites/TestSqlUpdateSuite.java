@@ -24,12 +24,13 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.regressionsuites.fixedsql.*;
+import org.voltdb.regressionsuites.fixedsql.Insert;
 
 /**
  * System tests for UPDATE, mainly focusing on the correctness of the WHERE
@@ -203,26 +204,32 @@ public class TestSqlUpdateSuite extends RegressionSuite {
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
+        project.addStmtProcedure("UTEST1", "update P1 set P1.NUM = -1 where P1.ID < 8 and P1.ID > 5");
+        project.addStmtProcedure("UTEST2", "update R1 set R1.NUM = -1 where R1.ID < 8 and R1.ID > 5");
         project.addPartitionInfo("P1", "ID");
         project.addProcedures(PROCEDURES);
 
         config = new LocalSingleProcessServer("sqlupdate-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        boolean success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         //ADHOC sql still returns double the number of modified rows
         config = new LocalSingleProcessServer("sqlupdate-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         config = new LocalSingleProcessServer("sqlupdate-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
-        config.compile(project);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         // Cluster
         config = new LocalCluster("sqlupdate-cluster.jar", 2, 2,
                                   1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         return builder;

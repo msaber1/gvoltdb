@@ -17,15 +17,16 @@
 
 package org.voltdb.expressions;
 
-import java.util.*;
+import java.util.List;
+import java.util.Stack;
 
 import org.voltdb.VoltType;
 import org.voltdb.planner.PlanColumn;
 import org.voltdb.planner.PlannerContext;
 import org.voltdb.types.ExpressionType;
-import org.voltdb.utils.VoltTypeUtil;
 import org.voltdb.utils.NotImplementedException;
 import org.voltdb.utils.Pair;
+import org.voltdb.utils.VoltTypeUtil;
 
 /**
  *
@@ -44,9 +45,15 @@ public abstract class ExpressionUtil {
      */
     public static Boolean needsRightExpression(AbstractExpression exp) {
         assert(exp != null);
-        return (exp.getExpressionType() != ExpressionType.OPERATOR_NOT &&
-                exp.getExpressionType() != ExpressionType.COMPARE_IN &&
-                !(exp instanceof AggregateExpression));
+        if (exp instanceof AggregateExpression)
+            return false;
+        switch (exp.getExpressionType()) {
+            case OPERATOR_NOT:
+            case COMPARE_IN:
+            case OPERATOR_ISNULL:
+                return false;
+        }
+        return true;
     }
 
     /**
@@ -142,6 +149,7 @@ public abstract class ExpressionUtil {
         // First get the value types for the left and right children
         //
         ExpressionType exp_type = exp.getExpressionType();
+        assert(exp_type != null);
         AbstractExpression left_exp = exp.getLeft();
         AbstractExpression right_exp = exp.getRight();
 
@@ -235,6 +243,7 @@ public abstract class ExpressionUtil {
         // at each position and call the method to figure out the cast type
         // -------------------------------
         } else {
+
             VoltType left_type = left_exp.getValueType();
             VoltType right_type = right_exp.getValueType();
             VoltType cast_type = VoltType.INVALID;

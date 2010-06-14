@@ -105,8 +105,9 @@ public class QueryPlanner {
         try {
             xmlSQL = m_HSQL.getXMLCompiledStatement(sql);
         } catch (HSQLParseException e) {
+            e.printStackTrace();
             // XXXLOG probably want a real log message here
-            m_recentErrorMsg = e.getMessage();
+            m_recentErrorMsg = "HSQL PLANNING EXCEPTION: " + e.getMessage();
             return null;
         }
 
@@ -125,6 +126,7 @@ public class QueryPlanner {
             initialParsedStmt = AbstractParsedStmt.parse(sql, xmlSQL, m_db);
         }
         catch (Exception e) {
+            e.printStackTrace();
             m_recentErrorMsg = e.getMessage();
             return null;
         }
@@ -171,6 +173,7 @@ public class QueryPlanner {
                 }
                 // on exception, set the error message and bail...
                 catch (PlanningErrorException e) {
+                    e.printStackTrace();
                     m_recentErrorMsg = e.getMessage();
                     return null;
                 }

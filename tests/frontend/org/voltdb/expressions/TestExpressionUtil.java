@@ -22,19 +22,17 @@
  */
 package org.voltdb.expressions;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Stack;
+import java.util.Vector;
+
+import junit.framework.TestCase;
 
 import org.voltdb.VoltType;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ComparisonExpression;
-import org.voltdb.expressions.ConjunctionExpression;
-import org.voltdb.expressions.ConstantValueExpression;
-import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.ParameterValueExpression;
-import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.types.*;
-
-import junit.framework.*;
+import org.voltdb.types.ExpressionType;
 
 /**
  *
@@ -348,7 +346,7 @@ public class TestExpressionUtil extends TestCase {
         ExpressionUtil.assignOutputValueTypesRecursively(root);
         assertEquals(VoltType.DECIMAL, root.getValueType());
 
-        op = new OperatorExpression();
+        op = new OperatorExpression(ExpressionType.AGGREGATE_SUM);
         root.setLeft(op);
 
         AbstractExpression left = new TupleValueExpression();

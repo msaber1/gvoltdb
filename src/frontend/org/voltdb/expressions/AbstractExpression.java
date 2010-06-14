@@ -19,11 +19,11 @@ package org.voltdb.expressions;
 
 import org.json.JSONException;
 import org.json.JSONObject;
-import org.json.JSONStringer;
 import org.json.JSONString;
+import org.json.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
 
 /**
  *
@@ -49,12 +49,15 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public boolean m_isJoiningClause = false;
 
     public AbstractExpression(ExpressionType type) {
+        assert(type != null);
         m_type = type;
+        assert(m_type != null);
     }
     public AbstractExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
         this(type);
         m_left = left;
         m_right = right;
+        assert(m_type != null);
     }
     public AbstractExpression() {
         //
@@ -144,6 +147,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param type
      */
     public void setExpressionType(ExpressionType type) {
+        assert(type != null);
         m_type = type;
     }
 
@@ -280,6 +284,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             return null;
         }
 
+        assert(type != null);
         expr.m_type = type;
 
         expr.m_valueType = VoltType.typeFromString(obj.getString(Members.VALUE_TYPE.name()));
@@ -312,6 +317,8 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         expr.loadFromJSONObject(obj, db);
+
+        assert(expr.m_type != null);
 
         return expr;
     }

@@ -17,9 +17,21 @@
 
 package org.voltdb.types;
 
-import java.util.*;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
-import org.voltdb.expressions.*;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ConjunctionExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.InComparisonExpression;
+import org.voltdb.expressions.NullValueExpression;
+import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.TupleAddressExpression;
+import org.voltdb.expressions.TupleValueExpression;
 
 /**
  *
@@ -45,6 +57,8 @@ public enum ExpressionType {
     OPERATOR_CAST                  (OperatorExpression.class,  7),
         // explicitly cast left as right (right is integer in ValueType enum)
     OPERATOR_NOT                   (OperatorExpression.class,  8),
+        // logical not
+    OPERATOR_ISNULL                (OperatorExpression.class,  9),
         // logical not
 
     // ----------------------------

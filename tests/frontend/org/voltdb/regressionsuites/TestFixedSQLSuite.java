@@ -935,6 +935,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addPartitionInfo("OBJECT_DETAIL", "OBJECT_DETAIL_ID");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("Eng397Limit1", "Select P1.NUM from P1 order by P1.NUM limit ?;");
+        project.addStmtProcedure("UpdateIndexOrderBy", "UPDATE R1 SET NUM = 38 WHERE (R1.ID<R1.NUM) AND (R1.ID<10)");
         //project.addStmtProcedure("Eng490Select", "SELECT A.ASSET_ID, A.OBJECT_DETAIL_ID,  OD.OBJECT_DETAIL_ID FROM ASSET A, OBJECT_DETAIL OD WHERE A.OBJECT_DETAIL_ID = OD.OBJECT_DETAIL_ID;");
 
         // CONFIG #1: Local Site/Partitions running on IPC backend
