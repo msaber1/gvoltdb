@@ -258,6 +258,7 @@ CTX.INPUT['indexes'] = """
  arrayuniqueindex.cpp
  tableindex.cpp
  tableindexfactory.cpp
+ IndexStats.cpp
 """
 
 CTX.INPUT['storage'] = """
@@ -328,6 +329,7 @@ if whichtests in ("${eetestsuite}", "common"):
      undolog_test
      valuearray_test
      nvalue_test
+     tabletuple_test
     """
 
 if whichtests in ("${eetestsuite}", "execution"):
@@ -354,6 +356,7 @@ if whichtests in ("${eetestsuite}", "storage"):
      constraint_test
      filter_test
      persistent_table_log_test
+     PersistentTableMemStatsTest
      serialize_test
      StreamedTable_test
      table_and_indexes_test
