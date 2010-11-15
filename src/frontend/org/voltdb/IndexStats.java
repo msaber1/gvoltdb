@@ -14,18 +14,18 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb;
 
-public enum SysProcSelector {
-    TABLE,            // invoked as @stat table
-    INDEX,            // invoked as @stat index
-    PROCEDURE,        // invoked as @stat procedure
-    STARVATION,
-    INITIATOR,        // invoked as @stat initiator
-    PARTITIONCOUNT,
-    IOSTATS,
-    NODEMEMORY,       // info about node's memory usage
-    MANAGEMENT,       //Returns pretty much everything
+import java.util.Iterator;
 
-    SNAPSHOTSTATUS;
+public class IndexStats extends SiteStatsSource {
+    public IndexStats(String name, int siteId) {
+        super(name, siteId, true);
+    }
+
+    @Override
+    protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+        return null;
+    }
 }
