@@ -362,7 +362,7 @@ public class Statistics extends VoltSystemProcedure {
         if (selector.toUpperCase().equals(SysProcSelector.NODEMEMORY.name())) {
             results = getNodeMemData();
         }
-        if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
+        else if (selector.toUpperCase().equals(SysProcSelector.TABLE.name())) {
             results = getTableData(interval, now);
         }
         else if (selector.toUpperCase().equals(SysProcSelector.INDEX.name())) {
