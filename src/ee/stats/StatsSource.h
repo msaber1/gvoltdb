@@ -53,7 +53,7 @@ public:
      * @parameter partitionId this stat source is associated with
      * @parameter databaseId Database this source is associated with
      */
-    void configure(
+    virtual void configure(
             std::string name,
             voltdb::CatalogId hostId,
             std::string hostname,

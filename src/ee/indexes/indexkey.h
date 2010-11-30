@@ -294,11 +294,6 @@ public:
         }
     }
 
-    size_t getKeySize() const
-    {
-        return keySize * sizeof(uint64_t);
-    }
-
     // actual location of data
     uint64_t data[keySize];
 
@@ -391,11 +386,6 @@ public:
         for (int i = 0; i < keySchema->columnCount(); i++) {
             keyTuple.setNValue(i, tuple->getNValue(indices[i]));
         }
-    }
-
-    size_t getKeySize() const
-    {
-        return keySize + sizeof(char);
     }
 
     // actual location of data, extends past the end.
@@ -526,11 +516,6 @@ class TupleKey {
             return indexColumn;
         else
             return m_columnIndices[indexColumn];
-    }
-
-    size_t getKeySize() const
-    {
-        return sizeof(int*) + sizeof(char*) + sizeof(TupleSchema*);
     }
 
   private:

@@ -56,10 +56,6 @@ class ArrayUniqueIndex : public TableIndex {
         bool checkForIndexChange(const TableTuple *lhs, const TableTuple *rhs);
 
         size_t getSize() const { return 0; }
-        int64_t getMemoryEstimate() const
-        {
-            return ARRAY_INDEX_INITIAL_SIZE * sizeof(void*);
-        }
         std::string getTypeName() const { return "ArrayIntUniqueIndex"; };
 
     protected:

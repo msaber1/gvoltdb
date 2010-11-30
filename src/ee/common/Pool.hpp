@@ -190,8 +190,7 @@ public:
     {
     }
 
-    Pool(uint64_t allocationSize, uint64_t maxChunkCount) :
-        m_memTotal(0)
+    Pool(uint64_t allocationSize, uint64_t maxChunkCount)
     {
     }
 
@@ -208,7 +207,6 @@ public:
     inline void* allocate(std::size_t size) {
         char *retval = new char[size];
         m_allocations.push_back(retval);
-        m_memTotal += size;
         return retval;
     }
 
@@ -217,17 +215,10 @@ public:
             delete [] m_allocations[ii];
         }
         m_allocations.clear();
-        m_memTotal = 0;
-    }
-
-    int64_t getAllocatedMemory()
-    {
-        return m_memTotal;
     }
 
 private:
     std::vector<char*> m_allocations;
-    int64_t m_memTotal;
     // No implicit copies
     Pool(const Pool&);
     Pool& operator=(const Pool&);

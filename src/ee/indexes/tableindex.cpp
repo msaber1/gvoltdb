@@ -44,13 +44,13 @@
  */
 
 #include <iostream>
-#include "indexes/tableindex.h"
+#include "tableindex.h"
 
 using namespace voltdb;
 
-TableIndex::TableIndex(const TableIndexScheme &scheme) :
-    m_scheme(scheme), name_(scheme.name), m_stats(this)
+TableIndex::TableIndex(const TableIndexScheme &scheme) : m_scheme(scheme)
 {
+    name_ = scheme.name;
     column_indices_vector_ = scheme.columnIndices;
     column_types_vector_ = scheme.columnTypes;
     colCount_ = (int)column_indices_vector_.size();
@@ -95,10 +95,6 @@ std::string TableIndex::debug() const
 
     std::string ret(buffer.str());
     return (ret);
-}
-
-IndexStats* TableIndex::getIndexStats() {
-    return &m_stats;
 }
 
 void TableIndex::printReport()

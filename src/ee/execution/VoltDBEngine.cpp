@@ -50,9 +50,6 @@
 #include <sstream>
 #include <unistd.h>
 #include <locale>
-#ifdef LINUX
-#include <malloc.h>
-#endif // LINUX
 #include "boost/shared_array.hpp"
 #include "boost/scoped_array.hpp"
 #include "boost/foreach.hpp"
@@ -129,30 +126,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
 
     // require a site id, at least, to inititalize.
     m_executorContext = NULL;
-
-#ifdef LINUX
-    // We ran into an issue where memory wasn't being returned to the
-    // operating system (and thus reducing RSS) when freeing. See
-    // ENG-891 for some info. It seems that some code we use somewhere
-    // (maybe JVM, but who knows) calls mallopt and changes some of
-    // the tuning parameters. At the risk of making that software
-    // angry, the following code resets the tunable parameters to
-    // their default values.
-
-    // Note: The parameters and default values come from looking at
-    // the glibc 2.5 source, which I is the version that shipps
-    // with redhat/centos 5. The code seems to also be effective on
-    // newer versions of glibc (tested againsts 2.12.1).
-
-    mallopt(M_MXFAST, 128);                 // DEFAULT_MXFAST
-    // note that DEFAULT_MXFAST was increased to 128 for 64-bit systems
-    // sometime between glibc 2.5 and glibc 2.12.1
-    mallopt(M_TRIM_THRESHOLD, 128 * 1024);  // DEFAULT_TRIM_THRESHOLD
-    mallopt(M_TOP_PAD, 0);                  // DEFAULT_TOP_PAD
-    mallopt(M_MMAP_THRESHOLD, 128 * 1024);  // DEFAULT_MMAP_THRESHOLD
-    mallopt(M_MMAP_MAX, 65536);             // DEFAULT_MMAP_MAX
-    mallopt(M_CHECK_ACTION, 3);             // DEFAULT_CHECK_ACTION
-#endif // LINUX
 }
 
 bool VoltDBEngine::initialize(
@@ -723,9 +696,8 @@ bool VoltDBEngine::rebuildTableCollections() {
     m_tables.clear();
     m_tablesByName.clear();
 
-    // need to re-map all the table ids / indexes
+    // need to re-map all the table ids.
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
-    getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
 
     map<string, catalog::Table*>::const_iterator it = m_database->tables().begin();
     map<string, CatalogDelegate*>::iterator cdIt = m_catalogDelegates.begin();
@@ -741,30 +713,6 @@ bool VoltDBEngine::rebuildTableCollections() {
             getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                                   catTable->relativeIndex(),
                                                   tcd->getTable()->getTableStats());
-
-            // add all of the indexes to the stats source
-            std::vector<TableIndex*> tindexes = tcd->getTable()->allIndexes();
-            for (int i = 0; i < tindexes.size(); i++) {
-                TableIndex *index = tindexes[i];
-                getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
-                                                      catTable->relativeIndex(),
-                                                      index->getIndexStats());
-            }
-
-
-            /*map<string, catalog::Index*>::const_iterator index_iterator;
-            for (index_iterator = catTable->indexes().begin();
-                 index_iterator != catTable->indexes().end(); index_iterator++) {
-
-                const catalog::Index *catalogIndex = index_iterator->second;
-                TableIndex *index = tcd->getTable()->index(catalogIndex->name());
-                printf("Looking for index named: %s\n", catalogIndex->name().c_str());
-                assert(index);
-
-                getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
-                                                      catTable->relativeIndex(),
-                                                      index->getIndexStats());
-            }*/
         }
         cdIt++;
     }
@@ -1081,23 +1029,6 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     try {
         switch (selector) {
         case STATISTICS_SELECTOR_TYPE_TABLE:
-            for (int ii = 0; ii < numLocators; ii++) {
-                CatalogId locator = static_cast<CatalogId>(locators[ii]);
-                if (m_tables.find(locator) == m_tables.end()) {
-                    char message[256];
-                    snprintf(message, 256,  "getStats() called with selector %d, and"
-                            " an invalid locator %d that does not correspond to"
-                            " a table", selector, locator);
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                  message);
-                }
-            }
-
-            resultTable = m_statsManager.getStats(
-                (StatisticsSelectorType) selector,
-                locatorIds, interval, now);
-            break;
-        case STATISTICS_SELECTOR_TYPE_INDEX:
             for (int ii = 0; ii < numLocators; ii++) {
                 CatalogId locator = static_cast<CatalogId>(locators[ii]);
                 if (m_tables.find(locator) == m_tables.end()) {

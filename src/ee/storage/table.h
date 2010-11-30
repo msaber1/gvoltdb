@@ -155,7 +155,7 @@ public:
     virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings) = 0;
 
     // ------------------------------------------------------------------
-    // TUPLES AND MEMORY USAGE
+    // TUPLES
     // ------------------------------------------------------------------
     int64_t allocatedTupleCount() const { return m_allocatedTuples; }
     int64_t activeTupleCount() const { return m_tupleCount; }
@@ -165,22 +165,6 @@ public:
     int64_t deletedTupleCount() const { return m_holeFreeTuples.size(); }
 #endif
     TableTuple& tempTuple();
-
-    int64_t allocatedTupleMemory() const
-    {
-        // XXX-IZZY change this to
-        // return m_data.size() * m_tableAllocationSize;
-        // when aweisberg's memory compaction lands on this branch.
-        return m_data.size() * m_tableAllocationTargetSize;
-    }
-
-    int64_t occupiedTupleMemory() const
-    {
-        return m_tupleCount * m_tempTuple.tupleLength();
-    }
-
-    // Only counts persistent table usage, currently
-    int64_t nonInlinedMemorySize() const { return m_nonInlinedMemorySize; }
 
     // ------------------------------------------------------------------
     // COLUMNS
@@ -320,7 +304,7 @@ protected:
     void initializeWithColumns(TupleSchema *schema, const std::string* columnNames, bool ownsTupleSchema);
     virtual void onSetColumns() {};
 
-    // TUPLES AND MEMORY USAGE
+    // TUPLES
     TableTuple m_tempTuple;
     /** not temptuple. these are for internal use. */
     TableTuple m_tmpTarget1, m_tmpTarget2;
@@ -331,7 +315,6 @@ protected:
     uint32_t m_columnCount;
     uint32_t m_tuplesPerBlock;
     uint32_t m_tupleLength;
-    int64_t m_nonInlinedMemorySize;
     // pointers to chunks of data
     std::vector<char*> m_data;
 
