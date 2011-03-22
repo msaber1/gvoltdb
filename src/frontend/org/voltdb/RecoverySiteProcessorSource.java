@@ -347,7 +347,6 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                 handleFailure(buffer);
             } finally {
                 origin.discard();
-                m_onCompletion.run();
                 closeIO();
             }
         }
