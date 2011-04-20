@@ -1,0 +1,4 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="4" sitesperhost="2" leader="volt3i" kfactor="1" />
+</deployment>
