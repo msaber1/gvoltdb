@@ -7,6 +7,8 @@ var $tabs = null;
 
 this.InitWorkspace = function()
 {
+    var autoConnect = false;
+
 	$(".sp_track").slider({ value:0, min:0, max: 205, slide: function(event,ui) {
 			$('#sidebar').width(Math.floor(250+parseInt(ui.value)));
 			$('#workspace').css("left", (5+Math.floor(250+parseInt(ui.value))) + "px");
@@ -222,12 +224,15 @@ this.InitWorkspace = function()
 				if (server.val() == '') server.val('localhost');
 				if (port.val() == '') port.val('8080');
 				tips.text('');
+                if (autoConnect)
+                {
+					VoltDB.TestConnection(server.val(), port.val(), admin.is(':checked'), user.val(), password.val(), false, function(result) {if (result == true) { updateTips("Connection successful.");VoltDB.AddConnection(server.val(), port.val(), admin.is(':checked'), user.val(), password.val(), false, MainUI.AddConnection);$('#connect-dialog').dialog("close"); } else updateTips("Unable to connect."); });
+                    autoConnect = false;
+                }
 			}
 		});
 		$('#connect-dialog').parent().find('.ui-dialog-buttonset').addClass('connect-dialog');
 		$('#connect-dialog').parent().find('.ui-dialog-buttonset').find('button:first').addClass('fl');
-		
-
 	});
 	
 	$('.sidebar .header span.connect').click(function() { MainUI.OnAddConnectionCompleted = null; $('#connect-dialog').dialog('open'); });
@@ -251,14 +256,55 @@ this.InitWorkspace = function()
 	shortcut.add("Ctrl+N", function() {$("#new-query").button().click();})
 	shortcut.add("F3", function() {$("#new-monitor").button().click();})
 	shortcut.add("F2", function() {$("#object-explorer").button().click();$("#object-explorer").button('refresh');})
-	shortcut.add("Ctrl+D", function() {$("#radio4").button().click();$("#radio4").button('refresh');})
-	shortcut.add("Ctrl+T", function() {$("#radio3").button().click();$("#radio3").button('refresh');})
+	shortcut.add("Ctrl+D", function() {$("#rf-grd").button().click();$("#rf-grd").button('refresh');})
+	shortcut.add("Ctrl+T", function() {$("#rf-fix").button().click();$("#rf-fix").button('refresh');})
 	
 	$(document).unload(function() {$('*').unbind(); });
 	$(window).resize(function(){MonitorUI.Redraw();});
 	
+    if (hasQueryParameters())
+    {
+        if (getQueryParameter('oe') == 0)
+            $('#sidebar span.close').click();
+        if (getQueryParameter('rf') != null)
+            $('#rf-' + getQueryParameter('rf')).click();
+        if (getQueryParameter('ms') != null)
+            $('#ms-' + getQueryParameter('ms')).click();
+        if (getQueryParameter('startup') != null)
+        {
+    		//$('#server').val('localhost');
+			//$('#port').val('8080');
+			//$('#user').val('');
+			//$('#password').val('');
+			//$('#admin').attr('checked','checked');
+            if (getQueryParameter('startup') == 'monitor')
+            {
+                autoConnect = true;
+                setTimeout(function() {$("#new-monitor").button().click()}, 100);
+            }
+            else if (getQueryParameter('startup') == 'query')
+            {
+                autoConnect = true;
+                setTimeout(function() {$("#new-query").button().click()}, 100);
+            }
+        }
+    }
 }
-
+function hasQueryParameters()
+{
+    return window.location.search.substring(1) != '';
+}
+function getQueryParameter(key)
+{
+    var pairs = window.location.search.substring(1).split('&');
+    for (i=0;i<pairs.length;i++)
+    {
+        pair = pairs[i].split("=");
+        if (pair[0] == key)
+            return decodeURIComponent(pair[1]);
+    }
+    return null;
+}
 function OnTabRemoved(panelid)
 {
 	if (panelid.substr(0,1) == 'm')
