@@ -401,7 +401,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
                 m_transactionQueue.shutdown();
 
-                ProcedureProfiler.flushProfile();
                 if (hsql != null) {
                     hsql.shutdown();
                 }
@@ -2141,9 +2140,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                                   currentFragResponse, params);
             }
             else {
-                // start the clock on this statement
-                ProcedureProfiler.startStatementCounter(fragmentId);
-
                 final int inputDepId = ftask.getOnlyInputDepId(frag);
 
                 /*
@@ -2167,16 +2163,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 } catch (final EEException e) {
                     hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
                     currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                    ProcedureProfiler.stopStatementCounter();
                     break;
                 } catch (final SQLException e) {
                     hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
                     currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                    ProcedureProfiler.stopStatementCounter();
                     break;
                 }
-
-                ProcedureProfiler.stopStatementCounter();
             }
         }
         return currentFragResponse;

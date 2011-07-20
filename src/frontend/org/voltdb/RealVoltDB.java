@@ -819,28 +819,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-
-            // set up profiling and tracing
-            // hack to prevent profiling on multiple machines
-            if (m_config.m_profilingLevel != ProcedureProfiler.Level.DISABLED) {
-                if (m_localSites.size() == 1) {
-                    hostLog.l7dlog(Level.INFO,
-                                   LogKeys.host_VoltDB_ProfileLevelIs.name(),
-                                   new Object[] { m_config.m_profilingLevel },
-                                   null);
-                    ProcedureProfiler.profilingLevel = m_config.m_profilingLevel;
-                }
-                else {
-                    hostLog.l7dlog(
-                                   Level.INFO,
-                                   LogKeys.host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts.name(),
-                                   null);
-                }
-            }
-
-            // if a workload tracer is specified, start her up!
-            ProcedureProfiler.initializeWorkloadTrace(catalog);
-
             // Create the client interfaces and associated dtxn initiators
             int portOffset = 0;
             for (Site site : m_catalogContext.siteTracker.getUpSites()) {
