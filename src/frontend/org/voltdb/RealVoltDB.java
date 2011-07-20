@@ -78,7 +78,6 @@ import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.Messenger;
 import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
@@ -454,10 +453,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
                 System.exit(-1);
             }
-
-            // start the dumper thread
-            if (config.listenForDumpRequests)
-                DumpManager.init();
 
             readBuildInfo();
             m_config = config;

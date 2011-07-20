@@ -179,9 +179,6 @@ public class VoltDB {
                 else if (arg.equals("intrusive")) {
                     m_profilingLevel = ProcedureProfiler.Level.INTRUSIVE;
                 }
-                else if (arg.equals("listenfordumps")) {
-                    listenForDumpRequests = true;
-                }
                 else if (arg.equals("quietadhoc"))
                 {
                     m_quietAdhoc = true;

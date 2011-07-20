@@ -22,8 +22,14 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.ByteBuffer;
-import java.util.*;
+import java.util.Deque;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -41,7 +47,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ConnectionUtil;
-import org.voltdb.debugstate.ExecutorContext;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
@@ -67,7 +72,6 @@ import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
-import org.voltdb.messaging.DebugMessage;
 import org.voltdb.messaging.FailureSiteUpdateMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -80,12 +84,10 @@ import org.voltdb.messaging.Mailbox;
 import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RecoveryMessage;
-import org.voltdb.messaging.SiteMailbox;
 import org.voltdb.messaging.Subject;
 import org.voltdb.messaging.TransactionInfoBaseMessage;
 import org.voltdb.messaging.VoltMessage;
 import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DumpManager;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.EstTime;
 import org.voltdb.utils.LogKeys;
@@ -97,7 +99,7 @@ import org.voltdb.utils.LogKeys;
  * do other things, but this is where the good stuff happens.
  */
 public class ExecutionSite
-implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProcedureConnection
+implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 {
     private VoltLogger m_txnlog;
     private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
@@ -167,10 +169,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
     public long getNextUndoToken() {
         return ++latestUndoToken;
     }
-
-    // store the id used by the DumpManager to identify this execution site
-    public final String m_dumpId;
-    public long m_currentDumpTimestamp = 0;
 
     // Each execution site manages snapshot using a SnapshotSiteProcessor
     private final SnapshotSiteProcessor m_snapshotter;
@@ -654,7 +652,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
         m_watchdog = null;
         ee = null;
         hsql = null;
-        m_dumpId = "MockExecSite";
         m_snapshotter = null;
         m_mailbox = null;
         m_transactionQueue = null;
@@ -707,9 +704,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
 
         // Should pass in the watchdog class to allow sleepy dogs..
         m_watchdog = new Watchdog(siteId, siteIndex);
-
-        m_dumpId = "ExecutionSite." + String.valueOf(getSiteId());
-        DumpManager.register(m_dumpId, this);
 
         m_systemProcedureContext = new SystemProcedureContext();
         m_mailbox = mailbox;
@@ -1273,11 +1267,6 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 assert (txnState instanceof MultiPartitionParticipantTxnState);
                 txnState.processCompleteTransactionResponse(response);
             }
-        }
-        else if (message instanceof DebugMessage) {
-            DebugMessage dmsg = (DebugMessage) message;
-            if (dmsg.shouldDump)
-                DumpManager.putDump(m_dumpId, m_currentDumpTimestamp, true, getDumpContents());
         }
         else if (message instanceof ExecutionSiteNodeFailureMessage) {
             discoverGlobalFaultData((ExecutionSiteNodeFailureMessage)message);
@@ -2293,47 +2282,5 @@ implements Runnable, DumpManager.Dumpable, SiteTransactionConnection, SiteProced
                 return false;
             }
         }
-    }
-
-
-
-    /*
-     *
-     * Dump manager interface
-     *
-     */
-
-    @Override
-    public void goDumpYourself(final long timestamp) {
-        m_currentDumpTimestamp = timestamp;
-        DebugMessage dmsg = new DebugMessage();
-        dmsg.shouldDump = true;
-        try {
-            m_mailbox.send(getSiteId(), 0, dmsg);
-        }
-        catch (org.voltdb.messaging.MessagingException e) {
-            e.printStackTrace();
-        }
-    }
-
-    /**
-     * Get the actual file contents for a dump of state reachable by
-     * this thread. Can be called unsafely or safely.
-     */
-    public ExecutorContext getDumpContents() {
-        final ExecutorContext context = new ExecutorContext();
-        context.siteId = getSiteId();
-
-        // messaging log window stored in mailbox history
-        if (m_mailbox instanceof SiteMailbox)
-            context.mailboxHistory = ((SiteMailbox) m_mailbox).getHistory();
-
-        // restricted priority queue content
-        m_transactionQueue.getDumpContents(context);
-
-        // TODO:
-        // m_transactionsById.getDumpContents(context);
-
-        return context;
     }
 }
