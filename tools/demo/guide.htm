@@ -78,7 +78,7 @@
         <hr />
 		<p>At the end of the benchmark, the call center simulator reports the contest winner (in the Terminal window), a query that takes a mere fraction of a second, despite millions of votes having been processed!</p>
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">4</td><td class="nbrtitle">Explore...</td></tr></table>
-        <p>You can open a new query in VoltDB Studio to run requests against the database even as the Voter application is running.</p>
+        <p>You can open a New Query in VoltDB Studio to run requests against the database even as the Voter application is running. Click the Execute Query button after typing in your query.</p>
         Follow live voting results:<br/>
         <pre>declare procedure Results
 exec Results</pre>
@@ -121,14 +121,14 @@ exec Results</pre>
             <li>The client runs various PUT/GET operations (12K payload).</li>
             <li>VoltDB serves as a simple high-speed data store.</li>
         </ul>
-		<p>The charts in VoltDB Studio (right side) show how many operations (transactions) per second the database is processing and how long it takes to process each operation ('Latency (ms)').</p>
+		<p>The charts in VoltDB Studio (right side) show how many operations (transactions/second) the database is processing and how long it takes to process each operation (latency in milliseconds).</p>
         <p>The obvious goal: high transaction throughput with low latency (more operations, faster!)</p>
         <hr />
 		<p>At the end of the benchmark, the client application reports performance results (in the Terminal window)</p>
 
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">4</td><td class="nbrtitle">Explore...</td></tr></table>
-        <p>You can open a New Query in VoltDB Studio to run requests against the database even as the application is running.</p>
-        Sample out store data:<br/>
+        <p>You can open a New Query in VoltDB Studio to run requests against the database even as the application is running. Click the Execute Query button after typing in your query.</p>
+        Sample stored data:<br/>
         <pre>select top 10 * from key_value;</pre>
         Get the total number of stored values:<br/>
         <pre>select count(*) from key_value;</pre>

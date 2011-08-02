@@ -97,6 +97,9 @@ SnapshotCompletionInterest {
     private final static String SNAPSHOT_ID = "/restore/snapshot_id";
     private final String zkBarrierNode;
 
+    // Transaction ID of the restore sysproc
+    private final static long RESTORE_TXNID = 1l;
+
     private final Integer m_hostId;
     private final CatalogContext m_context;
     private final TransactionInitiator m_initiator;
@@ -144,7 +147,7 @@ SnapshotCompletionInterest {
             return false;
         }
         @Override
-        public Long getMinLastSeenTxn() {
+        public Long getMaxLastSeenTxn() {
             return null;
         }
         @Override
@@ -157,7 +160,21 @@ SnapshotCompletionInterest {
         public void returnAllSegments() {}
     };
 
-    private Thread m_restoreHeartbeatThread;
+    /*
+     * A thread to keep on sending fake heartbeats until the restore is
+     * complete, or otherwise the RPQ is gonna be clogged.
+     */
+    private Thread m_restoreHeartbeatThread = new Thread(new Runnable() {
+        @Override
+        public void run() {
+            while (m_state == State.RESTORE) {
+                m_initiator.sendHeartbeat(RESTORE_TXNID + 1);
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {}
+            }
+        }
+    });
 
     private Runnable m_restorePlanner = new Runnable() {
         @Override
@@ -167,21 +184,26 @@ SnapshotCompletionInterest {
 
             enterRestore();
 
-            // Transaction ID of the restore sysproc
-            final long txnId = 1l;
-            TreeMap<Long, Snapshot> snapshots = getSnapshots();
-            Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
+            TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, SnapshotUtil.Snapshot>();
+            /*
+             * If the user wants to create a new database, don't scan the
+             * snapshots.
+             */
+            if (m_action != START_ACTION.CREATE) {
+                snapshots = getSnapshots();
+            }
 
-            final Long minLastSeenTxn = m_replayAgent.getMinLastSeenTxn();
+            final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
+            Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
             for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
                 /*
-                 * If the txn of the snapshot is before the earliest txn
+                 * If the txn of the snapshot is before the latest txn
                  * among the last seen txns across all initiators when the
                  * log starts, there is a gap in between the snapshot was
                  * taken and the beginning of the log. So the snapshot is
                  * not viable for replay.
                  */
-                if (minLastSeenTxn != null && e.getKey() < minLastSeenTxn) {
+                if (maxLastSeenTxn != null && e.getKey() < maxLastSeenTxn) {
                     continue;
                 }
 
@@ -257,7 +279,7 @@ SnapshotCompletionInterest {
             }
             LOG.debug("Gathered " + snapshotInfos.size() + " snapshot information");
 
-            sendLocalRestoreInformation(minLastSeenTxn, snapshotInfos);
+            sendLocalRestoreInformation(maxLastSeenTxn, snapshotInfos);
 
             // Negotiate with other hosts about which snapshot to restore
             String restorePath = null;
@@ -285,27 +307,12 @@ SnapshotCompletionInterest {
                 if (restorePath != null && restoreNonce != null) {
                     LOG.debug("Initiating snapshot " + restoreNonce +
                               " in " + restorePath);
-                    initSnapshotWork(txnId,
+                    initSnapshotWork(RESTORE_TXNID,
                                      Pair.of("@SnapshotRestore",
                                              new Object[] {restorePath, restoreNonce}));
                 }
             }
 
-            /*
-             * A thread to keep on sending fake heartbeats until the restore is
-             * complete, or otherwise the RPQ is gonna be clogged.
-             */
-            m_restoreHeartbeatThread = new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    while (m_state == State.RESTORE) {
-                        m_initiator.sendHeartbeat(txnId + 1);
-                        try {
-                            Thread.sleep(500);
-                        } catch (InterruptedException e) {}
-                    }
-                }
-            });
             m_restoreHeartbeatThread.start();
 
             if (!isLowestHost() || restorePath == null || restoreNonce == null) {
@@ -498,14 +505,16 @@ SnapshotCompletionInterest {
                                                START_ACTION.class,
                                                TransactionInitiator.class,
                                                CatalogContext.class,
-                                               ZooKeeper.class);
+                                               ZooKeeper.class,
+                                               long.class);
 
                 m_replayAgent =
                     (CommandLogReinitiator) constructor.newInstance(m_hostId,
                                                                     m_action,
                                                                     m_initiator,
                                                                     m_context,
-                                                                    m_zk);
+                                                                    m_zk,
+                                                                    RESTORE_TXNID + 1);
             }
         } catch (Exception e) {
             LOG.fatal("Unable to instantiate command log reinitiator", e);
@@ -597,7 +606,7 @@ SnapshotCompletionInterest {
             LOG.debug("Waiting for the initiator to send the snapshot txnid");
             try {
                 if (m_zk.exists(SNAPSHOT_ID, false) == null) {
-                    Thread.sleep(500);
+                    Thread.sleep(200);
                     continue;
                 } else {
                     byte[] data = m_zk.getData(SNAPSHOT_ID, false, null);
@@ -624,14 +633,14 @@ SnapshotCompletionInterest {
      * Send the information about the local snapshot files to the other hosts to
      * generate restore plan.
      *
-     * @param min
-     *            The minimum txnId of the last txn across all initiators in the
+     * @param max
+     *            The maximum txnId of the last txn across all initiators in the
      *            local command log.
      * @param snapshots
      *            The information of the local snapshot files.
      */
-    private void sendLocalRestoreInformation(Long min, Set<SnapshotInfo> snapshots) {
-        ByteBuffer buf = serializeRestoreInformation(min, snapshots);
+    private void sendLocalRestoreInformation(Long max, Set<SnapshotInfo> snapshots) {
+        ByteBuffer buf = serializeRestoreInformation(max, snapshots);
 
         String zkNode = RESTORE + "/" + m_hostId;
         try {
@@ -811,7 +820,7 @@ SnapshotCompletionInterest {
             }
         }
 
-        if (clStartTxnId != null && clStartTxnId > 0 &&
+        if (clStartTxnId != null && clStartTxnId != Long.MIN_VALUE &&
             snapshotFragments.size() == 0) {
             LOG.fatal("No viable snapshots to restore");
             VoltDB.crashVoltDB();
@@ -843,9 +852,9 @@ SnapshotCompletionInterest {
             // Check if there is log to replay
             boolean hasLog = buf.get() == 1;
             if (hasLog) {
-                long minTxnId = buf.getLong();
-                if (clStartTxnId == null || minTxnId > clStartTxnId) {
-                    clStartTxnId = minTxnId;
+                long maxTxnId = buf.getLong();
+                if (clStartTxnId == null || maxTxnId > clStartTxnId) {
+                    clStartTxnId = maxTxnId;
                 }
             }
 
@@ -901,15 +910,15 @@ SnapshotCompletionInterest {
     }
 
     /**
-     * @param min
+     * @param max
      * @param snapshots
      * @return
      */
-    private ByteBuffer serializeRestoreInformation(Long min, Set<SnapshotInfo> snapshots) {
+    private ByteBuffer serializeRestoreInformation(Long max, Set<SnapshotInfo> snapshots) {
         // hasLog + recover + snapshotCount
         int size = 1 + 1 + 4;
-        if (min != null) {
-            // we need to add the size of the min number to the total size
+        if (max != null) {
+            // we need to add the size of the max number to the total size
             size += 8;
         }
         for (SnapshotInfo i : snapshots) {
@@ -917,11 +926,11 @@ SnapshotCompletionInterest {
         }
 
         ByteBuffer buf = ByteBuffer.allocate(size);
-        if (min == null) {
+        if (max == null) {
             buf.put((byte) 0);
         } else {
             buf.put((byte) 1);
-            buf.putLong(min);
+            buf.putLong(max);
         }
         // 1 means recover, 0 means to create new DB
         buf.put((byte) m_action.ordinal());
@@ -1026,6 +1035,10 @@ SnapshotCompletionInterest {
             exitRestore();
             m_state = State.REPLAY;
 
+            try {
+                m_restoreHeartbeatThread.join();
+            } catch (InterruptedException e) {}
+
             /*
              * Add the interest here so that we can use the barriers in replay
              * agent to synchronize.
@@ -1036,9 +1049,6 @@ SnapshotCompletionInterest {
             m_state = State.TRUNCATE;
         } else if (m_state == State.TRUNCATE) {
             m_snapshotMonitor.removeInterest(this);
-            try {
-                m_restoreHeartbeatThread.join();
-            } catch (InterruptedException e) {}
             if (m_callback != null) {
                 m_callback.onRestoreCompletion(m_truncationSnapshot, true);
             }
@@ -1121,7 +1131,7 @@ SnapshotCompletionInterest {
         FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
         for (String path : paths) {
-            SnapshotUtil.retrieveSnapshotFiles(new File(path), snapshots, filter, 0, true);
+            SnapshotUtil.retrieveSnapshotFiles(new File(path), snapshots, filter, 0, false);
         }
 
         return snapshots;

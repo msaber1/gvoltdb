@@ -38,11 +38,12 @@ public class Results extends VoltProcedure {
     // get the results
 
     public final SQLStmt getResults = new SQLStmt("select a.contestant_name contestant_name, " +
+                                                  "       a.contestant_number contestant_number, " +
                                                   "       sum(b.num_votes) total_votes " +
                                                   "from v_votes_by_contestant_number b, " +
                                                   "     contestants a " +
                                                   "where a.contestant_number = b.contestant_number " +
-                                                  "group by a.contestant_name " +
+                                                  "group by a.contestant_name, a.contestant_number " +
                                                   "order by total_votes asc;");
 
     public VoltTable[] run() {

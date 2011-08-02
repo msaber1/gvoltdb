@@ -43,17 +43,19 @@ public class Vote extends VoltProcedure {
     public final SQLStmt checkVoter = new SQLStmt("select num_votes from v_votes_by_phone_number where phone_number = ?;");
 
     // record the vote
-    public final SQLStmt insertVote = new SQLStmt("insert into votes (phone_number, contestant_number) values (?, ?);");
+    public final SQLStmt insertVote = new SQLStmt("insert into votes (phone_number, area_code, state, contestant_number) values (?, ?, ?, ?);");
+
+    public final SQLStmt getState = new SQLStmt("SELECT state FROM area_code_state WHERE area_code = ?;");
 
     public VoltTable[] run(
             long phoneNumber,
-            byte contestantNumber,
+            int contestantNumber,
             long maxVotesPerPhoneNumber
     ) {
         boolean validVoter = false;
         boolean validContestant = false;
         int returnValue = 0;
-
+        short areaCode = (short)(phoneNumber / 10000000l);
         voltQueueSQL(checkContestant, contestantNumber);
         voltQueueSQL(checkVoter, phoneNumber);
         VoltTable resultsCheck[] = voltExecuteSQL();
@@ -72,7 +74,9 @@ public class Vote extends VoltProcedure {
         }
 
         if (validContestant && validVoter) {
-            voltQueueSQL(insertVote, phoneNumber, contestantNumber);
+            voltQueueSQL(getState, areaCode);
+            String state = voltExecuteSQL()[0].fetchRow(0).getString(0);
+            voltQueueSQL(insertVote, phoneNumber, areaCode, state, contestantNumber);
             voltExecuteSQL();
             returnValue = 0;
         } else if (!validContestant) {

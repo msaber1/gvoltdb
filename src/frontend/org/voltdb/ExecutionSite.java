@@ -529,7 +529,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
 
         // do other periodic work
-        m_snapshotter.doSnapshotWork(ee);
+        m_snapshotter.doSnapshotWork(ee, false);
         m_watchdog.pet();
 
         /*
@@ -1015,15 +1015,22 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     // Before blocking record the starvation
                     VoltMessage message = m_mailbox.recv();
                     if (message == null) {
-                        m_starvationTracker.beginStarvation();
-                        message = m_mailbox.recvBlocking(5);
-                        m_starvationTracker.endStarvation();
+                        if (m_snapshotter.doSnapshotWork(ee, true) != null) {
+                            continue;
+                        } else {
+                            m_starvationTracker.beginStarvation();
+                            message = m_mailbox.recvBlocking(5);
+                            m_starvationTracker.endStarvation();
+                        }
                     }
 
                     // do periodic work
                     tick();
                     if (message != null) {
                         handleMailboxMessage(message);
+                    } else {
+                        //idle, do snapshot work
+                        m_snapshotter.doSnapshotWork(ee, true);
                     }
                 }
                 if (currentTxnState != null) {
@@ -1288,7 +1295,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                 exportm.m_m.getPartitionId(),
                                 exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
-            m_snapshotter.doSnapshotWork(ee);
+            m_snapshotter.doSnapshotWork(ee, false);
         }
         else if (message instanceof ExecutionSiteLocalSnapshotMessage) {
             hostLog.info("Executing local snapshot. Completing any on-going snapshots.");
@@ -2022,6 +2029,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 tick();
                 if (message != null) {
                     handleMailboxMessage(message);
+                } else {
+                    //idle, do snapshot work
+                    m_snapshotter.doSnapshotWork(ee, true);
                 }
 
                 /**
