@@ -53,6 +53,8 @@ public abstract class ExportClientBase {
         = new HashMap<InetSocketAddress, ExportConnection>();
 
     protected final boolean m_useAdminPorts;
+    protected final boolean m_autodiscoverTopolgy;
+    protected boolean m_hasPrintedAutodiscoveryWarning = false;
 
     // First hash by table signature, second by partition
     private final HashMap<Long, HashMap<String, HashMap<Integer, ExportDataSink>>> m_sinks
@@ -89,7 +91,13 @@ public abstract class ExportClientBase {
 
     public ExportClientBase(boolean useAdminPorts)
     {
+        this(false, true);
+    }
+
+    public ExportClientBase(boolean useAdminPorts, boolean autodiscoverTopolgy)
+    {
         m_useAdminPorts = useAdminPorts;
+        m_autodiscoverTopolgy = autodiscoverTopolgy;
     }
 
     /**
@@ -269,15 +277,28 @@ public abstract class ExportClientBase {
 
                 // from here down, assume we connected
 
-                // successfully connected to one server, now rebuild the set of servers in the world
-                m_servers.clear();
-                m_logger.info("Discovered topology " + exportConnection.hosts.toString());
-                for (String hostname : exportConnection.hosts) {
-                    assert(hostname.contains(":"));
-                    String[] parts = hostname.split(":");
-                    int port = m_useAdminPorts ? Integer.valueOf(parts[2]) : Integer.valueOf(parts[1]);
-                    InetSocketAddress addr = new InetSocketAddress(parts[0], port);
-                    m_servers.add(addr);
+                if (m_autodiscoverTopolgy) {
+                    // successfully connected to one server, now rebuild the set of servers in the world
+                    m_servers.clear();
+                    m_logger.info("Discovered topology " + exportConnection.hosts.toString());
+                    for (String hostname : exportConnection.hosts) {
+                        assert(hostname.contains(":"));
+                        String[] parts = hostname.split(":");
+                        int port = m_useAdminPorts ? Integer.valueOf(parts[2]) : Integer.valueOf(parts[1]);
+                        InetSocketAddress addr = new InetSocketAddress(parts[0], port);
+                        m_servers.add(addr);
+                    }
+                }
+                else {
+                    // notify the user we're skipping auto-discovery
+                    m_logger.warn("Skipping topology auto-discovery per command line configuration.");
+                    // warn user once about the perils of their choice
+                    if (!m_hasPrintedAutodiscoveryWarning) {
+                        m_logger.warn("Running without auto-discovery may produce unexpected results " +
+                                "and should only be run if the implications are understood.");
+                        m_logger.warn("Please contact VoltDB support if more information is required.");
+                        m_hasPrintedAutodiscoveryWarning = true;
+                    }
                 }
 
                 // exit out of the loop

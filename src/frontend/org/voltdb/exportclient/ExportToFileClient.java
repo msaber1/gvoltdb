@@ -548,6 +548,19 @@ public class ExportToFileClient extends ExportClientBase {
     }
 
     public ExportToFileClient(char delimiter,
+            String nonce,
+            File outdir,
+            int period,
+            String dateformatString,
+            int firstfield,
+            boolean useAdminPorts,
+            boolean batched,
+            boolean withSchema) {
+        this(delimiter, nonce, outdir, period, dateformatString,
+                firstfield, useAdminPorts, batched, withSchema, true);
+    }
+
+    public ExportToFileClient(char delimiter,
                               String nonce,
                               File outdir,
                               int period,
@@ -555,8 +568,9 @@ public class ExportToFileClient extends ExportClientBase {
                               int firstfield,
                               boolean useAdminPorts,
                               boolean batched,
-                              boolean withSchema) {
-        super(useAdminPorts);
+                              boolean withSchema,
+                              boolean autodiscoverTopolgy) {
+        super(useAdminPorts, autodiscoverTopolgy);
         m_delimiter = delimiter;
         m_extension = (delimiter == ',') ? ".csv" : ".tsv";
         m_nonce = nonce;
@@ -692,6 +706,7 @@ public class ExportToFileClient extends ExportClientBase {
         String dateformatString = "yyyyMMddHHmmss";
         boolean batched = false;
         boolean withSchema = false;
+        boolean autodiscoverTopolgy = true;
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -824,6 +839,13 @@ public class ExportToFileClient extends ExportClientBase {
             else if (arg.equals("--with-schema")) {
                 withSchema = true;
             }
+            else if (arg.equals("--disable-topology-autodiscovery")) {
+                autodiscoverTopolgy = false;
+            }
+            else {
+                System.err.println("Unrecognized parameter " + arg);
+                System.exit(-1);
+            }
         }
         // Check args for validity
         if (volt_servers == null || volt_servers.length < 1) {
@@ -862,7 +884,8 @@ public class ExportToFileClient extends ExportClientBase {
                                                            firstfield,
                                                            connect == 'a',
                                                            batched,
-                                                           withSchema);
+                                                           withSchema,
+                                                           autodiscoverTopolgy);
 
         // add all of the servers specified
         for (String server : volt_servers) {
