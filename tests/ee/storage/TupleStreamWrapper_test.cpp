@@ -723,9 +723,7 @@ TEST_F(TupleStreamWrapperTest, PeriodicFlushEndOfStream)
 
 TEST_F(TupleStreamWrapperTest, JustGenerationChange)
 {
-    m_wrapper->setSignatureAndGeneration("dude", 1);
-    m_wrapper->periodicFlush(-1, 2, 2);
-
+    m_wrapper->setSignatureAndGeneration("dude", 3);
 
     // No buffer
     ASSERT_TRUE(m_topend.blocks.empty());

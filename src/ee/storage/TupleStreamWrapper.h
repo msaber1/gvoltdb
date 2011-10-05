@@ -143,6 +143,7 @@ public:
     /** previously sent block generation to detect the need for
         end of stream insertion */
     int64_t m_prevBlockGeneration;
+    bool m_firstGen;
 };
 
 }

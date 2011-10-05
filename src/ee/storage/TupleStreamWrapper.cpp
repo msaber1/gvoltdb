@@ -47,9 +47,9 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
       m_openTransactionId(0), m_openTransactionUso(0),
       m_committedTransactionId(0), m_committedUso(0),
       m_signature(""), m_generation(numeric_limits<int64_t>::min()),
-      m_prevBlockGeneration(numeric_limits<int64_t>::min())
+      m_prevBlockGeneration(numeric_limits<int64_t>::min()),
+      m_firstGen(true)
 {
-    extendBufferChain(m_defaultCapacity);
 }
 
 void
@@ -64,7 +64,6 @@ TupleStreamWrapper::setDefaultCapacity(size_t capacity)
     }
     cleanupManagedBuffers();
     m_defaultCapacity = capacity;
-    extendBufferChain(m_defaultCapacity);
 }
 
 
@@ -94,11 +93,32 @@ void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_
     assert(generation > m_generation);
     assert(signature == m_signature || m_signature == string(""));
 
-    if (generation != m_generation &&
-        m_generation != numeric_limits<int64_t>::min())
+    if (m_firstGen)
     {
-        commit(generation, generation);
+        m_generation = generation;
+        m_prevBlockGeneration = generation;
         extendBufferChain(0);
+        m_firstGen = false;
+    }
+    else if (generation != m_generation &&
+             m_generation != numeric_limits<int64_t>::min())
+    {
+        if (m_prevBlockGeneration == m_generation)
+        {
+            if (m_currBlock == NULL || m_currBlock->offset() == 0)
+            {
+                StreamBlock* temp_sb = new StreamBlock(NULL, 0, m_uso);
+                temp_sb->setGenerationId(m_generation);
+                temp_sb->setSignature(m_signature);
+                temp_sb->setEndOfStream(true);
+                m_pendingBlocks.push_back(temp_sb);
+            }
+        }
+        else
+        {
+            commit(generation, generation);
+            extendBufferChain(0);
+        }
         drainPendingBlocks();
     }
     m_signature = signature;
@@ -154,12 +174,13 @@ TupleStreamWrapper::drainPendingBlocks()
     {
         StreamBlock* block = m_pendingBlocks.front();
         //cout << "Checking block: " << block->generationId() << ", "
-        //     << block->uso() << ", " << block->offset() << endl;
+        //     << block->uso() << ", " << block->offset() << ", " << block->endOfStream() << endl;
         //cout << "Previous block generation: " << m_prevBlockGeneration << endl;
         // Check to see if we need to inject an end of stream
         // indication to Java
-        if (block->generationId() > m_prevBlockGeneration &&
-            m_prevBlockGeneration != numeric_limits<int64_t>::min())
+        //if (block->generationId() > m_prevBlockGeneration &&
+        //    m_prevBlockGeneration != numeric_limits<int64_t>::min())
+        if (block->generationId() > m_prevBlockGeneration)
         {
             StreamBlock* eos_block = new StreamBlock(NULL, 0, block->uso());
             eos_block->setGenerationId(m_prevBlockGeneration);
