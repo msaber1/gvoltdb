@@ -76,8 +76,11 @@ void TupleStreamWrapper::cleanupManagedBuffers()
 {
     StreamBlock *sb = NULL;
 
-    discardBlock(m_currBlock);
-    m_currBlock = NULL;
+    if (m_currBlock != NULL)
+    {
+        discardBlock(m_currBlock);
+        m_currBlock = NULL;
+    }
 
     while (m_pendingBlocks.empty() != true) {
         sb = m_pendingBlocks.front();
@@ -91,8 +94,6 @@ void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_
     assert(generation > m_generation);
     assert(signature == m_signature || m_signature == string(""));
 
-    //The first time through this is catalog load and m_generation
-    //will be Long.MIN.  Don't send the end of stream notice.
     if (generation != m_generation &&
         m_generation != numeric_limits<int64_t>::min())
     {
@@ -148,10 +149,13 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
 void
 TupleStreamWrapper::drainPendingBlocks()
 {
+    //cout << "PENDING BLOCKS: " << m_pendingBlocks.size() << endl;
     while (!m_pendingBlocks.empty())
     {
         StreamBlock* block = m_pendingBlocks.front();
-
+        //cout << "Checking block: " << block->generationId() << ", "
+        //     << block->uso() << ", " << block->offset() << endl;
+        //cout << "Previous block generation: " << m_prevBlockGeneration << endl;
         // Check to see if we need to inject an end of stream
         // indication to Java
         if (block->generationId() > m_prevBlockGeneration &&
@@ -237,17 +241,8 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
     }
 
     if (m_currBlock) {
-        if (m_currBlock->offset() > 0)
-        {
-            m_pendingBlocks.push_back(m_currBlock);
-            m_currBlock = NULL;
-        }
-        // fully discard empty blocks. makes valgrind/testcase
-        // conclusion easier.
-        else {
-            discardBlock(m_currBlock);
-            m_currBlock = NULL;
-        }
+        m_pendingBlocks.push_back(m_currBlock);
+        m_currBlock = NULL;
     }
 
     char *buffer = new char[m_defaultCapacity];
@@ -426,9 +421,10 @@ TupleStreamWrapper::computeOffsets(TableTuple &tuple,
 void
 TupleStreamWrapper::pushExportBlock(StreamBlock* sb)
 {
-    cout << endl << "Pushing block, generation: " << sb->generationId() << ", uso: " << sb->uso() << ", offset: " << sb->offset() << ", EOS: " << sb->endOfStream() << endl;
+    // Push the real block if it contains data.
     if (sb->offset() > 0)
     {
+        cout << endl << "Pushing block, generation: " << sb->generationId() << ", uso: " << sb->uso() << ", offset: " << sb->offset() << ", EOS: " << sb->endOfStream() << endl;
         //The block is handed off to the topend which is
         //responsible for releasing the memory associated with the
         //block data. The metadata is deleted here.
@@ -441,8 +437,10 @@ TupleStreamWrapper::pushExportBlock(StreamBlock* sb)
                              sb->endOfStream());
         delete sb;
     }
-    else
+    // Otherwise, don't bother unless we're trying to send end-of-stream
+    else if (sb->endOfStream())
     {
+        cout << endl << "Pushing block, generation: " << sb->generationId() << ", uso: " << sb->uso() << ", offset: " << sb->offset() << ", EOS: " << sb->endOfStream() << endl;
         ExecutorContext::getExecutorContext()->getTopend()->
             pushExportBuffer(sb->generationId(),
                              m_partitionId,
