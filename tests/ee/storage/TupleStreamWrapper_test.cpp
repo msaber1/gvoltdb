@@ -135,6 +135,9 @@ public:
         // excercise a smaller buffer capacity
         m_wrapper->setDefaultCapacity(BUFFER_SIZE);
 
+        // Set the initial generation (pretend to do the first catalog load)
+        m_wrapper->setSignatureAndGeneration("DUDE", 0);
+
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero
         ::memset(m_tupleMemory, 0, 8 * (COLUMN_COUNT + 1));
@@ -608,7 +611,6 @@ TEST_F(TupleStreamWrapperTest, AdvanceExportWindow)
  */
 TEST_F(TupleStreamWrapperTest, CatalogUpdateTest)
 {
-    m_wrapper->setSignatureAndGeneration("dude", 1);
     for (int i = 1; i < 10; i++)
     {
         appendTuple(i-1, i, 0);
@@ -625,7 +627,7 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateTest)
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->generationId(), 1);
+    EXPECT_EQ(results->generationId(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
 
     // now get the second
@@ -639,7 +641,6 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateTest)
 
 TEST_F(TupleStreamWrapperTest, CatalogUpdateAfterFlush)
 {
-    m_wrapper->setSignatureAndGeneration("dude", 1);
     for (int i = 1; i < 10; i++)
     {
         appendTuple(i-1, i, 0);
@@ -656,7 +657,7 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateAfterFlush)
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->generationId(), 1);
+    EXPECT_EQ(results->generationId(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
 
     // now get the second
@@ -670,7 +671,6 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateAfterFlush)
 
 TEST_F(TupleStreamWrapperTest, CatalogUpdateAfterRollback)
 {
-    m_wrapper->setSignatureAndGeneration("dude", 1);
     for (int i = 1; i < 10; i++)
     {
         appendTuple(i-1, i, 0);
@@ -691,7 +691,7 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateAfterRollback)
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
-    EXPECT_EQ(results->generationId(), 1);
+    EXPECT_EQ(results->generationId(), 0);
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 9));
 
     // now get the second
@@ -719,6 +719,19 @@ TEST_F(TupleStreamWrapperTest, PeriodicFlushEndOfStream)
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->generationId(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
+}
+
+TEST_F(TupleStreamWrapperTest, JustGenerationChange)
+{
+    m_wrapper->setSignatureAndGeneration("dude", 1);
+    m_wrapper->periodicFlush(-1, 2, 2);
+
+
+    // No buffer
+    ASSERT_TRUE(m_topend.blocks.empty());
+    ASSERT_TRUE(m_topend.receivedExportBuffer);
+    // But we should have seen some kind of end of stream indication
+    ASSERT_TRUE(m_topend.receivedEndOfStream);
 }
 
 int main() {
