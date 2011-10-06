@@ -337,20 +337,23 @@ public class ExportManager
         ExportManager instance = instance();
         ExportGeneration generation = null;
         try {
-            if ((generation = instance.m_windowDirectory.getWindow(generationId)) == null) {
-                generation = new ExportGeneration(
-                    generationId,
-                    instance.m_onGenerationDrained,
-                    instance.m_windowDirectory.m_exportOverflowDirectory);
+            synchronized(instance)
+            {
+                if ((generation = instance.m_windowDirectory.getWindow(generationId)) == null) {
+                    generation =
+                        new ExportGeneration(generationId,
+                                             instance.m_onGenerationDrained,
+                                             instance.m_windowDirectory.m_exportOverflowDirectory);
 
-                // BUG: Guess that the current catalog context is the right one.
-                // this is a false assumption - will have to fix this.
-                CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-                Connector conn = catalogContext.catalog.getClusters().get("cluster").
+                    // BUG: Guess that the current catalog context is the right one.
+                    // this is a false assumption - will have to fix this.
+                    CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+                    Connector conn = catalogContext.catalog.getClusters().get("cluster").
                     getDatabases().get("database").
                     getConnectors().get("0");
-                generation.initializeGenerationFromCatalog(catalogContext, conn, instance.m_hostId);
-                instance.m_windowDirectory.pushWindow(generationId, generation);
+                    generation.initializeGenerationFromCatalog(catalogContext, conn, instance.m_hostId);
+                    instance.m_windowDirectory.pushWindow(generationId, generation);
+                }
             }
 
             generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);
