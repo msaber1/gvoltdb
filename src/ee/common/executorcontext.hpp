@@ -68,6 +68,13 @@ public:
         m_undoQuantum = undoQuantum;
         m_txnId = txnId;
         m_lastCommittedTxnId = lastCommittedTxnId;
+        m_currentTxnTimestamp = (m_txnId >> 23) + m_epoch;
+        std::cout << "TXN ID: " << m_txnId << ", timestamp: "
+                  << m_currentTxnTimestamp << ", generationID: "
+                  << ((((m_currentTxnTimestamp / m_exportWindowSize) * m_exportWindowSize) - m_epoch) << 23) << std::endl;
+        m_currentGenerationId =
+            ((((m_currentTxnTimestamp / m_exportWindowSize) *
+               m_exportWindowSize) - m_epoch) << 23);
     }
 
     // data available via tick()
@@ -101,7 +108,7 @@ public:
 
     /** Current or most recently executed transaction id. */
     int64_t currentTxnTimestamp() {
-        return (m_txnId >> 23) + m_epoch;
+        return m_currentTxnTimestamp;
     }
 
     /** Last committed transaction known to this EE */
@@ -111,7 +118,7 @@ public:
 
     int64_t currentGenerationId()
     {
-        return (currentTxnTimestamp() / m_exportWindowSize) * m_exportWindowSize;
+        return m_currentGenerationId;
     }
 
     static ExecutorContext* getExecutorContext();
@@ -131,7 +138,9 @@ public:
 
     /** local epoch for voltdb, somtime around 2008, pulled from catalog */
     int64_t m_epoch;
+    int64_t m_currentTxnTimestamp;
     int64_t m_exportWindowSize;
+    int64_t m_currentGenerationId;
 };
 
 }
