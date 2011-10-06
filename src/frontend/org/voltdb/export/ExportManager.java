@@ -315,7 +315,7 @@ public class ExportManager
      * Create ExportDataStreams for the specified stream name.
      * streamname: generationid-partitionid-signature
      */
-    public InputHandler createExportClientStream(String streamname)
+    public InputHandler createExportStreamHandler(String streamname)
     {
         exportLog.info("Creating export data stream for " + streamname);
         long generationId = getGenerationIdFromStreamName(streamname);
@@ -337,11 +337,11 @@ public class ExportManager
             return null;
         }
 
-        return new ExportClientStream(streamname, sbq);
+        return new ExportStreamHandler(streamname, sbq);
     }
 
-    public InputHandler createExportListingService() {
-        return new ExportListingService();
+    public InputHandler createExportListingHandler() {
+        return new ExportListingHandler();
     }
 
 
