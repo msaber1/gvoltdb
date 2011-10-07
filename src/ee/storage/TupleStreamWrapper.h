@@ -100,11 +100,11 @@ public:
     size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
     void extendBufferChain(size_t minLength);
     void discardBlock(StreamBlock *sb);
-    void pushExportBlock(StreamBlock* sb);
+    void pushExportBlock(StreamBlock* sb, bool sync);
 
     /** Send committed data to the top end */
-    void commit(int64_t lastCommittedTxnId, int64_t txnId, bool sync = false);
-    void drainPendingBlocks();
+    void commit(int64_t lastCommittedTxnId, int64_t txnId);
+    void drainPendingBlocks(bool sync=false);
 
     // cached catalog values
     const CatalogId m_partitionId;

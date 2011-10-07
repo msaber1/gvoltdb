@@ -131,7 +131,8 @@ void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_
  * This is the only function that should modify m_openTransactionId,
  * m_openTransactionUso.
  */
-void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId, bool sync)
+void
+TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId)
 {
     if (currentTxnId < m_openTransactionId)
     {
@@ -167,7 +168,7 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
 }
 
 void
-TupleStreamWrapper::drainPendingBlocks()
+TupleStreamWrapper::drainPendingBlocks(bool sync)
 {
     //cout << "PENDING BLOCKS: " << m_pendingBlocks.size() << endl;
     while (!m_pendingBlocks.empty())
@@ -186,14 +187,14 @@ TupleStreamWrapper::drainPendingBlocks()
             eos_block->setGenerationId(m_prevBlockGeneration);
             eos_block->setSignature(m_signature);
             eos_block->setEndOfStream(true);
-            pushExportBlock(eos_block);
+            pushExportBlock(eos_block, false);
         }
         m_prevBlockGeneration = block->generationId();
 
         // check that the entire remainder is committed
         if (m_committedUso >= (block->uso() + block->offset()))
         {
-            pushExportBlock(block);
+            pushExportBlock(block, sync);
             m_pendingBlocks.pop_front();
         }
         else
@@ -311,8 +312,8 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
         }
 
         extendBufferChain(0);
-        commit(lastCommittedTxnId, txnId, timeInMillis < 0 ? true : false);
-        drainPendingBlocks();
+        commit(lastCommittedTxnId, txnId);
+        drainPendingBlocks(timeInMillis < 0 ? true : false);
     }
 }
 
@@ -440,7 +441,7 @@ TupleStreamWrapper::computeOffsets(TableTuple &tuple,
 }
 
 void
-TupleStreamWrapper::pushExportBlock(StreamBlock* sb)
+TupleStreamWrapper::pushExportBlock(StreamBlock* sb, bool sync)
 {
     // Push the real block if it contains data.
     if (sb->offset() > 0)
@@ -454,7 +455,7 @@ TupleStreamWrapper::pushExportBlock(StreamBlock* sb)
                              m_partitionId,
                              sb->signature(),
                              sb,
-                             false,
+                             sync,
                              sb->endOfStream());
         delete sb;
     }
@@ -467,7 +468,7 @@ TupleStreamWrapper::pushExportBlock(StreamBlock* sb)
                              m_partitionId,
                              sb->signature(),
                              NULL,
-                             false,
+                             sync,
                              sb->endOfStream());
         discardBlock(sb);
     }
