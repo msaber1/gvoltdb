@@ -25,6 +25,7 @@ package org.voltdb.export;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.TreeMap;
@@ -51,6 +52,8 @@ public class ExportTestClient extends ExportClientBase
 
     public TreeSet<Long> m_generationsSeen = new TreeSet<Long>();
 
+    public HashMap<String, ArrayDeque<Object[]>> m_tableSrcData = new HashMap<String, ArrayDeque<Object[]>>();
+
     public ExportTestClient(int nodeCount)
     {
         super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
@@ -70,6 +73,7 @@ public class ExportTestClient extends ExportClientBase
     @Override
     public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source)
     {
+        System.out.println("ExportTestClient:  saw generation: " + source.m_generation + " for source: " + source.tableName);
         m_generationsSeen.add(source.m_generation);
         String key = source.tableName + source.partitionId;
         if (m_verifiersToReserve.containsKey(source.m_generation)) {
@@ -79,8 +83,15 @@ public class ExportTestClient extends ExportClientBase
             }
         }
 
+        // Create a deque to dump expected data for this source's table into
+        if (!m_tableSrcData.containsKey(key))
+        {
+            ArrayDeque<Object[]> srcdata = new ArrayDeque<Object[]>();
+            m_tableSrcData.put(key, srcdata);
+        }
+
         // create a verifier with the 'schema'
-        ExportTestVerifier verifier = new ExportTestVerifier(source);
+        ExportTestVerifier verifier = new ExportTestVerifier(source, m_tableSrcData.get(key));
         // hash it by table name + partition ID
         m_logger.info("Creating verifier for table: " + source.tableName +
                 ", part ID: " + source.partitionId);
@@ -104,6 +115,8 @@ public class ExportTestClient extends ExportClientBase
         HashMap<String, ExportTestVerifier> verifiers = m_verifiers.get(generation);
         if (verifiers == null) {
             verifiers = new HashMap<String, ExportTestVerifier>();
+            System.out.println("Adding verifier for generation: " + generation);
+            System.out.println("\tTable: " + tableName);
             m_verifiers.put( generation, verifiers);
         }
 
@@ -111,10 +124,12 @@ public class ExportTestClient extends ExportClientBase
         if (verifier == null)
         {
             // something horribly wrong, bail
-            System.out.println("No verifier for table " + tableName + " and partition " + partition);
+            System.out.println("No verifier for table " + tableName + " and partition " + partition + " and generation: " + generation);
             System.exit(1);
         }
         verifier.addRow(data);
+        ArrayDeque<Object[]> srcdata = m_tableSrcData.get(tableName + partition);
+        srcdata.offer(data);
     }
 
     private boolean done()

@@ -37,19 +37,23 @@ class ExportTestVerifier extends ExportDecoderBase
     private int m_ackRepeats = 0;
     private final String m_tableName;
     private final int m_partitionId;
+    private long m_generation;
     private long sequenceNumber = 0;
 
-    ExportTestVerifier(AdvertisedDataSource source)
+    ExportTestVerifier(AdvertisedDataSource source, ArrayDeque<Object[]> srcdata)
     {
         super(source);
         m_tableName = source.tableName;
         m_partitionId = source.partitionId;
-        m_data = new ArrayDeque<Object[]>();
+        m_generation = source.m_generation;
+        //m_data = new ArrayDeque<Object[]>();
+        m_data = srcdata;
     }
 
     void addRow(Object[] data)
     {
-        m_data.offer(data);
+        System.out.println("Adding source data for table " + m_tableName + ", partition " + m_partitionId + ", generation " + m_generation);
+        //m_data.offer(data);
     }
 
     @Override
@@ -74,6 +78,7 @@ class ExportTestVerifier extends ExportDecoderBase
 
         // no data found - an ERROR.
         if (srcdata == null) {
+            System.out.println("Found no source data for table " + m_tableName + ", partition " + m_partitionId + ", generation " + m_generation);
             try {
                 Object[] decoded = decodeRow(rowData);
                 StringBuilder sb = new StringBuilder();
@@ -187,6 +192,11 @@ class ExportTestVerifier extends ExportDecoderBase
     {
         boolean result = (m_data.size() == 0) && (!m_rowFailed);
         if (!result) {
+            System.out.println("DOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOD!!!!");
+            System.out.println("DOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOD!!!!");
+            System.out.println("DOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOD!!!!");
+            System.out.println("DOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOD!!!!");
+            System.out.println("DOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOOD!!!!");
             System.out.println("ExportVerifier error. Table ID: " + m_tableName +
                                ", partition ID: " + m_partitionId);
             System.out.println("  Data size: " +
