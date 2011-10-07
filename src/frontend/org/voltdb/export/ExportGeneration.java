@@ -357,7 +357,6 @@ public class ExportGeneration {
         }
     }
 
-
     private ConcurrentHashMap<String, StreamBlockQueue> m_blockMap = new
         ConcurrentHashMap<String, StreamBlockQueue>();
 
@@ -371,4 +370,7 @@ public class ExportGeneration {
         m_blockMap.put(partitionId + "-" + signature, sbq);
     }
 
+    public boolean acknowledgeExportStreamBlockQueue(int partitionId, String signature) {
+            return true;
+    }
 }
