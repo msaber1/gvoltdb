@@ -107,7 +107,7 @@ public class ExportGenerationDirectory {
     }
 
     /** Initialize the directory from the on-disk contents */
-    void initializePersistedWindows(Runnable onDrained) throws IOException
+    void initializePersistedWindows() throws IOException
     {
         TreeSet<File> generationDirectories = new TreeSet<File>();
         for (File f : m_exportOverflowDirectory.listFiles()) {
@@ -122,9 +122,8 @@ public class ExportGenerationDirectory {
         for (File generationDirectory : generationDirectories) {
             ExportGeneration generation =
                 new ExportGeneration(
-                        onDrained,
-                        generationDirectory,
-                        Long.valueOf(generationDirectory.getName()));
+                        Long.valueOf(generationDirectory.getName()),
+                        generationDirectory);
             generation.initializeGenerationFromDisk();
             offer(Long.valueOf(generationDirectory.getName()), generation);
         }

@@ -22,7 +22,6 @@ import java.util.Collections;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
-import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault;
@@ -92,22 +91,6 @@ class VoltDBNodeFailureFaultHandler implements FaultHandler {
             VoltDB.crashVoltDB();
         }
         m_waitForFaultReported.release();
-
-        /*
-         * Use a new thread since this is a asynchronous (and infrequent)
-         * task and locks are being held by the fault distributor.
-         */
-        new Thread() {
-            @Override
-            public void run() {
-                // if we see an early fault (during startup), then it's ok not to
-                // notify the export manager
-                if (ExportManager.instance() == null)
-                    return;
-                //Notify the export manager the cluster topology has changed
-                ExportManager.instance().notifyOfClusterTopologyChange();
-            }
-        }.start();
     }
 
     @Override

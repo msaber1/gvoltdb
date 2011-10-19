@@ -60,15 +60,13 @@ public class ExportGeneration {
     private int m_numSources = 0;
     private final AtomicInteger m_drainedSources = new AtomicInteger(0);
 
-    private final Runnable m_onAllSourcesDrained;
-
     private final Runnable m_onSourceDrained = new Runnable() {
         @Override
         public void run() {
             int numSourcesDrained = m_drainedSources.incrementAndGet();
             exportLog.info("Drained source in generation " + m_timestamp + " with " + numSourcesDrained + " of " + m_numSources + " drained");
             if (numSourcesDrained == m_numSources) {
-                m_onAllSourcesDrained.run();
+                // TODO: Export: remove the final generation remnants.
             }
         }
     };
@@ -78,8 +76,7 @@ public class ExportGeneration {
      * @param exportOverflowDirectory
      * @throws IOException
      */
-    public ExportGeneration(long txnId, Runnable onAllSourcesDrained, File exportOverflowDirectory) throws IOException {
-        m_onAllSourcesDrained = onAllSourcesDrained;
+    public ExportGeneration(long txnId, File exportOverflowDirectory) throws IOException {
         m_timestamp = txnId;
         m_directory = new File(exportOverflowDirectory, Long.toString(txnId) );
         if (!m_directory.mkdir()) {
@@ -98,7 +95,6 @@ public class ExportGeneration {
             Runnable onAllSourcesDrained,
             File generationDirectory,
             long generationTimestamp) throws IOException {
-        m_onAllSourcesDrained = onAllSourcesDrained;
         m_timestamp = generationTimestamp;
         m_directory = generationDirectory;
         exportLog.info("Restoring export generation " + generationTimestamp);
@@ -126,7 +122,7 @@ public class ExportGeneration {
                         addDataSource(f);
                     } catch (IOException e) {
                         exportLog.fatal(e);
-                        VoltDB.crashVoltDB();
+                        VoltDB.crashLocalVoltDB("Failed to create export generation.", true, e);
                     }
                 } else {
                     //Delete ads that have no data
@@ -295,7 +291,7 @@ public class ExportGeneration {
 
             } catch (IOException e) {
                 exportLog.fatal(e);
-                VoltDB.crashVoltDB();
+                VoltDB.crashLocalVoltDB("Failed to create export data source.", true, e);
             }
         }
     }
@@ -357,7 +353,7 @@ public class ExportGeneration {
         }
     }
 
-    private ConcurrentHashMap<String, StreamBlockQueue> m_blockMap = new
+    private final ConcurrentHashMap<String, StreamBlockQueue> m_blockMap = new
         ConcurrentHashMap<String, StreamBlockQueue>();
 
     public StreamBlockQueue checkoutExportStreamBlockQueue(int partitionId, String signature)

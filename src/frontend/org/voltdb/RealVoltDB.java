@@ -214,7 +214,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public boolean recovering() { return m_recovering; }
 
-    private long m_recoveryStartTime = System.currentTimeMillis();
+    private final long m_recoveryStartTime = System.currentTimeMillis();
 
     CommandLog m_commandLog;
 
@@ -1350,8 +1350,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 initiator.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
             }
 
-            //Notify the export manager the cluster topology has changed
-            ExportManager.instance().notifyOfClusterTopologyChange();
         }
         else {
             // clean up any connections made
@@ -1397,7 +1395,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     /** Associate transaction ids to contexts */
-    private HashMap<Long, ContextTracker>m_txnIdToContextTracker =
+    private final HashMap<Long, ContextTracker>m_txnIdToContextTracker =
         new HashMap<Long, ContextTracker>();
 
     @Override
@@ -1433,9 +1431,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_catalogContext.update(currentTxnId, newCatalogBytes, diffCommands, true, deploymentCRC);
             m_txnIdToContextTracker.put(currentTxnId, new ContextTracker(m_catalogContext));
             m_catalogContext.logDebuggingInfoFromCatalog();
-
-            // 1. update the export manager.
-            ExportManager.instance().updateCatalog(m_catalogContext);
 
             // 2. update client interface (asynchronously)
             //    CI in turn updates the planner thread.

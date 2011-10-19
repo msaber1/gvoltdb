@@ -200,7 +200,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final VoltNetwork m_network;
         private volatile boolean m_running = true;
         private Thread m_thread = null;
-        private boolean m_isAdmin;
+        private final boolean m_isAdmin;
 
         /**
          * Limit on maximum number of connections. This should be set by inspecting ulimit -n, but
@@ -555,33 +555,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else if (service.startsWith("exportlisting")) {
                 handler = ExportManager.instance().createExportListingHandler();
             }
-            else {
-                String strUser = "ANONYMOUS";
-                if ((username != null) && (username.length() > 0)) strUser = username;
-
-                // If no processor can handle this service, null is returned.
-                String connectorClassName = ExportManager.instance().getConnectorForService(service);
-                if (connectorClassName == null) {
-                    //Send negative response
-                    responseBuffer.put(EXPORT_DISABLED_REJECTION).flip();
-                    socket.write(responseBuffer);
-                    socket.close();
-                    authLog.warn("Rejected user " + strUser +
-                                 " attempting to use disabled or unconfigured service " +
-                                 service + ".");
-                    return null;
-                }
-                if (!user.authorizeConnector(connectorClassName)) {
-                    //Send negative response
-                    responseBuffer.put(AUTHENTICATION_FAILURE).flip();
-                    socket.write(responseBuffer);
-                    socket.close();
-                    authLog.warn("Failure to authorize user " + strUser + " for service " + service + ".");
-                    return null;
-                }
-
-                handler = ExportManager.instance().createInputHandler(service, m_isAdmin);
-            }
 
             if (handler != null) {
                 byte buildString[] = VoltDB.instance().getBuildString().getBytes("UTF-8");
@@ -620,7 +593,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         private Connection m_connection;
         private final String m_hostname;
-        private boolean m_isAdmin;
+        private final boolean m_isAdmin;
 
         /**
          * Must use username to do a lookup via the auth system

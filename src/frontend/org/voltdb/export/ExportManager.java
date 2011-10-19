@@ -20,17 +20,13 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.CatalogContext;
-import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
-import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
-import org.voltdb.utils.LogKeys;
 
 /**
  * Bridges the connection to an OLAP system and the buffers passed
@@ -51,7 +47,6 @@ public class ExportManager
     public final ExportGenerationDirectory m_generationDirectory;
     private static ExportManager m_self;
     private final int m_hostId;
-    private String m_loaderClass;
 
     /** Thrown if the initial setup of the loader fails */
     public static class SetupException extends Exception
@@ -66,57 +61,6 @@ public class ExportManager
             return m_msg;
         }
     }
-
-    /**
-     * Connections OLAP loaders. Currently at most one loader allowed.
-     * Supporting multiple loaders mainly involves reference counting
-     * the EE data blocks and bookkeeping ACKs from processors.
-     */
-    AtomicReference<ExportDataProcessor> m_processor = new AtomicReference<ExportDataProcessor>();
-
-    /** Obtain the global ExportManager via its instance() method */
-
-    final Runnable m_onGenerationDrained = new Runnable() {
-        @Override
-        public void run() {
-            /*
-             * Do all the work to switch to a new generation in the thread for the processor
-             * of the old generation
-             */
-            ExportDataProcessor proc = m_processor.get();
-            if (proc == null) {
-                VoltDB.crashVoltDB();
-            }
-            proc.queueWork(new Runnable() {
-                @Override
-                public void run() {
-                    ExportGeneration head = m_generationDirectory.pop();
-
-                    exportLog.info("Creating connector " + m_loaderClass);
-                    ExportDataProcessor newProcessor = null;
-                    try {
-                        final Class<?> loaderClass = Class.forName(m_loaderClass);
-                        newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-                        newProcessor.addLogger(exportLog);
-                        newProcessor.setExportGeneration(m_generationDirectory.peek());
-                        newProcessor.readyForData();
-                    } catch (ClassNotFoundException e) {} catch (InstantiationException e) {
-                        exportLog.error(e);
-                    } catch (IllegalAccessException e) {
-                        exportLog.error(e);
-                    }
-
-                    m_processor.getAndSet(newProcessor).shutdown();
-                    try {
-                        exportLog.info("Finished draining generation " + head.m_timestamp);
-                        head.closeAndDelete();
-                    } catch (IOException e) {
-                        exportLog.error(e);
-                    }
-                }
-            });
-        }
-    };
 
     /**
      * Construct ExportManager using catalog.
@@ -178,102 +122,25 @@ public class ExportManager
 
         exportLog.info(String.format("Export is enabled and can overflow to %s.", cluster.getExportoverflow()));
 
-        m_loaderClass = conn.getLoaderclass();
-
         try {
-            exportLog.info("Creating connector " + m_loaderClass);
-            ExportDataProcessor newProcessor = null;
-            final Class<?> loaderClass = Class.forName(m_loaderClass);
-            newProcessor = (ExportDataProcessor)loaderClass.newInstance();
-            m_processor.set(newProcessor);
-            newProcessor.addLogger(exportLog);
 
             // add the disk generation(s) to the directory
-            m_generationDirectory.initializePersistedWindows(m_onGenerationDrained);
+            m_generationDirectory.initializePersistedWindows();
 
             // add the current in-memory generation to the directory
             File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
             ExportGeneration currentGeneration =
-                new ExportGeneration( catalogContext.m_transactionId, m_onGenerationDrained, exportOverflowDirectory);
+                new ExportGeneration( catalogContext.m_transactionId, exportOverflowDirectory);
             currentGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId);
             m_generationDirectory.offer(catalogContext.m_transactionId, currentGeneration);
-
-            // once windows are loaded, the processor can be started
-            m_processor.get().setExportGeneration(m_generationDirectory.peek());
-            m_processor.get().readyForData();
-        }
-        catch (final ClassNotFoundException e) {
-            exportLog.l7dlog( Level.ERROR, LogKeys.export_ExportManager_NoLoaderExtensions.name(), e);
-            throw new ExportManager.SetupException(e.getMessage());
         }
         catch (final Exception e) {
             throw new ExportManager.SetupException(e.getMessage());
         }
     }
 
-
-
-    public void notifyOfClusterTopologyChange() {
-        exportLog.info("Attempting to boot export client due to rejoin or other cluster topology change");
-        if (m_loaderClass == null) {
-            return;
-        }
-        ExportDataProcessor proc = m_processor.get();
-        while (proc == null) {
-            Thread.yield();
-            proc = m_processor.get();
-        }
-        proc.bootClient();
-    }
-
-    public void updateCatalog(CatalogContext catalogContext)
-    {
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        final Connector conn= db.getConnectors().get("0");
-        if (conn == null) {
-            m_loaderClass = null;
-            return;
-        }
-
-        m_loaderClass = conn.getLoaderclass();
-
-        File exportOverflowDirectory = new File(catalogContext.cluster.getExportoverflow());
-
-        ExportGeneration newGeneration = null;
-        try {
-            newGeneration = new ExportGeneration(
-                    catalogContext.m_transactionId,
-                    m_onGenerationDrained,
-                    exportOverflowDirectory);
-        } catch (IOException e1) {
-            exportLog.error(e1);
-            VoltDB.crashVoltDB();
-        }
-        newGeneration.initializeGenerationFromCatalog(catalogContext, conn, m_hostId);
-        m_generationDirectory.offer(catalogContext.m_transactionId, newGeneration);
-    }
-
     public void shutdown() {
-        ExportDataProcessor proc = m_processor.getAndSet(null);
-        if (proc != null) {
-            proc.shutdown();
-        }
-
         m_generationDirectory.closeAllGenerations();
-    }
-
-    /**
-     * Factory for input handlers
-     * @return InputHandler for new client connection
-     */
-    public InputHandler createInputHandler(String service, boolean isAdminPort)
-    {
-        ExportDataProcessor proc = m_processor.get();
-        if (proc != null) {
-            return proc.createInputHandler(service, isAdminPort);
-        }
-        return null;
     }
 
     // extract generation id from a stream name.
@@ -357,20 +224,6 @@ public class ExportManager
         }
     }
 
-
-    /**
-     * Map service strings to connector class names
-     * @param service
-     * @return classname responsible for service
-     */
-    public String getConnectorForService(String service) {
-        ExportDataProcessor proc = m_processor.get();
-        if (proc != null && proc.isConnectorForService(service)) {
-            return proc.getClass().getCanonicalName();
-        }
-        return null;
-    }
-
     public static long getQueuedExportBytes(int partitionId, String signature) {
         ExportManager instance = instance();
         try {
@@ -421,7 +274,6 @@ public class ExportManager
                 {
                     generation =
                         new ExportGeneration(generationId,
-                                             instance.m_onGenerationDrained,
                                              instance.m_generationDirectory.m_exportOverflowDirectory);
 
                     // BUG: Guess that the current catalog context is the right one.
