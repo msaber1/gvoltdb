@@ -29,16 +29,9 @@ import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
 
 /**
- * Bridges the connection to an OLAP system and the buffers passed
- * between the OLAP connection and the execution engine. Each processor
- * implements ExportDataProcessor interface. The processors are passed one
- * or more ExportDataSources. The sources map, currently, 1:1 with Export
- * enabled tables. The ExportDataSource has poll() and ack() methods that
- * processors may use to pull and acknowledge as processed, EE Export data.
- * Data passed to processors is wrapped in ExportDataBlocks which in turn
- * wrap a BBContainer.
- *
- * Processors are loaded by reflection based on configuration in project.xml.
+ * Provides interfaces to the export sub-system.
+ * The EE interacts with export via pushExportBuffer.
+ * ClientInterface uses ExportManager to create export client handlers.
  */
 public class ExportManager
 {
