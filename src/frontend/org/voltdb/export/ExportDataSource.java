@@ -24,18 +24,14 @@ import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Iterator;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
-import org.voltdb.export.processors.RawProcessor;
-import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.MessagingException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -59,12 +55,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private final int m_partitionId;
     public final ArrayList<String> m_columnNames = new ArrayList<String>();
     public final ArrayList<Integer> m_columnTypes = new ArrayList<Integer>();
-    private long m_firstUnpolledUso = 0;
     final StreamBlockQueue m_committedBuffers;
     private boolean m_endOfStream = false;
     private Runnable m_onDrain;
 
-    private int m_nullArrayLength;
+    private final int m_nullArrayLength;
 
     /**
      * Create a new data source.
@@ -261,155 +256,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
     }
 
-    private void resetPollMarker() throws IOException {
-        if (!m_committedBuffers.isEmpty()) {
-            StreamBlock oldestBlock = m_committedBuffers.peek();
-            m_firstUnpolledUso = oldestBlock.unreleasedUso();
-        }
-    }
-
-    private void releaseExportBytes(long releaseOffset, ArrayList<StreamBlock> blocksToDelete) throws IOException {
-        // if released offset is in an already-released past, just return success
-        if (!m_committedBuffers.isEmpty() && releaseOffset < m_committedBuffers.peek().uso())
-        {
-            return;
-        }
-
-        long lastUso = m_firstUnpolledUso;
-        while (!m_committedBuffers.isEmpty() &&
-                releaseOffset >= m_committedBuffers.peek().uso()) {
-            StreamBlock sb = m_committedBuffers.peek();
-            if (releaseOffset >= sb.uso() + sb.totalUso()) {
-                m_committedBuffers.pop();
-                blocksToDelete.add(sb);
-                lastUso = sb.uso() + sb.totalUso();
-            } else if (releaseOffset >= sb.uso()) {
-                sb.releaseUso(releaseOffset);
-                lastUso = releaseOffset;
-                break;
-            }
-        }
-        m_firstUnpolledUso = Math.max(m_firstUnpolledUso, lastUso);
-    }
-
-    /**
-     * Obtain next block of data from source
-     * @throws MessagingException
-     */
-    public void exportAction(RawProcessor.ExportInternalMessage m) throws MessagingException {
-        assert(m.m_m.getGeneration() == m_generation);
-        ExportProtoMessage message = m.m_m;
-        ExportProtoMessage result =
-            new ExportProtoMessage(
-                    message.getGeneration(), message.m_partitionId, message.m_signature);
-        ExportInternalMessage mbp = new ExportInternalMessage(m.m_sb, result);
-        StreamBlock first_unpolled_block = null;
-
-        //Assemble a list of blocks to delete so that they can be deleted
-        //outside of the m_committedBuffers critical section
-        ArrayList<StreamBlock> blocksToDelete = new ArrayList<StreamBlock>();
-
-        boolean hitEndOfStreamWithNoRunnable = false;
-        try {
-            //Perform all interaction with m_committedBuffers under lock
-            //because pushExportBuffer may be called from an ExecutionSite at any time
-            synchronized (m_committedBuffers) {
-                //Process the ack if any and add blocks to the delete list or move the released USO pointer
-                if (message.isAck() && message.getAckOffset() > 0) {
-                    try {
-                        releaseExportBytes(message.getAckOffset(), blocksToDelete);
-                    } catch (IOException e) {
-                        exportLog.error("Error attempting to release export bytes", e);
-                        VoltDB.crashVoltDB();
-                        return;
-                    }
-                }
-
-                if (m_endOfStream && m_committedBuffers.sizeInBytes() == 0) {
-                    if (m_onDrain != null) {
-                        try {
-                            exportLog.info("Drain of generation " + m_generation + " triggered by exportAction");
-                            m_onDrain.run();
-                        } finally {
-                            m_onDrain = null;
-                        }
-                    } else {
-                        hitEndOfStreamWithNoRunnable = true;
-                    }
-                    return;
-                }
-
-                //Reset the first unpolled uso so that blocks that have already been polled will
-                //be served up to the next connection
-                if (message.isClose()) {
-                    try {
-                        resetPollMarker();
-                    } catch (IOException e) {
-                        exportLog.error(e);
-                    }
-                }
-
-                //Inside this critical section do the work to find out
-                //what block should be returned by the next poll.
-                //Copying and sending the data will take place outside the critical section
-                try {
-                    if (message.isPoll()) {
-                        Iterator<StreamBlock> iter = m_committedBuffers.iterator();
-                        while (iter.hasNext()) {
-                            StreamBlock block = iter.next();
-                            // find the first block that has unpolled data
-                            if (m_firstUnpolledUso < block.uso() + block.totalUso()) {
-                                first_unpolled_block = block;
-                                m_firstUnpolledUso = block.uso() + block.totalUso();
-                                break;
-                            } else {
-                                blocksToDelete.add(block);
-                                iter.remove();
-                            }
-                        }
-                    }
-                } catch (RuntimeException e) {
-                    if (e.getCause() instanceof IOException) {
-                        exportLog.error("Error attempting to find unpolled export data", e);
-                        VoltDB.crashVoltDB();
-                    } else {
-                        throw e;
-                    }
-                }
-            }
-        } finally {
-            //Try hard not to leak memory
-            for (StreamBlock sb : blocksToDelete) {
-                sb.deleteContent();
-            }
-            //Cheesy hack for now where we serve info about old
-            //data sources from previous generations. In reality accessing
-            //this generation is something of an error
-            if (hitEndOfStreamWithNoRunnable) {
-                ByteBuffer buf = ByteBuffer.allocate(4);
-                buf.putInt(0).flip();
-                result.pollResponse(m_firstUnpolledUso, buf);
-                mbp.m_sb.event(result);
-            }
-        }
-
-        if (message.isPoll()) {
-            //If there are no unpolled blocks return the firstUnpolledUSO with no data
-            if (first_unpolled_block == null) {
-                ByteBuffer buf = ByteBuffer.allocate(4);
-                buf.putInt(0).flip();
-                result.pollResponse(m_firstUnpolledUso, buf);
-            } else {
-                //Otherwise return the block with the USO for the end of the block
-                //since the entire remainder of the block is being sent.
-                result.pollResponse(
-                        first_unpolled_block.uso() + first_unpolled_block.totalUso(),
-                        first_unpolled_block.unreleasedBuffer());
-            }
-            mbp.m_sb.event(result);
-        }
-    }
-
     public String getDatabase() {
         return m_database;
     }
@@ -541,7 +387,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                      */
                     exportLog.info("Syncing first unpolled USO to " + uso + " for table "
                             + m_tableName + " partition " + m_partitionId);
-                    m_firstUnpolledUso = uso;
                 }
             }
             if (sync) {

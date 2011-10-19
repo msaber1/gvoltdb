@@ -58,7 +58,6 @@ import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.NodeFailureFault;
@@ -103,7 +102,7 @@ public class ExecutionSite
 implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 {
     private VoltLogger m_txnlog;
-    private VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
+    private final VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
     private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
@@ -1312,15 +1311,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 assert(txnState instanceof MultiPartitionParticipantTxnState);
                 ((MultiPartitionParticipantTxnState)txnState).checkWorkUnits();
             }
-        }
-        else if (message instanceof RawProcessor.ExportInternalMessage) {
-            RawProcessor.ExportInternalMessage exportm =
-                (RawProcessor.ExportInternalMessage) message;
-            ee.exportAction(exportm.m_m.isSync(),
-                                exportm.m_m.getAckOffset(),
-                                0,
-                                exportm.m_m.getPartitionId(),
-                                exportm.m_m.getSignature());
         } else if (message instanceof PotentialSnapshotWorkMessage) {
             m_snapshotter.doSnapshotWork(ee, false);
         }
