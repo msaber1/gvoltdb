@@ -189,13 +189,21 @@ public class ExportGeneration {
         exportLog.info("Creating ExportDataSource for " + adFile + " table " + source.getTableName() +
                 " signature " + source.getSignature() + " partition id " + source.getPartitionId() +
                 " bytes " + source.sizeInBytes());
-        HashMap<String, ExportDataSource> dataSourcesForPartition =
-            m_dataSourcesByPartition.get(source.getPartitionId());
-        if (dataSourcesForPartition == null) {
-            dataSourcesForPartition = new HashMap<String, ExportDataSource>();
-            m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
+        if (source.sizeInBytes() == 0)
+        {
+            source.closeAndDelete();
+            m_numSources--;
         }
-        dataSourcesForPartition.put( source.getSignature(), source);
+        else
+        {
+            HashMap<String, ExportDataSource> dataSourcesForPartition =
+                m_dataSourcesByPartition.get(source.getPartitionId());
+            if (dataSourcesForPartition == null) {
+                dataSourcesForPartition = new HashMap<String, ExportDataSource>();
+                m_dataSourcesByPartition.put(source.getPartitionId(), dataSourcesForPartition);
+            }
+            dataSourcesForPartition.put( source.getSignature(), source);
+        }
     }
 
     /*
@@ -281,6 +289,7 @@ public class ExportGeneration {
     }
 
     public void closeAndDelete() throws IOException {
+        exportLog.debug("Closing and deleting generation: " + m_timestamp);
         for (HashMap<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : map.values()) {
                 source.closeAndDelete();
@@ -290,6 +299,7 @@ public class ExportGeneration {
     }
 
     public void truncateExportToTxnId(long txnId) {
+        exportLog.debug("Truncating generation: " + m_timestamp + " at txnID: " + txnId);
         for (HashMap<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : dataSources.values()) {
                 source.truncateExportToTxnId(txnId);
@@ -298,6 +308,7 @@ public class ExportGeneration {
     }
 
     public void close() {
+        exportLog.debug("Closing generation: " + m_timestamp);
         for (HashMap<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : sources.values()) {
                 source.close();
