@@ -69,9 +69,6 @@ public:
         m_txnId = txnId;
         m_lastCommittedTxnId = lastCommittedTxnId;
         m_currentTxnTimestamp = (m_txnId >> 23) + m_epoch;
-        std::cout << "TXN ID: " << m_txnId << ", timestamp: "
-                  << m_currentTxnTimestamp << ", generationID: "
-                  << ((((m_currentTxnTimestamp / m_exportWindowSize) * m_exportWindowSize) - m_epoch) << 23) << std::endl;
         m_currentGenerationId =
             ((((m_currentTxnTimestamp / m_exportWindowSize) *
                m_exportWindowSize) - m_epoch) << 23);
