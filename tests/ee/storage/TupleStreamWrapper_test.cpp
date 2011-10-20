@@ -55,6 +55,7 @@ const int COLUMN_COUNT = 5;
 const int MAGIC_TUPLE_SIZE = 94;
 // 1k buffer
 const int BUFFER_SIZE = 1024;
+const string TABLE_NAME = "dude";
 
 class DummyTopend : public Topend {
 public:
@@ -72,7 +73,7 @@ public:
     void crashVoltDB(voltdb::FatalException e) {
     }
 
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) {
+    int64_t getQueuedExportBytes(int32_t partitionId, string signature) {
         int64_t bytes = 0;
         for (int ii = 0; ii < blocks.size(); ii++) {
             bytes += blocks[ii]->rawLength();
@@ -80,16 +81,15 @@ public:
         return bytes;
     }
 
-    virtual void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, StreamBlock *block, bool sync, bool endOfStream) {
-        if (sync) {
-            return;
-        }
+    virtual void pushExportBuffer(int64_t generation, int32_t partitionId,
+                                  string signature, StreamBlock *block,
+                                  bool sync, bool endOfStream)
+    {
         partitionIds.push(partitionId);
         signatures.push(signature);
         if (block != NULL)
         {
             blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
-            data.push_back(shared_ptr<char>(block->rawPtr()));
         }
         receivedExportBuffer = true;
         if (!receivedEndOfStream)
@@ -100,9 +100,8 @@ public:
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
     queue<int32_t> partitionIds;
-    queue<std::string> signatures;
+    queue<string> signatures;
     deque<shared_ptr<StreamBlock> > blocks;
-    vector<shared_ptr<char> > data;
     bool receivedExportBuffer;
     bool receivedEndOfStream;
 };
@@ -115,9 +114,9 @@ public:
         srand(0);
 
         // set up the schema used to fill the new buffer
-        std::vector<ValueType> columnTypes;
-        std::vector<int32_t> columnLengths;
-        std::vector<bool> columnAllowNull;
+        vector<ValueType> columnTypes;
+        vector<int32_t> columnLengths;
+        vector<bool> columnAllowNull;
         for (int i = 0; i < COLUMN_COUNT; i++) {
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
@@ -136,7 +135,7 @@ public:
         m_wrapper->setDefaultCapacity(BUFFER_SIZE);
 
         // Set the initial generation (pretend to do the first catalog load)
-        m_wrapper->setSignatureAndGeneration("DUDE", 0);
+        m_wrapper->setSignatureAndGeneration(TABLE_NAME, 0);
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero
@@ -617,7 +616,7 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateTest)
     }
     appendTuple(10, 11, 0);
     ASSERT_FALSE(m_topend.receivedEndOfStream);
-    m_wrapper->setSignatureAndGeneration("dude", 12);
+    m_wrapper->setSignatureAndGeneration(TABLE_NAME, 12);
     appendTuple(12, 13, 10);
     m_wrapper->periodicFlush(-1, 13, 13);
     ASSERT_TRUE(m_topend.receivedEndOfStream);
@@ -647,7 +646,7 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateAfterFlush)
     }
     m_wrapper->periodicFlush(-1, 10, 10);
     ASSERT_FALSE(m_topend.receivedEndOfStream);
-    m_wrapper->setSignatureAndGeneration("dude", 12);
+    m_wrapper->setSignatureAndGeneration(TABLE_NAME, 12);
     appendTuple(12, 13, 10);
     m_wrapper->periodicFlush(-1, 13, 13);
     ASSERT_TRUE(m_topend.receivedEndOfStream);
@@ -681,7 +680,7 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateAfterRollback)
     // This should trip a new buffer despite getting rolled back.
     m_wrapper->rollbackTo(mark);
     // Then, we should end up with THIS as our generation ID
-    m_wrapper->setSignatureAndGeneration("dude", 12);
+    m_wrapper->setSignatureAndGeneration(TABLE_NAME, 12);
     appendTuple(12, 13, 10);
     m_wrapper->periodicFlush(-1, 13, 13);
     ASSERT_TRUE(m_topend.receivedEndOfStream);
@@ -723,7 +722,7 @@ TEST_F(TupleStreamWrapperTest, PeriodicFlushEndOfStream)
 
 TEST_F(TupleStreamWrapperTest, JustGenerationChange)
 {
-    m_wrapper->setSignatureAndGeneration("dude", 3);
+    m_wrapper->setSignatureAndGeneration(TABLE_NAME, 3);
 
     // No buffer
     ASSERT_TRUE(m_topend.blocks.empty());
