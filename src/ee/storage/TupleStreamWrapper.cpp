@@ -73,14 +73,13 @@ TupleStreamWrapper::setDefaultCapacity(size_t capacity)
  */
 void TupleStreamWrapper::cleanupManagedBuffers()
 {
-    StreamBlock *sb = NULL;
-
     if (m_currBlock != NULL)
     {
         discardBlock(m_currBlock);
         m_currBlock = NULL;
     }
 
+    StreamBlock *sb = NULL;
     while (m_pendingBlocks.empty() != true) {
         sb = m_pendingBlocks.front();
         m_pendingBlocks.pop_front();
@@ -174,13 +173,14 @@ TupleStreamWrapper::drainPendingBlocks(bool sync)
     while (!m_pendingBlocks.empty())
     {
         StreamBlock* block = m_pendingBlocks.front();
-        //cout << "Checking block: " << block->generationId() << ", "
-        //     << block->uso() << ", " << block->offset() << ", " << block->endOfStream() << endl;
+        // cout << "Checking block: " << block
+        //      << ", generation: " << block->generationId()
+        //      << ", uso: " << block->uso()
+        //      << ", offset: " << block->offset()
+        //      << ", EOS: " << block->endOfStream() << endl;
         //cout << "Previous block generation: " << m_prevBlockGeneration << endl;
         // Check to see if we need to inject an end of stream
         // indication to Java
-        //if (block->generationId() > m_prevBlockGeneration &&
-        //    m_prevBlockGeneration != numeric_limits<int64_t>::min())
         if (block->generationId() > m_prevBlockGeneration)
         {
             StreamBlock* eos_block = new StreamBlock(NULL, 0, block->uso());
@@ -199,6 +199,13 @@ TupleStreamWrapper::drainPendingBlocks(bool sync)
         }
         else
         {
+            cout << "Unclear what to do with block: " << block
+                 << ", generation: " << block->generationId()
+                 << ", uso: " << block->uso()
+                 << ", offset: " << block->offset()
+                 << ", end of stream: " << block->endOfStream()
+                 << ", committed USO: " << m_committedUso
+                 << endl;
             break;
         }
     }
@@ -246,8 +253,9 @@ void TupleStreamWrapper::rollbackTo(size_t mark)
  * Correctly release and delete a managed buffer that won't
  * be handed off
  */
-void TupleStreamWrapper::discardBlock(StreamBlock *sb) {
-    delete [] sb->rawPtr();
+void TupleStreamWrapper::discardBlock(StreamBlock *sb)
+{
+    delete[] sb->rawPtr();
     delete sb;
 }
 
@@ -446,7 +454,7 @@ TupleStreamWrapper::pushExportBlock(StreamBlock* sb, bool sync)
     // Push the real block if it contains data.
     if (sb->offset() > 0)
     {
-        cout << endl << "Pushing block, generation: " << sb->generationId() << ", uso: " << sb->uso() << ", offset: " << sb->offset() << ", EOS: " << sb->endOfStream() << endl;
+        cout << endl << "Pushing block: " << sb << ", generation: " << sb->generationId() << ", uso: " << sb->uso() << ", offset: " << sb->offset() << ", EOS: " << sb->endOfStream() << endl;
         //The block is handed off to the topend which is
         //responsible for releasing the memory associated with the
         //block data. The metadata is deleted here.
@@ -462,7 +470,7 @@ TupleStreamWrapper::pushExportBlock(StreamBlock* sb, bool sync)
     // Otherwise, don't bother unless we're trying to send end-of-stream
     else if (sb->endOfStream())
     {
-        cout << endl << "Pushing block, generation: " << sb->generationId() << ", uso: " << sb->uso() << ", offset: " << sb->offset() << ", EOS: " << sb->endOfStream() << endl;
+        cout << endl << "Pushing block: " << sb << ", generation: " << sb->generationId() << ", uso: " << sb->uso() << ", offset: " << sb->offset() << ", EOS: " << sb->endOfStream() << endl;
         ExecutorContext::getExecutorContext()->getTopend()->
             pushExportBuffer(sb->generationId(),
                              m_partitionId,
@@ -470,6 +478,12 @@ TupleStreamWrapper::pushExportBlock(StreamBlock* sb, bool sync)
                              NULL,
                              sync,
                              sb->endOfStream());
+        discardBlock(sb);
+    }
+    else
+    {
+        // This is an empty block with nothing to tell Java.  Just get
+        // rid of it.
         discardBlock(sb);
     }
 }

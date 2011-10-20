@@ -55,7 +55,6 @@ const int COLUMN_COUNT = 5;
 const int MAGIC_TUPLE_SIZE = 94;
 // 1k buffer
 const int BUFFER_SIZE = 1024;
-const string TABLE_NAME = "dude";
 
 class DummyTopend : public Topend {
 public:
@@ -90,6 +89,7 @@ public:
         if (block != NULL)
         {
             blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
+            data.push_back(shared_ptr<char>(block->rawPtr()));
         }
         receivedExportBuffer = true;
         if (!receivedEndOfStream)
@@ -102,6 +102,7 @@ public:
     queue<int32_t> partitionIds;
     queue<string> signatures;
     deque<shared_ptr<StreamBlock> > blocks;
+    vector<shared_ptr<char> > data;
     bool receivedExportBuffer;
     bool receivedEndOfStream;
 };
@@ -135,7 +136,7 @@ public:
         m_wrapper->setDefaultCapacity(BUFFER_SIZE);
 
         // Set the initial generation (pretend to do the first catalog load)
-        m_wrapper->setSignatureAndGeneration(TABLE_NAME, 0);
+        m_wrapper->setSignatureAndGeneration("dude", 0);
 
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero
@@ -616,7 +617,7 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateTest)
     }
     appendTuple(10, 11, 0);
     ASSERT_FALSE(m_topend.receivedEndOfStream);
-    m_wrapper->setSignatureAndGeneration(TABLE_NAME, 12);
+    m_wrapper->setSignatureAndGeneration("dude", 12);
     appendTuple(12, 13, 10);
     m_wrapper->periodicFlush(-1, 13, 13);
     ASSERT_TRUE(m_topend.receivedEndOfStream);
@@ -646,7 +647,7 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateAfterFlush)
     }
     m_wrapper->periodicFlush(-1, 10, 10);
     ASSERT_FALSE(m_topend.receivedEndOfStream);
-    m_wrapper->setSignatureAndGeneration(TABLE_NAME, 12);
+    m_wrapper->setSignatureAndGeneration("dude", 12);
     appendTuple(12, 13, 10);
     m_wrapper->periodicFlush(-1, 13, 13);
     ASSERT_TRUE(m_topend.receivedEndOfStream);
@@ -680,7 +681,7 @@ TEST_F(TupleStreamWrapperTest, CatalogUpdateAfterRollback)
     // This should trip a new buffer despite getting rolled back.
     m_wrapper->rollbackTo(mark);
     // Then, we should end up with THIS as our generation ID
-    m_wrapper->setSignatureAndGeneration(TABLE_NAME, 12);
+    m_wrapper->setSignatureAndGeneration("dude", 12);
     appendTuple(12, 13, 10);
     m_wrapper->periodicFlush(-1, 13, 13);
     ASSERT_TRUE(m_topend.receivedEndOfStream);
@@ -715,6 +716,7 @@ TEST_F(TupleStreamWrapperTest, PeriodicFlushEndOfStream)
     // And we should have seen some kind of end of stream indication
     ASSERT_TRUE(m_topend.receivedEndOfStream);
     shared_ptr<StreamBlock> results = m_topend.blocks.front();
+    m_topend.blocks.pop_front();
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->generationId(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
@@ -722,7 +724,7 @@ TEST_F(TupleStreamWrapperTest, PeriodicFlushEndOfStream)
 
 TEST_F(TupleStreamWrapperTest, JustGenerationChange)
 {
-    m_wrapper->setSignatureAndGeneration(TABLE_NAME, 3);
+    m_wrapper->setSignatureAndGeneration("dude", 3);
 
     // No buffer
     ASSERT_TRUE(m_topend.blocks.empty());
