@@ -62,8 +62,11 @@ class MockTopend : public Topend {
         }
         partitionIds.push(partitionId);
         signatures.push(signature);
-        blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
-        data.push_back(shared_ptr<char>(block->rawPtr()));
+        if (block != NULL)
+        {
+            blocks.push_back(shared_ptr<StreamBlock>(new StreamBlock(block)));
+            data.push_back(shared_ptr<char>(block->rawPtr()));
+        }
         receivedExportBuffer = true;
     }
 
