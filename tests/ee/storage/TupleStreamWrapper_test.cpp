@@ -142,7 +142,8 @@ public:
                                          true);
 
         // allocate a new buffer and wrap it
-        m_wrapper = new TupleStreamWrapper(1, 1, COLUMN_COUNT, m_columnNames);
+        m_wrapper = new TupleStreamWrapper(1, 1);
+        m_wrapper->setColumnNames(COLUMN_COUNT, m_columnNames);
 
         // excercise a smaller buffer capacity
         m_wrapper->setDefaultCapacity(BUFFER_SIZE);

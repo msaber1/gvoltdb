@@ -20,11 +20,9 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.CatalogContext;
-import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Connector;
@@ -32,7 +30,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.network.InputHandler;
-import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -324,6 +321,7 @@ public class ExportManager
             long generationId,
             int partitionId,
             String signature,
+            String[] columnNames,
             long uso,
             long txnId,
             long bufferPtr,
@@ -334,12 +332,21 @@ public class ExportManager
         // The EE sends the right export generation id. If this is the
         // first time the generation has been seen, make a new one.
 
+        System.out.println("DOOOOD!");
+        exportLog.info("pushExportBuffer: gen: " + generationId + ", sig: " + signature + ", uso: " + uso + ", endOfStream: " + endOfStream);
+        for (int i = 0; i < columnNames.length; i++)
+        {
+            System.out.println("Column: " + i + ", name: " + columnNames[i]);
+        }
+
         ExportManager instance = instance();
         ExportGeneration generation = null;
         try {
+            exportLog.info("Looked up generation: " + generationId + ", found: " + instance.m_windowDirectory.getWindow(generationId));
             synchronized(instance)
             {
-                if ((generation = instance.m_windowDirectory.getWindow(generationId)) == null) {
+                if ((generation = instance.m_windowDirectory.getWindow(generationId)) == null)
+                {
                     generation =
                         new ExportGeneration(generationId,
                                              instance.m_onGenerationDrained,
@@ -359,7 +366,7 @@ public class ExportManager
             generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
-            exportLog.error(e);
+            exportLog.error("Failure to push export buffer for generation: " + generationId + ", partition: " + partitionId, e);
         }
     }
 

@@ -40,9 +40,7 @@ const int METADATA_COL_CNT = 6;
 const int MAX_BUFFER_AGE = 4000;
 
 TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
-                                       CatalogId siteId,
-                                       int columnCount,
-                                       const string* columnNames)
+                                       CatalogId siteId)
     : m_partitionId(partitionId), m_siteId(siteId),
       m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
@@ -52,10 +50,6 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
       m_prevBlockGeneration(numeric_limits<int64_t>::min()),
       m_firstGen(true)
 {
-    for (int i = 0; i < columnCount; i++)
-    {
-        m_columnNames.push_back(&columnNames[i]);
-    }
 }
 
 void
@@ -72,7 +66,14 @@ TupleStreamWrapper::setDefaultCapacity(size_t capacity)
     m_defaultCapacity = capacity;
 }
 
-
+void
+TupleStreamWrapper::setColumnNames(int columnCount, const string* columnNames)
+{
+    for (int i = 0; i < columnCount; i++)
+    {
+        m_columnNames.push_back(&columnNames[i]);
+    }
+}
 
 /*
  * Essentially, shutdown.

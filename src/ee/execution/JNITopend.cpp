@@ -24,8 +24,7 @@
 #include "storage/table.h"
 
 using namespace std;
-
-namespace voltdb{
+using namespace voltdb;
 
 // Create an instance of this class on the stack to release all local
 // references created during its lifetime.
@@ -78,7 +77,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     if (jniClass == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(jniClass != 0);
-        throw std::exception();
+        throw exception();
     }
 
     m_fallbackToEEAllocatedBufferMID =
@@ -89,14 +88,14 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     if (m_fallbackToEEAllocatedBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_fallbackToEEAllocatedBufferMID != 0);
-        throw std::exception();
+        throw exception();
     }
 
     m_nextDependencyMID = m_jniEnv->GetMethodID(jniClass, "nextDependencyAsBytes", "(I)[B");
     if (m_nextDependencyMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_nextDependencyMID != 0);
-        throw std::exception();
+        throw exception();
     }
 
     m_crashVoltDBMID =
@@ -107,31 +106,31 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     if (m_crashVoltDBMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_crashVoltDBMID != NULL);
-        throw std::exception();
+        throw exception();
     }
 
     m_exportManagerClass = m_jniEnv->FindClass("org/voltdb/export/ExportManager");
     if (m_exportManagerClass == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_exportManagerClass != NULL);
-        throw std::exception();
+        throw exception();
     }
 
     m_exportManagerClass = static_cast<jclass>(m_jniEnv->NewGlobalRef(m_exportManagerClass));
     if (m_exportManagerClass == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_exportManagerClass != NULL);
-        throw std::exception();
+        throw exception();
     }
 
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(JILjava/lang/String;JJJLjava/nio/ByteBuffer;ZZ)V");
+            "(JILjava/lang/String;[Ljava/lang/String;JJJLjava/nio/ByteBuffer;ZZ)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
-        throw std::exception();
+        throw exception();
     }
 
     m_getQueuedExportBytesMID = m_jniEnv->GetStaticMethodID(
@@ -141,7 +140,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     if (m_getQueuedExportBytesMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_getQueuedExportBytesMID != NULL);
-        throw std::exception();
+        throw exception();
     }
 
     if (m_nextDependencyMID == 0 ||
@@ -151,7 +150,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         m_exportManagerClass == 0 ||
         m_fallbackToEEAllocatedBufferMID == 0)
     {
-        throw std::exception();
+        throw exception();
     }
 }
 
@@ -160,29 +159,29 @@ void JNITopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 1);
     if (jni_frame.checkResult() < 0) {
         VOLT_ERROR("Unable to load dependency: jni frame error.");
-        throw std::exception();
+        throw exception();
     }
 
     jobject jbuffer = m_jniEnv->NewDirectByteBuffer(buffer, length);
     if (jbuffer == NULL) {
         m_jniEnv->ExceptionDescribe();
-        throw std::exception();
+        throw exception();
     }
 
     m_jniEnv->CallVoidMethod(m_javaExecutionEngine, m_fallbackToEEAllocatedBufferMID, jbuffer);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
-        throw std::exception();
+        throw exception();
     }
 }
 
-int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, Table* destination) {
+int JNITopend::loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination) {
     VOLT_DEBUG("iterating java dependency for id %d", dependencyId);
 
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
     if (jni_frame.checkResult() < 0) {
         VOLT_ERROR("Unable to load dependency: jni frame error.");
-        throw std::exception();
+        throw exception();
     }
 
     jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine,
@@ -217,17 +216,17 @@ void JNITopend::crashVoltDB(FatalException e) {
                     static_cast<int32_t>(e.m_traces.size()) + 4);
     if (jni_frame.checkResult() < 0) {
         VOLT_ERROR("Unable to load dependency: jni frame error.");
-        throw std::exception();
+        throw exception();
     }
     jstring jReason = m_jniEnv->NewStringUTF(e.m_reason.c_str());
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
-        throw std::exception();
+        throw exception();
     }
     jstring jFilename = m_jniEnv->NewStringUTF(e.m_filename);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
-        throw std::exception();
+        throw exception();
     }
     jobjectArray jTracesArray =
             m_jniEnv->NewObjectArray(
@@ -236,7 +235,7 @@ void JNITopend::crashVoltDB(FatalException e) {
                     NULL);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
-        throw std::exception();
+        throw exception();
     }
     for (int ii = 0; ii < e.m_traces.size(); ii++) {
         jstring traceString = m_jniEnv->NewStringUTF(e.m_traces[ii].c_str());
@@ -249,7 +248,7 @@ void JNITopend::crashVoltDB(FatalException e) {
             jTracesArray,
             jFilename,
             static_cast<int32_t>(e.m_lineno));
-    throw std::exception();
+    throw exception();
 }
 
 JNITopend::~JNITopend() {
@@ -274,21 +273,47 @@ void JNITopend::pushExportBuffer(
         vector<const string*> columnNames,
         StreamBlock *block,
         bool sync,
-        bool endOfStream) {
+        bool endOfStream)
+{
+    cout << "COLUMNNAMES LENGTH: " << columnNames.size() << endl;
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
+    jclass stringCls = m_jniEnv->FindClass("java/lang/String");
+    if (stringCls == NULL)
+    {
+        m_jniEnv->ExceptionDescribe();
+        throw exception();
+    }
+    jobjectArray colNames =
+        m_jniEnv->NewObjectArray(static_cast<jsize>(columnNames.size()),
+                                 stringCls,
+                                 m_jniEnv->NewStringUTF(""));
+    if (colNames == NULL)
+    {
+        m_jniEnv->ExceptionDescribe();
+        throw exception();
+    }
+
+    for (int i = 0; i < columnNames.size(); i++)
+    {
+        m_jniEnv->
+            SetObjectArrayElement(colNames, i,
+                                  m_jniEnv->NewStringUTF((*columnNames[i]).c_str()));
+    }
+
     if (block != NULL) {
         jobject buffer = m_jniEnv->NewDirectByteBuffer( block->rawPtr(), block->rawLength());
         if (buffer == NULL) {
             m_jniEnv->ExceptionDescribe();
-            throw std::exception();
+            throw exception();
         }
-        //std::cout << "Block is length " << block->rawLength() << std::endl;
+        //cout << "Block is length " << block->rawLength() << endl;
         m_jniEnv->CallStaticVoidMethod(
                 m_exportManagerClass,
                 m_pushExportBufferMID,
                 exportGeneration,
                 partitionId,
                 signatureString,
+                colNames,
                 block->uso(),
                 block->generationId(),
                 reinterpret_cast<jlong>(block->rawPtr()),
@@ -297,15 +322,16 @@ void JNITopend::pushExportBuffer(
                 endOfStream ? JNI_TRUE : JNI_FALSE);
         m_jniEnv->DeleteLocalRef(buffer);
     } else {
-        //std::cout << "Block is null" << std::endl;
+        //cout << "Block is null" << endl;
         m_jniEnv->CallStaticVoidMethod(
                         m_exportManagerClass,
                         m_pushExportBufferMID,
                         exportGeneration,
                         partitionId,
                         signatureString,
+                        colNames,
                         static_cast<int64_t>(0),
-                        std::numeric_limits<int64_t>::min(),
+                        numeric_limits<int64_t>::min(),
                         NULL,
                         NULL,
                         sync ? JNI_TRUE : JNI_FALSE,
@@ -314,7 +340,11 @@ void JNITopend::pushExportBuffer(
     m_jniEnv->DeleteLocalRef(signatureString);
     if (m_jniEnv->ExceptionCheck()) {
         m_jniEnv->ExceptionDescribe();
-        throw std::exception();
+        throw exception();
     }
-}
+    m_jniEnv->DeleteLocalRef(colNames);
+    if (m_jniEnv->ExceptionCheck()) {
+        m_jniEnv->ExceptionDescribe();
+        throw exception();
+    }
 }

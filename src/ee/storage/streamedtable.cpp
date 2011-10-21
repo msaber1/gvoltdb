@@ -31,9 +31,7 @@ StreamedTable::StreamedTable(ExecutorContext *ctx, bool exportEnabled)
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
         m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId,
-                                           columnCount(),
-                                           columnNames());
+                                           m_executorContext->m_siteId);
     }
 }
 
@@ -51,10 +49,18 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
     return st;
 }
 
-
 StreamedTable::~StreamedTable()
 {
     delete m_wrapper;
+}
+
+void
+StreamedTable::onSetColumns()
+{
+    if (m_wrapper)
+    {
+        m_wrapper->setColumnNames(columnCount(), columnNames());
+    }
 }
 
 TableIterator& StreamedTable::iterator() {

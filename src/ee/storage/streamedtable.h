@@ -50,6 +50,8 @@ class StreamedTable : public Table {
 
     // virtual Table functions
     // Return a table iterator BY VALUE
+    virtual void onSetColumns();
+
     virtual TableIterator& iterator();
     virtual TableIterator* makeIterator();
 

@@ -42,12 +42,13 @@ class TupleStreamWrapper
 public:
     enum Type { INSERT, DELETE };
 
-    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId,
-                       int columnCount, const std::string* columnNames);
+    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId);
 
     ~TupleStreamWrapper() {
         cleanupManagedBuffers();
     }
+
+    void setColumnNames(int columnCount, const std::string* columnNames);
 
     /**
      * Drop and release all claimed buffers. Intended for use at
