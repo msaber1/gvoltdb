@@ -27,18 +27,23 @@
 #include "common/Topend.h"
 #include <deque>
 #include <cassert>
+#include <string>
+#include <vector>
+
 namespace voltdb {
 
 class Topend;
-//If you change this constant here change it in Java in the StreamBlockQueue where
-//it is used to calculate the number of bytes queued
-const int EL_BUFFER_SIZE = /* 1024; */ 2 * 1024 * 1024;
+//If you change this constant here change it in Java in the
+//StreamBlockQueue where it is used to calculate the number of bytes queued
+const int EL_BUFFER_SIZE = 2 * 1024 * 1024;
 
-class TupleStreamWrapper {
+class TupleStreamWrapper
+{
 public:
     enum Type { INSERT, DELETE };
 
-    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId);
+    TupleStreamWrapper(CatalogId partitionId, CatalogId siteId,
+                       int columnCount, const std::string* columnNames);
 
     ~TupleStreamWrapper() {
         cleanupManagedBuffers();
@@ -65,11 +70,14 @@ public:
     }
 
     /** Set the total number of bytes used (for rejoin/recover) */
+    // XXX-IZZY THIS WILL BE PURGED WHEN TXN_ID WINDOWS WORK
     void setBytesUsed(size_t count) {
         assert(m_uso == 0);
+        std::vector<const std::string*> columnNames;
         StreamBlock *sb = new StreamBlock(new char[1], 0, count);
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                                m_generation, m_partitionId, m_signature, sb, false, false);
+        ExecutorContext::getExecutorContext()->getTopend()->
+            pushExportBuffer(m_generation, m_partitionId, m_signature,
+                             columnNames, sb, false, false);
         delete [] sb->rawPtr();
         delete sb;
         m_uso = count;
@@ -139,6 +147,7 @@ public:
 
     std::string m_signature;
     int64_t m_generation;
+    std::vector<const std::string*> m_columnNames;
 
     /** previously sent block generation to detect the need for
         end of stream insertion */

@@ -56,7 +56,10 @@ class MockTopend : public Topend {
     MockTopend() {
     }
 
-    void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, voltdb::StreamBlock* block, bool sync, bool endOfStream) {
+    void pushExportBuffer(int64_t generation, int32_t partitionId,
+                          string signature, vector<const string*> columnNames,
+                          StreamBlock* block, bool sync, bool endOfStream)
+    {
         if (sync) {
             return;
         }

@@ -21,6 +21,7 @@
 #include "common/executorcontext.hpp"
 #include "tableiterator.h"
 
+using namespace std;
 using namespace voltdb;
 
 StreamedTable::StreamedTable(ExecutorContext *ctx, bool exportEnabled)
@@ -30,7 +31,9 @@ StreamedTable::StreamedTable(ExecutorContext *ctx, bool exportEnabled)
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
         m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId);
+                                           m_executorContext->m_siteId,
+                                           columnCount(),
+                                           columnNames());
     }
 }
 
@@ -153,7 +156,7 @@ void StreamedTable::flushOldTuples(int64_t timeInMillis)
 /**
  * Inform the tuple stream wrapper of the table's delegate id
  */
-void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t generation) {
+void StreamedTable::setSignatureAndGeneration(string signature, int64_t generation) {
     if (m_wrapper) {
         m_wrapper->setSignatureAndGeneration(signature, generation);
     }

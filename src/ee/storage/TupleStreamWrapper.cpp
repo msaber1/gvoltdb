@@ -40,7 +40,9 @@ const int METADATA_COL_CNT = 6;
 const int MAX_BUFFER_AGE = 4000;
 
 TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
-                                       CatalogId siteId)
+                                       CatalogId siteId,
+                                       int columnCount,
+                                       const string* columnNames)
     : m_partitionId(partitionId), m_siteId(siteId),
       m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
@@ -50,6 +52,10 @@ TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
       m_prevBlockGeneration(numeric_limits<int64_t>::min()),
       m_firstGen(true)
 {
+    for (int i = 0; i < columnCount; i++)
+    {
+        m_columnNames.push_back(&columnNames[i]);
+    }
 }
 
 void
@@ -462,6 +468,7 @@ TupleStreamWrapper::pushExportBlock(StreamBlock* sb, bool sync)
             pushExportBuffer(sb->generationId(),
                              m_partitionId,
                              sb->signature(),
+                             m_columnNames,
                              sb,
                              sync,
                              sb->endOfStream());
@@ -475,6 +482,7 @@ TupleStreamWrapper::pushExportBlock(StreamBlock* sb, bool sync)
             pushExportBuffer(sb->generationId(),
                              m_partitionId,
                              sb->signature(),
+                             m_columnNames,
                              NULL,
                              sync,
                              sb->endOfStream());

@@ -81,7 +81,9 @@ public:
     }
 
     virtual void pushExportBuffer(int64_t generation, int32_t partitionId,
-                                  string signature, StreamBlock *block,
+                                  string signature,
+                                  vector<const string*> columnNames,
+                                  StreamBlock *block,
                                   bool sync, bool endOfStream)
     {
         partitionIds.push(partitionId);
@@ -96,6 +98,10 @@ public:
         {
             receivedEndOfStream = endOfStream;
         }
+        for (int i = 0; i < columnNames.size(); i++)
+        {
+            m_columnNames.push_back(columnNames[i]);
+        }
     }
 
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
@@ -103,6 +109,7 @@ public:
     queue<string> signatures;
     deque<shared_ptr<StreamBlock> > blocks;
     vector<shared_ptr<char> > data;
+    vector<const string*> m_columnNames;
     bool receivedExportBuffer;
     bool receivedEndOfStream;
 };
@@ -118,6 +125,11 @@ public:
         vector<ValueType> columnTypes;
         vector<int32_t> columnLengths;
         vector<bool> columnAllowNull;
+        m_columnNames[0] = "COLUMN0";
+        m_columnNames[1] = "COLUMN1";
+        m_columnNames[2] = "COLUMN2";
+        m_columnNames[3] = "COLUMN3";
+        m_columnNames[4] = "COLUMN4";
         for (int i = 0; i < COLUMN_COUNT; i++) {
             columnTypes.push_back(VALUE_TYPE_INTEGER);
             columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
@@ -130,7 +142,7 @@ public:
                                          true);
 
         // allocate a new buffer and wrap it
-        m_wrapper = new TupleStreamWrapper(1, 1);
+        m_wrapper = new TupleStreamWrapper(1, 1, COLUMN_COUNT, m_columnNames);
 
         // excercise a smaller buffer capacity
         m_wrapper->setDefaultCapacity(BUFFER_SIZE);
@@ -178,6 +190,7 @@ protected:
     TableTuple* m_tuple;
     DummyTopend m_topend;
     scoped_ptr<ExecutorContext> m_context;
+    string m_columnNames[COLUMN_COUNT];
 };
 
 // Several of these cases were move to TestExportDataSource in Java
@@ -258,6 +271,12 @@ TEST_F(TupleStreamWrapperTest, DoOneTuple)
     EXPECT_EQ(results->uso(), 0);
     EXPECT_EQ(results->generationId(), 0);
     EXPECT_EQ(results->offset(), MAGIC_TUPLE_SIZE);
+    // Check the column names for good measure
+    EXPECT_EQ(m_topend.m_columnNames.size(), COLUMN_COUNT);
+    for (int i = 0; i < m_topend.m_columnNames.size(); i++)
+    {
+        EXPECT_EQ(*m_topend.m_columnNames[i], m_columnNames[i]);
+    }
 }
 
 /**

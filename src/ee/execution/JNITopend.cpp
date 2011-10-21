@@ -271,6 +271,7 @@ void JNITopend::pushExportBuffer(
         int64_t exportGeneration,
         int32_t partitionId,
         string signature,
+        vector<const string*> columnNames,
         StreamBlock *block,
         bool sync,
         bool endOfStream) {
