@@ -334,10 +334,6 @@ public class ExportManager
 
         System.out.println("DOOOOD!");
         exportLog.info("pushExportBuffer: gen: " + generationId + ", sig: " + signature + ", uso: " + uso + ", endOfStream: " + endOfStream);
-        for (int i = 0; i < columnNames.length; i++)
-        {
-            System.out.println("Column: " + i + ", name: " + columnNames[i]);
-        }
 
         ExportManager instance = instance();
         ExportGeneration generation = null;
