@@ -35,6 +35,7 @@ public:
             int64_t exportGeneration,
             int32_t partitionId,
             std::string signature,
+            std::vector<const std::string*> columnNames,
             StreamBlock *block,
             bool sync,
             bool endOfStream);
