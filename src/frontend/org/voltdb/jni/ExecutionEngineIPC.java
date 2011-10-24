@@ -324,10 +324,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
                     long exportGeneration = header.getLong();
                     int partitionId = header.getInt();
+                    // XXX-IZZY ADD ME
+                    int siteId = 0;
                     int signatureLength = header.getInt();
                     byte signatureBytes[] = new byte[signatureLength];
                     header.get(signatureBytes);
                     String signature = new String(signatureBytes, "UTF-8");
+                    // XXX-IZZY FIX ME TO BE REAL DESERIALIZATION
+                    String[] columnNames = new String[5];
                     long uso = header.getLong();
                     long txn_id = header.getLong();
                     boolean sync = header.get() == 1 ? true : false;
@@ -344,9 +348,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     ExportManager.pushExportBuffer(
                             exportGeneration,
                             partitionId,
+                            siteId,
                             signature,
+                            columnNames,
                             uso,
-                            txn_id,
                             0,
                             length == 0 ? null : exportBuffer,
                             sync,
