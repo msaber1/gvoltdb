@@ -5,7 +5,7 @@ import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
-import java.util.concurrent.LinkedBlockingQueue;
+import java.util.Set;
 
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.export.ExportProtoMessage;
@@ -15,20 +15,20 @@ import org.voltdb.logging.VoltLogger;
 class ExportClientListingConnection implements Runnable {
     static final VoltLogger LOG = new VoltLogger("ExportClient");
     final InetSocketAddress m_server;
-    final LinkedBlockingQueue<Object[]> m_results;
+    final Set<Object[]> m_results;
     final String m_ackedAdvertisement;
     final long m_ackedBytes;
 
     /** Create a connection to read the advertisement listing */
     public ExportClientListingConnection(InetSocketAddress server,
-        LinkedBlockingQueue<Object[]> results)
+        Set<Object[]> results)
     {
         this(server, results, null, 0L);
     }
 
     /** Create a connection to ack an advertisement and read the current listing */
     public ExportClientListingConnection(InetSocketAddress server,
-        LinkedBlockingQueue<Object[]> results,
+        Set<Object[]> results,
         String ackedAdvertisement,
         long ackedByteCount)
     {

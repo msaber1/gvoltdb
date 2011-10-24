@@ -1,12 +1,15 @@
 package org.voltdb.exportclient;
 
 import java.net.InetSocketAddress;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.TimeUnit;
 
 import org.voltdb.VoltDB;
 import org.voltdb.logging.VoltLogger;
@@ -20,9 +23,23 @@ public class ExportClient {
     // logging target for all export client log4j output
     static final VoltLogger LOG = new VoltLogger("ExportClient");
 
+    // sleep time between advertisement polls when empty.
+    private static final long QUIET_POLL_INTERVAL = 5000;
+
+    // orders advertisements by the advertisement string.
+    private static class AdveristementComparator implements Comparator<Object[]> {
+        @Override
+        public int compare(Object[] o1, Object[] o2) {
+            String genId1 = (String)o1[1];
+            String genId2 = (String)o2[1];
+            return genId1.compareTo(genId2);
+        }
+    }
+
     // unserviced advertisements (InetSocketAddress, String) pairs
-    private final LinkedBlockingQueue<Object[]> m_advertisements =
-        new LinkedBlockingQueue<Object[]>();
+    Set<Object[]> m_advertisements =
+            Collections.synchronizedSet(new TreeSet<Object[]>(new AdveristementComparator()));
+
 
     // servers, configured and discovered
     private final List<InetSocketAddress> m_servers =
@@ -65,8 +82,14 @@ public class ExportClient {
             }
 
             while (true) {
-                Object[] pair = m_advertisements.poll(30, TimeUnit.SECONDS);
+                Object[] pair = null;
+                Iterator<Object[]> it = m_advertisements.iterator();
+                if (it.hasNext()) {
+                    pair = it.next();
+                }
                 if (pair == null) {
+                    // block for some period of time - don't spam the server.
+                    Thread.sleep(QUIET_POLL_INTERVAL);
                     for (InetSocketAddress s : m_servers) {
                         m_workerPool.execute(new ExportClientListingConnection(s, m_advertisements));
                     }
