@@ -22,11 +22,12 @@
 
 #include <stdexcept>
 
-namespace voltdb {
+using namespace std;
+using namespace voltdb;
 
 IPCTopend::IPCTopend(VoltDBIPC *vdbipc) : m_vdbipc(vdbipc) {}
 
-int IPCTopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool, Table* destination) {
+int IPCTopend::loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination) {
     VOLT_DEBUG("iterating java dependency for id %d\n", dependencyId);
     size_t dependencySz;
     char* buf = m_vdbipc->retrieveDependency(dependencyId, &dependencySz);
@@ -52,18 +53,19 @@ void IPCTopend::crashVoltDB(FatalException e) {
     m_vdbipc->crashVoltDB(e);
 }
 
-int64_t IPCTopend::getQueuedExportBytes(int32_t partitionId, std::string signature) {
+int64_t IPCTopend::getQueuedExportBytes(int32_t partitionId, string signature) {
     return m_vdbipc->getQueuedExportBytes( partitionId, signature);
 }
 
 void IPCTopend::pushExportBuffer(
         int64_t exportGeneration,
         int32_t partitionId,
-        std::string signature,
+        int32_t siteId,
+        string signature,
+        vector<const string*> columnNames,
         StreamBlock *block,
         bool sync,
         bool endOfStream) {
+    // XXX-IZZY push new stuff into the ipc call.
     m_vdbipc->pushExportBuffer(exportGeneration, partitionId, signature, block, sync, endOfStream);
 }
-}
-
