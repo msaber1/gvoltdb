@@ -126,7 +126,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     m_pushExportBufferMID = m_jniEnv->GetStaticMethodID(
             m_exportManagerClass,
             "pushExportBuffer",
-            "(JILjava/lang/String;[Ljava/lang/String;JJJLjava/nio/ByteBuffer;ZZ)V");
+            "(JIILjava/lang/String;[Ljava/lang/String;JJLjava/nio/ByteBuffer;ZZ)V");
     if (m_pushExportBufferMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_pushExportBufferMID != NULL);
@@ -269,6 +269,7 @@ int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
 void JNITopend::pushExportBuffer(
         int64_t exportGeneration,
         int32_t partitionId,
+        int32_t siteId,
         string signature,
         vector<const string*> columnNames,
         StreamBlock *block,
@@ -312,10 +313,10 @@ void JNITopend::pushExportBuffer(
                 m_pushExportBufferMID,
                 exportGeneration,
                 partitionId,
+                siteId,
                 signatureString,
                 colNames,
                 block->uso(),
-                block->generationId(),
                 reinterpret_cast<jlong>(block->rawPtr()),
                 buffer,
                 sync ? JNI_TRUE : JNI_FALSE,
@@ -328,10 +329,10 @@ void JNITopend::pushExportBuffer(
                         m_pushExportBufferMID,
                         exportGeneration,
                         partitionId,
+                        siteId,
                         signatureString,
                         colNames,
                         static_cast<int64_t>(0),
-                        numeric_limits<int64_t>::min(),
                         NULL,
                         NULL,
                         sync ? JNI_TRUE : JNI_FALSE,

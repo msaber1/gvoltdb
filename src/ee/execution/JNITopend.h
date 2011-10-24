@@ -36,6 +36,7 @@ public:
     void pushExportBuffer(
             int64_t exportGeneration,
             int32_t partitionId,
+            int32_t siteId,
             std::string signature,
             std::vector<const std::string*> columnNames,
             StreamBlock *block,

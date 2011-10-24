@@ -468,6 +468,7 @@ TupleStreamWrapper::pushExportBlock(StreamBlock* sb, bool sync)
         ExecutorContext::getExecutorContext()->getTopend()->
             pushExportBuffer(sb->generationId(),
                              m_partitionId,
+                             m_siteId,
                              sb->signature(),
                              m_columnNames,
                              sb,
@@ -482,6 +483,7 @@ TupleStreamWrapper::pushExportBlock(StreamBlock* sb, bool sync)
         ExecutorContext::getExecutorContext()->getTopend()->
             pushExportBuffer(sb->generationId(),
                              m_partitionId,
+                             m_siteId,
                              sb->signature(),
                              m_columnNames,
                              NULL,

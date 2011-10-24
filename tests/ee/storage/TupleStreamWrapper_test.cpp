@@ -81,7 +81,7 @@ public:
     }
 
     virtual void pushExportBuffer(int64_t generation, int32_t partitionId,
-                                  string signature,
+                                  int32_t siteId, string signature,
                                   vector<const string*> columnNames,
                                   StreamBlock *block,
                                   bool sync, bool endOfStream)
