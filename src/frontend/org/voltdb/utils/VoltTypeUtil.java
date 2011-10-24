@@ -269,6 +269,7 @@ public abstract class VoltTypeUtil {
     public static String getSignatureForTable(String name, ArrayList<VoltType> schema) {
         StringBuilder sb = new StringBuilder();
         sb.append(name);
+        sb.append("!");
         for (VoltType t : schema) {
             sb.append(t.getSignatureChar());
         }
