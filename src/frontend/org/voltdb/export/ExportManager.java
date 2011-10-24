@@ -353,11 +353,6 @@ public class ExportManager
 
                     // BUG: Guess that the current catalog context is the right one.
                     // this is a false assumption - will have to fix this.
-                    CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
-                    Connector conn = catalogContext.catalog.getClusters().get("cluster").
-                    getDatabases().get("database").
-                    getConnectors().get("0");
-                    //generation.initializeGenerationFromCatalog(catalogContext, conn, instance.m_hostId);
                     instance.m_windowDirectory.pushWindow(generationId, generation);
                 }
                 generation.addDataSource(signature, partitionId, siteId, columnNames);
