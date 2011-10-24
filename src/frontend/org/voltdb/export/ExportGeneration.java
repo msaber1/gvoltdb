@@ -206,6 +206,42 @@ public class ExportGeneration {
         }
     }
 
+    void addDataSource(String signature, int partitionId, int siteId, String[] columnNames)
+    {
+        String tableName = signature.split("!")[0];
+        /*
+         * IOException can occur if there is a problem
+         * with the persistent aspects of the datasource storage
+         */
+        try {
+            HashMap<String, ExportDataSource> dataSourcesForPartition = m_dataSourcesByPartition.get(partitionId);
+            if (dataSourcesForPartition == null) {
+                dataSourcesForPartition = new HashMap<String, ExportDataSource>();
+                m_dataSourcesByPartition.put(partitionId, dataSourcesForPartition);
+            }
+            ExportDataSource exportDataSource = dataSourcesForPartition.get(signature);
+            if (exportDataSource == null)
+            {
+                exportDataSource = new ExportDataSource(
+                                                        m_onSourceDrained,
+                                                        "database",
+                                                        partitionId,
+                                                        siteId,
+                                                        signature,
+                                                        m_timestamp,
+                                                        columnNames,
+                                                        m_directory.getPath());
+                m_numSources++;
+                exportLog.info("Creating ExportDataSource for table " + tableName +
+                               " signature " + signature + " partition id " + partitionId);
+                dataSourcesForPartition.put(signature, exportDataSource);
+            }
+        } catch (IOException e) {
+            exportLog.fatal(e);
+            VoltDB.crashVoltDB();
+        }
+    }
+
     /*
      * An unfortunate test only method for supplying a mock source
      */
@@ -266,7 +302,6 @@ public class ExportGeneration {
         //            System.out.println("Have partition " + i);
         //        }
         assert(m_dataSourcesByPartition.containsKey(partitionId));
-        assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
         HashMap<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
 
         if (sources == null) {
@@ -282,6 +317,7 @@ public class ExportGeneration {
                     " signature " + signature + " generation " +
                     m_timestamp + " the export data is being discarded");
             DBBPool.deleteCharArrayMemory(bufferPtr);
+            assert(m_dataSourcesByPartition.get(partitionId).containsKey(signature));
             return;
         }
 

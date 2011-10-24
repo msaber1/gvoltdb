@@ -320,10 +320,10 @@ public class ExportManager
     public static void pushExportBuffer(
             long generationId,
             int partitionId,
+            int siteId,
             String signature,
             String[] columnNames,
             long uso,
-            long txnId,
             long bufferPtr,
             ByteBuffer buffer,
             boolean sync,
@@ -339,6 +339,9 @@ public class ExportManager
         ExportGeneration generation = null;
         try {
             exportLog.info("Looked up generation: " + generationId + ", found: " + instance.m_windowDirectory.getWindow(generationId));
+            // XXX-IZZY todo:
+            // -- synchronize this less
+            // -- make the existence check and new source addition smarter
             synchronized(instance)
             {
                 if ((generation = instance.m_windowDirectory.getWindow(generationId)) == null)
@@ -354,9 +357,11 @@ public class ExportManager
                     Connector conn = catalogContext.catalog.getClusters().get("cluster").
                     getDatabases().get("database").
                     getConnectors().get("0");
-                    generation.initializeGenerationFromCatalog(catalogContext, conn, instance.m_hostId);
+                    //generation.initializeGenerationFromCatalog(catalogContext, conn, instance.m_hostId);
                     instance.m_windowDirectory.pushWindow(generationId, generation);
                 }
+                generation.addDataSource(signature, partitionId, siteId, columnNames);
+
             }
 
             generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);

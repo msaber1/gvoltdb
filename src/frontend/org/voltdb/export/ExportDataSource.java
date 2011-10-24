@@ -128,7 +128,87 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
 
         File adFile = new VoltFile(overflowPath, nonce + ".ad");
-        exportLog.info("Creating ad for " + nonce);
+        exportLog.info("Creating ad for " + nonce + ", generation: " + generation);
+        assert(!adFile.exists());
+        FastSerializer fs = new FastSerializer();
+        fs.writeInt(m_siteId);
+        fs.writeString(m_database);
+        writeAdvertisementTo(fs);
+        FileOutputStream fos = new FileOutputStream(adFile);
+        fos.write(fs.getBytes());
+        fos.getFD().sync();
+        fos.close();
+
+        // compute the number of bytes necessary to hold one bit per
+        // schema column
+        m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
+    }
+
+    /**
+     * Create a new data source.
+     * @param db
+     * @param tableName
+     * @param isReplicated
+     * @param partitionId
+     * @param siteId
+     * @param tableId
+     * @param catalogMap
+     */
+    public ExportDataSource(
+            Runnable onDrain,
+            String db,
+            int partitionId, int siteId, String signature, long generation,
+            String[] columnNames,
+            String overflowPath) throws IOException
+    {
+        m_generation = generation;
+        m_onDrain = onDrain;
+        m_database = db;
+        m_tableName = signature.split("!")[0];
+
+        String types = signature.split("!")[1];
+
+        String nonce = signature + "_" + siteId + "_" + partitionId;
+
+        m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
+
+        /*
+         * This is not the catalog relativeIndex(). This ID incorporates
+         * a catalog version and a table id so that it is constant across
+         * catalog updates that add or drop tables.
+         */
+        m_signature = signature;
+        m_partitionId = partitionId;
+        m_siteId = siteId;
+
+        // Add the Export meta-data columns to the schema followed by the
+        // catalog columns for this table.
+        m_columnNames.add("VOLT_TRANSACTION_ID");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+
+        m_columnNames.add("VOLT_EXPORT_TIMESTAMP");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+
+        m_columnNames.add("VOLT_EXPORT_SEQUENCE_NUMBER");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+
+        m_columnNames.add("VOLT_PARTITION_ID");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+
+        m_columnNames.add("VOLT_SITE_ID");
+        m_columnTypes.add(((int)VoltType.BIGINT.getValue()));
+
+        m_columnNames.add("VOLT_EXPORT_OPERATION");
+        m_columnTypes.add(((int)VoltType.TINYINT.getValue()));
+
+        for (int i = 0; i < columnNames.length; i++)
+        {
+            m_columnNames.add(columnNames[i]);
+            m_columnTypes.add((int)VoltType.typeFromSignature(types.charAt(i)).getValue());
+        }
+
+        File adFile = new VoltFile(overflowPath, nonce + ".ad");
+        exportLog.info("Creating ad for " + nonce + ", generation: " + generation);
         assert(!adFile.exists());
         FastSerializer fs = new FastSerializer();
         fs.writeInt(m_siteId);
@@ -248,6 +328,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (m_endOfStream && m_committedBuffers.sizeInBytes() == 0) {
                     if (m_onDrain != null) {
                         try {
+                            exportLog.info("Drain of generation " + m_generation + " triggered by exportAction");
                             m_onDrain.run();
                         } finally {
                             m_onDrain = null;
@@ -426,6 +507,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 if (m_committedBuffers.sizeInBytes() == 0) {
                     exportLog.info("Pushed EOS buffer with 0 bytes remaining");
                     try {
+                        exportLog.info("Drain of generation " + m_generation + " triggered by pushExportBuffer");
                         m_onDrain.run();
                     } finally {
                         m_onDrain = null;
@@ -475,6 +557,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     }
 
     public void closeAndDelete() throws IOException {
+        exportLog.info("Closing and deleting data source, generation: " + m_generation + ", table: " + m_tableName + ", partition: " + m_partitionId);
         m_committedBuffers.closeAndDelete();
     }
 
@@ -485,9 +568,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     public void truncateExportToTxnId(long txnId) {
         try {
             synchronized (m_committedBuffers) {
+                if (m_committedBuffers.isEmpty())
+                {
+                    exportLog.info("truncateExportToTxnId: generation " + m_generation + " for table " + m_tableName + ", partition " + m_partitionId + " started empty");
+                }
                 m_committedBuffers.truncateToTxnId(txnId, m_nullArrayLength);
                 if (m_committedBuffers.isEmpty() && m_endOfStream) {
                     try {
+                        exportLog.info("Drain of generation " + m_generation + " for table " + m_tableName + ", partition " + m_partitionId + " triggered by truncateExportToTxnId");
                         m_onDrain.run();
                     } finally {
                         m_onDrain = null;
