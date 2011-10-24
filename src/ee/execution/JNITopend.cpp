@@ -276,7 +276,6 @@ void JNITopend::pushExportBuffer(
         bool sync,
         bool endOfStream)
 {
-    cout << "COLUMNNAMES LENGTH: " << columnNames.size() << endl;
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
     jclass stringCls = m_jniEnv->FindClass("java/lang/String");
     if (stringCls == NULL)
