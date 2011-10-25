@@ -17,14 +17,18 @@ class ExportClientStreamConnection implements Runnable {
     private final String m_advertisement;
     private final InetSocketAddress m_server;
     private final CompletionEvent m_onCompletion;
+    private final ExportClientProcessor m_processor;
 
-    public ExportClientStreamConnection(InetSocketAddress server,
-        String nextAdvertisement,
-        CompletionEvent onCompletion)
+    public ExportClientStreamConnection(
+            InetSocketAddress server,
+            String nextAdvertisement,
+            CompletionEvent onCompletion,
+            ExportClientProcessor processor)
     {
         m_advertisement = nextAdvertisement;
         m_server = server;
         m_onCompletion = onCompletion;
+        m_processor = processor;
     }
 
     @Override
@@ -32,9 +36,8 @@ class ExportClientStreamConnection implements Runnable {
     {
         BufferedInputStream reader;
         SocketChannel socket = null;
+        long bytesRead = 0;
         long totalBytes = 0;
-        int bytesRead = 0;
-        long lastLogged = 0;
 
         LOG.info("Retrieving data for advertisement: " + m_advertisement);
 
@@ -48,25 +51,19 @@ class ExportClientStreamConnection implements Runnable {
             socket = (SocketChannel) cxndata[0];
             socket.configureBlocking(true);
             reader = new BufferedInputStream(socket.socket().getInputStream());
-            ByteBuffer buf = ByteBuffer.allocate(1024 * 1024 * 2);
             do {
+                ByteBuffer buf = m_processor.emptyBuffer();
                 bytesRead = reader.read(buf.array());
                 buf.flip();
-                totalBytes += bytesRead;
+                totalBytes += buf.limit();
                 if (LOG.isTraceEnabled()) {
-                    LOG.trace("Advertisement " + m_advertisement +
-                        " read " + bytesRead +
-                        " bytes. Total read:"+ totalBytes/(1024*1024) + " MB");
+                    LOG.trace("Advertisement " + m_advertisement + " read " + bytesRead);
                 }
-                else if (totalBytes > lastLogged + (1024*1024*5)) {
-                    lastLogged = totalBytes;
-                    LOG.info("Advertisement " + m_advertisement +
-                        " read " + totalBytes + ". Last read: " + bytesRead);
-                }
+                m_processor.offer(m_advertisement, buf);
             } while(bytesRead > 0);
 
             // trigger the ack for this advertisement
-            m_onCompletion.run(totalBytes);
+            m_onCompletion.setProcessedByteCount(totalBytes);
         }
         catch (IOException e) {
             LOG.error(e);
