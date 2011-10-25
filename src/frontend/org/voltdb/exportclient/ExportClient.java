@@ -15,7 +15,6 @@ import java.util.concurrent.Executors;
 import org.voltdb.VoltDB;
 import org.voltdb.logging.VoltLogger;
 
-
 /**
  * Pull and ack export data from a VoltDB cluster.
  */

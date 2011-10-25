@@ -99,11 +99,6 @@ public class ExportToFileClient extends ExportClientBase {
 
     protected final Object m_batchLock = new Object();
 
-    /**
-    *
-    */
-    public void notifyRollIsComplete(File[] files) {}
-
     class PeriodicExportContext {
         final File m_dirContainingFiles;
         final Map<FileHandle, CSVWriter> m_writers = new TreeMap<FileHandle, CSVWriter>();

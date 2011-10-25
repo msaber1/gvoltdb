@@ -17,6 +17,7 @@
 
 package org.voltdb.exportclient;
 
+import java.io.File;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
@@ -409,6 +410,7 @@ public abstract class ExportClientBase {
     protected void startWorkHook() {}
     protected void endWorkHook() {}
     protected void extraShutdownHookWork() {}
+    protected void notifyRollIsComplete(File[] files) {}
 
     /**
      * Perform one iteration of Export Client work.
