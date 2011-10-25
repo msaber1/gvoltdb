@@ -35,7 +35,6 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.TreeMap;
 
-import org.apache.commons.lang3.StringEscapeUtils;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
@@ -59,30 +58,22 @@ import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 public class ExportToFileClient extends ExportClientBase {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
-    // These get put in from of the batch folders
-    // active means the folder is being written to
+    // Folders/files being written are named with this prefix
     private static final String ACTIVE_PREFIX = "active-";
 
-    // ODBC Datetime Format
-    // if you need microseconds, you'll have to change this code or
-    //  export a bigint representing microseconds since an epoch
+    // ODBC time-stamp format: millisecond granularity
     protected static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
+
+    // SimpleDataFormat is not threadsafe
+    protected final ThreadLocal<SimpleDateFormat> m_dateformat;
+
     // use thread-local to avoid SimpleDateFormat thread-safety issues
     protected final ThreadLocal<SimpleDateFormat> m_ODBCDateformat;
-    protected final char m_delimiter;
-    protected final char[] m_fullDelimiters;
-    protected final String m_extension;
-    protected final String m_nonce;
-    // outDir is the folder that will contain the raw files or batch folders
-    protected final File m_outDir;
-    // the set of active decoders
+
     protected final HashMap<Long, HashMap<String, ExportToFileDecoder>> m_tableDecoders;
-    // how often to roll batches / files
-    protected final int m_period;
-    // use thread-local to avoid SimpleDateFormat thread-safety issues
-    protected final ThreadLocal<SimpleDateFormat> m_dateformat;
-    protected final String m_dateFormatOriginalString;
-    protected final int m_firstfield;
+
+    // configuration parsed from command line parameters
+    protected final FileClientConfiguration m_cfg;
 
     // timer used to roll batches
     protected final Timer m_timer = new Timer();
@@ -93,9 +84,6 @@ public class ExportToFileClient extends ExportClientBase {
     protected final Set<String> m_globalSchemasWritten = new HashSet<String>();
 
     protected PeriodicExportContext m_current = null;
-
-    protected final boolean m_batched;
-    protected final boolean m_withSchema;
 
     protected final Object m_batchLock = new Object();
 
@@ -118,31 +106,31 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             String getPath(String prefix) {
-                if (m_batched) {
+                if (ExportToFileClient.this.m_cfg.batched()) {
                     return m_dirContainingFiles.getPath() +
                            File.separator +
                            generation +
                            "-" +
                            tableName +
-                           m_extension;
+                           ExportToFileClient.this.m_cfg.extension();
                 }
                 else {
                     return m_dirContainingFiles.getPath() +
                            File.separator +
                            prefix +
-                           m_nonce +
+                           ExportToFileClient.this.m_cfg.nonce() +
                            "-" +
                            generation +
                            "-" +
                            tableName +
                            "-" +
                            m_dateformat.get().format(start) +
-                           m_extension;
+                           ExportToFileClient.this.m_cfg.extension();
                 }
             }
 
             String getPathForSchema() {
-                if (m_batched) {
+                if (ExportToFileClient.this.m_cfg.batched()) {
                     return m_dirContainingFiles.getPath() +
                            File.separator +
                            generation +
@@ -153,7 +141,7 @@ public class ExportToFileClient extends ExportClientBase {
                 else {
                     return m_dirContainingFiles.getPath() +
                            File.separator +
-                           m_nonce +
+                           ExportToFileClient.this.m_cfg.nonce() +
                            "-" +
                            generation +
                            "-" +
@@ -176,7 +164,7 @@ public class ExportToFileClient extends ExportClientBase {
         PeriodicExportContext(Date batchStart) {
             start = batchStart;
 
-            if (m_batched) {
+            if (ExportToFileClient.this.m_cfg.batched()) {
                 m_dirContainingFiles = new File(getPathOfBatchDir(ACTIVE_PREFIX));
                 m_logger.trace(String.format("Creating dir for batch at %s", m_dirContainingFiles.getPath()));
                 m_dirContainingFiles.mkdirs();
@@ -186,13 +174,14 @@ public class ExportToFileClient extends ExportClientBase {
                 }
             }
             else {
-                m_dirContainingFiles = m_outDir;
+                m_dirContainingFiles = ExportToFileClient.this.m_cfg.outDir();
             }
         }
 
         String getPathOfBatchDir(String prefix) {
-            assert(m_batched);
-            return m_outDir.getPath() + File.separator + prefix + m_nonce + "-" + m_dateformat.get().format(start);
+            assert(ExportToFileClient.this.m_cfg.batched());
+            return ExportToFileClient.this.m_cfg.outDir().getPath() + File.separator + prefix +
+                   ExportToFileClient.this.m_cfg.nonce() + "-" + m_dateformat.get().format(start);
         }
 
         /**
@@ -237,7 +226,7 @@ public class ExportToFileClient extends ExportClientBase {
                 }
             }
 
-            if (m_batched)
+            if (ExportToFileClient.this.m_cfg.batched())
                 closeBatch();
             else
                 closeFiles();
@@ -298,6 +287,9 @@ public class ExportToFileClient extends ExportClientBase {
         }
 
         CSVWriter getWriter(String tableName, long generation) {
+            char[] fullDelimiters = ExportToFileClient.this.m_cfg.fullDelimiters();
+            char delimiter = ExportToFileClient.this.m_cfg.delimiter();
+
             FileHandle handle = new FileHandle(tableName, generation);
             CSVWriter writer = m_writers.get(handle);
             if (writer != null)
@@ -313,13 +305,13 @@ public class ExportToFileClient extends ExportClientBase {
             }
             try {
                 OutputStreamWriter osw = new OutputStreamWriter(new FileOutputStream(newFile, false), "UTF-8");
-                if (m_fullDelimiters != null) {
+                if (fullDelimiters != null) {
                     writer = new CSVWriter(new BufferedWriter(osw, 1048576),
-                            m_fullDelimiters[0], m_fullDelimiters[1], m_fullDelimiters[2], String.valueOf(m_fullDelimiters[3]));
+                            fullDelimiters[0], fullDelimiters[1], fullDelimiters[2], String.valueOf(fullDelimiters[3]));
                 }
-                else if (m_delimiter == ',')
+                else if (delimiter == ',')
                     // CSV
-                    writer = new CSVWriter(new BufferedWriter(osw, 1048576), m_delimiter);
+                    writer = new CSVWriter(new BufferedWriter(osw, 1048576), delimiter);
                 else {
                     // TSV
                     writer = CSVWriter.getStrictTSVWriter(new BufferedWriter(osw, 1048576));
@@ -336,13 +328,15 @@ public class ExportToFileClient extends ExportClientBase {
 
         void writeSchema(String tableName, long generation, String schema) {
             // if no schema's enabled pretend like this worked
-            if (!m_withSchema) return;
+            if (ExportToFileClient.this.m_cfg.withSchema()) {
+                return;
+            }
 
             FileHandle handle = new FileHandle(tableName, generation);
             String path = handle.getPathForSchema();
 
             // only write the schema once per batch
-            if (m_batched) {
+            if (ExportToFileClient.this.m_cfg.batched()) {
                 if (m_batchSchemasWritten.contains(path)) {
                     return;
                 }
@@ -360,7 +354,7 @@ public class ExportToFileClient extends ExportClientBase {
                 writer.write(schema);
                 writer.flush();
                 writer.close();
-                if (m_batched) {
+                if (ExportToFileClient.this.m_cfg.batched()) {
                     m_batchSchemasWritten.add(path);
                 }
                 else {
@@ -443,6 +437,8 @@ public class ExportToFileClient extends ExportClientBase {
 
         @Override
         public boolean processRow(int rowSize, byte[] rowData) {
+            int firstfield = ExportToFileClient.this.m_cfg.firstField();
+
             // Grab the data row
             Object[] row = null;
             try {
@@ -453,20 +449,20 @@ public class ExportToFileClient extends ExportClientBase {
             }
 
             try {
-                String[] fields = new String[m_tableSchema.size() - m_firstfield];
+                String[] fields = new String[m_tableSchema.size() - firstfield];
 
-                for (int i = m_firstfield; i < m_tableSchema.size(); i++) {
+                for (int i = firstfield; i < m_tableSchema.size(); i++) {
                     if (row[i] == null) {
-                        fields[i - m_firstfield] = "NULL";
+                        fields[i - firstfield] = "NULL";
                     } else if (m_tableSchema.get(i) == VoltType.VARBINARY) {
-                        fields[i - m_firstfield] = Encoder.hexEncode((byte[]) row[i]);
+                        fields[i - firstfield] = Encoder.hexEncode((byte[]) row[i]);
                     } else if (m_tableSchema.get(i) == VoltType.STRING) {
-                        fields[i - m_firstfield] = (String) row[i];
+                        fields[i - firstfield] = (String) row[i];
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {
                         TimestampType timestamp = (TimestampType) row[i];
-                        fields[i - m_firstfield] = m_ODBCDateformat.get().format(timestamp.asApproximateJavaDate());
+                        fields[i - firstfield] = m_ODBCDateformat.get().format(timestamp.asApproximateJavaDate());
                     } else {
-                        fields[i - m_firstfield] = row[i].toString();
+                        fields[i - firstfield] = row[i].toString();
                     }
                 }
                 m_writer.writeNext(fields);
@@ -571,70 +567,29 @@ public class ExportToFileClient extends ExportClientBase {
         }
     }
 
-    public ExportToFileClient(char delimiter,
-            String nonce,
-            File outdir,
-            int period,
-            String dateformatString,
-            String fullDelimiters,
-            int firstfield,
-            boolean useAdminPorts,
-            boolean batched,
-            boolean withSchema,
-            int throughputMonitorPeriod) {
-        this(delimiter, nonce, outdir, period, dateformatString, fullDelimiters,
-                firstfield, useAdminPorts, batched, withSchema, throughputMonitorPeriod, true);
-    }
+    public ExportToFileClient(final FileClientConfiguration cfg)
+    {
+        super(cfg.useAdminPorts(), cfg.throughputMonitorPeriod(), cfg.autoDiscoverTopology());
+        m_cfg = cfg;
 
-    public ExportToFileClient(char delimiter,
-                              String nonce,
-                              File outdir,
-                              int period,
-                              String dateformatString,
-                              String fullDelimiters,
-                              int firstfield,
-                              boolean useAdminPorts,
-                              boolean batched,
-                              boolean withSchema,
-                              int throughputMonitorPeriod,
-                              boolean autodiscoverTopolgy) {
-        super(useAdminPorts, throughputMonitorPeriod, autodiscoverTopolgy);
-        m_delimiter = delimiter;
-        m_extension = (delimiter == ',') ? ".csv" : ".tsv";
-        m_nonce = nonce;
-        m_outDir = outdir;
         m_tableDecoders = new HashMap<Long, HashMap<String, ExportToFileDecoder>>();
-        m_period = period;
-        m_dateFormatOriginalString = dateformatString;
+
         // SimpleDateFormat isn't threadsafe
         // ThreadLocal variables should protect them, lamely.
         m_dateformat = new ThreadLocal<SimpleDateFormat>() {
             @Override
             protected SimpleDateFormat initialValue() {
-                return new SimpleDateFormat(m_dateFormatOriginalString);
+                return new SimpleDateFormat(cfg.dateFormatOriginalString());
             }
         };
+
         m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
             @Override
             protected SimpleDateFormat initialValue() {
                 return new SimpleDateFormat(ODBC_DATE_FORMAT_STRING);
             }
         };
-        m_firstfield = firstfield;
-        m_batched = batched;
-        m_withSchema = withSchema;
 
-        if (fullDelimiters != null) {
-            fullDelimiters = StringEscapeUtils.unescapeHtml4(fullDelimiters);
-            m_fullDelimiters = new char[4];
-            for (int i = 0; i < 4; i++) {
-                m_fullDelimiters[i] = fullDelimiters.charAt(i);
-                //System.out.printf("FULL DELIMETER %d: %c\n", i, m_fullDelimiters[i]);
-            }
-        }
-        else {
-            m_fullDelimiters = null;
-        }
 
         // init the batch system with the first batch
         assert(m_current == null);
@@ -647,7 +602,7 @@ public class ExportToFileClient extends ExportClientBase {
                 roll(new Date());
             }
         };
-        m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * m_period, 1000 * 60 * m_period);
+        m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * cfg.period(), 1000 * 60 * cfg.period());
     }
 
     PeriodicExportContext getCurrentContextAndAddref(ExportToFileDecoder decoder) {
@@ -711,16 +666,17 @@ public class ExportToFileClient extends ExportClientBase {
         }
 
         m_logger.info(String.format("Writing to disk in %s format",
-                (m_delimiter == ',') ? "CSV" : "TSV"));
+                (ExportToFileClient.this.m_cfg.delimiter() == ',') ? "CSV" : "TSV"));
         m_logger.info(String.format("Prepending export data files with nonce: %s",
-                m_nonce));
+                ExportToFileClient.this.m_cfg.nonce()));
         m_logger.info(String.format("Using date format for file names: %s",
-                m_dateFormatOriginalString));
+                ExportToFileClient.this.m_cfg.dateFormatOriginalString()));
         m_logger.info(String.format("Rotate export files every %d minute%s",
-                m_period, m_period == 1 ? "" : "s"));
+                ExportToFileClient.this.m_cfg.period(),
+                ExportToFileClient.this.m_cfg.period() == 1 ? "" : "s"));
         m_logger.info(String.format("Writing export files to dir: %s",
-                m_outDir));
-        if (m_firstfield == 0) {
+                ExportToFileClient.this.m_cfg.outDir()));
+        if (ExportToFileClient.this.m_cfg.firstField() == 0) {
             m_logger.info("Including VoltDB export metadata");
         }
         else {
@@ -728,257 +684,20 @@ public class ExportToFileClient extends ExportClientBase {
         }
     }
 
-    protected static void printHelpAndQuit(int code) {
-        System.out.println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
-                        + "--help");
-        System.out.println("java -cp <classpath> org.voltdb.exportclient.ExportToFileClient "
-                        + "--servers server1[,server2,...,serverN] "
-                        + "--connect (admin|client) "
-                        + "--type (csv|tsv) "
-                        + "--nonce file_prefix "
-                        + "[--batched] "
-                        + "[--with-schema] "
-                        + "[--period rolling_period_in_minutes] "
-                        + "[--dateformat date_pattern_for_file_name] "
-                        + "[--outdir target_directory] "
-                        + "[--skipinternals] "
-                        + "[--delimiters html-escaped delimiter set (4 chars)] "
-                        + "[--user export_username] "
-                        + "[--password export_password]");
-        System.out.println("Note that server hostnames may be appended with a specific port:");
-        System.out.println("  --servers server1:port1[,server2:port2,...,serverN:portN]");
-
-        System.exit(code);
-    }
 
     public static void main(String[] args) {
-        String[] volt_servers = null;
-        String user = null;
-        String password = null;
-        String nonce = null;
-        char delimiter = '\0';
-        File outdir = null;
-        int firstfield = 0;
-        int period = 60;
-        char connect = ' '; // either ' ', 'c' or 'a'
-        String dateformatString = "yyyyMMddHHmmss";
-        boolean batched = false;
-        boolean withSchema = false;
-        String fullDelimiters = null;
-        int throughputMonitorPeriod = 0;
-        boolean autodiscoverTopolgy = true;
-
-        for (int ii = 0; ii < args.length; ii++) {
-            String arg = args[ii];
-            if (arg.equals("--help")) {
-                printHelpAndQuit(0);
-            }
-            else if (arg.equals("--discard")) {
-                System.err.println("Option \"--discard\" is no longer supported.");
-                System.err.println("Try org.voltdb.exportclient.DiscardingExportClient.");
-                printHelpAndQuit(-1);
-            }
-            else if (arg.equals("--skipinternals")) {
-                firstfield = 6;
-            }
-            else if (arg.equals("--connect")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --connect");
-                    printHelpAndQuit(-1);
-                }
-                String connectStr = args[ii + 1];
-                if (connectStr.equalsIgnoreCase("admin")) {
-                    connect = 'a';
-                } else if (connectStr.equalsIgnoreCase("client")) {
-                    connect = 'c';
-                } else {
-                    System.err.println("Error: --type must be one of \"admin\" or \"client\"");
-                    printHelpAndQuit(-1);
-                }
-                ii++;
-            }
-            else if (arg.equals("--servers")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --servers");
-                    printHelpAndQuit(-1);
-                }
-                volt_servers = args[ii + 1].split(",");
-                ii++;
-            }
-            else if (arg.equals("--type")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --type");
-                    printHelpAndQuit(-1);
-                }
-                String type = args[ii + 1];
-                if (type.equalsIgnoreCase("csv")) {
-                    delimiter = ',';
-                } else if (type.equalsIgnoreCase("tsv")) {
-                    delimiter = '\t';
-                } else {
-                    System.err.println("Error: --type must be one of CSV or TSV");
-                    printHelpAndQuit(-1);
-                }
-                ii++;
-            }
-            else if (arg.equals("--outdir")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --outdir");
-                    printHelpAndQuit(-1);
-                }
-                boolean invalidDir = false;
-                outdir = new File(args[ii + 1]);
-                if (!outdir.exists()) {
-                    System.err.println("Error: " + outdir.getPath() + " does not exist");
-                    invalidDir = true;
-                }
-                if (!outdir.canRead()) {
-                    System.err.println("Error: " + outdir.getPath() + " does not have read permission set");
-                    invalidDir = true;
-                }
-                if (!outdir.canExecute()) {
-                    System.err.println("Error: " + outdir.getPath() + " does not have execute permission set");
-                    invalidDir = true;
-                }
-                if (!outdir.canWrite()) {
-                    System.err.println("Error: " + outdir.getPath() + " does not have write permission set");
-                    invalidDir = true;
-                }
-                if (invalidDir) {
-                    System.exit(-1);
-                }
-                ii++;
-            }
-            else if (arg.equals("--nonce")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --nonce");
-                    printHelpAndQuit(-1);
-                }
-                nonce = args[ii + 1];
-                ii++;
-            }
-            else if (arg.equals("--user")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --user");
-                    printHelpAndQuit(-1);
-                }
-                user = args[ii + 1];
-                ii++;
-            }
-            else if (arg.equals("--password")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --password");
-                    printHelpAndQuit(-1);
-                }
-                password = args[ii + 1];
-                ii++;
-            }
-            else if (arg.equals("--period")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --period");
-                    printHelpAndQuit(-1);
-                }
-                period = Integer.parseInt(args[ii + 1]);
-                if (period < 1) {
-                    System.err.println("Error: Specified value for --period must be >= 1.");
-                    printHelpAndQuit(-1);
-                }
-                ii++;
-            }
-            else if (arg.equals("--dateformat")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --dateformat");
-                    printHelpAndQuit(-1);
-                }
-                dateformatString = args[ii + 1].trim();
-                ii++;
-            }
-            else if (arg.equals("--batched")) {
-                batched = true;
-            }
-            else if (arg.equals("--with-schema")) {
-                withSchema = true;
-            }
-            else if (arg.equals("--delimiters")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --delimiters");
-                    printHelpAndQuit(-1);
-                }
-                fullDelimiters = args[ii + 1].trim();
-                ii++;
-                String charsAsStr = StringEscapeUtils.unescapeHtml4(fullDelimiters.trim());
-                if (charsAsStr.length() != 4) {
-                    System.err.println("The delimiter set must contain exactly 4 characters (after any html escaping).");
-                    printHelpAndQuit(-1);
-                }
-            }
-            else if (arg.equals("--disable-topology-autodiscovery")) {
-                autodiscoverTopolgy = false;
-            }
-            else if (arg.equals("--throughput-monitor-period")) {
-                if (args.length < ii + 1) {
-                    System.err.println("Error: Not enough args following --throughput-monitor-period");
-                    printHelpAndQuit(-1);
-                }
-                throughputMonitorPeriod = Integer.parseInt(args[ii + 1].trim());
-                ii++;
-            }
-            else {
-                System.err.println("Unrecognized parameter " + arg);
-                System.exit(-1);
-            }
-        }
-        // Check args for validity
-        if (volt_servers == null || volt_servers.length < 1) {
-            System.err.println("ExportToFile: must provide at least one VoltDB server");
-            printHelpAndQuit(-1);
-        }
-        if (connect == ' ') {
-            System.err.println("ExportToFile: must specify connection type as admin or client using --connect argument");
-            printHelpAndQuit(-1);
-        }
-        assert ((connect == 'c') || (connect == 'a'));
-        if (user == null) {
-            user = "";
-        }
-        if (password == null) {
-            password = "";
-        }
-        if (nonce == null) {
-            System.err.println("ExportToFile: must provide a filename nonce");
-            printHelpAndQuit(-1);
-        }
-        if (outdir == null) {
-            outdir = new File(".");
-        }
-        if (delimiter == '\0') {
-            System.err.println("ExportToFile: must provide an output type");
-            printHelpAndQuit(-1);
-        }
-
-        // create the export to file client
-        ExportToFileClient client = new ExportToFileClient(delimiter,
-                                                           nonce,
-                                                           outdir,
-                                                           period,
-                                                           dateformatString,
-                                                           fullDelimiters,
-                                                           firstfield,
-                                                           connect == 'a',
-                                                           batched,
-                                                           withSchema,
-                                                           throughputMonitorPeriod,
-                                                           autodiscoverTopolgy);
+        FileClientConfiguration config = new FileClientConfiguration(args);
+        ExportToFileClient client = new ExportToFileClient(config);
 
         // add all of the servers specified
-        for (String server : volt_servers) {
+        for (String server : config.voltServers()) {
             server = server.trim();
             client.m_commandLineServerArgs.add(server);
-            client.addServerInfo(server, connect == 'a');
+            client.addServerInfo(server, config.connect() == 'a');
         }
 
         // add credentials (default blanks used if none specified)
-        client.addCredentials(user, password);
+        client.addCredentials(config.user(), config.password());
 
         // main loop
         try {
