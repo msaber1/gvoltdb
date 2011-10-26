@@ -36,7 +36,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.export.ExportTestClient;
 import org.voltdb.exportclient.ExportClientException;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
@@ -225,17 +224,20 @@ public class TestSecuritySuite extends RegressionSuite {
     }
 
     public void testAllowedExportConnectorPermissions() throws ExportClientException {
+        fail();
         // user1 can connect (in groups list)
-        ExportTestClient eclient = new ExportTestClient(1);
-        eclient.addCredentials("user1", "password");
-        eclient.connect();
-        eclient.disconnect();
+        // ExportTestClient eclient = new ExportTestClient(1);
+        // eclient.addCredentials("user1", "password");
+        // eclient.connect();
+        // eclient.disconnect();
 
         // Expected to throw an exception on failure
         assertTrue(true);
     }
 
     public void testRejectedExportConnectorPermissions() {
+        fail();
+        /*
         boolean caught = false;
         ExportTestClient eclient = new ExportTestClient(1);
         try {
@@ -249,6 +251,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(caught);
 
         eclient.disconnect();
+        */
     }
 
     /**

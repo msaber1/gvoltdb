@@ -37,7 +37,7 @@ class ExportTestVerifier extends ExportDecoderBase
     private int m_ackRepeats = 0;
     private final String m_tableName;
     private final int m_partitionId;
-    private long m_generation;
+    private final long m_generation;
     private long sequenceNumber = 0;
 
     ExportTestVerifier(AdvertisedDataSource source, ArrayDeque<Object[]> srcdata)
@@ -204,10 +204,5 @@ class ExportTestVerifier extends ExportDecoderBase
         }
         return result;
 
-    }
-
-    @Override
-    public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-        m_ackRepeats = 100;
     }
 }

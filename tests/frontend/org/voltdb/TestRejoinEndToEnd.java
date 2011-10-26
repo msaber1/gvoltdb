@@ -34,25 +34,13 @@ import java.net.InetSocketAddress;
 import java.nio.channels.ServerSocketChannel;
 import java.nio.channels.SocketChannel;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.voltdb.BackendTarget;
-import org.voltdb.ExecutionSite;
-import org.voltdb.OperationMode;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportClientBase;
-import org.voltdb.exportclient.ExportClientException;
-import org.voltdb.exportclient.ExportConnection;
-import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
@@ -710,154 +698,6 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(1000);
 
         assertTrue(VoltDB.instance().getMode() == OperationMode.PAUSED);
-
-        localServer.shutdown();
-        cluster.shutDown();
-    }
-
-    class TrivialExportClient extends ExportClientBase {
-
-        public class TrivialDecoder extends ExportDecoderBase {
-
-            public TrivialDecoder(AdvertisedDataSource source) {
-                super(source);
-            }
-
-            @Override
-            public boolean processRow(int rowSize, byte[] rowData) {
-                return true;
-            }
-
-            @Override
-            public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-                // TODO Auto-generated method stub
-
-            }
-
-        }
-
-        public TrivialExportClient() throws ExportClientException {
-            super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
-            super.addCredentials(null, null);
-            super.connect();
-        }
-
-        @Override
-        public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
-            return new TrivialDecoder(source);
-        }
-
-        @Override
-        public int work() throws ExportClientException {
-            super.work();
-            for (ExportConnection ec : m_exportConnections.values()) {
-                System.out.printf("Export Conn Offset: %d\n", ec.getLastAckOffset());
-            }
-            return 1;
-        }
-
-    }
-
-    public void testRejoinWithExport() throws Exception {
-        VoltProjectBuilder builder = getBuilderForTest();
-        //builder.setTableAsExportOnly("blah", false);
-        //builder.setTableAsExportOnly("blah_replicated", false);
-        //builder.setTableAsExportOnly("PARTITIONED", false);
-        //builder.setTableAsExportOnly("PARTITIONED_LARGE", false);
-        builder.addExport("org.voltdb.export.processors.RawProcessor",
-                true,  // enabled
-                null);  // authGroups (off)
-
-        LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                                                BackendTarget.NATIVE_EE_JNI, true);
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-        cluster.setHasLocalServer(false);
-
-        cluster.startUp();
-
-        ClientResponse response;
-        Client client;
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
-
-        response = client.callProcedure("InsertSinglePartition", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 1);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 0);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
-        response = client.callProcedure("InsertSinglePartition", 2);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 3);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        TrivialExportClient exportClient = new TrivialExportClient();
-        exportClient.work();
-        exportClient.work();
-
-        Thread.sleep(4000);
-
-        exportClient.work();
-
-        Thread.sleep(4000);
-
-        exportClient.work();
-
-        cluster.shutDownSingleHost(0);
-        Thread.sleep(100);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_rejoinToHostAndPort = m_username + ":" + m_password + "@localhost:21213";
-        config.m_isRejoinTest = true;
-        ServerThread localServer = new ServerThread(config);
-
-        localServer.start();
-        localServer.waitForInitialization();
-
-        Thread.sleep(1000);
-        while (VoltDB.instance().recovering()) {
-            Thread.sleep(100);
-        }
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
-
-        response = client.callProcedure("InsertSinglePartition", 5);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 6);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("InsertReplicated", 7);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
-        response = client.callProcedure("InsertSinglePartition", 8);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        response = client.callProcedure("Insert", 9);
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        client.close();
-
-        exportClient = new TrivialExportClient();
-        exportClient.work();
-
-        Thread.sleep(4000);
-
-        exportClient.work();
-
-        Thread.sleep(4000);
-
-        exportClient.work();
 
         localServer.shutdown();
         cluster.shutDown();

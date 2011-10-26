@@ -45,12 +45,6 @@ public class TestExportDecoderBase extends TestCase
         {
             return false;
         }
-
-        @Override
-        public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-            // TODO Auto-generated method stub
-
-        }
     }
 
     static final String[] COLUMN_NAMES =

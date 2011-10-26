@@ -54,20 +54,12 @@ public abstract class ExportDecoderBase {
      */
     abstract public boolean processRow(int rowSize, byte[] rowData);
 
-    abstract public void sourceNoLongerAdvertised(AdvertisedDataSource source);
 
     /**
      * Finalize operation upon block completion - provides a means for a
      * specific decoder to flush data to disk - virtual method
      */
     public void onBlockCompletion() {
-    }
-
-    /**
-     * Notify that a new block of data is going to be processed now
-     */
-    public void onBlockStart() {
-
     }
 
     /**
