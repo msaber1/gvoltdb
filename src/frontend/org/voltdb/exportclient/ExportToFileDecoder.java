@@ -8,7 +8,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportToFileClient.PeriodicExportContext;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
