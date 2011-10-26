@@ -41,7 +41,6 @@ import org.voltdb.logging.VoltLogger;
 public class ExportToFileClient {
     private static final VoltLogger m_logger = new VoltLogger("ExportClient");
 
-
     protected final HashMap<Long, HashMap<String, ExportToFileDecoder>> m_tableDecoders;
 
     // configuration parsed from command line parameters
@@ -69,18 +68,19 @@ public class ExportToFileClient {
                 roll(new Date());
             }
         };
-        m_timer.scheduleAtFixedRate(rotateTask, 1000 * 60 * cfg.period(), 1000 * 60 * cfg.period());
+
+        m_timer.scheduleAtFixedRate(rotateTask,
+                1000 * 60 * cfg.period(),
+                1000 * 60 * cfg.period());
     }
 
     PeriodicExportContext getCurrentContextAndAddref(ExportToFileDecoder decoder) {
         PeriodicExportContext ctx = m_current.get();
-        ctx.m_decoders.add(decoder);
+        ctx.addDecoder(decoder);
         return ctx;
     }
 
     public ExportToFileDecoder constructExportDecoder(AdvertisedDataSource source) {
-        // For every source that provides part of a table, use the same
-        // export decoder.
         String table_name = source.tableName;
         HashMap<String, ExportToFileDecoder> decoders = m_tableDecoders.get(source.m_generation);
         if (decoders == null) {
@@ -103,11 +103,13 @@ public class ExportToFileClient {
      */
     void roll(Date rollTime) {
         m_logger.trace("Rolling batch.");
+
+        // A set and cannot interleave between the get and set of ctx.getAndSet().
+        // As long as all callers do getAndSet and close the returned context,
+        // all contexts will be closed.
         PeriodicExportContext oldctx =
                 m_current.getAndSet(new PeriodicExportContext(rollTime, m_cfg));
-        oldctx.end = rollTime;
-        if (oldctx.m_decoders.size() == 0)
-            oldctx.closeAllWriters();
+        oldctx.roll(rollTime);
     }
 
     protected void logConfigurationInfo() {
