@@ -1,5 +1,5 @@
 package org.voltdb.exportclient;
 
 public interface ExportClientProcessorFactory {
-    ExportClientProcessor factory();
+    ExportClientProcessor factory(String advertisement);
 }

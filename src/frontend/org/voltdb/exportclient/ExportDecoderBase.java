@@ -19,6 +19,8 @@ package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.BufferOverflowException;
+import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
 
@@ -68,6 +70,61 @@ public abstract class ExportDecoderBase {
      * cares about this case.
      */
     public void noDataReceived(long ackOffset) {
+    }
+
+
+    // data that hasn't been row-framed and processed
+    private ByteBuffer m_undecoded = ByteBuffer.allocate(1024*1024*2);
+
+    // loop, doubling capacity, until buf can be appended to m_undecoded.
+    // when done, m_undecoded will have appended buf and will have its
+    // position set to 0.
+    private void appendToUndecoded(ByteBuffer buf) {
+        int currCapacity = m_undecoded.capacity();
+        boolean appended = false;
+        // move previous unprocessed bytes to the front
+        m_undecoded.compact();
+        do {
+            try {
+                m_undecoded.put(buf);
+                appended = true;
+            } catch (BufferOverflowException e) {
+                currCapacity *= 2;
+                ByteBuffer tmp = ByteBuffer.allocate(currCapacity);
+                tmp.put(m_undecoded);
+                tmp.put(buf);
+                m_undecoded = tmp;
+            }
+            m_undecoded.flip();
+        } while (!appended);
+    }
+
+    /** Frame buf into rows and process complete rows
+     * @throws IOException */
+    protected void decode(ByteBuffer buf) throws IOException {
+        m_undecoded.order(ByteOrder.LITTLE_ENDIAN);
+        buf.order(ByteOrder.LITTLE_ENDIAN);
+
+        // get this working first and eliminate this copy later
+        appendToUndecoded(buf);
+        ByteBuffer src = m_undecoded;
+
+        do {
+            // not enough data to frame anything else
+            if (src.limit() - src.position() < 4) {
+                break;
+            }
+            src.mark();
+            int rowlength = src.getInt();
+            // not enough data to frame a full row
+            if (src.limit() - src.position() < rowlength) {
+                src.reset();
+                break;
+            }
+            byte[] row = new byte[rowlength];
+            src.get(row, 0, rowlength);
+            decodeRow(row);
+        } while (true);
     }
 
     /**

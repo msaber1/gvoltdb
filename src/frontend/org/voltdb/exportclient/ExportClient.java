@@ -83,7 +83,7 @@ public class ExportClient {
         private long lastLogged = 0;
 
         @Override
-        public ExportClientProcessor factory() {
+        public ExportClientProcessor factory(String advertisement) {
             return new NullProcessor();
         }
 
@@ -145,7 +145,7 @@ public class ExportClient {
                         new ExportClientStreamConnection(socket,
                             advertisement,
                             new CompletionEvent(advertisement, socket),
-                            m_processorFactory.factory()));
+                            m_processorFactory.factory(advertisement)));
                 }
             }
         } catch (Exception e) {
