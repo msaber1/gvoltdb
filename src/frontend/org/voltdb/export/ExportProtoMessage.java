@@ -54,69 +54,6 @@ public class ExportProtoMessage
     public boolean isSync()         {return (m_type & kSync) != 0;}
 
     /**
-     * The Export data source metadata returned in a kOpenResponse message.
-     */
-    static public class AdvertisedDataSource {
-        final public int partitionId;
-        final public String signature;
-        final public String tableName;
-        final public long m_generation;
-        final public long systemStartTimestamp;
-        final public ArrayList<String> columnNames = new ArrayList<String>();
-        final public ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
-
-        @Override
-        public int hashCode() {
-            return (((int)m_generation) + ((int)(m_generation >> 32))) + partitionId + signature.hashCode();
-        }
-
-        @Override
-        public boolean equals(Object o) {
-            if (o instanceof AdvertisedDataSource) {
-                AdvertisedDataSource other = (AdvertisedDataSource)o;
-                if (other.m_generation == m_generation &&
-                        other.signature.equals(signature) &&
-                        other.partitionId == partitionId) {
-                    return true;
-                }
-            }
-            return false;
-        }
-
-        public AdvertisedDataSource(int p_id, String t_signature, String t_name,
-                                    long systemStartTimestamp,
-                                    long generation,
-                                    ArrayList<String> names,
-                                    ArrayList<VoltType> types)
-        {
-            partitionId = p_id;
-            signature = t_signature;
-            tableName = t_name;
-            m_generation = generation;
-            this.systemStartTimestamp = systemStartTimestamp;
-
-            // null checks are for happy-making test time
-            if (names != null)
-                columnNames.addAll(names);
-            if (types != null)
-                columnTypes.addAll(types);
-        }
-
-        public VoltType columnType(int index) {
-            return columnTypes.get(index);
-        }
-
-        public String columnName(int index) {
-            return columnNames.get(index);
-        }
-
-        @Override
-        public String toString() {
-            return "Generation: " + m_generation + " Table: " + tableName + " partition " + partitionId + " signature " + signature;
-        }
-    }
-
-    /**
      * Called to produce an Export protocol message from a FastDeserializer.
      * Note that this expects the length preceding value was already
      * read (probably how the buffer length was originally determined).

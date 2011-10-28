@@ -25,7 +25,6 @@ package org.voltdb.export;
 import java.io.IOException;
 import java.util.ArrayDeque;
 
-import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.utils.Encoder;
 

@@ -250,27 +250,25 @@ public class ExportManager
     {
         // The EE sends the right export generation id. If this is the
         // first time the generation has been seen, make a new one.
-
-        System.out.println("DOOOOD!");
-        exportLog.info("pushExportBuffer: gen: " + generationId + ", sig: " + signature + ", uso: " + uso + ", endOfStream: " + endOfStream);
+        exportLog.info("pushExportBuffer: gen: " + generationId +
+                ", sig: " + signature +
+                ", uso: " + uso +
+                ", endOfStream: " + endOfStream);
 
         ExportManager instance = instance();
         ExportGeneration generation = null;
         try {
-            exportLog.info("Looked up generation: " + generationId + ", found: " + instance.m_generationDirectory.get(generationId));
-            // XXX-IZZY todo:
-            // -- synchronize this less
-            // -- make the existence check and new source addition smarter
+            exportLog.info("Looked up generation: " + generationId +
+                    ", found: " + instance.m_generationDirectory.get(generationId));
+
             synchronized(instance)
             {
                 if ((generation = instance.m_generationDirectory.get(generationId)) == null)
                 {
                     generation =
                         new ExportGeneration(generationId,
-                                             instance.m_generationDirectory.m_exportOverflowDirectory);
+                                instance.m_generationDirectory.m_exportOverflowDirectory);
 
-                    // BUG: Guess that the current catalog context is the right one.
-                    // this is a false assumption - will have to fix this.
                     instance.m_generationDirectory.offer(generationId, generation);
                 }
                 generation.addDataSource(signature, partitionId, siteId, columnNames);
@@ -279,7 +277,8 @@ public class ExportManager
             generation.pushExportBuffer(partitionId, signature, uso, bufferPtr, buffer, sync, endOfStream);
         } catch (Exception e) {
             //Don't let anything take down the execution site thread
-            exportLog.error("Failure to push export buffer for generation: " + generationId + ", partition: " + partitionId, e);
+            exportLog.error("Failure to push export buffer for generation: " + generationId +
+                    ", partition: " + partitionId, e);
         }
     }
 

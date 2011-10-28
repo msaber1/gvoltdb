@@ -1,3 +1,19 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2011 VoltDB Inc.
+ *
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.voltdb.exportclient;
 
 import java.io.IOException;
@@ -8,6 +24,7 @@ import java.util.LinkedList;
 import java.util.Set;
 
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
 
@@ -16,7 +33,7 @@ class ExportClientListingConnection implements Runnable {
     static final VoltLogger LOG = new VoltLogger("ExportClient");
     final InetSocketAddress m_server;
     final Set<Object[]> m_results;
-    final String m_ackedAdvertisement;
+    final AdvertisedDataSource m_ackedAdvertisement;
     final long m_ackedBytes;
 
     /** Create a connection to read the advertisement listing */
@@ -29,7 +46,7 @@ class ExportClientListingConnection implements Runnable {
     /** Create a connection to ack an advertisement and read the current listing */
     public ExportClientListingConnection(InetSocketAddress server,
         Set<Object[]> results,
-        String ackedAdvertisement,
+        AdvertisedDataSource ackedAdvertisement,
         long ackedByteCount)
     {
         m_server = server;
@@ -44,7 +61,8 @@ class ExportClientListingConnection implements Runnable {
         if (m_ackedAdvertisement == null) {
             return;
         }
-        ExportProtoMessage m = new ExportProtoMessage(0, 0, m_ackedAdvertisement);
+        ExportProtoMessage m =
+                new ExportProtoMessage(0, 0, m_ackedAdvertisement.signature);
         m.ack(m_ackedBytes);
         socket.write(m.toBuffer());
     }
@@ -52,7 +70,8 @@ class ExportClientListingConnection implements Runnable {
     // helper for listing de/serialization
     private void poll(SocketChannel socket) throws IOException
     {
-        LinkedList<String> advertisements = new LinkedList<String>();
+        LinkedList<AdvertisedDataSource> advertisements =
+                new LinkedList<AdvertisedDataSource>();
 
         // poll for advertisements
         ExportProtoMessage m = new ExportProtoMessage(0,0,null);
@@ -74,33 +93,33 @@ class ExportClientListingConnection implements Runnable {
         int count = adCount.getInt();
 
         for (int i=0; i < count; i++) {
-            // string length
-            ByteBuffer adLen = ByteBuffer.allocate(4);
-            read = socket.read(adLen);
+            ByteBuffer msgSize = ByteBuffer.allocate(4);
+            read = socket.read(msgSize);
             if (read < 0) {
-                LOG.info("Retrieved " + advertisements.size() + " advertisements");
-                break;
+                LOG.error("Failed to read an advertisement count from: " + m_server);
+                return;
             }
             if (read != 4) {
-                LOG.error("Invalid read reading advertisements");
-                break;
+                LOG.error("Failed to read an advertisement count from: " + m_server);
+                return;
             }
-            // actual string
-            adLen.flip();
-            int length = adLen.getInt();
-            ByteBuffer ad = ByteBuffer.allocate(length);
-            read = socket.read(ad);
+            msgSize.flip();
+            ByteBuffer msgBytes = ByteBuffer.allocate(msgSize.getInt());
+            read = socket.read(msgBytes);
             if (read < 0) {
-                LOG.error("Invalid read reading advertisements");
-                break;
+                LOG.error("Failed to read an advertisement count from: " + m_server);
+                return;
             }
-            ad.flip();
-            byte[] strbytes = new byte[length];
-            ad.get(strbytes);
-            advertisements.add(new String(strbytes, "UTF-8"));
+            if (read != msgBytes.capacity()) {
+                LOG.error("Failed to read an advertisement count from: " + m_server);
+                return;
+            }
+            msgBytes.flip();
+            AdvertisedDataSource ad = AdvertisedDataSource.deserialize(msgBytes);
+            advertisements.add(ad);
         }
         LOG.info("Found " + advertisements.size() + " advertisements from " + m_server);
-        for (String a : advertisements) {
+        for (AdvertisedDataSource a : advertisements) {
             m_results.add(new Object[] {m_server, a});
         }
     }

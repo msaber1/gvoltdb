@@ -1,8 +1,25 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2011 VoltDB Inc.
+ *
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClient.CompletionEvent;
 
 public class FileClient implements ExportClientProcessorFactory
@@ -31,7 +48,7 @@ public class FileClient implements ExportClientProcessorFactory
 
         /** ExportClientProcessor interface to receive a new buffer */
         @Override
-        public void offer(String advertisement, ByteBuffer buf) throws IOException {
+        public void offer(AdvertisedDataSource advertisement, ByteBuffer buf) throws IOException {
             m_decoder.decode(buf);
         }
 
@@ -45,7 +62,7 @@ public class FileClient implements ExportClientProcessorFactory
 
     /** ECPFactory interface to make an ECP for a new advertisement */
     @Override
-    public ExportClientProcessor factory(String advertisement) {
+    public ExportClientProcessor factory(AdvertisedDataSource advertisement) {
         return new DecoderWrapper(m_cfg);
     }
 

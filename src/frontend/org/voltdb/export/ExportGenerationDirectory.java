@@ -20,8 +20,6 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.LinkedList;
-import java.util.List;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.TreeSet;
@@ -30,6 +28,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
 import org.voltdb.logging.VoltLogger;
+import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -64,23 +63,31 @@ public class ExportGenerationDirectory {
     }
 
     /** Produce a description of the available data sources. */
-    List<ExportAdvertisement> createListing()
+    void createListing(FastSerializer fs) throws IOException
     {
-        // for each generation, for each partition, for each table...
+        // todo: this is idiotic but.. FS rant.
+        int found = 0;
         TreeMap<Long,ExportGeneration> gens = m_library.get();
-        LinkedList<ExportAdvertisement> list = new LinkedList<ExportAdvertisement>();
         for (Entry<Long, ExportGeneration> e : gens.entrySet()) {
             for(Entry<Integer, HashMap<String, ExportDataSource>> ds :
                 e.getValue().m_dataSourcesByPartition.entrySet()) {
                 for(Entry<String, ExportDataSource> d : ds.getValue().entrySet()) {
-                    String signature = d.getKey();
-                    int partition = d.getValue().getPartitionId();
-                    long generation = d.getValue().getGeneration();
-                    list.add(new ExportAdvertisement(generation, partition, signature));
+                    assert(d.getValue() != null); //silence warning
+                    found++;
                 }
             }
         }
-        return list;
+
+        // for each generation, for each partition, for each table...
+        fs.writeInt(found);
+        for (Entry<Long, ExportGeneration> e : gens.entrySet()) {
+            for(Entry<Integer, HashMap<String, ExportDataSource>> ds :
+                e.getValue().m_dataSourcesByPartition.entrySet()) {
+                for(Entry<String, ExportDataSource> d : ds.getValue().entrySet()) {
+                    d.getValue().writeAdvertisementTo(fs);
+                }
+            }
+        }
     }
 
     /** Remove all on-disk generations or die trying. */

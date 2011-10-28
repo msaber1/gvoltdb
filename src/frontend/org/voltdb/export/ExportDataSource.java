@@ -276,7 +276,20 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return m_partitionId;
     }
 
+    /** Serialize an AdvertisedDataSource object */
     public void writeAdvertisementTo(FastSerializer fs) throws IOException {
+        int msgbytes =
+                8 + // m_generation
+                4 + // partition id
+                4 + m_signature.getBytes("UTF-8").length +
+                4 + getTableName().getBytes("UTF-8").length +
+                8 + // start time
+                4; // column names length
+        for (int ii=0; ii < m_columnNames.size(); ++ii) {
+            msgbytes += (4 + m_columnNames.get(ii).getBytes("UTF-8").length);
+            msgbytes += 4; // columntypes
+        }
+        fs.writeInt(msgbytes);
         fs.writeLong(m_generation);
         fs.writeInt(getPartitionId());
         fs.writeString(m_signature);

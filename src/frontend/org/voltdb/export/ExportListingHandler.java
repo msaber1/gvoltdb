@@ -19,7 +19,6 @@ package org.voltdb.export;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.List;
 
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
@@ -43,16 +42,9 @@ public class ExportListingHandler extends VoltProtocolHandler {
         FastSerializer fs = new FastSerializer();
         ExportGenerationDirectory lib = ExportManager.instance().m_generationDirectory;
 
-        // serialize the advertisement list as:
-        // <count of advertisements>
-        // <fast serialized strings>*
         if (m.isPoll()) {
-            List<ExportAdvertisement> listing = lib.createListing();
             try {
-                fs.writeInt(listing.size());
-                for (ExportAdvertisement ad : listing) {
-                    ad.serialize(fs);
-                }
+                lib.createListing(fs);
                 m_cxn.writeStream().enqueue(fs.getBBContainer());
             } catch (IOException e) {
                 exportLog.error("Failed to create export advertisement listing.");
@@ -63,7 +55,6 @@ public class ExportListingHandler extends VoltProtocolHandler {
             long byteCount = m.getAckOffset();
             ExportManager.instance().ackStream(advertisement, byteCount);
         }
-
     }
 
     @Override

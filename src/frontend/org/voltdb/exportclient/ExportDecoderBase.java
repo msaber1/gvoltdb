@@ -25,7 +25,7 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 
 import org.voltdb.VoltType;
-import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 

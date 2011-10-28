@@ -1,3 +1,19 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2011 VoltDB Inc.
+ *
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 package org.voltdb.exportclient;
 
 import java.net.InetSocketAddress;
@@ -13,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.voltdb.VoltDB;
+import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 
 /**
@@ -36,7 +53,7 @@ public class ExportClient {
         }
     }
 
-    // unserviced advertisements (InetSocketAddress, String) pairs
+    // unserviced advertisements (InetSocketAddress, AdvertisedDataSource) pairs
     Set<Object[]> m_advertisements =
             Collections.synchronizedSet(
                     new TreeSet<Object[]>(new AdvertisementComparator()));
@@ -54,11 +71,11 @@ public class ExportClient {
 
     /** Schedule an ack for a client stream connection */
     class CompletionEvent {
-        private final String m_advertisement;
+        private final AdvertisedDataSource m_advertisement;
         private final InetSocketAddress m_server;
         private long m_ackedByteCount;
 
-        CompletionEvent(String advertisement, InetSocketAddress server) {
+        CompletionEvent(AdvertisedDataSource advertisement, InetSocketAddress server) {
             m_advertisement = advertisement;
             m_server = server;
         }
@@ -83,7 +100,7 @@ public class ExportClient {
         private long lastLogged = 0;
 
         @Override
-        public ExportClientProcessor factory(String advertisement) {
+        public ExportClientProcessor factory(AdvertisedDataSource advertisement) {
             return new NullProcessor();
         }
 
@@ -93,7 +110,7 @@ public class ExportClient {
         }
 
         @Override
-        public void offer(String advertisement, ByteBuffer buf) {
+        public void offer(AdvertisedDataSource advertisement, ByteBuffer buf) {
             totalBytes += buf.limit();
             if (totalBytes > lastLogged + (1024*1024*5)) {
                 lastLogged = totalBytes;
@@ -140,7 +157,7 @@ public class ExportClient {
                 }
                 else {
                     InetSocketAddress socket = (InetSocketAddress) pair[0];
-                    String advertisement =  (String) pair[1];
+                    AdvertisedDataSource advertisement =  (AdvertisedDataSource) pair[1];
                     m_workerPool.execute(
                         new ExportClientStreamConnection(socket,
                             advertisement,

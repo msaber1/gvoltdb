@@ -25,7 +25,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicReference;
 
-import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 
 /**

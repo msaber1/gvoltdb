@@ -28,7 +28,7 @@ import java.util.ArrayList;
 import junit.framework.TestCase;
 
 import org.voltdb.VoltType;
-import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
+import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.messaging.FastDeserializer;
 
 public class TestExportDecoderBase extends TestCase
