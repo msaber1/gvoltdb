@@ -204,7 +204,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
 
         File adFile = new VoltFile(overflowPath, nonce + ".ad");
         exportLog.info("Creating ad for " + nonce + ", generation: " + generation);
-        assert(!adFile.exists());
         FastSerializer fs = new FastSerializer();
         fs.writeInt(m_siteId);
         fs.writeString(m_database);
