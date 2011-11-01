@@ -222,8 +222,8 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
     }
 
-    public void testAllowedExportConnectorPermissions() 
-    // throws ExportClientException 
+    public void testAllowedExportConnectorPermissions()
+    // throws ExportClientException
     {
         fail();
         // user1 can connect (in groups list)

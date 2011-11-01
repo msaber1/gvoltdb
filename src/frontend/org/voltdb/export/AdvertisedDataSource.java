@@ -40,6 +40,8 @@ public class AdvertisedDataSource {
         return (((int)m_generation) + ((int)(m_generation >> 32))) + partitionId + signature.hashCode();
     }
 
+    /** Advertised data sources with equal generations, signatures
+        and partition IDs are equal. */
     @Override
     public boolean equals(Object o) {
         if (o instanceof AdvertisedDataSource) {
