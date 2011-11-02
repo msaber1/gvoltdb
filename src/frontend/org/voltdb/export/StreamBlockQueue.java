@@ -16,19 +16,18 @@
  */
 package org.voltdb.export;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayDeque;
 import java.util.Iterator;
 
 import org.voltdb.logging.VoltLogger;
-import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
-import org.voltdb.utils.PersistentBinaryDeque;
 import org.voltdb.utils.BinaryDeque;
-import org.voltdb.utils.VoltFile;
-
+import org.voltdb.utils.BinaryDeque.BinaryDequeTruncator;
 import org.voltdb.utils.DBBPool.BBContainer;
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
+import org.voltdb.utils.PersistentBinaryDeque;
+import org.voltdb.utils.VoltFile;
 
 /**
  * A customized queue for StreamBlocks that contain export data. The queue is able to
@@ -92,7 +91,15 @@ public class StreamBlockQueue {
             final BBContainer fcont = cont;
             long uso = cont.b.getLong();
             ByteBuffer buf = cont.b.slice();
-            StreamBlock block = new StreamBlock(fcont, uso, true);
+            StreamBlock block = new StreamBlock(
+                    new BBContainer(buf, 0L) {
+                        @Override
+                        public void discard() {
+                            fcont.discard();
+                        }
+                    },
+                    uso,
+                    true);
 
             //Optionally store a reference to the block in the in memory deque
             if (!actuallyPoll) {
