@@ -163,7 +163,7 @@ public class TestCtrlC extends TestCase {
     int startClientProcess() throws IOException, Exception {
         String classpath = System.getProperty("java.class.path");
         System.out.println(classpath);
-        ProcessBuilder pb = new ProcessBuilder("java", "-cp", classpath, "org.voltdb.exportclient.ExportToSocketClient");
+        ProcessBuilder pb = new ProcessBuilder("java", "-cp", classpath, "org.voltdb.exportclient.FileClient");
         m_clientProcess = pb.redirectErrorStream(true).start();
         assert(m_clientProcess != null);
 
@@ -179,6 +179,8 @@ public class TestCtrlC extends TestCase {
     }
 
     public void testSimple() throws Exception {
+
+        fail();
 
         VoltDBFickleCluster.compile();
         Random r = new Random();
