@@ -129,8 +129,9 @@ public class ExportGenerationDirectory {
         for (File generationDirectory : generationDirectories) {
             ExportGeneration generation =
                 new ExportGeneration(
-                        Long.valueOf(generationDirectory.getName()),
-                        generationDirectory);
+                        null,
+                        generationDirectory,
+                        Long.valueOf(generationDirectory.getName()));
             generation.initializeGenerationFromDisk();
             offer(Long.valueOf(generationDirectory.getName()), generation);
         }
