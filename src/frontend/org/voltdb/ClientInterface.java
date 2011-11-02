@@ -549,10 +549,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_isAdmin);
             }
             else if (service.startsWith("exportstream:")) {
+                if (!user.authorizeConnector("org.voltdb.export.processors.RawProcessor")) {
+                    responseBuffer.put(AUTHENTICATION_FAILURE).flip();
+                    socket.write(responseBuffer);
+                    socket.close();
+                    authLog.warn("Failure to authorize user " + user.m_name +
+                                 " for " + service + ".");
+                    return null;
+                }
                 String streamname = service.substring("exportstream:".length());
                 handler = ExportManager.instance().createExportStreamHandler(streamname);
             }
             else if (service.startsWith("exportlisting")) {
+                if (!user.authorizeConnector("org.voltdb.export.processors.RawProcessor")) {
+                    responseBuffer.put(AUTHENTICATION_FAILURE).flip();
+                    socket.write(responseBuffer);
+                    socket.close();
+                    authLog.warn("Failure to authorize user " + user.m_name +
+                                 " for " + service + ".");
+                    return null;
+                }
                 handler = ExportManager.instance().createExportListingHandler();
             }
 

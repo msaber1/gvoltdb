@@ -127,24 +127,6 @@ public class ConnectionUtil {
         return getAuthenticatedConnection("database", host, username, hashedPassword, port);
     }
 
-    /**
-     * Create a connection to a Volt server for export and authenticate the connection.
-     * @param host
-     * @param username
-     * @param password
-     * @param port
-     * @throws IOException
-     * @returns An array of objects. The first is an
-     * authenticated socket channel, the second. is an array of 4 longs -
-     * Integer hostId, Long connectionId, Long timestamp (part of instanceId), Int leaderAddress (part of instanceId).
-     * The last object is the build string
-     */
-    public static Object[] getAuthenticatedExportConnection(
-            String host, String username, byte[] hashedPassword, int port) throws IOException
-    {
-        return getAuthenticatedConnection("export", host, username, hashedPassword, port);
-    }
-
     public static Object[] getAuthenticatedExportListingConnection(
         String host, String username, byte[] hashedPassword, int port) throws IOException
     {

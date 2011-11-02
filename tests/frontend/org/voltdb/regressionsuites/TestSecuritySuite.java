@@ -24,18 +24,23 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
+import java.util.TreeSet;
 
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
+import org.voltdb.exportclient.ExportClientListingConnection;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing1;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing2;
 import org.voltdb_testprocs.regressionsuites.securityprocs.DoNothing3;
@@ -225,34 +230,33 @@ public class TestSecuritySuite extends RegressionSuite {
     public void testAllowedExportConnectorPermissions()
     // throws ExportClientException
     {
-        fail();
         // user1 can connect (in groups list)
-        // ExportTestClient eclient = new ExportTestClient(1);
-        // eclient.addCredentials("user1", "password");
-        // eclient.connect();
-        // eclient.disconnect();
+        InetSocketAddress server = new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT);
 
-        // Expected to throw an exception on failure
-        assertTrue(true);
+        ExportClientListingConnection cxn =
+                new ExportClientListingConnection(
+                        server,
+                        "user1",
+                        ConnectionUtil.getHashedPassword("password"),
+                        new TreeSet<Object[]>());
+
+        cxn.run();
+        assertFalse(cxn.m_failed.get());
     }
 
     public void testRejectedExportConnectorPermissions() {
-        fail();
-        /*
-        boolean caught = false;
-        ExportTestClient eclient = new ExportTestClient(1);
-        try {
-            // bad group
-            eclient.addCredentials("user2", "password");
-            eclient.connect();
-        }
-        catch (ExportClientException e) {
-            caught = true;
-        }
-        assertTrue(caught);
+        // user2 can not connect
+        InetSocketAddress server = new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT);
 
-        eclient.disconnect();
-        */
+        ExportClientListingConnection cxn =
+                new ExportClientListingConnection(
+                        server,
+                        "user2",
+                        ConnectionUtil.getHashedPassword("password"),
+                        new TreeSet<Object[]>());
+
+        cxn.run();
+        assertTrue(cxn.m_failed.get());
     }
 
     /**

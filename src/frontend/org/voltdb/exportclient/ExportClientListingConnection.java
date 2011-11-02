@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.LinkedList;
 import java.util.Set;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.export.AdvertisedDataSource;
@@ -29,27 +30,38 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.logging.VoltLogger;
 
 /** Connect to a server and publish a list of available data channels */
-class ExportClientListingConnection implements Runnable {
+public class ExportClientListingConnection implements Runnable {
     static final VoltLogger LOG = new VoltLogger("ExportClient");
     final InetSocketAddress m_server;
+    final String m_username;
+    final byte[] m_hashedPassword;
     final Set<Object[]> m_results;
     final AdvertisedDataSource m_ackedAdvertisement;
     final long m_ackedBytes;
 
+    // Allow users to query simple pass/fail.
+    public AtomicBoolean m_failed = new AtomicBoolean(false);
+
     /** Create a connection to read the advertisement listing */
     public ExportClientListingConnection(InetSocketAddress server,
+        String username,
+        byte[] hashedPassword,
         Set<Object[]> results)
     {
-        this(server, results, null, 0L);
+        this(server, username, hashedPassword, results, null, 0L);
     }
 
     /** Create a connection to ack an advertisement and read the current listing */
     public ExportClientListingConnection(InetSocketAddress server,
-        Set<Object[]> results,
-        AdvertisedDataSource ackedAdvertisement,
+            String username,
+            byte[] hashedPassword,
+            Set<Object[]> results,
+            AdvertisedDataSource ackedAdvertisement,
         long ackedByteCount)
     {
         m_server = server;
+        m_username = username;
+        m_hashedPassword = hashedPassword.clone();
         m_results = results;
         m_ackedBytes = ackedByteCount;
         m_ackedAdvertisement = ackedAdvertisement;
@@ -132,8 +144,8 @@ class ExportClientListingConnection implements Runnable {
         try {
             Object[] cxndata = ConnectionUtil.getAuthenticatedExportListingConnection(
                 m_server.getHostName(),
-                null,
-                null,
+                m_username,
+                m_hashedPassword,
                 m_server.getPort());
             socket = (SocketChannel) cxndata[0];
             if (socket == null) {
@@ -145,6 +157,7 @@ class ExportClientListingConnection implements Runnable {
             poll(socket);
         } catch(IOException e) {
             LOG.error(e);
+            m_failed.set(true);
         } finally {
             try {
                 if (socket != null)

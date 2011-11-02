@@ -29,6 +29,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
 import org.voltdb.VoltDB;
+import org.voltdb.client.ConnectionUtil;
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
 
@@ -62,6 +63,10 @@ public class ExportClient {
     private final List<InetSocketAddress> m_servers =
         new LinkedList<InetSocketAddress>();
 
+    // authentication components
+    private String m_username = null;
+    private byte[] m_hashedPassword = null;
+
     // pool of I/O workers
     private final ExecutorService m_workerPool =
         Executors.newFixedThreadPool(4);
@@ -87,8 +92,9 @@ public class ExportClient {
         public void run() {
             ExportClient.this.m_workerPool.execute(
                 new ExportClientListingConnection(m_server,
-                    ExportClient.this.m_advertisements,
-                    m_advertisement, m_ackedByteCount));
+                        m_username, m_hashedPassword,
+                        ExportClient.this.m_advertisements,
+                        m_advertisement, m_ackedByteCount));
         }
     }
 
@@ -139,7 +145,9 @@ public class ExportClient {
         try {
             // seed the advertisement pool
             for (InetSocketAddress s : m_servers) {
-                m_workerPool.execute(new ExportClientListingConnection(s, m_advertisements));
+                m_workerPool.execute(
+                        new ExportClientListingConnection(s,
+                                m_username, m_hashedPassword, m_advertisements));
             }
 
             while (true) {
@@ -152,7 +160,9 @@ public class ExportClient {
                     // block for some period of time - don't spam the server.
                     Thread.sleep(QUIET_POLL_INTERVAL);
                     for (InetSocketAddress s : m_servers) {
-                        m_workerPool.execute(new ExportClientListingConnection(s, m_advertisements));
+                        m_workerPool.execute(
+                                new ExportClientListingConnection(
+                                        s, m_username, m_hashedPassword, m_advertisements));
                     }
                 }
                 else {
@@ -160,9 +170,10 @@ public class ExportClient {
                     AdvertisedDataSource advertisement =  (AdvertisedDataSource) pair[1];
                     m_workerPool.execute(
                         new ExportClientStreamConnection(socket,
-                            advertisement,
-                            new CompletionEvent(advertisement, socket),
-                            m_processorFactory.factory(advertisement)));
+                                m_username, m_hashedPassword,
+                                advertisement,
+                                new CompletionEvent(advertisement, socket),
+                                m_processorFactory.factory(advertisement)));
                 }
             }
         } catch (Exception e) {
@@ -184,6 +195,13 @@ public class ExportClient {
             addr = new InetSocketAddress(parts[0], port);
         }
         m_servers.add(addr);
+    }
+
+    /** Set the authentication username and password */
+    void addCredentials(String username, String password)
+    {
+        m_username = username;
+        m_hashedPassword = ConnectionUtil.getHashedPassword(password);
     }
 
     /** Read command line configuration and fire up an export client */

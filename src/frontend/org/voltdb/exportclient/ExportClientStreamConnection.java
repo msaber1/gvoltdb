@@ -33,17 +33,23 @@ class ExportClientStreamConnection implements Runnable {
     static final VoltLogger LOG = new VoltLogger("ExportClient");
     private final AdvertisedDataSource m_advertisement;
     private final InetSocketAddress m_server;
+    private final String m_username;
+    private final byte[] m_hashedPassword;
     private final CompletionEvent m_onCompletion;
     private final ExportClientProcessor m_processor;
 
     public ExportClientStreamConnection(
             InetSocketAddress server,
+            String username,
+            byte[] hashedPassword,
             AdvertisedDataSource nextAdvertisement,
             CompletionEvent onCompletion,
             ExportClientProcessor processor)
     {
         m_advertisement = nextAdvertisement;
         m_server = server;
+        m_username = username;
+        m_hashedPassword = hashedPassword;
         m_onCompletion = onCompletion;
         m_processor = processor;
     }
@@ -62,8 +68,8 @@ class ExportClientStreamConnection implements Runnable {
             Object[] cxndata = ConnectionUtil.getAuthenticatedExportStreamConnection(
                 m_advertisement.signature,
                 m_server.getHostName(),
-                null,
-                null,
+                m_username,
+                m_hashedPassword,
                 m_server.getPort());
             socket = (SocketChannel) cxndata[0];
             socket.configureBlocking(true);
