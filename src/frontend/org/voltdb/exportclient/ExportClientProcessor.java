@@ -43,4 +43,7 @@ public interface ExportClientProcessor {
 
     /** Indicate an advertisement is complete. */
     public void done(CompletionEvent completionEvent);
+
+    /** Indicate a fatal, unrecoverable error has occurred */
+    public void error(Exception e);
 }

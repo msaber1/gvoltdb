@@ -58,6 +58,12 @@ public class FileClient implements ExportClientProcessorFactory
             // Complete with the ExportClient
             completionEvent.run();
         }
+
+        /** ExportClientProcess interface to indicate error */
+        @Override
+        public void error(Exception e) {
+            // TODO: need to clean up the file with the ExportToFileDecoder
+        }
     }
 
     /** ECPFactory interface to make an ECP for a new advertisement */

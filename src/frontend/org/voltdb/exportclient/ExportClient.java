@@ -27,6 +27,9 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltdb.VoltDB;
 import org.voltdb.client.ConnectionUtil;
@@ -71,8 +74,21 @@ public class ExportClient {
     private final ExecutorService m_workerPool =
         Executors.newFixedThreadPool(4);
 
+    // set this to true to terminate the export client
+    final AtomicBoolean m_shutdown = new AtomicBoolean(false);
+
     // data processor - accepts exported bytes as its input
     final ExportClientProcessorFactory m_processorFactory;
+
+    /** A hook that allows SIGINT to shutdown the system somewhat gracefully */
+    Thread m_shutdownHook = new Thread() {
+        @Override
+        public void run() {
+            final VoltLogger log = new VoltLogger("ExportClient");
+            log.info("Received request to shutdown.");
+            ExportClient.this.m_shutdown.set(true);
+        }
+    };
 
     /** Schedule an ack for a client stream connection */
     class CompletionEvent {
@@ -90,16 +106,22 @@ public class ExportClient {
         }
 
         public void run() {
-            ExportClient.this.m_workerPool.execute(
-                new ExportClientListingConnection(m_server,
-                        m_username, m_hashedPassword,
-                        ExportClient.this.m_advertisements,
-                        m_advertisement, m_ackedByteCount));
+            try {
+                ExportClient.this.m_workerPool.submit(
+                        new ExportClientListingConnection(m_server,
+                                m_username, m_hashedPassword,
+                                ExportClient.this.m_advertisements,
+                                m_advertisement, m_ackedByteCount));
+            } catch (RejectedExecutionException e) {
+                if (ExportClient.this.m_shutdown.get() == false) {
+                    ExportClient.LOG.error("Failed to submit completion task.", e);
+                }
+            }
         }
     }
 
     /** Testing processor that counts bytes and is its own factory */
-    private static class NullProcessor
+    static class NullProcessor
         implements ExportClientProcessor, ExportClientProcessorFactory
     {
         private long totalBytes = 0;
@@ -130,6 +152,11 @@ public class ExportClient {
         public void done(CompletionEvent completionEvent) {
             completionEvent.run();
         }
+
+        @Override
+        public void error(Exception e) {
+            // this condition is already logged.
+        }
     }
 
     /** Create an export client that will push data through the processor */
@@ -142,15 +169,18 @@ public class ExportClient {
 
     /** Loop forever reading advertisements and processing data channels */
     public void start() {
+
+        Runtime.getRuntime().addShutdownHook(m_shutdownHook);
+
         try {
             // seed the advertisement pool
             for (InetSocketAddress s : m_servers) {
-                m_workerPool.execute(
+                m_workerPool.submit(
                         new ExportClientListingConnection(s,
                                 m_username, m_hashedPassword, m_advertisements));
             }
 
-            while (true) {
+            while (m_shutdown.get() == false) {
                 Object[] pair = null;
                 Iterator<Object[]> it = m_advertisements.iterator();
                 if (it.hasNext()) {
@@ -160,7 +190,7 @@ public class ExportClient {
                     // block for some period of time - don't spam the server.
                     Thread.sleep(QUIET_POLL_INTERVAL);
                     for (InetSocketAddress s : m_servers) {
-                        m_workerPool.execute(
+                        m_workerPool.submit(
                                 new ExportClientListingConnection(
                                         s, m_username, m_hashedPassword, m_advertisements));
                     }
@@ -168,7 +198,7 @@ public class ExportClient {
                 else {
                     InetSocketAddress socket = (InetSocketAddress) pair[0];
                     AdvertisedDataSource advertisement =  (AdvertisedDataSource) pair[1];
-                    m_workerPool.execute(
+                    m_workerPool.submit(
                         new ExportClientStreamConnection(socket,
                                 m_username, m_hashedPassword,
                                 advertisement,
@@ -176,8 +206,17 @@ public class ExportClient {
                                 m_processorFactory.factory(advertisement)));
                 }
             }
+
+            // shutdown will interrupt in-progress runnable(s).
+            // they should do the right thing in response.
+            // the right thing can not be to schedule another runnable.
+            m_workerPool.shutdownNow();
+            m_workerPool.awaitTermination(1, TimeUnit.MINUTES);
+
         } catch (Exception e) {
             LOG.error(e);
+        } finally {
+            Runtime.getRuntime().removeShutdownHook(m_shutdownHook);
         }
     }
 

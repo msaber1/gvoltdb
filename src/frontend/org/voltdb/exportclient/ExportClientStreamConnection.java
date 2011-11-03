@@ -87,9 +87,11 @@ class ExportClientStreamConnection implements Runnable {
 
             // trigger the ack for this advertisement
             m_onCompletion.setProcessedByteCount(totalBytes);
+            m_processor.done(m_onCompletion);
         }
-        catch (IOException e) {
+        catch (Exception e) {
             LOG.error(e);
+            m_processor.error(e);
         }
         finally {
             try {

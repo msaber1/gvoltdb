@@ -155,7 +155,7 @@ public class ExportClientListingConnection implements Runnable {
             socket.configureBlocking(true);
             ack(socket);
             poll(socket);
-        } catch(IOException e) {
+        } catch(Exception e) {
             LOG.error(e);
             m_failed.set(true);
         } finally {
