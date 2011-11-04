@@ -64,13 +64,18 @@ class ExportClientStreamConnection implements Runnable {
 
         LOG.info("Retrieving data for advertisement: " + m_advertisement);
 
+        String compositeIdentity =
+                m_advertisement.m_generation + "-" +
+                m_advertisement.partitionId + "-" +
+                m_advertisement.signature;
+
         try {
             Object[] cxndata = ConnectionUtil.getAuthenticatedExportStreamConnection(
-                m_advertisement.signature,
-                m_server.getHostName(),
-                m_username,
-                m_hashedPassword,
-                m_server.getPort());
+                    compositeIdentity,
+                    m_server.getHostName(),
+                    m_username,
+                    m_hashedPassword,
+                    m_server.getPort());
             socket = (SocketChannel) cxndata[0];
             socket.configureBlocking(true);
             reader = new BufferedInputStream(socket.socket().getInputStream());

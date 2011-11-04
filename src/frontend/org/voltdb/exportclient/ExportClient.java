@@ -51,8 +51,8 @@ public class ExportClient {
     private static class AdvertisementComparator implements Comparator<Object[]> {
         @Override
         public int compare(Object[] o1, Object[] o2) {
-            String genId1 = (String)o1[1];
-            String genId2 = (String)o2[1];
+            AdvertisedDataSource genId1 = (AdvertisedDataSource)o1[1];
+            AdvertisedDataSource genId2 = (AdvertisedDataSource)o2[1];
             return genId1.compareTo(genId2);
         }
     }
@@ -60,15 +60,16 @@ public class ExportClient {
     // unserviced advertisements (InetSocketAddress, AdvertisedDataSource) pairs
     Set<Object[]> m_advertisements =
             Collections.synchronizedSet(
-                    new TreeSet<Object[]>(new AdvertisementComparator()));
+                new TreeSet<Object[]>(new AdvertisementComparator())
+            );
 
     // servers, configured and discovered
     private final List<InetSocketAddress> m_servers =
         new LinkedList<InetSocketAddress>();
 
     // authentication components
-    private String m_username = null;
-    private byte[] m_hashedPassword = null;
+    private String m_username = "export";
+    private byte[] m_hashedPassword = ConnectionUtil.getHashedPassword("");
 
     // pool of I/O workers
     private final ExecutorService m_workerPool =
@@ -214,7 +215,7 @@ public class ExportClient {
             m_workerPool.awaitTermination(1, TimeUnit.MINUTES);
 
         } catch (Exception e) {
-            LOG.error(e);
+            LOG.error("Unexpected exception terminating ExportClient", e);
         } finally {
             Runtime.getRuntime().removeShutdownHook(m_shutdownHook);
         }

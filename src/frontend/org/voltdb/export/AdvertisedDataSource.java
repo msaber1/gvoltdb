@@ -26,7 +26,7 @@ import org.voltdb.messaging.FastDeserializer;
 /**
  * The Export data source metadata returned in a kOpenResponse message.
  */
-public class AdvertisedDataSource {
+public class AdvertisedDataSource implements Comparable<AdvertisedDataSource> {
     final public int partitionId;
     final public String signature;
     final public String tableName;
@@ -54,6 +54,25 @@ public class AdvertisedDataSource {
         }
         return false;
     }
+
+    /** returns a negative integer, zero, or a positive integer as this object is less than,
+     * equal to, or greater than the specified object. */
+    @Override
+    public int compareTo(AdvertisedDataSource that) {
+        if (this.m_generation < that.m_generation) {
+            return -1;
+        } else if (this.m_generation > that.m_generation) {
+            return 1;
+        }
+
+        int stringCompare = this.signature.compareTo(that.signature);
+        if (stringCompare != 0) {
+            return stringCompare;
+        }
+
+        return this.partitionId - that.partitionId;
+    }
+
 
     public AdvertisedDataSource(int p_id, String t_signature, String t_name,
                                 long systemStartTimestamp,
@@ -107,4 +126,5 @@ public class AdvertisedDataSource {
     public String toString() {
         return "Generation: " + m_generation + " Table: " + tableName + " partition " + partitionId + " signature " + signature;
     }
+
 }

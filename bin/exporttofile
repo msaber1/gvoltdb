@@ -118,6 +118,6 @@ CLASSPATH=${CLASSPATH}:${EXTRA_CLASSPATH}
 
 # run it
 export CMDVAL="$JAVA $JAVA_HEAP_MAX $VOLTDB_OPTS -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
-export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.exportclient.ExportToFileClient $@"
+export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.exportclient.FileClient $@"
 #echo $CMDVAL
 exec $CMDVAL

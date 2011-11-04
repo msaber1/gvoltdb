@@ -21,9 +21,12 @@ import java.nio.ByteBuffer;
 
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClient.CompletionEvent;
+import org.voltdb.logging.VoltLogger;
 
 public class FileClient implements ExportClientProcessorFactory
 {
+    static final VoltLogger LOG = new VoltLogger("ExportClient");
+
     // Configuration parsed from the command line.
     final FileClientConfiguration m_cfg;
 
@@ -35,9 +38,9 @@ public class FileClient implements ExportClientProcessorFactory
     {
         final ExportToFileDecoder m_decoder;
 
-        DecoderWrapper(FileClientConfiguration config) {
+        DecoderWrapper(AdvertisedDataSource ad, FileClientConfiguration config) {
             // need to coordinate with the file roller here.
-            m_decoder = new ExportToFileDecoder(null, config);
+            m_decoder = new ExportToFileDecoder(ad, config);
         }
 
         /** ExportClientProcessor interface to obtain a new buffer */
@@ -69,20 +72,26 @@ public class FileClient implements ExportClientProcessorFactory
     /** ECPFactory interface to make an ECP for a new advertisement */
     @Override
     public ExportClientProcessor factory(AdvertisedDataSource advertisement) {
-        return new DecoderWrapper(m_cfg);
+        return new DecoderWrapper(advertisement, m_cfg);
     }
 
     /** Configure and start exporting */
     public static void main(String[] args) {
-        FileClientConfiguration config = new FileClientConfiguration(args);
-        FileClient fileClient = new FileClient(config);
-        ExportClient exportClient = new ExportClient(fileClient);
+        try {
+            FileClientConfiguration config = new FileClientConfiguration(args);
+            FileClient fileClient = new FileClient(config);
+            ExportClient exportClient = new ExportClient(fileClient);
 
-       for (String server : config.voltServers()) {
-           exportClient.addServerInfo(server, config.useAdminPorts());
-       }
+            for (String server : config.voltServers()) {
+                exportClient.addServerInfo(server, config.useAdminPorts());
+            }
 
-       exportClient.start();
+            exportClient.start();
+        }
+        catch (Exception e) {
+            e.printStackTrace(System.err);
+            LOG.fatal("Unexpected exception running FileClient", e);
+        }
     }
 
 

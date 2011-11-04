@@ -103,6 +103,7 @@ public class ExportClientListingConnection implements Runnable {
         }
         adCount.flip();
         int count = adCount.getInt();
+        LOG.info("Found " + count + " advertisements from " + m_server);
 
         for (int i=0; i < count; i++) {
             ByteBuffer msgSize = ByteBuffer.allocate(4);
@@ -130,7 +131,6 @@ public class ExportClientListingConnection implements Runnable {
             AdvertisedDataSource ad = AdvertisedDataSource.deserialize(msgBytes);
             advertisements.add(ad);
         }
-        LOG.info("Found " + advertisements.size() + " advertisements from " + m_server);
         for (AdvertisedDataSource a : advertisements) {
             m_results.add(new Object[] {m_server, a});
         }
@@ -156,7 +156,7 @@ public class ExportClientListingConnection implements Runnable {
             ack(socket);
             poll(socket);
         } catch(Exception e) {
-            LOG.error(e);
+            LOG.error("Unexpected exception terminating export listing request", e);
             m_failed.set(true);
         } finally {
             try {
