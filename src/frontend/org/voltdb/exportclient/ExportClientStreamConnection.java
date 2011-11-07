@@ -88,7 +88,7 @@ class ExportClientStreamConnection implements Runnable {
                 if (LOG.isTraceEnabled()) {
                     LOG.trace("Advertisement " + m_advertisement + " read " + bytesRead);
                 }
-                m_processor.offer(m_advertisement, buf);
+                m_processor.offer(buf);
             } while(bytesRead > 0);
 
             // trigger the ack for this advertisement

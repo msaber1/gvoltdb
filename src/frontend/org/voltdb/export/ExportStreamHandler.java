@@ -78,14 +78,45 @@ public class ExportStreamHandler implements InputHandler {
     /** The writer instance */
     private final ExportStreamHandler.Writer m_writer;
 
-    /** Schedules m_writer when the queue falls below kLowWaterMark bytes */
+    /** Closes the connection when the stream block queue is empty */
+    class Done implements Runnable {
+        @Override
+        public void run() {
+            try {
+                if (!m_sbq.endOfStream())
+                    throw new IOException("Error: tried to close unfinished stream block queue.");
+                if (!m_sbq.isEmpty())
+                    throw new IOException("Error: tried to  close unempty stream block queue");
+
+                m_cxn.unregister();
+            } catch (IOException e) {
+                // TODO: needs to log.
+                System.err.println(e.getMessage());
+                e.printStackTrace();
+            }
+        }
+    }
+
+    /** The done instance */
+    private final ExportStreamHandler.Done m_done;
+
+    /** Schedules a transfer from sbq when cxn queue falls below kLowWaterMark bytes */
     class WriteMonitor implements QueueMonitor {
         @Override
         public boolean queue(int bytes) {
             int queued = counter.addAndGet(bytes);
-            if (queued < kLowWaterMark) {
+
+            // If the last bytes of a closed stream were transferred, schedule
+            // the close of the connection.
+            if (queued == 0 && m_sbq.endOfStream()) {
+                m_cxn.scheduleRunnable(ExportStreamHandler.this.m_done);
+            }
+
+            // Otherwise, transfer more bytes from the stream block queue.
+            else if (queued < kLowWaterMark) {
                 m_cxn.scheduleRunnable(ExportStreamHandler.this.m_writer);
             }
+
             // never request artificial back-pressure
             return false;
         }
@@ -96,6 +127,7 @@ public class ExportStreamHandler implements InputHandler {
         m_streamName = streamname;
         m_sbq = sbq;
         m_writer = this.new Writer();
+        m_done = this.new Done();
     }
 
     @Override

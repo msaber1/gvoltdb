@@ -361,7 +361,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                 assert(buffer == null);
                 assert(!sync);
                 m_endOfStream = endOfStream;
-
+                m_committedBuffers.setEndOfStream();
                 if (m_committedBuffers.sizeInBytes() == 0) {
                     exportLog.info("Pushed EOS buffer with 0 bytes remaining");
                     try {

@@ -154,7 +154,7 @@
             <arg value="--pool=50000000"/>
             <arg value="--procedure=${proc}"/>
             <arg value="--threads=1"/>
-            <arg value="--rate=200000"/>
+            <arg value="--rate=1000"/>
             <arg value="--async"/>
             <arg value="--share-connection"/>
             <arg value="--duration=3000"/>

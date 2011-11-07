@@ -55,6 +55,17 @@ public class StreamBlockQueue {
 
     private final String m_nonce;
 
+    /** Set to true when the controlling datasource receives end of stream */
+    private Boolean m_endOfStream = false;
+
+    public void setEndOfStream() {
+        m_endOfStream = true;
+    }
+
+    public Boolean endOfStream() {
+        return m_endOfStream;
+    }
+
     public StreamBlockQueue(String path, String nonce) throws java.io.IOException {
         m_persistentDeque = new PersistentBinaryDeque( nonce, new VoltFile(path));
         m_nonce = nonce;

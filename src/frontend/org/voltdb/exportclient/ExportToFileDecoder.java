@@ -44,16 +44,17 @@ class ExportToFileDecoder extends ExportDecoderBase {
     // ODBC time-stamp format: millisecond granularity
     protected static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
 
-
-    // transient per-block state
-    protected PeriodicExportContext m_context = null;
-    protected CSVWriter m_writer = null;
+    protected final PeriodicExportContext m_context;
+    protected final CSVWriter m_writer;
 
     public ExportToFileDecoder(
+            PeriodicExportContext context,
             AdvertisedDataSource source,
             FileClientConfiguration config)
     {
         super(source);
+        m_context = context;
+        m_writer = m_context.getWriter(source.tableName, source.m_generation);
         m_cfg = config;
         setSchemaForSource(source);
 
@@ -63,6 +64,8 @@ class ExportToFileDecoder extends ExportDecoderBase {
                 return new SimpleDateFormat(ODBC_DATE_FORMAT_STRING);
             }
         };
+
+        m_context.addDecoder(this);
     }
 
     /**
@@ -155,7 +158,6 @@ class ExportToFileDecoder extends ExportDecoderBase {
             if (m_context != null) {
                 m_context.decref(this);
             }
-            m_context = null;
         }
     }
 
@@ -165,7 +167,6 @@ class ExportToFileDecoder extends ExportDecoderBase {
             if (m_writer != null) {
                 m_writer.flush();
                 m_writer.close();
-                m_writer = null;
             }
         }
         catch (Exception e) {

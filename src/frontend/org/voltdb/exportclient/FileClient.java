@@ -18,6 +18,7 @@ package org.voltdb.exportclient;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Date;
 
 import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClient.CompletionEvent;
@@ -30,49 +31,72 @@ public class FileClient implements ExportClientProcessorFactory
     // Configuration parsed from the command line.
     final FileClientConfiguration m_cfg;
 
+    // Use a PeriodicExportContext to manage filenames and CSV configuration
+    private final PeriodicExportContext m_currentContext;
+
     FileClient(FileClientConfiguration config) {
         m_cfg = config;
+        m_currentContext = new PeriodicExportContext(new Date(), m_cfg);
     }
 
+    // DecoderWrapper maps the processer interface to ExportToFileDecoder.
     private static class DecoderWrapper implements ExportClientProcessor
     {
-        final ExportToFileDecoder m_decoder;
+        private final ExportToFileDecoder m_decoder;
+        private final AdvertisedDataSource m_ad;
 
-        DecoderWrapper(AdvertisedDataSource ad, FileClientConfiguration config) {
-            // need to coordinate with the file roller here.
-            m_decoder = new ExportToFileDecoder(ad, config);
+        DecoderWrapper(ExportToFileDecoder decoder, AdvertisedDataSource ad) {
+            m_decoder = decoder;
+            m_ad = ad;
         }
 
-        /** ExportClientProcessor interface to obtain a new buffer */
+        /** ECP interface to obtain a new buffer */
         @Override
         public ByteBuffer emptyBuffer() {
             return ByteBuffer.allocate(1024 * 1024 * 2);
         }
 
-        /** ExportClientProcessor interface to receive a new buffer */
+        /** ECP interface to receive a new buffer */
         @Override
-        public void offer(AdvertisedDataSource advertisement, ByteBuffer buf) throws IOException {
+        public void offer(ByteBuffer buf) throws IOException {
             m_decoder.decode(buf);
         }
 
-        /** ExportClientProcessor interface to complete an advertisement */
+        /** ECP interface to complete an advertisement */
         @Override
         public void done(CompletionEvent completionEvent) {
+            // Complete with the Decoder
+            LOG.info("Completing advertisement " + m_ad);
+            m_decoder.onBlockCompletion();
+
             // Complete with the ExportClient
             completionEvent.run();
         }
 
-        /** ExportClientProcess interface to indicate error */
+        /** ECP interface to indicate error */
         @Override
         public void error(Exception e) {
             // TODO: need to clean up the file with the ExportToFileDecoder
         }
     }
 
-    /** ECPFactory interface to make an ECP for a new advertisement */
+    /**
+     * ECPFactory interface to make an ECP for a new advertisement
+     * The factory is the only public interface to the FileClient and
+     * can be invoked concurrently by ExportClient. Synchronization here
+     * keeps changes to m_currentContext thread safe.
+     *
+     * Note that the periodic context is handed off to multiple decoders.
+     * The PeriodicExportContext is responsible for its own safety.
+     *
+     * Once synchronized here, the DecoderWrapper is never reentrantly
+     * invoked by ExportClient.
+     */
     @Override
-    public ExportClientProcessor factory(AdvertisedDataSource advertisement) {
-        return new DecoderWrapper(advertisement, m_cfg);
+    synchronized public ExportClientProcessor factory(AdvertisedDataSource advertisement) {
+        ExportToFileDecoder decoder =
+                new ExportToFileDecoder(m_currentContext, advertisement, m_cfg);
+        return new DecoderWrapper(decoder, advertisement);
     }
 
     /** Configure and start exporting */

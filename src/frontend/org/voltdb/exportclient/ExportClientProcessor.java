@@ -20,7 +20,6 @@ package org.voltdb.exportclient;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
-import org.voltdb.export.AdvertisedDataSource;
 import org.voltdb.exportclient.ExportClient.CompletionEvent;
 
 /**
@@ -39,7 +38,7 @@ public interface ExportClientProcessor {
      * Hand-off a buffer of export data.
      * @throws IOException if data could not be buffered or processed.
      * */
-    public void offer(AdvertisedDataSource advertisement, ByteBuffer buf) throws IOException;
+    public void offer(ByteBuffer buf) throws IOException;
 
     /** Indicate an advertisement is complete. */
     public void done(CompletionEvent completionEvent);

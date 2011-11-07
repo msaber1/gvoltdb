@@ -47,7 +47,7 @@ public class ExportClient {
     // sleep time between advertisement polls when empty.
     private static final long QUIET_POLL_INTERVAL = 5000;
 
-    // orders advertisements by the advertisement string.
+    // orders advertisements by generation and partition and signature
     private static class AdvertisementComparator implements Comparator<Object[]> {
         @Override
         public int compare(Object[] o1, Object[] o2) {
@@ -78,10 +78,10 @@ public class ExportClient {
     // set this to true to terminate the export client
     final AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
-    // data processor - accepts exported bytes as its input
+    // a client processor accepts exported bytes as input
     final ExportClientProcessorFactory m_processorFactory;
 
-    /** A hook that allows SIGINT to shutdown the system somewhat gracefully */
+    /** SIGINT shutdown hook */
     Thread m_shutdownHook = new Thread() {
         @Override
         public void run() {
@@ -139,13 +139,12 @@ public class ExportClient {
         }
 
         @Override
-        public void offer(AdvertisedDataSource advertisement, ByteBuffer buf) {
+        public void offer(ByteBuffer buf) {
             totalBytes += buf.limit();
             if (totalBytes > lastLogged + (1024*1024*5)) {
                 lastLogged = totalBytes;
-                LOG.info("Advertisement " + advertisement +
-                        " read " + totalBytes +
-                        ". Last read: " + buf.limit());
+                LOG.info(" read " + totalBytes +
+                         ". Last read: " + buf.limit());
             }
         }
 
@@ -174,10 +173,12 @@ public class ExportClient {
         try {
             while (m_shutdown.get() == false) {
                 Object[] pair = null;
-                Iterator<Object[]> it = m_advertisements.iterator();
-                if (it.hasNext()) {
-                    pair = it.next();
-                    it.remove();
+                synchronized (m_advertisements) {
+                    Iterator<Object[]> it = m_advertisements.iterator();
+                    if (it.hasNext()) {
+                        pair = it.next();
+                        it.remove();
+                    }
                 }
                 if (pair == null) {
                     for (InetSocketAddress s : m_servers) {
