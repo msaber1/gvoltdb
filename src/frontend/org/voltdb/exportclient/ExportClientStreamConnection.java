@@ -82,6 +82,7 @@ class ExportClientStreamConnection implements Runnable {
             do {
                 ByteBuffer buf = m_processor.emptyBuffer();
                 bytesRead = reader.read(buf.array());
+                buf.position((int) bytesRead);
                 buf.flip();
                 totalBytes += buf.limit();
                 if (LOG.isTraceEnabled()) {
@@ -95,7 +96,7 @@ class ExportClientStreamConnection implements Runnable {
             m_processor.done(m_onCompletion);
         }
         catch (Exception e) {
-            LOG.error(e);
+            LOG.error("Unexpected error terminating stream " + m_advertisement, e);
             m_processor.error(e);
         }
         finally {
@@ -104,8 +105,7 @@ class ExportClientStreamConnection implements Runnable {
                     socket.close();
                 }
             }
-            catch (IOException e) {
-                LOG.error(e);
+            catch (IOException ignored) {
             }
         }
     }

@@ -170,31 +170,24 @@ public class ExportClient {
 
     /** Loop forever reading advertisements and processing data channels */
     public void start() {
-
         Runtime.getRuntime().addShutdownHook(m_shutdownHook);
-
         try {
-            // seed the advertisement pool
-            for (InetSocketAddress s : m_servers) {
-                m_workerPool.submit(
-                        new ExportClientListingConnection(s,
-                                m_username, m_hashedPassword, m_advertisements));
-            }
-
             while (m_shutdown.get() == false) {
                 Object[] pair = null;
                 Iterator<Object[]> it = m_advertisements.iterator();
                 if (it.hasNext()) {
                     pair = it.next();
+                    it.remove();
                 }
                 if (pair == null) {
-                    // block for some period of time - don't spam the server.
-                    Thread.sleep(QUIET_POLL_INTERVAL);
                     for (InetSocketAddress s : m_servers) {
                         m_workerPool.submit(
                                 new ExportClientListingConnection(
                                         s, m_username, m_hashedPassword, m_advertisements));
                     }
+                    // block for some period of time - don't spam the server for listings.
+                    Thread.sleep(QUIET_POLL_INTERVAL);
+                    continue;
                 }
                 else {
                     InetSocketAddress socket = (InetSocketAddress) pair[0];
@@ -213,7 +206,6 @@ public class ExportClient {
             // the right thing can not be to schedule another runnable.
             m_workerPool.shutdownNow();
             m_workerPool.awaitTermination(1, TimeUnit.MINUTES);
-
         } catch (Exception e) {
             LOG.error("Unexpected exception terminating ExportClient", e);
         } finally {

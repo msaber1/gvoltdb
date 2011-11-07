@@ -80,22 +80,19 @@ public abstract class ExportDecoderBase {
     // when done, m_undecoded will have appended buf and will have its
     // position set to 0.
     private void appendToUndecoded(ByteBuffer buf) {
-        int currCapacity = m_undecoded.capacity();
         boolean appended = false;
         // move previous unprocessed bytes to the front
         m_undecoded.compact();
         do {
             try {
                 m_undecoded.put(buf);
+                m_undecoded.flip();
                 appended = true;
             } catch (BufferOverflowException e) {
-                currCapacity *= 2;
-                ByteBuffer tmp = ByteBuffer.allocate(currCapacity);
+                ByteBuffer tmp = ByteBuffer.allocate(m_undecoded.capacity() * 2);
                 tmp.put(m_undecoded);
-                tmp.put(buf);
                 m_undecoded = tmp;
             }
-            m_undecoded.flip();
         } while (!appended);
     }
 
@@ -107,23 +104,22 @@ public abstract class ExportDecoderBase {
 
         // get this working first and eliminate this copy later
         appendToUndecoded(buf);
-        ByteBuffer src = m_undecoded;
 
         do {
-            // not enough data to frame anything else
-            if (src.limit() - src.position() < 4) {
+            // not enough data to read the length prefix
+            if (m_undecoded.remaining() < 4) {
                 break;
             }
-            src.mark();
-            int rowlength = src.getInt();
-            // not enough data to frame a full row
-            if (src.limit() - src.position() < rowlength) {
-                src.reset();
+            m_undecoded.mark();
+            int rowlength = m_undecoded.getInt();
+            // not enough data to frame a row
+            if (m_undecoded.remaining() < rowlength) {
+                m_undecoded.reset();
                 break;
             }
             byte[] row = new byte[rowlength];
-            src.get(row, 0, rowlength);
-            decodeRow(row);
+            m_undecoded.get(row, 0, rowlength);
+            processRow(rowlength, row);
         } while (true);
     }
 
