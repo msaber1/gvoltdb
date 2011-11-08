@@ -96,7 +96,12 @@ class ExportClientStreamConnection implements Runnable {
             m_processor.done(m_onCompletion);
         }
         catch (Exception e) {
-            LOG.error("Unexpected error terminating stream " + m_advertisement, e);
+            if (e.getMessage().contains("Authentication rejected")) {
+                LOG.info("Stream unavailable to client: " + m_advertisement);
+            }
+            else {
+                LOG.error("Unexpected error. Terminating stream " + m_advertisement, e);
+            }
             m_processor.error(e);
         }
         finally {
