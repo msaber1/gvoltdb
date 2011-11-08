@@ -33,7 +33,11 @@ import org.voltdb.utils.VoltFile;
 
 /**
  *  An interface to list, claim and unclaim, create and delete
- *  export generations.
+ *  export generations. Note that each ListingHandler being served
+ *  to the outside world has a reference to the directory. There
+ *  can be multiple listing handlers and multiple source-reservations
+ *  concurrently (via new StreamHandlers).  This all necessatitates
+ *  a thread safe export generation directory.
  */
 public class ExportGenerationDirectory {
 
@@ -63,7 +67,7 @@ public class ExportGenerationDirectory {
     }
 
     /** Produce a description of the available data sources. */
-    void createListing(FastSerializer fs) throws IOException
+    synchronized void createListing(FastSerializer fs) throws IOException
     {
         // todo: this is idiotic but.. FS rant.
         int found = 0;
@@ -72,8 +76,9 @@ public class ExportGenerationDirectory {
             for(Entry<Integer, HashMap<String, ExportDataSource>> ds :
                 e.getValue().m_dataSourcesByPartition.entrySet()) {
                 for(Entry<String, ExportDataSource> d : ds.getValue().entrySet()) {
-                    assert(d.getValue() != null); //silence warning
-                    found++;
+                    if (!d.getValue().isReserved()) {
+                        found++;
+                    }
                 }
             }
         }
@@ -84,14 +89,16 @@ public class ExportGenerationDirectory {
             for(Entry<Integer, HashMap<String, ExportDataSource>> ds :
                 e.getValue().m_dataSourcesByPartition.entrySet()) {
                 for(Entry<String, ExportDataSource> d : ds.getValue().entrySet()) {
-                    d.getValue().writeAdvertisementTo(fs);
+                    if (!d.getValue().isReserved()) {
+                        d.getValue().writeAdvertisementTo(fs);
+                    }
                 }
             }
         }
     }
 
     /** Remove all on-disk generations or die trying. */
-    public void deletePersistedGenerations()
+    synchronized public void deletePersistedGenerations()
     {
         File exportOverflowDirectory = new File(m_overflowPath);
         exportLog.info("Deleting export overflow data from " + exportOverflowDirectory);
@@ -114,7 +121,7 @@ public class ExportGenerationDirectory {
     }
 
     /** Initialize the directory from the on-disk contents */
-    void initializePersistedWindows() throws IOException
+    synchronized void initializePersistedWindows() throws IOException
     {
         TreeSet<File> generationDirectories = new TreeSet<File>();
         for (File f : m_exportOverflowDirectory.listFiles()) {
@@ -138,7 +145,7 @@ public class ExportGenerationDirectory {
     }
 
     /** Close all generations. */
-    public void closeAllGenerations()
+    synchronized public void closeAllGenerations()
     {
         for (ExportGeneration generation : m_library.get().values()) {
             generation.close();
@@ -146,7 +153,7 @@ public class ExportGenerationDirectory {
     }
 
     /** Estimate total queued bytes in all generations. */
-    public long estimateQueuedBytes(int partitionId, String signature)
+    synchronized public long estimateQueuedBytes(int partitionId, String signature)
     {
         TreeMap<Long, ExportGeneration> generations = m_library.get();
         if (generations.isEmpty()) {
@@ -162,7 +169,7 @@ public class ExportGenerationDirectory {
     }
 
     /** Forget data that follows snapshotTxnId */
-    public void truncateExportToTxnId(long snapshotTxnId)
+    synchronized public void truncateExportToTxnId(long snapshotTxnId)
     {
         for (ExportGeneration generation : m_library.get().values()) {
             generation.truncateExportToTxnId( snapshotTxnId);
@@ -171,19 +178,19 @@ public class ExportGenerationDirectory {
 
 
     /** Get reference to a specific generation in the directory. */
-    public ExportGeneration get(long id)
+    synchronized public ExportGeneration get(long id)
     {
         return m_library.get().get(id);
     }
 
     /** Get reference to first generation in the directory */
-    public ExportGeneration peek()
+    synchronized public ExportGeneration peek()
     {
         return m_library.get().firstEntry().getValue();
     }
 
     /** Pop and return the oldest generation from the directory */
-    public ExportGeneration pop()
+    synchronized public ExportGeneration pop()
     {
         ExportGeneration head = null;
         while (true) {
@@ -200,7 +207,7 @@ public class ExportGenerationDirectory {
     }
 
     /** Add a new generation to the directory */
-    public void offer(long txnId, ExportGeneration exportGeneration)
+    synchronized public void offer(long txnId, ExportGeneration exportGeneration)
     {
         while(true) {
             TreeMap<Long, ExportGeneration> current = m_library.get();

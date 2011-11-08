@@ -171,6 +171,16 @@ public class ExportManager
         return parts[2];
     }
 
+    // extract tablename from a stream name
+    public static String getTableNameFromStreamName(String streamname) {
+        String signature = getSignatureFromStreamName(streamname);
+        String[] parts = signature.split("!");
+        if (parts.length != 2) {
+            return "";
+        }
+        return parts[0];
+    }
+
     /**
      * Create ExportDataStreams for the specified stream name.
      * streamname: generationid-partitionid-signature
@@ -181,6 +191,7 @@ public class ExportManager
         long generationId = getGenerationFromAdvertisement(streamname);
         int partitionId = getPartitionIdFromAdvertisement(streamname);
         String signature = getSignatureFromStreamName(streamname);
+        // String tablename = getTableNameFromStreamName(streamname);
 
         ExportGeneration gen = m_generationDirectory.get(generationId);
         if (gen == null) {
@@ -204,16 +215,15 @@ public class ExportManager
         return new ExportListingHandler();
     }
 
-    public boolean ackStream(String streamname, long byteCount) {
+    public void ackStream(String streamname, long byteCount) throws IOException {
         long generationId = getGenerationFromAdvertisement(streamname);
         int partitionId = getPartitionIdFromAdvertisement(streamname);
         String signature = getSignatureFromStreamName(streamname);
+        // String tablename = getTableNameFromStreamName(streamname);
 
         ExportGeneration gen = m_generationDirectory.get(generationId);
-        if (gen == null) {
-            return false;
-        } else {
-            return gen.acknowledgeExportStreamBlockQueue(partitionId, signature);
+        if (gen != null) {
+            gen.acknowledgeExportStreamBlockQueue(partitionId, signature, byteCount);
         }
     }
 

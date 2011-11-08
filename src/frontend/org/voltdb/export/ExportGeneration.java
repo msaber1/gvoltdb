@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltdb.CatalogContext;
@@ -37,8 +36,11 @@ import org.voltdb.utils.VoltFile;
 
 /**
  * Export data from a single catalog version and database instance.
- *
- */
+ * Note - generations have multiple concurrent owners: each
+ * data source that is being served to the outside or that is being
+ * advertised. Also, each EE can push simultaneously to a generation.
+ * This requires a thread safe export generation.
+  */
 public class ExportGeneration {
     /**
      * Processors also log using this facility.
@@ -52,7 +54,7 @@ public class ExportGeneration {
      * Data sources, one per table per site, provide the interface to
      * poll() and ack() Export data from the execution engines. Data sources
      * are configured by the Export manager at initialization time.
-     * partitionid : <tableid : datasource>.
+     * partitionid : <signature : datasource>.
      */
     public final HashMap<Integer, HashMap<String, ExportDataSource>> m_dataSourcesByPartition =
         new HashMap<Integer, HashMap<String, ExportDataSource>>();
@@ -100,7 +102,7 @@ public class ExportGeneration {
         exportLog.info("Restoring export generation " + generationTimestamp);
     }
 
-    void initializeGenerationFromDisk() {
+    synchronized void initializeGenerationFromDisk() {
         /*
          * Find all the advertisements. Once one is found, extract the nonce
          * and check for any data files related to the advertisement. If no data files
@@ -133,7 +135,7 @@ public class ExportGeneration {
     }
 
 
-    void initializeGenerationFromCatalog(CatalogContext catalogContext,
+    synchronized void initializeGenerationFromCatalog(CatalogContext catalogContext,
             final Connector conn, int hostId)
     {
         /*
@@ -148,7 +150,7 @@ public class ExportGeneration {
 
     }
 
-    public long getQueuedExportBytes(int partitionId, String signature) {
+    synchronized public long getQueuedExportBytes(int partitionId, String signature) {
         //assert(m_dataSourcesByPartition.containsKey(partitionId));
         //assert(m_dataSourcesByPartition.get(partitionId).containsKey(delegateId));
         HashMap<String, ExportDataSource> sources = m_dataSourcesByPartition.get(partitionId);
@@ -203,7 +205,7 @@ public class ExportGeneration {
         }
     }
 
-    void addDataSource(String signature, int partitionId, int siteId, String[] columnNames)
+    synchronized void addDataSource(String signature, int partitionId, int siteId, String[] columnNames)
     {
         String tableName = signature.split("!")[0];
         /*
@@ -242,7 +244,7 @@ public class ExportGeneration {
     /*
      * An unfortunate test only method for supplying a mock source
      */
-    public void addDataSource(ExportDataSource source) {
+    synchronized public void addDataSource(ExportDataSource source) {
         HashMap<String, ExportDataSource> dataSourcesForPartition =
             m_dataSourcesByPartition.get(source.getPartitionId());
         if (dataSourcesForPartition == null) {
@@ -286,9 +288,6 @@ public class ExportGeneration {
                         " signature " + table.getSignature() + " partition id " + partition);
                 dataSourcesForPartition.put(table.getSignature(), exportDataSource);
 
-                // update the sbq / signature map.
-                addExportStreamBlockQueue(partition, table.getSignature(), exportDataSource.m_committedBuffers);
-
             } catch (IOException e) {
                 exportLog.fatal(e);
                 VoltDB.crashLocalVoltDB("Failed to create export data source.", true, e);
@@ -296,7 +295,7 @@ public class ExportGeneration {
         }
     }
 
-    public void pushExportBuffer(int partitionId, String signature, long uso,
+    synchronized public void pushExportBuffer(int partitionId, String signature, long uso,
             long bufferPtr, ByteBuffer buffer, boolean sync, boolean endOfStream) {
         //        System.out.println("In generation " + m_timestamp + " partition " + partitionId + " signature " + signature + (buffer == null ? " null buffer " : (" buffer length " + buffer.remaining())));
         //        for (Integer i : m_dataSourcesByPartition.keySet()) {
@@ -325,7 +324,7 @@ public class ExportGeneration {
         source.pushExportBuffer(uso, bufferPtr, buffer, sync, endOfStream);
     }
 
-    public void closeAndDelete() throws IOException {
+    synchronized public void closeAndDelete() throws IOException {
         exportLog.debug("Closing and deleting generation: " + m_timestamp);
         for (HashMap<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : map.values()) {
@@ -335,7 +334,7 @@ public class ExportGeneration {
         VoltFile.recursivelyDelete(m_directory);
     }
 
-    public void truncateExportToTxnId(long txnId) {
+    synchronized public void truncateExportToTxnId(long txnId) {
         exportLog.debug("Truncating generation: " + m_timestamp + " at txnID: " + txnId);
         for (HashMap<String, ExportDataSource> dataSources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : dataSources.values()) {
@@ -344,7 +343,7 @@ public class ExportGeneration {
         }
     }
 
-    public void close() {
+    synchronized public void close() {
         exportLog.debug("Closing generation: " + m_timestamp);
         for (HashMap<String, ExportDataSource> sources : m_dataSourcesByPartition.values()) {
             for (ExportDataSource source : sources.values()) {
@@ -353,20 +352,24 @@ public class ExportGeneration {
         }
     }
 
-    private final ConcurrentHashMap<String, StreamBlockQueue> m_blockMap = new
-        ConcurrentHashMap<String, StreamBlockQueue>();
+    synchronized public StreamBlockQueue checkoutExportStreamBlockQueue(int partitionId, String signature) {
+        HashMap<String, ExportDataSource> map = m_dataSourcesByPartition.get(partitionId);
+        System.out.println("looking for tablename: " + signature);
 
-    public StreamBlockQueue checkoutExportStreamBlockQueue(int partitionId, String signature)
-    {
-        return m_blockMap.remove(partitionId + "-" + signature);
+        ExportDataSource exportDataSource = map.get(signature);
+        if (exportDataSource != null && !exportDataSource.isReserved()) {
+            exportDataSource.reserve();
+            return exportDataSource.m_committedBuffers;
+        }
+        return null;
     }
 
-    public void addExportStreamBlockQueue(int partitionId, String signature, StreamBlockQueue sbq)
-    {
-        m_blockMap.put(partitionId + "-" + signature, sbq);
-    }
-
-    public boolean acknowledgeExportStreamBlockQueue(int partitionId, String signature) {
-            return true;
+    synchronized public void acknowledgeExportStreamBlockQueue(int partitionId, String tableName, long byteCount)
+    throws IOException {
+        HashMap<String, ExportDataSource> map = m_dataSourcesByPartition.get(partitionId);
+        ExportDataSource exportDataSource = map.get(tableName);
+        if (exportDataSource.sizeInBytes() == byteCount) {
+            exportDataSource.closeAndDelete();
+        }
     }
 }

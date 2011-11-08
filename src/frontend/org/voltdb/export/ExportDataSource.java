@@ -58,8 +58,11 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     final StreamBlockQueue m_committedBuffers;
     private boolean m_endOfStream = false;
     private Runnable m_onDrain;
-
     private final int m_nullArrayLength;
+
+    // set to true of this data source is being served to the network.
+    private boolean m_reserved;
+
 
     /**
      * Create a new data source.
@@ -253,6 +256,14 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         // compute the number of bytes necessary to hold one bit per
         // schema column
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
+    }
+
+    public Boolean isReserved() {
+        return m_reserved;
+    }
+
+    public void  reserve() {
+        m_reserved = true;
     }
 
     public String getDatabase() {

@@ -38,7 +38,7 @@ public class ExportListingHandler extends VoltProtocolHandler {
     private static final VoltLogger exportLog = new VoltLogger("EXPORT");
     private Connection m_cxn = null;
 
-    private void handleMessage(ExportProtoMessage m) {
+    private void handleMessage(ExportProtoMessage m) throws IOException {
         FastSerializer fs = new FastSerializer();
         ExportGenerationDirectory lib = ExportManager.instance().m_generationDirectory;
 
