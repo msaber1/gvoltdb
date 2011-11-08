@@ -234,27 +234,46 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         if (read != data.length) {
             throw new IOException("Failed to read ad file " + adFile);
         }
+
+        // More misery inducing use of fast serialization below!
+        // Notice how here, for fun and pleasure, we deserialize
+        // a few things written by (copy/pasted) ExportDataSource
+        // constructors and then, inline a few more things written by
+        // writeAdvertisementTo(). Good news, though! Once you read
+        // all that code, you can reverse engineer the right
+        // deserialization to be done here!
         FastDeserializer fds = new FastDeserializer(data);
 
+        // these fields are inserted by the adfile writer.
         m_siteId = fds.readInt();
         m_database = fds.readString();
+
+        // this length prefix is inserted by writeAdvertisementTo()
+        int ignored = fds.readInt();
+        assert(ignored > 0);
+
         m_generation = fds.readLong();
         m_partitionId = fds.readInt();
         m_signature = fds.readString();
         m_tableName = fds.readString();
-        fds.readLong(); // timestamp of JVM startup can be ignored
+
+        // timestamp of JVM startup? No idea why.
+        long ts = fds.readLong();
+        assert(ts > -1);
+
         int numColumns = fds.readInt();
         for (int ii=0; ii < numColumns; ++ii) {
-            m_columnNames.add(fds.readString());
+            String cn = fds.readString();
             int columnType = fds.readInt();
+            m_columnNames.add(cn);
             m_columnTypes.add(columnType);
         }
 
+        // table, signature enough? No. Need nonce!
         String nonce = m_signature + "_" + m_siteId + "_" + m_partitionId;
         m_committedBuffers = new StreamBlockQueue(overflowPath, nonce);
 
-        // compute the number of bytes necessary to hold one bit per
-        // schema column
+        // number of bytes necessary to hold one bit per schema column
         m_nullArrayLength = ((m_columnTypes.size() + 7) & -8) >> 3;
     }
 
