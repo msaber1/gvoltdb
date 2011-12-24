@@ -43,48 +43,91 @@ import voltkv.Constants;
         singlePartition = true
         )
 
-public class Put extends VoltProcedure
+public class Lock extends VoltProcedure
 {
-    // Checks if key exists
+    // Checks if key exists, and is locked
     public final SQLStmt checkStmt = new SQLStmt("SELECT lock_txnid, lock_expiration_time, lock_root_key " +
             "FROM store WHERE key = ?;");
 
     // Updates a key/value pair
-    public final SQLStmt updateStmt = new SQLStmt("UPDATE store SET value = ?, lock_txnid = NULL, " +
-            "lock_expiration_time = NULL, lock_root_key = NULL WHERE key = ?;");
+    public final SQLStmt lockStmt = new SQLStmt("UPDATE store SET lock_txnid = ?, lock_expiration_time = ?, lock_root_key = ? WHERE key = ?;");
 
-    // Inserts a key/value pair
-    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO store (key, value) VALUES (?, ?);");
+    public final SQLStmt selectStmt = new SQLStmt("SELECT key, value FROM store WHERE key = ?");
 
-    public VoltTable run(String key, byte[] value)
+    public VoltTable run(String key, long lockTxnId, String rootLock, long expireTime, byte returnValue)
     {
-        // Check whether the pair exists
+        if (lockTxnId != VoltType.NULL_BIGINT && rootLock == null) {
+            throw new VoltAbortException("If a lock txnid is supplied then the root lock key must be supplied as well");
+        }
+        if (lockTxnId == VoltType.NULL_BIGINT && rootLock != null) {
+            throw new VoltAbortException("If a root lock key is supplied then the lock txnid must be supplied as well");
+        }
+
+        final long now = getTransactionTime().getTime();
+        if (expireTime < now) {
+            setAppStatusCode(Constants.EXPIRE_TIME_REACHED);
+            return null;
+        }
+
+        // Check whether the key exists
         voltQueueSQL(checkStmt, key);
 
         VoltTable rowTable = voltExecuteSQL()[0];
-        // Insert new or update existing key depending on result
+        // Does the row to be locked exist?
         if (rowTable.getRowCount() == 0) {
-            voltQueueSQL(insertStmt, key, value);
-            return voltExecuteSQL(true)[0];
+            setAppStatusCode(Constants.KEY_DOES_NOT_EXIST);
+            return null;
         } else {
             rowTable.advanceRow();
             //Check if the row is locked
             final long lockExpirationTime = rowTable.getLong(1);
             if (rowTable.wasNull()) {
                 //No lock
-                voltQueueSQL(updateStmt, value, key);
-                return voltExecuteSQL(true)[0];
+                if (rootLock == null) {
+                    //this is the root lock, use this txnid for the lock
+                    final long txnId = super.getTransactionId();
+                    voltQueueSQL(lockStmt, txnId, expireTime, rootLock, key);
+                    //Be weird and put it in the app status string
+                    setAppStatusString(Long.toString(txnId));
+                } else {
+                    //The txnid for the lock is provided
+                    voltQueueSQL(lockStmt, lockTxnId, expireTime, rootLock, key);
+                }
+                if (returnValue == 1) {
+                    //Optionally return  the locked row data
+                    voltQueueSQL(selectStmt, key);
+                    return voltExecuteSQL(true)[1];
+                } else {
+                    voltExecuteSQL(true);
+                    return null;
+                }
             } else {
                 final long lock_txnid = rowTable.getLong(0);
                 //It was locked, has the lock expired?
-                if (lockExpirationTime < getTransactionTime().getTime()) {
+                if (lockExpirationTime < now) {
                     //Crap it expired. More work for me
                     String lockRootKey = rowTable.getString(2);
                     if (rowTable.wasNull()) {
                         //If the root lock (this key) is expired
-                        //that means the commit never happened, safe to clobber
-                        voltQueueSQL(updateStmt, value, key);
-                        return voltExecuteSQL(true)[0];
+                        //that means the commit never happened
+                        if (rootLock == null) {
+                            //this is the root lock, use this txnid for the lock
+                            final long txnId = super.getTransactionId();
+                            voltQueueSQL(lockStmt, txnId, expireTime, rootLock, key);
+                            //Be weird and put it in the app status string
+                            setAppStatusString(Long.toString(txnId));
+                        } else {
+                            //The txnid for the lock is provided
+                            voltQueueSQL(lockStmt, lockTxnId, expireTime, rootLock, key);
+                        }
+                        if (returnValue == 1) {
+                            //Optionally return  the locked row data
+                            voltQueueSQL(selectStmt, key);
+                            return voltExecuteSQL(true)[1];
+                        } else {
+                            voltExecuteSQL(true);
+                            return null;
+                        }
                     } else {
                         //The root lock is elsewhere, need to go fishing to find out the
                         //fate of the txn associated with this lock
