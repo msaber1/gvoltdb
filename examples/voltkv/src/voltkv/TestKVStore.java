@@ -89,129 +89,129 @@ public class TestKVStore {
         m_config.shutDown();
     }
 
-    //    @Test
-    //    public void testPut() throws Exception {
-    //        Client client = getClient();
-    //        m_store = new KVStore();
-    //        m_store.init(client);
-    //
-    //        /*
-    //         * Put a key uncontended
-    //         */
-    //        SCallback cb = new SCallback();
-    //        m_store.put("foo", new byte[0], cb);
-    //        cb.getResponse();
-    //        VoltTable vt = client.callProcedure("@AdHoc", "SELECT * FROM STORE;").getResults()[0];
-    //        assertTrue(vt.advanceRow());
-    //        assertTrue("foo".equals(vt.getString(0)));
-    //        assertTrue(vt.getVarbinary(1).length == 0);
-    //        vt.getLong(2);
-    //        assertTrue(vt.wasNull());
-    //        vt.getLong(3);
-    //        assertTrue(vt.wasNull());
-    //        vt.getString(4);
-    //        assertTrue(vt.wasNull());
-    //
-    //        /*
-    //         * Lock the key and make it wait for the lock to time out
-    //         */
-    //        cb = new SCallback();
-    //        client.callProcedure("@AdHoc", "UPDATE STORE SET lock_txnid = 5, lock_expiration_time = " + (System.currentTimeMillis() + 1000));
-    //        m_store.put("foo", null, cb);
-    //        KVStore.Response r = cb.getResponse();
-    //        assertTrue(r.rtt > 800);
-    //        vt = client.callProcedure("@AdHoc", "SELECT * FROM STORE;").getResults()[0];
-    //        assertTrue(vt.advanceRow());
-    //        vt.getVarbinary(1);
-    //        assertTrue(vt.wasNull());
-    //
-    //        //make it not null
-    //        cb = new SCallback();
-    //        m_store.put("foo", new byte[0], cb); cb.getResponse();
-    //        cb = new SCallback();
-    //        m_store.put("z", new byte[0], cb); cb.getResponse();
-    //
-    //        /*
-    //         * Set the key up so the txn needs to be recovered, replay should set z to null, and foo should get the value
-    //         * from the put which will undo the actions from the replay
-    //         */
-    //        client.callProcedure("@AdHoc", "UPDATE STORE SET lock_txnid = 10, lock_expiration_time = 5, lock_root_key='bar' where key = 'foo';");
-    //        client.callProcedure("@AdHoc", "UPDATE STORE SET lock_txnid = 10, lock_expiration_time = 5, lock_root_key='bar' where key = 'z';");
-    //        client.callProcedure("@AdHoc", "INSERT INTO STORE VALUES ( 'bar', NULL, 10, 5, NULL);");
-    //        client.callProcedure("@AdHoc", "INSERT INTO JOURNAL VALUES ( 'bar', 10, 5, 'z', 1, NULL);");
-    //        client.callProcedure("@AdHoc", "INSERT INTO JOURNAL VALUES ( 'bar', 10, 5, 'foo', 0, NULL);");
-    //
-    //        cb = new SCallback();
-    //        m_store.put("foo", new byte[3], cb);
-    //        r = cb.getResponse();
-    //        assertTrue(r.rtt < 500);//shouldn't take long, already expired
-    //
-    //        vt = client.callProcedure("@AdHoc", "SELECT * FROM STORE;").getResults()[0];
-    //        assertTrue(vt.getRowCount() == 3);
-    //        while (vt.advanceRow()) {
-    //            final String key = vt.getString(0);
-    //            if (key.equals("foo")) {
-    //                assertTrue(vt.getVarbinary(1).length == 3);
-    //            } else {
-    //                vt.getVarbinary(1);
-    //                assertTrue(vt.wasNull());
-    //            }
-    //        }
-    //    }
-    //
-    //    private void recoverTransaction(String contendedKey, String lockKey, long lockTxn, long expirationTime) throws Exception {
-    //        VoltTable lockState = getLockState( lockTxn, expirationTime, lockKey);
-    //        final CountDownLatch latch = new CountDownLatch(1);
-    //        m_store.recoverTransaction(new Runnable() {
-    //            @Override
-    //            public void run() {
-    //                latch.countDown();
-    //            }
-    //        }, contendedKey, lockState);
-    //        latch.await();
-    //    }
-    //
-    //    @Test
-    //    public void testRecoverTransaction() throws Exception {
-    //        Client client = getClient();
-    //        m_store = new KVStore();
-    //        m_store.init(client);
-    //
-    //        /*
-    //         * Locked row, root key doesn't exist
-    //         */
-    //        client.callProcedure("@AdHoc", "INSERT INTO STORE VALUES ( 'foo', NULL, 10, 5, 'bar');");
-    //        recoverTransaction("foo", "bar", 10, 5);
-    //        assertLockState(client, "foo", false);
-    //        client.callProcedure("@AdHoc", "DELETE FROM STORE;");
-    //
-    //        /*
-    //         * Locked row, root key exists, but there is no journal
-    //         */
-    //        client.callProcedure("@AdHoc", "INSERT INTO STORE VALUES ( 'foo', NULL, 10, 5, 'bar');");
-    //        client.callProcedure("@AdHoc", "INSERT INTO STORE VALUES ( 'bar', NULL, 10, 5, NULL);");
-    //        recoverTransaction("foo", "bar", 10, 5);
-    //        assertLockState(client, "foo", false);
-    //        client.callProcedure("@AdHoc", "DELETE FROM STORE;");
-    //
-    //        /*
-    //         * Locked row, root key exists, and there is a journal
-    //         */
-    //        client.callProcedure("Put", "foo", new byte[0]);
-    //        client.callProcedure("@AdHoc", "UPDATE STORE SET lock_txnid = 10, lock_expiration_time = 5, lock_root_key='bar' where key = 'foo';");
-    //        VoltTable vt = client.callProcedure("@AdHoc", "SELECT * FROM STORE;").getResults()[0];
-    //        assertTrue(vt.advanceRow());
-    //        vt.getVarbinary(1);
-    //        assertFalse(vt.wasNull());
-    //        client.callProcedure("@AdHoc", "INSERT INTO STORE VALUES ( 'bar', NULL, 10, 5, NULL);");
-    //        client.callProcedure("@AdHoc", "INSERT INTO JOURNAL VALUES ( 'bar', 10, 5, 'foo', 1, NULL);");
-    //        recoverTransaction("foo", "bar", 10, 5);
-    //        vt = client.callProcedure("Get", "foo", (byte)0).getResults()[0];
-    //        assertTrue(vt.advanceRow());
-    //        vt.getVarbinary(1);
-    //        assertTrue(vt.wasNull());
-    //        client.callProcedure("@AdHoc", "DELETE FROM STORE;");
-    //    }
+    @Test
+    public void testPut() throws Exception {
+        Client client = getClient();
+        m_store = new KVStore();
+        m_store.init(client);
+
+        /*
+         * Put a key uncontended
+         */
+        SCallback cb = new SCallback();
+        m_store.put("foo", new byte[0], cb);
+        cb.getResponse();
+        VoltTable vt = client.callProcedure("@AdHoc", "SELECT * FROM STORE;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        assertTrue("foo".equals(vt.getString(0)));
+        assertTrue(vt.getVarbinary(1).length == 0);
+        vt.getLong(2);
+        assertTrue(vt.wasNull());
+        vt.getLong(3);
+        assertTrue(vt.wasNull());
+        vt.getString(4);
+        assertTrue(vt.wasNull());
+
+        /*
+         * Lock the key and make it wait for the lock to time out
+         */
+        cb = new SCallback();
+        client.callProcedure("@AdHoc", "UPDATE STORE SET lock_txnid = 5, lock_expiration_time = " + (System.currentTimeMillis() + 1000));
+        m_store.put("foo", null, cb);
+        KVStore.Response r = cb.getResponse();
+        assertTrue(r.rtt > 800);
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM STORE;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getVarbinary(1);
+        assertTrue(vt.wasNull());
+
+        //make it not null
+        cb = new SCallback();
+        m_store.put("foo", new byte[0], cb); cb.getResponse();
+        cb = new SCallback();
+        m_store.put("z", new byte[0], cb); cb.getResponse();
+
+        /*
+         * Set the key up so the txn needs to be recovered, replay should set z to null, and foo should get the value
+         * from the put which will undo the actions from the replay
+         */
+        client.callProcedure("@AdHoc", "UPDATE STORE SET lock_txnid = 10, lock_expiration_time = 5, lock_root_key='bar' where key = 'foo';");
+        client.callProcedure("@AdHoc", "UPDATE STORE SET lock_txnid = 10, lock_expiration_time = 5, lock_root_key='bar' where key = 'z';");
+        client.callProcedure("@AdHoc", "INSERT INTO STORE VALUES ( 'bar', NULL, 10, 5, NULL);");
+        client.callProcedure("@AdHoc", "INSERT INTO JOURNAL VALUES ( 'bar', 10, 5, 'z', 1, NULL);");
+        client.callProcedure("@AdHoc", "INSERT INTO JOURNAL VALUES ( 'bar', 10, 5, 'foo', 0, NULL);");
+
+        cb = new SCallback();
+        m_store.put("foo", new byte[3], cb);
+        r = cb.getResponse();
+        assertTrue(r.rtt < 500);//shouldn't take long, already expired
+
+        vt = client.callProcedure("@AdHoc", "SELECT * FROM STORE;").getResults()[0];
+        assertTrue(vt.getRowCount() == 3);
+        while (vt.advanceRow()) {
+            final String key = vt.getString(0);
+            if (key.equals("foo")) {
+                assertTrue(vt.getVarbinary(1).length == 3);
+            } else {
+                vt.getVarbinary(1);
+                assertTrue(vt.wasNull());
+            }
+        }
+    }
+
+    private void recoverTransaction(String contendedKey, String lockKey, long lockTxn, long expirationTime) throws Exception {
+        VoltTable lockState = getLockState( lockTxn, expirationTime, lockKey);
+        final CountDownLatch latch = new CountDownLatch(1);
+        m_store.recoverTransaction(new Runnable() {
+            @Override
+            public void run() {
+                latch.countDown();
+            }
+        }, contendedKey, lockState);
+        latch.await();
+    }
+
+    @Test
+    public void testRecoverTransaction() throws Exception {
+        Client client = getClient();
+        m_store = new KVStore();
+        m_store.init(client);
+
+        /*
+         * Locked row, root key doesn't exist
+         */
+        client.callProcedure("@AdHoc", "INSERT INTO STORE VALUES ( 'foo', NULL, 10, 5, 'bar');");
+        recoverTransaction("foo", "bar", 10, 5);
+        assertLockState(client, "foo", false);
+        client.callProcedure("@AdHoc", "DELETE FROM STORE;");
+
+        /*
+         * Locked row, root key exists, but there is no journal
+         */
+        client.callProcedure("@AdHoc", "INSERT INTO STORE VALUES ( 'foo', NULL, 10, 5, 'bar');");
+        client.callProcedure("@AdHoc", "INSERT INTO STORE VALUES ( 'bar', NULL, 10, 5, NULL);");
+        recoverTransaction("foo", "bar", 10, 5);
+        assertLockState(client, "foo", false);
+        client.callProcedure("@AdHoc", "DELETE FROM STORE;");
+
+        /*
+         * Locked row, root key exists, and there is a journal
+         */
+        client.callProcedure("Put", "foo", new byte[0]);
+        client.callProcedure("@AdHoc", "UPDATE STORE SET lock_txnid = 10, lock_expiration_time = 5, lock_root_key='bar' where key = 'foo';");
+        VoltTable vt = client.callProcedure("@AdHoc", "SELECT * FROM STORE;").getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getVarbinary(1);
+        assertFalse(vt.wasNull());
+        client.callProcedure("@AdHoc", "INSERT INTO STORE VALUES ( 'bar', NULL, 10, 5, NULL);");
+        client.callProcedure("@AdHoc", "INSERT INTO JOURNAL VALUES ( 'bar', 10, 5, 'foo', 1, NULL);");
+        recoverTransaction("foo", "bar", 10, 5);
+        vt = client.callProcedure("Get", "foo", (byte)0).getResults()[0];
+        assertTrue(vt.advanceRow());
+        vt.getVarbinary(1);
+        assertTrue(vt.wasNull());
+        client.callProcedure("@AdHoc", "DELETE FROM STORE;");
+    }
 
     private VoltTable getLockState(long lockTxnId, long expireTime, String rootKey ) {
         VoltTable vt =  new VoltTable(
@@ -276,6 +276,8 @@ public class TestKVStore {
                                 new KeyLockIntent("b", false),
                                 new KeyLockIntent("a", false) }),
                                 munger, cb);
+        Thread.sleep(5000);
+        client.callProcedure("@AdHoc", "UPDATE STORE SET lock_expiration_time = null, lock_txnid = null where key = 'a';");
         cb.getResponse();
         assertTrue(System.currentTimeMillis() > expireTime);
 
@@ -350,33 +352,19 @@ public class TestKVStore {
         VoltTable store = client.callProcedure("@AdHoc", "SELECT * FROM STORE").getResults()[0];
         assertEquals(2, store.getRowCount());
 
-        while (store.advanceRow()) {        while (store.advanceRow()) {
+        while (store.advanceRow()) {
             final String key = store.getString(0);
             final byte value[] = store.getVarbinary(1);
+            assertEquals(value.length, 0);
+            assertTrue(key.equals("foo") || key.equals("bar"));
             if (key.equals("foo")) {
+                assertTrue(store.getString(4).equals("bar"));
+            } else {
+                store.getString(4);
                 assertTrue(store.wasNull());
-            } else{
-                assertEquals(32, value.length);
             }
-            store.getLong(2);
-            assertTrue(store.wasNull());
-            store.getLong(3);
-            assertTrue(store.wasNull());
-            store.getString(4);
-            assertTrue(store.wasNull());
-        }
-        final String key = store.getString(0);
-        final byte value[] = store.getVarbinary(1);
-        assertEquals(value.length, 0);
-        assertTrue(key.equals("foo") || key.equals("bar"));
-        if (key.equals("foo")) {
-            assertTrue(store.getString(4).equals("bar"));
-        } else {
-            store.getString(4);
-            assertTrue(store.wasNull());
-        }
-        store.getLong(2); assertFalse(store.wasNull());
-        store.getLong(3); assertFalse(store.wasNull());
+            store.getLong(2); assertFalse(store.wasNull());
+            store.getLong(3); assertFalse(store.wasNull());
         }
 
         VoltTable journal = client.callProcedure("@AdHoc", "SELECT * FROM JOURNAL").getResults()[0];

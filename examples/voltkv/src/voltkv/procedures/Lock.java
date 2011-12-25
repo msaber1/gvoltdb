@@ -140,6 +140,7 @@ public class Lock extends VoltProcedure
                         return vt;
                     }
                 } else {
+                    System.out.println("Failed to acquire lock on " + key + " with expire time " + (lockExpirationTime - System.currentTimeMillis()));
                     //It's locked, too bad so sad
                     setAppStatusCode(Constants.ROW_LOCKED);
                     return null;
