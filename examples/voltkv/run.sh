@@ -59,15 +59,13 @@ function async-benchmark() {
         --servers=localhost \
         --port=21212 \
         --pool-size=100000 \
-        --preload=true \
-        --get-put-ratio=0.90 \
         --key-size=32 \
         --min-value-size=1024 \
         --max-value-size=1024 \
         --entropy=127 \
         --use-compression=false \
         --rate-limit=100000 \
-        --auto-tune=true \
+        --auto-tune=false \
         --latency-target=10.0
 }
 

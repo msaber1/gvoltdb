@@ -17,11 +17,16 @@ import org.voltdb.utils.Pair;
 import org.voltdb.client.SyncCallback;
 
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class KVStore {
     private ScheduledExecutorService m_es;
     private ExecutorService m_blockingService;
 
+    private AtomicInteger m_rootLockContentions = new AtomicInteger(0);
+    private AtomicInteger m_secondaryLockContentions = new AtomicInteger(0);
+
+    private Future<?> m_contentionReporter;
     private static final int m_initialBackoff = 40;
 
     private static int getNextBackoff(int current) {
@@ -44,7 +49,7 @@ public class KVStore {
             }
         }
 
-        private final String m_key;
+        public final String m_key;
         private final byte m_getValue;
     }
 
@@ -97,7 +102,32 @@ public class KVStore {
     public void init(Client client) {
         m_client = client;
         m_es = Executors.newScheduledThreadPool(1);
-        m_blockingService = Executors.newCachedThreadPool();
+        m_blockingService = Executors.newCachedThreadPool(new java.util.concurrent.ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
+                return new Thread(null, r, "KVStore blocking", 131072);
+            }
+        });
+        m_contentionReporter = m_blockingService.submit(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    while (true) {
+                        Thread.sleep(5000);
+                        long rootLock = m_rootLockContentions.getAndSet(0);
+                        long secondaryLock = m_secondaryLockContentions.getAndSet(0);
+                        System.out.println("Root lock contentions/sec " + (rootLock / 5.0) + " secondary lock contentions/sec " + (secondaryLock / 5.0));
+                    }
+                } catch (InterruptedException e) {}
+            }
+        });
+    }
+    public static class NullCallback implements Callback {
+
+        @Override
+        public void response(Response r) {
+        }
+
     }
 
     public static class SCallback implements Callback {
@@ -363,6 +393,9 @@ public class KVStore {
             byte appStatus = r.getAppStatus();
             if (appStatus == Constants.EXPIRE_TIME_REACHED
                     || appStatus == Constants.ROW_LOCKED) {
+                if (appStatus == Constants.ROW_LOCKED) {
+                    m_rootLockContentions.incrementAndGet();
+                }
                 // ouch?
                 final int backoff = getNextBackoff(lastBackoff);
                 m_es.schedule(new Runnable() {
@@ -518,6 +551,9 @@ public class KVStore {
              */
             LinkedList<Runnable> runnablesThatWillWaitOnStuffToBeDone = new LinkedList<Runnable>();
 
+            if (!lockedKeys.isEmpty()) {
+                m_secondaryLockContentions.addAndGet(lockedKeys.size());
+            }
             /*
              * If there were locked keys then there is contention in the system
              * and backoff is probably a good idea. If the expire time was reached
@@ -734,7 +770,7 @@ public class KVStore {
                 for (SyncCallback cb : unlockCallbacks) {
                     cb.waitForResponse();
                 }
-                m_client.callProcedure( new NullCallback(), "ClearJournal", rootKey, lockTxnId);
+                m_client.callProcedure( new org.voltdb.client.NullCallback(), "ClearJournal", rootKey, lockTxnId);
                 Response response = new Response(null, System.currentTimeMillis() - startTime);
                 cb.response(response);
                 return true;

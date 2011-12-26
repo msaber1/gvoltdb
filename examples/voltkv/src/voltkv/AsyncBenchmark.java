@@ -39,11 +39,18 @@
  */
 package voltkv;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicLongArray;
 
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NullCallback;
@@ -55,6 +62,9 @@ import org.voltdb.client.exampleutils.ClientConnectionPool;
 import org.voltdb.client.exampleutils.IRateLimiter;
 import org.voltdb.client.exampleutils.LatencyLimiter;
 import org.voltdb.client.exampleutils.RateLimiter;
+
+import voltkv.KVStore.KeyUpdateIntent;
+import voltkv.KVStore.Response;
 
 public class AsyncBenchmark
 {
@@ -84,8 +94,6 @@ public class AsyncBenchmark
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
                 .add("pool-size", "pool_size", "Size of the pool of keys to work with (10,00, 10,000, 100,000 items, etc.).", 100000)
-                .add("preload", "preload", "Whether the data store should be initialized with default values before the benchmark is run (true|false).", true)
-                .add("get-put-ratio", "get_put_ratio", "Ratio of GET versus PUT operations: 1.0 => 100% GETs; 0.0 => 0% GETs; 0.95 => 95% GETs, 5% PUTs. Value between 0 and 1", 0.95)
                 .add("key-size", "key_size", "Size of the keys in number of characters. Max: 250", 50)
                 .add("min-value-size", "min_value_size", "Minimum size for the value blob (in bytes, uncompressed). Max: 1048576", 1000)
                 .add("max-value-size", "max_value_size", "Maximum size for the value blob (in bytes, uncompressed) - set equal to min-value-size for constant size. Max: 1048576", 1000)
@@ -102,9 +110,8 @@ public class AsyncBenchmark
             long duration          = apph.longValue("duration");
             String servers         = apph.stringValue("servers");
             int port               = apph.intValue("port");
-            double getPutRatio     = apph.doubleValue("get-put-ratio");
             int poolSize           = apph.intValue("pool-size");
-            boolean preload        = apph.booleanValue("preload");
+            boolean preload        = true;
             int keySize            = apph.intValue("key-size");
             int minValueSize       = apph.intValue("min-value-size");
             int maxValueSize       = apph.intValue("max-value-size");
@@ -119,7 +126,6 @@ public class AsyncBenchmark
             apph.validate("duration", (duration > 0))
                 .validate("display-interval", (displayInterval > 0))
                 .validate("pool-size", (poolSize > 0))
-                .validate("get-put-ratio", (getPutRatio >= 0) && (getPutRatio <= 1))
                 .validate("key-size", (keySize > 0) && (keySize < 251))
                 .validate("min-value-size", (minValueSize > 0) && (minValueSize < 1048576))
                 .validate("max-value-size", (maxValueSize > 0) && (maxValueSize < 1048576) && (maxValueSize >= minValueSize))
@@ -134,6 +140,8 @@ public class AsyncBenchmark
 
             // Get a client connection - we retry for a while in case the server hasn't started yet
             Con = ClientConnectionPool.getWithRetry(servers, port);
+            KVStore store = new KVStore();
+            store.init(Con.Client);
 
             // Get a payload generator to create random Key-Value pairs to store in the database and process (uncompress) pairs retrieved from the database.
             final PayloadProcessor processor = new PayloadProcessor(keySize, minValueSize, maxValueSize, entropy, poolSize, useCompression);
@@ -143,11 +151,10 @@ public class AsyncBenchmark
             {
                 System.out.print("Initializing data store... ");
                 for(int i=0;i<poolSize;i++) {
-                    Con.executeAsync(
-                            new NullCallback(),
-                            "Put",
+                    store.put(
                             String.format(processor.KeyFormat, i),
-                            processor.generateForStore().getStoreValue());
+                            processor.generateForStore().getStoreValue(),
+                            new KVStore.NullCallback());
                 }
                 Con.drain();
                 System.out.println(" Done.");
@@ -162,7 +169,7 @@ public class AsyncBenchmark
                 @Override
                 public void run()
                 {
-                    System.out.print(Con.getStatistics("Get", "Put"));
+                    System.out.print(Con.getStatistics("doTransaction"));
                 }
             }
             , displayInterval*1000l
@@ -178,72 +185,103 @@ public class AsyncBenchmark
             else
                 limiter = new RateLimiter(rateLimit);
 
+            final Semaphore maxTransactions = new Semaphore(300);
             // Run the benchmark loop for the requested duration
             long endTime = System.currentTimeMillis() + (1000l * duration);
-            Random rand = new Random();
             while (endTime > System.currentTimeMillis())
             {
-                // Decide whether to perform a GET or PUT operation
-                if (rand.nextDouble() < getPutRatio)
-                {
-                    // Get a key/value pair, asynchronously
-                    Con.executeAsync(new ProcedureCallback()
-                    {
-                        @Override
-                        public void clientCallback(ClientResponse response) throws Exception
-                        {
-                            // Track the result of the operation (Success, Failure, Payload traffic...)
-                            if (response.getStatus() == ClientResponse.SUCCESS)
-                            {
-                                final VoltTable pairData = response.getResults()[0];
-                                // Cache miss (Key does not exist)
-                                if (pairData.getRowCount() == 0)
-                                    GetStoreResults.incrementAndGet(1);
-                                else
-                                {
-                                    final PayloadProcessor.Pair pair = processor.retrieveFromStore(pairData.fetchRow(0).getString(0), pairData.fetchRow(0).getVarbinary(1));
-                                    GetStoreResults.incrementAndGet(0);
-                                    GetCompressionResults.addAndGet(0, pair.getStoreValueLength());
-                                    GetCompressionResults.addAndGet(1, pair.getRawValueLength());
+                    maxTransactions.acquire();
+                    /*
+                     * Fool the client jigger into maintaning stats
+                     */
+                    final ClientConnection.TrackingCallback tracker =
+                            new ClientConnection.TrackingCallback(
+                                    Con,
+                                    "doTransaction",
+                                    null);
+
+                    final KVStore.KeyLockIntent keys[] =
+                            new KVStore.KeyLockIntent[] {
+                                new KVStore.KeyLockIntent( processor.generateRandomKeyForRetrieval(), true),
+                                new KVStore.KeyLockIntent( processor.generateRandomKeyForRetrieval(), true) };
+                    while(keys[0].m_key.equals(keys[1].m_key)){
+                        keys[1] = new KVStore.KeyLockIntent( processor.generateRandomKeyForRetrieval(), true);
+                    }
+
+                    final AtomicLong storeValueLength = new AtomicLong();
+                    final AtomicLong rawValueLength = new AtomicLong();
+                    // Get a two key/value pair, asynchronously and transactionally swap them
+                    store.doTransaction(
+                            Arrays.asList(keys),
+                            new KVStore.KeyMunger() {
+                                private int m_executionTimes = 0;
+
+                                @Override
+                                public List<KeyUpdateIntent> mungeKeys(
+                                        Map<String, byte[]> keysMap) {
+                                    m_executionTimes++;
+                                    if(m_executionTimes > 1) {
+                                        System.out.println("Had contention on a key, munger called " + m_executionTimes);
+                                    }
+                                    ArrayList<KeyUpdateIntent> updateIntents = new ArrayList<KeyUpdateIntent>(2);
+                                    String key1 = null;
+                                    String key2 = null;
+                                    byte payload1[] = null;
+                                    byte payload2[] = null;
+                                    for (Map.Entry<String, byte[]> entry : keysMap.entrySet()) {
+                                        if (key1 == null) {
+                                            key1 = entry.getKey();
+                                            payload1 = entry.getValue();
+                                        } else {
+                                            key2 = entry.getKey();
+                                            payload2 = entry.getValue();
+                                        }
+                                    }
+
+                                    assert(key1 != null && payload1 != null && key2 != null && payload2 != null);
+
+                                    if (key1 == null || key2 == null) {
+                                        System.out.println("Key 1 " + keys[0].m_key + " Key 2 " + keys[1].m_key);
+                                        System.exit(-1);
+                                    }
+                                    /*
+                                     * Swap the values
+                                     */
+                                    updateIntents.add(new KVStore.KeyUpdateIntent(key1, payload2));
+                                    updateIntents.add(new KVStore.KeyUpdateIntent(key2, payload1));
+
+                                    /*
+                                     * Record stats for the data being retrieved
+                                     */
+                                    GetStoreResults.addAndGet(0, 2);
+                                    final PayloadProcessor.Pair pair1 = processor.retrieveFromStore( null, payload1);
+                                    final PayloadProcessor.Pair pair2 = processor.retrieveFromStore( null, payload2);
+                                    storeValueLength.set(pair1.getStoreValueLength() + pair2.getStoreValueLength());
+                                    rawValueLength.set(pair1.getRawValueLength() + pair2.getRawValueLength());
+                                    GetCompressionResults.addAndGet(0, pair1.getStoreValueLength() + pair2.getStoreValueLength());
+                                    GetCompressionResults.addAndGet(1, pair1.getRawValueLength() + pair2.getRawValueLength());
+                                    return updateIntents;
                                 }
-                            }
-                            else
-                                GetStoreResults.incrementAndGet(1);
-                        }
-                    }
-                    , "Get"
-                    , processor.generateRandomKeyForRetrieval()
-                    );
-                }
-                else
-                {
-                    // Put a key/value pair, asynchronously
-                    final PayloadProcessor.Pair pair = processor.generateForStore();
-                    Con.executeAsync(new ProcedureCallback()
-                    {
-                        final long StoreValueLength;
-                        final long RawValueLength;
-                        {
-                            this.StoreValueLength = pair.getStoreValueLength();
-                            this.RawValueLength = pair.getRawValueLength();
-                        }
-                        @Override
-                        public void clientCallback(ClientResponse response) throws Exception
-                        {
-                            // Track the result of the operation (Success, Failure, Payload traffic...)
-                            if (response.getStatus() == ClientResponse.SUCCESS)
-                                PutStoreResults.incrementAndGet(0);
-                            else
-                                PutStoreResults.incrementAndGet(1);
-                            PutCompressionResults.addAndGet(0, this.StoreValueLength);
-                            PutCompressionResults.addAndGet(1, this.RawValueLength);
-                        }
-                    }
-                    , "Put"
-                    , pair.Key
-                    , pair.getStoreValue()
-                    );
-                }
+                            },
+                            new KVStore.Callback() {
+                                @Override
+                                public void response(Response r) {
+                                    maxTransactions.release();
+                                    ClientResponseImpl response =
+                                            new ClientResponseImpl(
+                                                    ClientResponse.SUCCESS,
+                                                    Byte.MIN_VALUE, null, new VoltTable[]{}, null);
+                                    response.setClientRoundtrip((int)r.rtt);
+                                    response.setClusterRoundtrip((int)r.rtt);
+                                    PutStoreResults.incrementAndGet(0);
+                                    PutCompressionResults.addAndGet(0, storeValueLength.get());
+                                    PutCompressionResults.addAndGet(1, rawValueLength.get());
+
+                                    /*
+                                     * To generate stats
+                                     */
+                                    tracker.clientCallback(response);
+                            }});
 
                 // Use the limiter to throttle client activity
                 limiter.throttle();
@@ -296,7 +334,7 @@ public class AsyncBenchmark
               "\n\n-------------------------------------------------------------------------------------\n"
             + " System Statistics\n"
             + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.getStatistics("Get", "Put").toString(false));
+            System.out.print(Con.getStatistics("doTransaction").toString(false));
 
             // 3. Per-procedure detailed performance statistics
             System.out.println(

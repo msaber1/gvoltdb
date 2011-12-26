@@ -137,7 +137,6 @@ public class Commit extends VoltProcedure
             }
 
             if (journal != null) {
-                System.out.println(journal);
                 /*
                  * Journal the updates to the other locked rows to make it atomic
                  */

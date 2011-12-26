@@ -34,7 +34,7 @@ import java.util.concurrent.Future;
 public class ClientConnection implements Closeable
 {
     private final PerfCounterMap Statistics;
-    private final Client Client;
+    public final Client Client;
 
     /**
      * The base hash/key for this connection, that uniquely identifies its parameters, as defined by the pool.
@@ -163,7 +163,7 @@ public class ClientConnection implements Closeable
     /**
      * Internal asynchronous callback used to track the execution performance of asynchronous calls.
      */
-    private static class TrackingCallback  implements ProcedureCallback
+    public static class TrackingCallback  implements ProcedureCallback
     {
         private final ClientConnection Owner;
         private final String Procedure;
