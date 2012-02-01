@@ -23,10 +23,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ClientInterface;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.ClientInterface;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LiveClientStats;
 import org.voltdb.ParameterSet;
@@ -361,10 +361,9 @@ public class Statistics extends VoltSystemProcedure {
                 final Long now = (Long)params.toArray()[1];
                 Map<Long, Pair<String,long[]>> stats =
                     new HashMap<Long, Pair<String, long[]>>();
-                for (ClientInterface ci : VoltDB.instance().getClientInterfaces())
-                {
+                ClientInterface ci = VoltDB.instance().getClientInterface();
+                if (ci != null)
                     stats.putAll(ci.getLiveClientStats());
-                }
 
                 final String hostname = VoltDB.instance().getHostMessenger().getHostname();
                 for (Map.Entry<Long, Pair<String, long[]>> e : stats.entrySet()) {

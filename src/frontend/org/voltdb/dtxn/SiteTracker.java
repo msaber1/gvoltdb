@@ -612,4 +612,8 @@ public class SiteTracker {
     public int getFirstNonExecSiteForHost(int hostId) {
         return m_firstNonExecSiteForHost[hostId];
     }
+
+    public int getAgreementSiteForHost(int hostId) {
+        return getFirstNonExecSiteForHost(hostId);
+    }
 }

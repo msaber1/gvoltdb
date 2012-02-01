@@ -16,6 +16,7 @@
  */
 package org.voltdb.fault;
 
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 
@@ -38,6 +39,10 @@ public class NodeFailureFault extends VoltFault
     public int getHostId()
     {
         return m_hostId;
+    }
+
+    public int getFailedAgreementSite() {
+        return Collections.min(m_failedNonExecSites);
     }
 
     public Set<Integer> getFailedNonExecSites() {

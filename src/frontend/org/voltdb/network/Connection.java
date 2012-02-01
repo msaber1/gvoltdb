@@ -36,10 +36,16 @@ public interface Connection {
     /**
      * Get the hostname of a host if it's available, otherwise return the IP
      * address.
-     *
      * @return hostname or IP as a string
      */
     String getHostnameOrIP();
+
+    /**
+     * Get the port the network is connected to.
+     * @return The port as an integer.
+     */
+    int getLocalPort();
+
     long connectionId();
 
     /**

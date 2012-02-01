@@ -114,21 +114,6 @@ public class TestDtxnInitiatorMailbox extends TestCase
         public boolean createTransaction(long connectionId,
                                       String connectionHostname,
                                       boolean adminConnection,
-                                      StoredProcedureInvocation invocation,
-                                      boolean isReadOnly,
-                                      boolean isSinglePartition,
-                                      boolean isEveryPartition,
-                                      int[] partitions, int numPartitions,
-                                      Object clientData, int messageSize,
-                                      long now)
-        {
-            return true;
-        }
-
-        @Override
-        public boolean createTransaction(long connectionId,
-                                      String connectionHostname,
-                                      boolean adminConnection,
                                       long txnId,
                                       StoredProcedureInvocation invocation,
                                       boolean isReadOnly,
@@ -202,6 +187,12 @@ public class TestDtxnInitiatorMailbox extends TestCase
         public void removeConnectionStats(long connectionId) {
             // TODO Auto-generated method stub
 
+        }
+
+        @Override
+        public int getSiteId() {
+            // TODO Auto-generated method stub
+            return 0;
         }
     }
 

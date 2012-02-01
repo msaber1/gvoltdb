@@ -26,7 +26,7 @@ package org.voltdb.network;
 import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 
-import junit.framework.*;
+import junit.framework.TestCase;
 
 /*
  * Not a lot of functionality in VoltPort. The only tricky bit
@@ -50,7 +50,7 @@ public class TestVoltPort extends TestCase {
     // implement abstract run() method.
     private static class MockVoltPort extends VoltPort {
         MockVoltPort(VoltNetwork vn, Channel channel) {
-            super (vn, null, 2048, "");
+            super (vn, null, 2048, "", -1);
         }
     }
 

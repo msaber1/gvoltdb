@@ -317,6 +317,11 @@ SnapshotCompletionInterest {
         }
 
         @Override
+        public int getLocalPort() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public long connectionId() {
             return -1;
         }
@@ -1050,7 +1055,8 @@ SnapshotCompletionInterest {
         });
 
         if (txnId == null) {
-            m_initiator.createTransaction(-1, "CommandLog", true, spi,
+            m_initiator.createTransaction(-1, "CommandLog", true,
+                                          TransactionInitiator.REQUEST_TXN_ID, spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),

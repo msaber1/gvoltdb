@@ -344,7 +344,8 @@ public class VoltNetwork implements Runnable
                     this,
                     handler,
                     handler.getExpectedOutgoingMessageSize(),
-                    channel.socket().getInetAddress().getHostAddress());
+                    channel.socket().getInetAddress().getHostAddress(),
+                    channel.socket().getLocalPort());
         port.registering();
 
         /*

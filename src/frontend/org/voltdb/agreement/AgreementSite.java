@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltdb.agreement;
 
 import java.io.ByteArrayInputStream;
@@ -183,16 +184,16 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 return;
             }
             Set<NodeFailureFault> faultedNodes = new HashSet<NodeFailureFault>();
-            Set<Integer> faultedNonExecSites = new HashSet<Integer>();
+            Set<Integer> faultedAgreementSites = new HashSet<Integer>();
             for (VoltFault fault : faults) {
                 if (fault instanceof NodeFailureFault) {
                     NodeFailureFault nodeFault = (NodeFailureFault)fault;
                     faultedNodes.add(nodeFault);
-                    faultedNonExecSites.addAll(nodeFault.getFailedNonExecSites());
+                    faultedAgreementSites.add(nodeFault.getFailedAgreementSite());
                 }
             }
             if (!faultedNodes.isEmpty()) {
-                m_recoveryLog.info("Delivering fault message with failed non-exec sites " + faultedNonExecSites);
+                m_recoveryLog.info("Delivering fault message with failed agreement sites " + faultedAgreementSites);
                 m_mailbox.deliver(new FaultMessage(faultedNodes));
             }
         }
@@ -206,9 +207,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     for (VoltFault fault : copy) {
                         if (fault instanceof NodeFailureFault) {
                             NodeFailureFault nff = (NodeFailureFault)fault;
-                            for (Integer site : nff.getFailedNonExecSites()) {
-                                processRejoin(site);
-                            }
+                            processRejoin(nff.getFailedAgreementSite());
                         }
                     }
                 }
@@ -544,9 +543,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
             FaultMessage fm = (FaultMessage)message;
 
             for (NodeFailureFault fault : fm.nodeFaults){
-                for (Integer faultedInitiator : fault.getFailedNonExecSites()) {
-                    m_safetyState.removeState(faultedInitiator);
-                }
+                m_safetyState.removeState(fault.getFailedAgreementSite());
             }
             discoverGlobalFaultData(fm);
         } else if (message instanceof RecoveryMessage) {
@@ -606,7 +603,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     Set<Integer> getFaultingSites(FaultMessage fm) {
         HashSet<Integer> faultingSites = new HashSet<Integer>();
         for (NodeFailureFault fault : fm.nodeFaults) {
-            faultingSites.addAll(fault.getFailedNonExecSites());
+            faultingSites.add(fault.getFailedAgreementSite());
         }
         return faultingSites;
     }
@@ -643,7 +640,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
 
         m_handledFailedSites.addAll(failedSiteIds);
         for (NodeFailureFault fault : failures) {
-            if (newFailedSiteIds.containsAll(fault.getFailedNonExecSites())) {
+            if (newFailedSiteIds.contains(fault.getFailedAgreementSite())) {
                 m_faultDistributor.
                     reportFaultHandled(m_faultHandler, fault);
             }
@@ -766,7 +763,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 Set<NodeFailureFault> faults = ((FaultMessage)m).nodeFaults;
                 HashSet<Integer> newFailedSiteIds = new HashSet<Integer>();
                 for (NodeFailureFault fault : faults) {
-                    newFailedSiteIds.addAll(fault.getFailedNonExecSites());
+                    newFailedSiteIds.add(fault.getFailedAgreementSite());
                 }
                 m_mailbox.deliverFront(m);
                 m_recoveryLog.info("Agreement, Detected a concurrent failure from FaultDistributor, new failed sites "
@@ -801,10 +798,14 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                                 if (hostnameTemp != null) hostname = hostnameTemp;
                             }
                         }
+
+                        HashSet<Integer> agreementSites = new HashSet<Integer>();
+                        agreementSites.add(VoltDB.instance().getCatalogContext().siteTracker.getAgreementSiteForHost(hostId));
+
                         VoltDB.instance().getFaultDistributor().
                             reportFault(new NodeFailureFault(
                                     hostId,
-                                    VoltDB.instance().getCatalogContext().siteTracker.getNonExecSitesForHost(hostId),
+                                    agreementSites,
                                     hostname));
                     }
                     m_recoveryLog.info("Detected a concurrent failure from " +

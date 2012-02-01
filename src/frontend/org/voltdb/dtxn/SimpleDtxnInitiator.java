@@ -95,7 +95,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     public final static int MAX_DESIRED_PENDING_TXNS = 5000;
     private long m_pendingTxnBytes = 0;
     private int m_pendingTxnCount = 0;
-    private final DtxnInitiatorMailbox m_mailbox;
+    final DtxnInitiatorMailbox m_mailbox;
     private final int m_siteId;
     private final int m_hostId;
     private long m_lastSeenOriginalTxnId = Long.MIN_VALUE;
@@ -121,37 +121,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         m_mailbox.setInitiator(this);
     }
 
-
     @Override
     public synchronized boolean createTransaction(
                                   final long connectionId,
                                   final String connectionHostname,
                                   final boolean adminConnection,
-                                  final StoredProcedureInvocation invocation,
-                                  final boolean isReadOnly,
-                                  final boolean isSinglePartition,
-                                  final boolean isEveryPartition,
-                                  final int partitions[],
-                                  final int numPartitions,
-                                  final Object clientData,
-                                  final int messageSize,
-                                  final long now)
-    {
-        long txnId;
-        txnId = m_idManager.getNextUniqueTransactionId();
-        boolean retval =
-            createTransaction(connectionId, connectionHostname, adminConnection, txnId,
-                              invocation, isReadOnly, isSinglePartition, isEveryPartition,
-                              partitions, numPartitions, clientData, messageSize, now);
-        return retval;
-    }
-
-    @Override
-    public synchronized boolean createTransaction(
-                                  final long connectionId,
-                                  final String connectionHostname,
-                                  final boolean adminConnection,
-                                  final long txnId,
+                                  long txnId,
                                   final StoredProcedureInvocation invocation,
                                   final boolean isReadOnly,
                                   final boolean isSinglePartition,
@@ -165,6 +140,11 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         assert(invocation != null);
         assert(partitions != null);
         assert(numPartitions >= 1);
+
+        // if the transaction doesn't have a transaction id, assign one
+        if (txnId == TransactionInitiator.REQUEST_TXN_ID) {
+            txnId = m_idManager.getNextUniqueTransactionId();
+        }
 
         if (invocation.getType() == ProcedureInvocationType.REPLICATED)
         {
@@ -518,5 +498,10 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     @Override
     public void removeConnectionStats(long connectionId) {
         m_mailbox.removeConnectionStats(connectionId);
+    }
+
+    @Override
+    public int getSiteId() {
+        return m_siteId;
     }
 }

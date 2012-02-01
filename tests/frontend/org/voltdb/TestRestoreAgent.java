@@ -162,26 +162,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         public boolean createTransaction(long connectionId,
                                       String connectionHostname,
                                       boolean adminConnection,
-                                      StoredProcedureInvocation invocation,
-                                      boolean isReadOnly,
-                                      boolean isSinglePartition,
-                                      boolean isEverySite,
-                                      int[] partitions,
-                                      int numPartitions,
-                                      Object clientData,
-                                      int messageSize,
-                                      long now) {
-            createTransaction(connectionId, connectionHostname, adminConnection,
-                              0, invocation, isReadOnly, isSinglePartition,
-                              isEverySite, partitions, numPartitions,
-                              clientData, messageSize, now);
-            return true;
-        }
-
-        @Override
-        public boolean createTransaction(long connectionId,
-                                      String connectionHostname,
-                                      boolean adminConnection,
                                       long txnId,
                                       StoredProcedureInvocation invocation,
                                       boolean isReadOnly,
@@ -258,6 +238,12 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         @Override
         public void removeConnectionStats(long connectionId) {
 
+        }
+
+        @Override
+        public int getSiteId() {
+            // TODO Auto-generated method stub
+            return 0;
         }
     }
 

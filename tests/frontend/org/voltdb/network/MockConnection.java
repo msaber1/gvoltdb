@@ -50,6 +50,11 @@ public class MockConnection implements Connection {
     }
 
     @Override
+    public int getLocalPort() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public long connectionId() {
         throw new UnsupportedOperationException();
     }

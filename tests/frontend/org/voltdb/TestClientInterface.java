@@ -23,6 +23,25 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -54,9 +73,6 @@ import org.voltdb.network.VoltNetwork;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-
 public class TestClientInterface {
     private static final int AGREEMENT_SITE_ID = 3; // random number
 
@@ -64,7 +80,8 @@ public class TestClientInterface {
     private static final VoltDBInterface m_volt = mock(VoltDBInterface.class);
     private static final StatsAgent m_statsAgent = mock(StatsAgent.class);
     private static final HostMessenger m_messenger = mock(HostMessenger.class);
-    private static final TransactionInitiator m_initiator = mock(TransactionInitiator.class);
+    private static final TransactionInitiator m_spInitiator = mock(TransactionInitiator.class);
+    private static final TransactionInitiator m_mpInitiator = mock(TransactionInitiator.class);
     private static final ClientInputHandler m_handler = mock(ClientInputHandler.class);
 
     // real context
@@ -99,7 +116,7 @@ public class TestClientInterface {
         VoltNetwork network = mock(VoltNetwork.class);
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
                                        m_context, network, ReplicationRole.NONE,
-                                       100, m_initiator, m_allPartitions));
+                                       100, m_spInitiator, m_mpInitiator, m_allPartitions));
         ArgumentCaptor<Mailbox> captor = ArgumentCaptor.forClass(Mailbox.class);
         verify(m_messenger).createMailbox(eq(100), eq(VoltDB.CLIENT_INTERFACE_MAILBOX_ID),
                                           captor.capture());
@@ -138,7 +155,8 @@ public class TestClientInterface {
     @After
     public void tearDown() {
         reset(m_messenger);
-        reset(m_initiator);
+        reset(m_spInitiator);
+        reset(m_mpInitiator);
         reset(m_handler);
     }
 
@@ -186,11 +204,18 @@ public class TestClientInterface {
     private StoredProcedureInvocation readAndCheck(ByteBuffer msg, String procName, Object partitionParam,
                                                    boolean isAdmin, boolean isReadonly, boolean isSinglePart,
                                                    boolean isEverySite) throws IOException, MessagingException {
-        when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
-                                           any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
-                                           any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong())).thenReturn(true);
+        when(m_spInitiator.createTransaction(anyLong(), anyString(), anyBoolean(),
+                                             anyLong(),
+                                             any(StoredProcedureInvocation.class),
+                                             anyBoolean(), anyBoolean(), anyBoolean(),
+                                             any(int[].class), anyInt(), anyObject(),
+                                             anyInt(), anyLong())).thenReturn(true);
+        when(m_mpInitiator.createTransaction(anyLong(), anyString(), anyBoolean(),
+                                             anyLong(),
+                                             any(StoredProcedureInvocation.class),
+                                             anyBoolean(), anyBoolean(), anyBoolean(),
+                                             any(int[].class), anyInt(), anyObject(),
+                                             anyInt(), anyLong())).thenReturn(true);
 
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
@@ -199,11 +224,22 @@ public class TestClientInterface {
         ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =
                 ArgumentCaptor.forClass(StoredProcedureInvocation.class);
         ArgumentCaptor<int[]> partitionCaptor = ArgumentCaptor.forClass(int[].class);
-        verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
-                                              invocationCaptor.capture(),
-                                              boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(), partitionCaptor.capture(),
-                                              anyInt(), anyObject(), anyInt(), anyLong());
+        if (isSinglePart) {
+            verify(m_spInitiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
+                                                    anyLong(),
+                                                    invocationCaptor.capture(),
+                                                    boolCaptor.capture(), boolCaptor.capture(),
+                                                    boolCaptor.capture(), partitionCaptor.capture(),
+                                                    anyInt(), anyObject(), anyInt(), anyLong());
+        }
+        else {
+            verify(m_mpInitiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
+                                                    anyLong(),
+                                                    invocationCaptor.capture(),
+                                                    boolCaptor.capture(), boolCaptor.capture(),
+                                                    boolCaptor.capture(), partitionCaptor.capture(),
+                                                    anyInt(), anyObject(), anyInt(), anyLong());
+        }
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertEquals(isAdmin, boolValues.get(0)); // is admin
         assertEquals(isReadonly, boolValues.get(1)); // readonly
@@ -248,7 +284,8 @@ public class TestClientInterface {
      */
     @Test
     public void testFinishedAdHocPlanning() {
-        when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
+        when(m_mpInitiator.createTransaction(anyLong(), anyString(), anyBoolean(),
+                                           anyLong(),
                                            any(StoredProcedureInvocation.class),
                                            anyBoolean(), anyBoolean(), anyBoolean(),
                                            any(int[].class), anyInt(), anyObject(),
@@ -272,7 +309,8 @@ public class TestClientInterface {
         ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
         ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =
                 ArgumentCaptor.forClass(StoredProcedureInvocation.class);
-        verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
+        verify(m_mpInitiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
+                                              anyLong(),
                                               invocationCaptor.capture(),
                                               boolCaptor.capture(), boolCaptor.capture(),
                                               boolCaptor.capture(), any(int[].class),
@@ -304,7 +342,8 @@ public class TestClientInterface {
      */
     @Test
     public void testFinishedCatalogDiffing() {
-        when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
+        when(m_spInitiator.createTransaction(anyLong(), anyString(), anyBoolean(),
+                                           anyLong(),
                                            any(StoredProcedureInvocation.class),
                                            anyBoolean(), anyBoolean(), anyBoolean(),
                                            any(int[].class), anyInt(), anyObject(),
@@ -328,7 +367,8 @@ public class TestClientInterface {
         ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
         ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =
                 ArgumentCaptor.forClass(StoredProcedureInvocation.class);
-        verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
+        verify(m_spInitiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
+                                              anyLong(),
                                               invocationCaptor.capture(),
                                               boolCaptor.capture(), boolCaptor.capture(),
                                               boolCaptor.capture(), any(int[].class),

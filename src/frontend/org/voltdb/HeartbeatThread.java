@@ -17,7 +17,6 @@
 
 package org.voltdb;
 
-import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
@@ -31,11 +30,11 @@ import org.voltdb.logging.VoltLogger;
  */
 public class HeartbeatThread extends Thread {
 
-    ArrayList<ClientInterface> m_clientInterfaces;
+    final ClientInterface m_clientInterface;
     private static final VoltLogger log = new VoltLogger("HOST");
 
-    public HeartbeatThread(ArrayList<ClientInterface> clientInterfaces) {
-        m_clientInterfaces = clientInterfaces;
+    public HeartbeatThread(ClientInterface clientInterface) {
+        m_clientInterface = clientInterface;
     }
 
     @Override
@@ -52,9 +51,7 @@ public class HeartbeatThread extends Thread {
                 } catch (InterruptedException e) {
                     return;
                 }
-                for (ClientInterface ci : m_clientInterfaces) {
-                    ci.processPeriodicWork();
-                }
+                m_clientInterface.processPeriodicWork();
             }
             catch (Exception ex) {
                 log.warn(ex.getMessage(), ex);

@@ -52,7 +52,7 @@ public class ClusterCompiler
         }
 
         // add all the sites
-        int initiatorsPerHost = 1;
+        int initiatorsPerHost = 2; // one for single part and one for multi-part
         int partitionCounter = -1;
         int nextInitiatorId = 1;
         for (int i = 0; i < (sitesPerHost + initiatorsPerHost) * hostCount; i++) {

@@ -17,9 +17,10 @@
 
 package org.voltdb.dtxn;
 
-import org.voltdb.StoredProcedureInvocation;
 import java.util.ArrayList;
 import java.util.Map;
+
+import org.voltdb.StoredProcedureInvocation;
 
 /**
  * <p>A <code>TransactionInitiator</code> is the center of the distributed
@@ -35,42 +36,15 @@ import java.util.Map;
 public abstract class TransactionInitiator {
 
     /**
-     * <p>Create a new transaction, which will result in one or more
-     * <code>WorkUnit</code>'s being generated for worker partitions.</p>
-     *
-     * <p>Does not need to be synchronized as the scheduler will ensure
-     * that only one thread is ever accepting connections at a time.</p>
-     *
-     * @param connectionId A unique integer identifying which TCP/IP connection
-     * spawned this transaction.
-     * @param connectionHostname hostname associated with this connection
-     * @param invocation The data describing the work to be done.
-     * @param partitions The partitions (from the catalog) involved in this
-     * transaction (Errs on the side of too many).
-     * @param numPartitions Number of relevant partitions in the array (allows
-     * for the array to be oversized).
-     * @param clientData Client data returned with the completed transaction
-     * @param messageSize Size in bytes of the message that created this invocation
+     * Used to specify that a new txn id is requested for createTransaction.
      */
-    public abstract boolean createTransaction(
-            long connectionId,
-            final String connectionHostname,
-            boolean adminConnection,
-            StoredProcedureInvocation invocation,
-            boolean isReadOnly,
-            boolean isSinglePartition,
-            boolean isEverySite,
-            int partitions[],
-            int numPartitions,
-            Object clientData,
-            int messageSize,
-            long now);
+    public final static long REQUEST_TXN_ID = 0;
 
     /**
      * <p>
-     * Create a new transaction with a specified transaction ID, which will
-     * result in one or more <code>WorkUnit</code>'s being generated for worker
-     * partitions.
+     * Create a new transaction, which will result in one or more <code>WorkUnit</code>'s
+     * being generated for worker partitions. Optionally can pass in an existing txn id
+     * for re-running replicated transactions on a second cluster.
      * </p>
      *
      * <p>
@@ -166,4 +140,9 @@ public abstract class TransactionInitiator {
      * @param connectionId
      */
     public abstract void removeConnectionStats(long connectionId);
+
+    /**
+     * @return The site id associated with this initiator.
+     */
+    public abstract int getSiteId();
 }

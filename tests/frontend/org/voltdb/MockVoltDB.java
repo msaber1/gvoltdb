@@ -23,7 +23,6 @@
 package org.voltdb;
 
 import java.net.InetSocketAddress;
-import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
@@ -315,7 +314,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public ArrayList<ClientInterface> getClientInterfaces()
+    public ClientInterface getClientInterface()
     {
         // TODO Auto-generated method stub
         return null;

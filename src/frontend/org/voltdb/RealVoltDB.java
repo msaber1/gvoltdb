@@ -64,12 +64,6 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-
-import org.voltdb.compiler.AsyncCompilerAgent;
-
-import org.voltdb.dtxn.SimpleDtxnInitiator;
-
-import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.agreement.AgreementSite;
 import org.voltdb.agreement.ZKUtil;
@@ -82,15 +76,17 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.UsersType;
-import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.NodeFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.logging.Level;
 import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.HostMessenger;
@@ -154,8 +150,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     private String m_versionString = m_defaultVersionString;
     // fields accessed via the singleton
     HostMessenger m_messenger = null;
-    final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
-    final ArrayList<SimpleDtxnInitiator> m_dtxns = new ArrayList<SimpleDtxnInitiator>();
+    ClientInterface m_clientInterface;
+    SimpleDtxnInitiator m_spInitiator;
+    SimpleDtxnInitiator m_mpInitiator;
     private Map<Integer, ExecutionSite> m_localSites;
     VoltNetwork m_network = null;
     AgreementSite m_agreementSite;
@@ -185,6 +182,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     final HashSet<Integer> m_downHosts = new HashSet<Integer>();
     final Set<Integer> m_downNonExecSites = new HashSet<Integer>();
+    final Set<Integer> m_downZkSites = new HashSet<Integer>();
     //For command log only, will also mark self as faulted
     final Set<Integer> m_downSites = new HashSet<Integer>();
 
@@ -271,8 +269,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
-            m_clientInterfaces.clear();
-            m_dtxns.clear();
+            m_clientInterface = null;
+            m_spInitiator = null;
+            m_mpInitiator = null;
             m_agreementSite = null;
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
@@ -448,41 +447,47 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
+            // Initialize the initiators
+
+            Set<Integer> nonExecSites = m_catalogContext.siteTracker.getNonExecSitesForHost(m_myHostId);
+            int spInitiatorId = m_catalogContext.siteTracker.getFirstNonExecSiteForHost(m_myHostId);
+            Site spInitiatorSite = m_catalogContext.siteTracker.getSiteForId(spInitiatorId);
+            boolean removed = nonExecSites.remove(spInitiatorId);
+            assert(removed);
+            assert(nonExecSites.size() == 1);
+            int mpInitiatorId = nonExecSites.iterator().next();
+            Site mpInitiatorSite = m_catalogContext.siteTracker.getSiteForId(mpInitiatorId);
+            assert(mpInitiatorSite.getIsexec() == false);
+
+            m_spInitiator = new SimpleDtxnInitiator(
+                            m_catalogContext,
+                            m_messenger,
+                            m_myHostId,
+                            spInitiatorId,
+                            spInitiatorSite.getInitiatorid(),
+                            m_config.m_timestampTestingSalt);
+
+            m_mpInitiator = new SimpleDtxnInitiator(
+                            m_catalogContext,
+                            m_messenger,
+                            m_myHostId,
+                            mpInitiatorId,
+                            mpInitiatorSite.getInitiatorid(),
+                            m_config.m_timestampTestingSalt);
+
             // Create the client interface
-            int portOffset = 0;
-            for (Site site : m_catalogContext.siteTracker.getUpSites()) {
-                int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
-                int currSiteId = Integer.parseInt(site.getTypeName());
 
-
-                // create DTXN and CI for each local non-EE site
-                if ((sitesHostId == m_myHostId) && (site.getIsexec() == false)) {
-                    SimpleDtxnInitiator initiator =
-                        new SimpleDtxnInitiator(
-                                m_catalogContext,
-                                m_messenger,
-                                m_myHostId,
-                                currSiteId,
-                                site.getInitiatorid(),
-                                m_config.m_timestampTestingSalt);
-
-                    ClientInterface ci =
-                        ClientInterface.create(m_network,
-                                               m_messenger,
-                                               m_catalogContext,
-                                               m_replicationRole,
-                                               initiator,
-                                               m_catalogContext.numberOfNodes,
-                                               currSiteId,
-                                               site.getInitiatorid(),
-                                               config.m_port + portOffset,
-                                               config.m_adminPort + portOffset,
-                                               m_config.m_timestampTestingSalt);
-                    portOffset += 2;
-                    m_clientInterfaces.add(ci);
-                    m_dtxns.add(initiator);
-                }
-            }
+            m_clientInterface = ClientInterface.create(m_network,
+                                       m_messenger,
+                                       m_catalogContext,
+                                       m_replicationRole,
+                                       m_spInitiator,
+                                       m_mpInitiator,
+                                       spInitiatorId,
+                                       m_catalogContext.numberOfNodes,
+                                       config.m_port,
+                                       config.m_adminPort,
+                                       m_config.m_timestampTestingSalt);
 
             m_partitionCountStats = new PartitionCountStats( m_catalogContext.numberOfPartitions);
             m_statsAgent.registerStatsSource(SysProcSelector.PARTITIONCOUNT,
@@ -529,7 +534,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_messenger.waitForAllHostsToBeReady();
             }
 
-            heartbeatThread = new HeartbeatThread(m_clientInterfaces);
+            heartbeatThread = new HeartbeatThread(m_clientInterface);
             heartbeatThread.start();
             schedulePeriodicWorks();
 
@@ -541,15 +546,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.warn("Running without redundancy (k=0) is not recommended for production use.");
             }
 
-            assert(m_clientInterfaces.size() > 0);
-            ClientInterface ci = m_clientInterfaces.get(0);
-            ci.initializeSnapshotDaemon();
+            m_clientInterface.initializeSnapshotDaemon();
 
             // set additional restore agent stuff
-            TransactionInitiator initiator = m_dtxns.get(0);
             if (m_restoreAgent != null) {
                 m_restoreAgent.setCatalogContext(m_catalogContext);
-                m_restoreAgent.setInitiator(initiator);
+                m_restoreAgent.setInitiator(m_spInitiator);
             }
         }
     }
@@ -804,6 +806,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
              */
             for (Integer downHost : m_downHosts) {
                 m_downNonExecSites.addAll(m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
+                m_downZkSites.add(m_catalogContext.siteTracker.getAgreementSiteForHost(downHost));
                 m_downSites.addAll(m_catalogContext.siteTracker.getNonExecSitesForHost(downHost));
                 m_faultManager.reportFault(
                         new NodeFailureFault(
@@ -1222,9 +1225,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_adminListener.stop();
 
             // shut down the client interface
-            for (ClientInterface ci : m_clientInterfaces) {
-                ci.shutdown();
-            }
+            m_clientInterface.shutdown();
 
             // shut down Export and its connectors.
             ExportManager.instance().shutdown();
@@ -1303,7 +1304,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             }
 
             // The network iterates this list. Clear it after network's done.
-            m_clientInterfaces.clear();
+            m_clientInterface = null;
 
             ExportManager.instance().shutdown();
             m_computationService.shutdown();
@@ -1443,9 +1444,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             clusterUpdate(catalogDiffCommands);
 
             // update the SafteyState in the initiators
-            for (SimpleDtxnInitiator dtxn : m_dtxns) {
-                dtxn.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
-            }
+            m_spInitiator.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
+            m_mpInitiator.notifyExecutionSiteRejoin(rejoiningExecSiteIds);
 
             //Notify the export manager the cluster topology has changed
             ExportManager.instance().notifyOfClusterTopologyChange();
@@ -1536,9 +1536,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // 2. update client interface (asynchronously)
             //    CI in turn updates the planner thread.
-            for (ClientInterface ci : m_clientInterfaces) {
-                ci.notifyOfCatalogUpdate();
-            }
+            m_clientInterface.notifyOfCatalogUpdate();
 
             // 3. update HTTPClientInterface (asynchronously)
             // This purges cached connection state so that access with
@@ -1562,10 +1560,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                                        diffCommands, false, -1);
         }
 
-        for (ClientInterface ci : m_clientInterfaces)
-        {
-            ci.notifyOfCatalogUpdate();
-        }
+        if (m_clientInterface != null)
+            m_clientInterface.notifyOfCatalogUpdate();
     }
 
     @Override
@@ -1599,8 +1595,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     @Override
-    public ArrayList<ClientInterface> getClientInterfaces() {
-        return m_clientInterfaces;
+    public ClientInterface getClientInterface() {
+        return m_clientInterface;
     }
 
     @Override
@@ -1658,9 +1654,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         out.print("Content-type: multipart/mixed; boundary=\"reportsection\"");
 
         out.print("\n\n--reportsection\nContent-Type: text/plain\n\nClientInterface Report\n");
-        for (ClientInterface ci : getClientInterfaces()) {
-          out.print(ci.toString() + "\n");
-        }
+        out.print(m_clientInterface.toString() + "\n");
 
         out.print("\n\n--reportsection\nContent-Type: text/plain\n\nLocalSite Report\n");
         for(ExecutionSite es : getLocalSites().values()) {
@@ -1703,9 +1697,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         final long delta = ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000);
         final long megabytes = m_executionSiteRecoveryTransferred / (1024 * 1024);
         final double megabytesPerSecond = megabytes / ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000.0);
-        for (ClientInterface intf : getClientInterfaces()) {
-            intf.mayActivateSnapshotDaemon();
-        }
+        if (m_clientInterface != null)
+            m_clientInterface.mayActivateSnapshotDaemon();
         hostLog.info(
                 "Node data recovery completed after " + delta + " seconds with " + megabytes +
                 " megabytes transferred at a rate of " +
@@ -1733,8 +1726,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 hostLog.info("Node recovery completed");
             }
         } catch (Exception e) {
-            hostLog.fatal("Unable to log host recovery completion to ZK", e);
-            VoltDB.crashVoltDB();
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
         hostLog.info("Logging host recovery completion to ZK");
     }
@@ -1791,9 +1783,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             hostLog.info("Changing replication role from " + m_replicationRole +
                          " to " + role);
             m_replicationRole = role;
-            for (ClientInterface ci : m_clientInterfaces) {
-                ci.setReplicationRole(m_replicationRole);
-            }
+            m_clientInterface.setReplicationRole(m_replicationRole);
         }
     }
 
@@ -1838,19 +1828,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
          * Enable the initiator to send normal heartbeats and accept client
          * connections
          */
-        for (SimpleDtxnInitiator dtxn : m_dtxns) {
-            dtxn.setSendHeartbeats(true);
-        }
+        m_spInitiator.setSendHeartbeats(true);
+        m_mpInitiator.setSendHeartbeats(true);
 
-        for (ClientInterface ci : m_clientInterfaces) {
-            try {
-                ci.startAcceptingConnections();
-            } catch (IOException e) {
-                hostLog.l7dlog(Level.FATAL,
-                               LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
-                               e);
-                VoltDB.crashVoltDB();
-            }
+        try {
+            m_clientInterface.startAcceptingConnections();
+        } catch (IOException e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
         if (m_startMode != null) {

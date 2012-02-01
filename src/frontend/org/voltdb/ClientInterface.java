@@ -50,7 +50,6 @@ import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Partition;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
@@ -110,7 +109,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
-    private final TransactionInitiator m_initiator;
+    private final TransactionInitiator m_spInitiator;
+    private final TransactionInitiator m_mpInitiator;
     private final CopyOnWriteArrayList<Connection> m_connections = new CopyOnWriteArrayList<Connection>();
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
@@ -690,7 +690,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void stopped(Connection c) {
             m_numConnections.decrementAndGet();
-            m_initiator.removeConnectionStats(connectionId());
+            m_spInitiator.removeConnectionStats(connectionId());
+            m_mpInitiator.removeConnectionStats(connectionId());
         }
 
         @Override
@@ -791,19 +792,38 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final int messageSize,
             final long now)
     {
-        return m_initiator.createTransaction(
-                connectionId,
-                connectionHostname,
-                adminConnection,
-                invocation,
-                isReadOnly,
-                isSinglePartition,
-                isEveryPartition,
-                partitions,
-                numPartitions,
-                clientData,
-                messageSize,
-                now);
+        if (isSinglePartition) {
+            return m_spInitiator.createTransaction(
+                    connectionId,
+                    connectionHostname,
+                    adminConnection,
+                    TransactionInitiator.REQUEST_TXN_ID,
+                    invocation,
+                    isReadOnly,
+                    isSinglePartition,
+                    isEveryPartition,
+                    partitions,
+                    numPartitions,
+                    clientData,
+                    messageSize,
+                    now);
+        }
+        else {
+            return m_mpInitiator.createTransaction(
+                    connectionId,
+                    connectionHostname,
+                    adminConnection,
+                    TransactionInitiator.REQUEST_TXN_ID,
+                    invocation,
+                    isReadOnly,
+                    isSinglePartition,
+                    isEveryPartition,
+                    partitions,
+                    numPartitions,
+                    clientData,
+                    messageSize,
+                    now);
+        }
     }
 
 
@@ -817,10 +837,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             Messenger messenger,
             CatalogContext context,
             ReplicationRole replicationRole,
-            SimpleDtxnInitiator initiator,
-            int hostCount,
+            SimpleDtxnInitiator spInitiator,
+            SimpleDtxnInitiator mpInitiator,
             int siteId,
-            int initiatorId,
+            int hostCount,
             int port,
             int adminPort,
             long timestampTestingSalt) {
@@ -837,18 +857,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-           port, adminPort, context, network, replicationRole, siteId, initiator, allPartitions);
+           port, adminPort, context, network, replicationRole,
+           siteId, spInitiator, mpInitiator, allPartitions);
 
-        initiator.setClientInterface(ci);
+        spInitiator.setClientInterface(ci);
+        mpInitiator.setClientInterface(ci);
         return ci;
     }
 
     ClientInterface(int port, int adminPort, CatalogContext context, VoltNetwork network,
-                    ReplicationRole replicationRole, int siteId, TransactionInitiator initiator,
+                    ReplicationRole replicationRole, int siteId,
+                    TransactionInitiator spInitiator, TransactionInitiator mpInitiator,
                     int[] allPartitions)
     {
         m_catalogContext.set(context);
-        m_initiator = initiator;
+        m_spInitiator = spInitiator;
+        m_mpInitiator = mpInitiator;
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
@@ -958,7 +982,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // in the cluster, make our SnapshotDaemon responsible for snapshots
     public void mayActivateSnapshotDaemon() {
         SnapshotSchedule schedule = m_catalogContext.get().database.getSnapshotschedule().get("default");
-        if (m_siteId ==
+        if (m_spInitiator.getSiteId() ==
                 m_catalogContext.get().siteTracker.getLowestLiveNonExecSiteId() &&
             schedule != null && schedule.getEnabled())
         {
@@ -1233,7 +1257,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     involvedPartitions, involvedPartitions.length,
                     ccxn, buf.capacity(),
                     now);
-
         }
 
         // dispatch a user procedure
@@ -1365,8 +1388,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             task = new StoredProcedureInvocation();
                             task.readExternal(fds);
                         } catch (Exception e) {
-                            hostLog.fatal(e);
-                            VoltDB.crashVoltDB();
+                            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                         }
 
                         // initiate the transaction
@@ -1410,8 +1432,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         task = new StoredProcedureInvocation();
                         task.readExternal(fds);
                     } catch (Exception e) {
-                        hostLog.fatal(e);
-                        VoltDB.crashVoltDB();
+                        VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                     }
 
                     // initiate the transaction. These hard-coded values from catalog
@@ -1445,7 +1466,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private long m_tickCounter = 0;
 
     public final void processPeriodicWork() {
-        final long time = m_initiator.tick();
+        m_mpInitiator.tick();
+        final long time = m_spInitiator.tick();
         m_tickCounter++;
         if (m_tickCounter % 20 == 0) {
             checkForDeadConnections(time);
@@ -1650,6 +1672,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
+        public int getLocalPort() {
+            throw new UnsupportedOperationException();
+        }
+
+        @Override
         public void scheduleRunnable(Runnable r) {
         }
 
@@ -1675,19 +1702,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         Map<Long, Pair<String, long[]>> client_stats =
             new HashMap<Long, Pair<String, long[]>>();
 
-        Map<Long, long[]> inflight_txn_stats = m_initiator.getOutstandingTxnStats();
+        Map<Long, long[]> inflightTxnStatsSP = m_spInitiator.getOutstandingTxnStats();
+        Map<Long, long[]> inflightTxnStatsMP = m_mpInitiator.getOutstandingTxnStats();
 
-        // put all the live connections in the stats map, then fill in admin and
+        // put all the live connections in the stats map, then fill in
         // outstanding txn info from the inflight stats
 
-        for (Connection c : m_connections)
-        {
-            if (!client_stats.containsKey(c.connectionId()))
-            {
+        int adminPort = VoltDB.instance().getConfig().m_adminPort;
+
+        for (Connection c : m_connections) {
+            if (!client_stats.containsKey(c.connectionId())) {
                 client_stats.put(
                     c.connectionId(),
                     new Pair<String, long[]>(c.getHostnameOrIP(),
-                            new long[]{0,
+                            new long[]{(c.getLocalPort() == adminPort) ? 1 : 0,
                                        c.readStream().dataAvailable(),
                                        c.writeStream().getOutstandingMessageCount(),
                                        0})
@@ -1695,12 +1723,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
-        for (Entry<Long, long[]> stat : inflight_txn_stats.entrySet())
-        {
-            if (client_stats.containsKey(stat.getKey()))
-            {
-                client_stats.get(stat.getKey()).getSecond()[0] = stat.getValue()[0];
-                client_stats.get(stat.getKey()).getSecond()[3] = stat.getValue()[1];
+        for (Entry<Long, long[]> stat : inflightTxnStatsSP.entrySet()) {
+            if (client_stats.containsKey(stat.getKey())) {
+                client_stats.get(stat.getKey()).getSecond()[3] += stat.getValue()[1];
+            }
+        }
+        for (Entry<Long, long[]> stat : inflightTxnStatsMP.entrySet()) {
+            if (client_stats.containsKey(stat.getKey())) {
+                client_stats.get(stat.getKey()).getSecond()[3] += stat.getValue()[1];
             }
         }
 

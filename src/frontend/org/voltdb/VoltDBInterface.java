@@ -16,11 +16,9 @@
  */
 package org.voltdb;
 
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -79,7 +77,7 @@ public interface VoltDBInterface
     public Object[] getInstanceId();
     public Messenger getMessenger();
     public HostMessenger getHostMessenger();
-    public ArrayList<ClientInterface> getClientInterfaces();
+    public ClientInterface getClientInterface();
     public Map<Integer, ExecutionSite> getLocalSites();
     public VoltNetwork getNetwork();
     public StatsAgent getStatsAgent();

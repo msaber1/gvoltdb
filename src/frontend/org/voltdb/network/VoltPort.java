@@ -103,6 +103,7 @@ public class VoltPort implements Callable<VoltPort>, Connection
      */
     volatile String m_remoteHost = null;
     final String m_remoteIP;
+    final int m_localPort;
     private String m_toString = null;
 
     /**
@@ -121,11 +122,13 @@ public class VoltPort implements Callable<VoltPort>, Connection
             VoltNetwork network,
             InputHandler handler,
             final int expectedOutgoingMessageSize,
-            String remoteIP) {
+            String remoteIP,
+            int remotePort) {
         m_network = network;
         m_handler = handler;
         m_expectedOutgoingMessageSize = expectedOutgoingMessageSize;
         m_remoteIP = remoteIP;
+        m_localPort = remotePort;
     }
 
     /**
@@ -454,6 +457,11 @@ public class VoltPort implements Callable<VoltPort>, Connection
         } else {
             return m_remoteIP;
         }
+    }
+
+    @Override
+    public int getLocalPort() {
+        return m_localPort;
     }
 
     @Override

@@ -551,8 +551,9 @@ public class Inits {
                     hostLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingLocalSite.name(), new Object[] { currSiteId }, null);
                     m_rvdb.m_messenger.createLocalSite(currSiteId);
                 }
-                // Create an agreement site for every initiator
-                if (site.getIsexec() == false) {
+
+                // Create an agreement site for the first initiator on each host
+                if (currSiteId == m_rvdb.m_catalogContext.siteTracker.getAgreementSiteForHost(sitesHostId)) {
                     agreementSiteIds.add(currSiteId);
                     if (sitesHostId == m_rvdb.m_myHostId) {
                         myAgreementSiteId = currSiteId;
@@ -584,7 +585,7 @@ public class Inits {
                             myAgreementSiteId,
                             agreementSiteIds,
                             myAgreementInitiatorId,
-                            m_rvdb.m_downNonExecSites,
+                            m_rvdb.m_downZkSites,
                             agreementMailbox,
                             new InetSocketAddress(
                                     m_config.m_zkInterface.split(":")[0],

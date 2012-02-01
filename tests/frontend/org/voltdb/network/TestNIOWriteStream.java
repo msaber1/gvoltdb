@@ -53,9 +53,10 @@ package org.voltdb.network;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
-import junit.framework.*;
 import java.nio.channels.SelectionKey;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import junit.framework.TestCase;
 
 import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.DBBPool.BBContainer;
@@ -72,7 +73,7 @@ public class TestNIOWriteStream extends TestCase {
         }
 
         public MockPort() {
-            super(null, null, 2048, "");
+            super(null, null, 2048, "", -1);
         }
 
         @Override
