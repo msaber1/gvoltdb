@@ -74,7 +74,10 @@ public class PartitionDRGateway {
                         boolean rejoiningAtStartup,
                         boolean replicationActive,
                         File overflowDir) throws IOException {}
-    public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
+    public void onSuccessfulProcedureCall(long txnId,
+                                          boolean singlePartition,
+                                          StoredProcedureInvocation spi,
+                                          ClientResponseImpl response) {}
     public void tick(long txnId) {}
     public void shutdown() {}
 

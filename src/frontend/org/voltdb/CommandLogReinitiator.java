@@ -34,7 +34,7 @@ public interface CommandLogReinitiator {
 
     public void setCatalogContext(CatalogContext context);
 
-    public void setInitiator(TransactionInitiator initiator);
+    public void setInitiator(TransactionInitiator spInitiator, TransactionInitiator mpInitiator);
 
     /**
      * Generate the local replay plan. Call this before starting replay.

@@ -110,7 +110,8 @@ SnapshotCompletionInterest {
     private final String m_snapshotPath;
     private final int m_lowestHostId;
 
-    private TransactionInitiator m_initiator;
+    private TransactionInitiator m_spInitiator;
+    private TransactionInitiator m_mpInitiator;
 
     // The snapshot to restore
     private SnapshotInfo m_snapshotToRestore = null;
@@ -174,7 +175,7 @@ SnapshotCompletionInterest {
         @Override
         public void setCatalogContext(CatalogContext context) {}
         @Override
-        public void setInitiator(TransactionInitiator initiator) {}
+        public void setInitiator(TransactionInitiator spInitiator, TransactionInitiator mpInitiator) {}
     };
 
     /*
@@ -185,7 +186,8 @@ SnapshotCompletionInterest {
         @Override
         public void run() {
             while (m_state == State.RESTORE) {
-                m_initiator.sendHeartbeat(RESTORE_TXNID + 1);
+                m_spInitiator.sendHeartbeat(RESTORE_TXNID + 1);
+                m_mpInitiator.sendHeartbeat(RESTORE_TXNID + 1);
                 try {
                     Thread.sleep(500);
                 } catch (InterruptedException e) {}
@@ -408,7 +410,8 @@ SnapshotCompletionInterest {
                         Set<Integer> liveHosts)
     throws IOException {
         m_hostId = hostId;
-        m_initiator = null;
+        m_spInitiator = null;
+        m_mpInitiator = null;
         m_snapshotMonitor = snapshotMonitor;
         m_callback = callback;
         m_action = action;
@@ -464,10 +467,11 @@ SnapshotCompletionInterest {
         m_replayAgent.setCatalogContext(context);
     }
 
-    public void setInitiator(TransactionInitiator initiator) {
-        m_initiator = initiator;
+    public void setInitiator(TransactionInitiator spInitiator, TransactionInitiator mpInitiator) {
+        m_spInitiator = spInitiator;
+        m_mpInitiator = mpInitiator;
         if (m_replayAgent != null)
-            m_replayAgent.setInitiator(initiator);
+            m_replayAgent.setInitiator(m_spInitiator, m_mpInitiator);
     }
 
     /**
@@ -1055,7 +1059,7 @@ SnapshotCompletionInterest {
         });
 
         if (txnId == null) {
-            m_initiator.createTransaction(-1, "CommandLog", true,
+            m_spInitiator.createTransaction(-1, "CommandLog", true,
                                           TransactionInitiator.REQUEST_TXN_ID, spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
@@ -1064,7 +1068,7 @@ SnapshotCompletionInterest {
                                           m_restoreAdapter, 0,
                                           EstTime.currentTimeMillis());
         } else {
-            m_initiator.createTransaction(-1, "CommandLog", true,
+            m_spInitiator.createTransaction(-1, "CommandLog", true,
                                           txnId, spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),

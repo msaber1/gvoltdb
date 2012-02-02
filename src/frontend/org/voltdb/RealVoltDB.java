@@ -551,7 +551,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
                 m_restoreAgent.setCatalogContext(m_catalogContext);
-                m_restoreAgent.setInitiator(m_spInitiator);
+                m_restoreAgent.setInitiator(m_spInitiator, m_mpInitiator);
             }
         }
     }

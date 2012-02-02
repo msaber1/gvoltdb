@@ -1174,7 +1174,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
             if ((invocation != null) && (m_recovering == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
-                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
+                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, txnState.isSinglePartition(), invocation, txnState.getResults());
                 }
             }
 
