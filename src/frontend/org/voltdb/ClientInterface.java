@@ -46,6 +46,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.json_voltpatches.JSONException;
+
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Partition;
@@ -567,6 +569,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             socket.socket().getInetAddress().getHostName(),
                             m_isAdmin);
             }
+            else if (service.equalsIgnoreCase("json")) {
+                handler =
+                    new ClientInputHandler(
+                            username,
+                            socket.socket().getInetAddress().getHostName(),
+                            m_isAdmin,
+                            true);  // isJsonFormat = true
+
+            }
             else {
                 String strUser = "ANONYMOUS";
                 if ((username != null) && (username.length() > 0)) strUser = username;
@@ -633,6 +644,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private Connection m_connection;
         private final String m_hostname;
         private final boolean m_isAdmin;
+        private final boolean m_isJsonFormat;
 
         /**
          * Must use username to do a lookup via the auth system
@@ -644,9 +656,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public ClientInputHandler(String username, String hostname,
                                   boolean isAdmin)
         {
+            this(username, hostname, isAdmin, false);
+        }
+
+        public ClientInputHandler(String username, String hostname,
+                boolean isAdmin, boolean isJsonFormat)
+        {
             m_username = username.intern();
             m_hostname = hostname;
             m_isAdmin = isAdmin;
+            m_isJsonFormat = isJsonFormat;
         }
 
         public boolean isAdmin()
@@ -1149,10 +1168,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     final ClientResponseImpl handleRead(ByteBuffer buf, ClientInputHandler handler, Connection ccxn) throws IOException {
         final long now = System.currentTimeMillis();
-        final FastDeserializer fds = new FastDeserializer(buf);
-        final StoredProcedureInvocation task = fds.readObject(StoredProcedureInvocation.class);
-        ClientResponseImpl error = null;
+        StoredProcedureInvocation task;
 
+        if (handler.m_isJsonFormat) {
+            task = new StoredProcedureInvocation();
+            try {
+                task.readJsonExternal(buf);
+            } catch (JSONException e) {
+                throw new IOException(e);
+            }
+        }
+        else {
+            final FastDeserializer fds = new FastDeserializer(buf);
+            task = fds.readObject(StoredProcedureInvocation.class);
+        }
+        ClientResponseImpl error = null;
 
         // Check for admin mode restrictions before proceeding any further
         VoltDBInterface instance = VoltDB.instance();
@@ -1265,7 +1295,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else {
                 // break out the Hashinator and calculate the appropriate partition
                 try {
-                    involvedPartitions = new int[] { getPartitionForProcedure(catProc.getPartitionparameter(), task) };
+                    involvedPartitions = new int[] {
+                        getPartitionForProcedure(catProc.getPartitionparameter(), task) };
                 }
                 catch (RuntimeException e) {
                     // unable to hash to a site, return an error
@@ -1569,7 +1600,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @return The partition best set up to execute the procedure.
      */
     int getPartitionForProcedure(int partitionIndex, StoredProcedureInvocation task) {
-        return TheHashinator.hashToPartition(task.getParameterAtIndex(partitionIndex));
+        if (task.getPartitionKeyValue() != null) {
+            TheHashinator.hashToPartition(task.getPartitionKeyValue());
+        }
+        else {
+            return TheHashinator.hashToPartition(task.getParameterAtIndex(partitionIndex));
+        }
     }
 
     @Override

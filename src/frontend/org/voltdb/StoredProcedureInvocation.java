@@ -23,6 +23,9 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.FutureTask;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ProcedureInvocationType;
@@ -61,6 +64,19 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     /** A descriptor provided by the client, opaque to the server,
         returned to the client in the ClientResponse */
     long clientHandle = -1;
+
+
+    /*
+     * For json originated StoredProcedureInvocations only,
+     * the partition key value. Try to avoid param deserialization
+     * of json values in client interface. This value is not
+     * serialized as part of a stored procedure invocation.
+     */
+    Object partitionKeyValue = null;
+
+    public Object getPartitionKeyValue() {
+        return partitionKeyValue;
+    }
 
     public StoredProcedureInvocation getShallowCopy()
     {
@@ -177,6 +193,22 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
                 return fds.readObject(ParameterSet.class);
             }
         });
+    }
+
+    public void readJsonExternal(ByteBuffer buf) throws IOException, JSONException {
+        String jsonString = new String(buf.array(), "UTF-8");
+        final JSONObject json = new JSONObject(jsonString);
+        this.procName = json.getString("procedure");
+        this.clientHandle = json.getLong("handle");
+        this.partitionKeyValue = json.get("partition-key");
+        params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+            @Override
+            public ParameterSet call() throws Exception {
+                JSONArray arr = json.getJSONArray("parameters");
+                return ParameterSet.fromJSONArray(arr);
+            }
+        });
+
     }
 
     @Override
