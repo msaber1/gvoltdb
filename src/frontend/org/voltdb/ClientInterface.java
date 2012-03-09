@@ -49,6 +49,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
@@ -80,8 +82,6 @@ import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.LocalMailbox;
@@ -1145,6 +1145,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
+    /**
+     * Find the synthesized catalog procedure for a Fragment runner procedure
+     */
+    private Procedure getCatProcForFragmentProc(String name) {
+        if (name.equals("@" + FragmentWriteProc.class.getSimpleName())) {
+            return FragmentWriteProc.asCatalogProcedure();
+        }
+        else if (name.equals("@" + FragmentReadProc.class.getSimpleName())) {
+            return FragmentReadProc.asCatalogProcedure();
+        }
+        else if (name.equals("@" + FragmentNonTransactionalProc.class.getSimpleName())) {
+            return FragmentNonTransactionalProc.asCatalogProcedure();
+        }
+        else {
+            return null;
+        }
+    }
 
     /**
      *
@@ -1175,7 +1192,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
         AuthSystem.AuthUser user = catalogContext.authSystem.getUser(handler.m_username);
-        final Procedure catProc = catalogContext.procedures.get(task.procName);
+        final Procedure catProc = task.procName.startsWith("@Fragment") ?
+                getCatProcForFragmentProc(task.procName) : catalogContext.procedures.get(task.procName);
         Config sysProc = SystemProcedureCatalog.listing.get(task.procName);
 
         if (user == null) {

@@ -541,6 +541,8 @@ public class TestExecutionSite extends TestCase {
                 return new MockMPProcedureRunner((MockMPVoltProcedure) procedure, (ExecutionSite) site);
             else if (procedure instanceof VoltSystemProcedure)
                 return super.create(procedure, site, catProc, hsql);
+            else if (procedure instanceof FragmentWriteProc)
+                return super.create(procedure, site, catProc, hsql);
             else
                 assert(false);
             return null;

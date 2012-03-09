@@ -69,6 +69,8 @@ public interface SiteProcedureConnection {
             long txnId,
             boolean readOnly) throws EEException;
 
+    public VoltTable executePlanFragment(long fragmentId, int inputDepId, ParameterSet params);
+
     /**
      * Get the number of partitions so ProcedureRunner can divide
      * replicated table DML results to get the *real* number of

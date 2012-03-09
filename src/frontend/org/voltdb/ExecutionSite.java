@@ -857,6 +857,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         procs.clear();
         m_registeredSysProcPlanFragments.clear();
         loadProceduresFromCatalog(backendTarget);
+        loadFragmentProcedures();
         loadSystemProcedures(backendTarget);
     }
 
@@ -910,6 +911,30 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             runner = m_runnerFactory.create(procedure, this, proc, hsql);
             procs.put(proc.getTypeName(), runner);
         }
+    }
+
+    private void loadFragmentProcedures() {
+        FragmentWriteProc fragProc; // all frag procs inherit from write
+        ProcedureRunner runner;
+        Procedure proc;
+
+        fragProc = new FragmentWriteProc();
+        proc = FragmentWriteProc.asCatalogProcedure();
+        runner = m_runnerFactory.create(fragProc, this, proc, hsql);
+        fragProc.initFragmentProc(ee, this);
+        procs.put("@" + FragmentWriteProc.class.getSimpleName(), runner);
+
+        fragProc = new FragmentReadProc();
+        proc = FragmentReadProc.asCatalogProcedure();
+        runner = m_runnerFactory.create(fragProc, this, proc, hsql);
+        fragProc.initFragmentProc(ee, this);
+        procs.put("@" + FragmentReadProc.class.getSimpleName(), runner);
+
+        fragProc = new FragmentNonTransactionalProc();
+        proc = FragmentNonTransactionalProc.asCatalogProcedure();
+        runner = m_runnerFactory.create(fragProc, this, proc, hsql);
+        fragProc.initFragmentProc(ee, this);
+        procs.put("@" + FragmentNonTransactionalProc.class.getSimpleName(), runner);
     }
 
     private void loadSystemProcedures(BackendTarget backendTarget) {
@@ -2138,6 +2163,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
     }
 
+    @Override
+    public VoltTable executePlanFragment(long fragmentId, int inputDepId, ParameterSet params) {
+        return ee.executePlanFragment(fragmentId,
+                                      inputDepId,
+                                      params,
+                                      m_currentTransactionState.txnId,
+                                      lastCommittedTxnId,
+                                      m_currentTransactionState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken());
+    }
 
     @Override
     public FragmentResponseMessage processFragmentTask(
@@ -2259,7 +2293,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 if (callerParams != null) {
                     ClientResponseImpl cr = null;
 
-                    // find the txn id visible to the proc
+                    // find the txn id visible to the proc for determinism
                     long txnId = txnState.txnId;
                     StoredProcedureInvocation invocation = txnState.getInvocation();
                     if ((invocation != null) && (invocation.getType() == ProcedureInvocationType.REPLICATED)) {

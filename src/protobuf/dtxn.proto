@@ -1,0 +1,15 @@
+package pmsg;
+option java_package = "org.voltdb.pmsg";
+option java_outer_classname = "DTXN";
+
+message DependencySet {
+    message DependencyGroup {
+        optional int32 dependencyId = 1;
+        repeated bytes dependencies = 2;
+    }
+    repeated DependencyGroup dependencies = 1;
+}
+
+message ParameterSet {
+    repeated bytes parameterSets = 1;
+}

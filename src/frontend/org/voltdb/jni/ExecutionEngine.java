@@ -17,6 +17,7 @@
 
 package org.voltdb.jni;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -36,7 +37,10 @@ import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.pmsg.DTXN;
 import org.voltdb.utils.LogKeys;
+
+import com.google.protobuf.ByteString;
 
 /**
  * Wrapper for native Execution Engine library. There are two implementations,
@@ -105,6 +109,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /**
+     * Called by Java to store dependencies for the EE. Creates
+     * a private list of dependencies to be manipulated by the tracker.
+     * Does not copy the table data - references WorkUnit's tables.
+     * @param dependencies
+     */
+    public void stashWorkUnitDependencies(final DTXN.DependencySet dependencies) {
+        m_dependencyTracker.trackNewWorkUnit(dependencies);
+    }
+
+    /**
      * Stash a single dependency. Exists only for test cases.
      * @param depId
      * @param vt
@@ -152,6 +166,29 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 // intentionally overwrite the previous dependency id.
                 // would a lookup and a clear() be faster?
                 m_depsById.put(e.getKey(), deque);
+            }
+        }
+
+        void trackNewWorkUnit(final DTXN.DependencySet dependencies) {
+            for (final DTXN.DependencySet.DependencyGroup group : dependencies.getDependenciesList()) {
+                // create a new list of references to the workunit's table
+                // to avoid any changes to the WorkUnit's list. But do not
+                // copy the table data.
+                final ArrayDeque<VoltTable> deque = new ArrayDeque<VoltTable>();
+                for (ByteString bs : group.getDependenciesList()) {
+                    FastDeserializer fds = new FastDeserializer(bs.asReadOnlyByteBuffer());
+                    VoltTable t = null;
+                    try {
+                        t = fds.readObject(VoltTable.class);
+                    } catch (IOException e) {
+                        VoltDB.crashLocalVoltDB(
+                                "Unable to deserialize dependecny from protobuf", true, e);
+                    }
+                    deque.add(t);
+                }
+                // intentionally overwrite the previous dependency id.
+                // would a lookup and a clear() be faster?
+                m_depsById.put(group.getDependencyId(), deque);
             }
         }
 

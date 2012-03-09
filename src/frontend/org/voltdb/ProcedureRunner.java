@@ -843,7 +843,7 @@ public class ProcedureRunner {
 //       Expectation.check(m_procedureName, "NO STMT", 0, expectation, table);
 //   }
 
-   private VoltTable[] executeQueriesInIndividualBatches(List<QueuedSQL> batch, boolean finalTask) {
+   protected VoltTable[] executeQueriesInIndividualBatches(List<QueuedSQL> batch, boolean finalTask) {
        assert(batch.size() > 0);
 
        VoltTable[] retval = new VoltTable[batch.size()];
@@ -869,7 +869,7 @@ public class ProcedureRunner {
        return retval;
    }
 
-   private VoltTable[] slowPath(List<QueuedSQL> batch, boolean finalTask) {
+   protected VoltTable[] slowPath(List<QueuedSQL> batch, boolean finalTask) {
        /*
         * Determine if reads and writes are mixed. Can't mix reads and writes
         * because the order of execution is wrong when replicated tables are involved
