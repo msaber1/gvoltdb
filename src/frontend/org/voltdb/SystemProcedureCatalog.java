@@ -19,6 +19,9 @@ package org.voltdb;
 
 import java.util.HashMap;
 
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Procedure;
 
 
@@ -113,10 +116,33 @@ public class SystemProcedureCatalog {
             p.setPartitionparameter(0);
             return p;
         }
+
+        JSONObject serializeToJson() throws JSONException
+        {
+            JSONObject json = new JSONObject();
+            json.put("procedure", name);
+            json.put("parameters", new JSONArray());
+            for (int i = 0; i < paramTypes.length; i++)
+            {
+                json.append("parameters", paramTypes[i].toSQLString());
+            }
+            return json;
+        }
     }
 
     public static final HashMap<String, Config> listing =
         new HashMap<String, Config>();
+
+    public static JSONObject serializeSysprocCatalogToJson() throws JSONException
+    {
+        JSONObject json = new JSONObject();
+        json.put("sysprocs", new JSONArray());
+        for (Config sysproc : listing.values())
+        {
+            json.append("sysprocs", sysproc.serializeToJson());
+        }
+        return json;
+    }
 
     static {
         listing.put("@AdHoc",
