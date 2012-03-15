@@ -46,6 +46,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Partition;
@@ -597,8 +599,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             if (handler != null) {
                 byte buildString[] = VoltDB.instance().getBuildString().getBytes("UTF-8");
-                responseBuffer = ByteBuffer.allocate(34 + buildString.length);
-                responseBuffer.putInt(30 + buildString.length);//message length
+
+                String ads = getAdvertisements();
+                int ad_length = 0;
+                if (ads != null)
+                {
+                    ad_length = 4 + ads.getBytes("UTF-8").length;
+                }
+
+                responseBuffer = ByteBuffer.allocate(34 + buildString.length + ad_length);
+                responseBuffer.putInt(30 + buildString.length + ad_length);//message length
                 responseBuffer.put((byte)0);//version
 
                 //Send positive response
@@ -608,7 +618,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 responseBuffer.putLong((Long)VoltDB.instance().getInstanceId()[0]);
                 responseBuffer.putInt((Integer)VoltDB.instance().getInstanceId()[1]);
                 responseBuffer.putInt(buildString.length);
-                responseBuffer.put(buildString).flip();
+                responseBuffer.put(buildString);
+
+                // Add the requested optional responses
+                if (ads != null)
+                {
+                    responseBuffer.putInt(ads.getBytes("UTF-8").length);
+                    responseBuffer.put(ads.getBytes("UTF-8"));
+                }
+
+                responseBuffer.flip();
                 socket.write(responseBuffer);
 
             }
@@ -623,6 +642,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             }
             return handler;
+        }
+
+        private String getAdvertisements()
+        {
+            try
+            {
+                return SystemProcedureCatalog.serializeSysprocCatalogToJson().toString();
+            }
+            catch (JSONException e)
+            {
+                e.printStackTrace();
+                return null;
+            }
         }
     }
 
