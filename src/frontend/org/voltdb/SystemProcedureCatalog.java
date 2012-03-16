@@ -59,6 +59,7 @@ public class SystemProcedureCatalog {
         public final boolean advertise;
         public final String name;
         public final VoltType[] paramTypes;
+        public final String helpString;
 
         public Config(String className,
                 boolean readOnly,
@@ -69,7 +70,8 @@ public class SystemProcedureCatalog {
                 boolean allowedInReplica,
                 boolean advertise,
                 String name,
-                VoltType[] paramTypes)
+                VoltType[] paramTypes,
+                String helpString)
         {
             this.className = className;
             this.readOnly = readOnly;
@@ -81,6 +83,7 @@ public class SystemProcedureCatalog {
             this.advertise = advertise;
             this.name = name;
             this.paramTypes = paramTypes;
+            this.helpString = helpString;
         }
 
         boolean getEverysite() {
@@ -130,6 +133,7 @@ public class SystemProcedureCatalog {
             JSONObject json = new JSONObject();
             json.put("procedure", name);
             json.put("parameters", new JSONArray());
+            json.put("help", helpString);
             for (int i = 0; i < paramTypes.length; i++)
             {
                 json.append("parameters", paramTypes[i].toSQLString());
@@ -160,112 +164,141 @@ public class SystemProcedureCatalog {
                     new Config("org.voltdb.sysprocs.AdHoc",
                                false, false, false, false, false, true,
                                true, "@AdHoc",
-                               new VoltType[] {VoltType.STRING}));
+                               new VoltType[] {VoltType.STRING},
+                               ""));
         listing.put("@AdHocSP",
                     new Config("org.voltdb.sysprocs.AdHocSP",
                                false, false, false, false, false, true,
                                true, "@AdHocSP",
                                new VoltType[] {VoltType.STRING,
-                                               VoltType.STRING}));
+                                               VoltType.STRING},
+                               ""));
         listing.put("@BalancePartitions",
                     new Config("org.voltdb.sysprocs.BalancePartitions",
                                false, false, true, true, true, false,
                                false, "@BalancePartitions",
-                               new VoltType[] {}));
+                               new VoltType[] {},
+                               ""));
         listing.put("@LoadMultipartitionTable",
                     new Config("org.voltdb.sysprocs.LoadMultipartitionTable",
                                false, false, false, false, false, false,
                                true, "@LoadMultipartitionTable",
-                               new VoltType[] {}));
+                               new VoltType[] {VoltType.STRING,
+                                               VoltType.VOLTTABLE},
+                               ""));
         listing.put("@LoadSinglepartitionTable",
                     new Config("org.voltdb.sysprocs.LoadSinglepartitionTable",
                                false, false, false, false, false, false,
                                true, "@LoadSinglePartitionTable",
-                               new VoltType[] {}));
+                               new VoltType[] {VoltType.STRING,
+                                               VoltType.VOLTTABLE},
+                               ""));
         listing.put("@Pause",
                     new Config("org.voltdb.sysprocs.Pause",
                                false, true,  false, false, true, true,
                                true, "@Pause",
-                               new VoltType[] {}));
+                               new VoltType[] {},
+                               ""));
         listing.put("@ProfCtl",
                     new Config("org.voltdb.sysprocs.ProfCtl",
                                false, false, false, false, true, true,
                                false, "@ProfCtl",
-                               new VoltType[] {}));
+                               new VoltType[] {},
+                               ""));
         listing.put("@Promote",
                     new Config("org.voltdb.sysprocs.Promote",
                                false, true, false, false, true, true,
                                true, "@Promote",
-                               new VoltType[] {}));
+                               new VoltType[] {},
+                               ""));
         listing.put("@Quiesce",
                     new Config("org.voltdb.sysprocs.Quiesce",
                                false, false, false, false, true, true,
                                true, "@Quiesce",
-                               new VoltType[] {}));
+                               new VoltType[] {},
+                               ""));
         listing.put("@Rejoin",
                     new Config("org.voltdb.sysprocs.Rejoin",
                                false, false, false, false, true, true,
                                true, "@Rejoin",
-                               new VoltType[] {}));
+                               new VoltType[] {},
+                               ""));
         listing.put("@Resume",
                     new Config("org.voltdb.sysprocs.Resume",
                                false, true,  false, false, true, true,
                                true, "@Resume",
-                               new VoltType[] {}));
+                               new VoltType[] {},
+                               ""));
         listing.put("@Shutdown",
                     new Config("org.voltdb.sysprocs.Shutdown",
                                false, false, false, false, true, true,
                                true, "@Shutdown",
-                               new VoltType[] {}));
+                               new VoltType[] {},
+                               ""));
         listing.put("@SnapshotDelete",
                     new Config("org.voltdb.sysprocs.SnapshotDelete",
                                false, false, false, false, true, true,
                                true, "@SnapshotDelete",
-                               new VoltType[] {}));
+                               new VoltType[] {},
+                               ""));
         listing.put("@SnapshotRestore",
                     new Config("org.voltdb.sysprocs.SnapshotRestore",
                                false, false, false, true, true, false,
                                true, "@SnapshotRestore",
-                               new VoltType[] {}));
+                               new VoltType[] {VoltType.STRING,
+                                               VoltType.STRING},
+                               ""));
         listing.put("@SnapshotSave",
                     new Config("org.voltdb.sysprocs.SnapshotSave",
                                false, false, false, false, true, true,
                                true, "@SnapshotSave",
-                               new VoltType[] {}));
+                               new VoltType[] {VoltType.STRING,
+                                               VoltType.STRING,
+                                               VoltType.INTEGER},
+                               ""));
         listing.put("@SnapshotScan",
                     new Config("org.voltdb.sysprocs.SnapshotScan",
                                false, false, false, false, true, true,
                                true, "@SnapshotScan",
-                               new VoltType[] {}));
+                               new VoltType[] {VoltType.STRING},
+                               ""));
         listing.put("@SnapshotStatus",
                     new Config("org.voltdb.sysprocs.SnapshotStatus",
                                false, false, false, false, true, true,
                                true, "@SnapshotStatus",
-                               new VoltType[] {}));
+                               new VoltType[] {},
+                               ""));
         listing.put("@Statistics",
                     new Config("org.voltdb.sysprocs.Statistics",
                                true,  false, false, false, true, true,
                                true, "@Statistics",
-                               new VoltType[] {}));
+                               new VoltType[] {VoltType.STRING,
+                                               VoltType.INTEGER},
+                               ""));
         listing.put("@SystemCatalog",
                     new Config("org.voltdb.sysprocs.SystemCatalog",
                                true,  false, false, false, true, true,
                                true, "@SystemCatalog",
-                               new VoltType[] {}));
+                               new VoltType[] {VoltType.STRING},
+                               ""));
         listing.put("@SystemInformation",
                     new Config("org.voltdb.sysprocs.SystemInformation",
                                true,  false, false, false, true, true,
                                true, "@SystemInformation",
-                               new VoltType[] {}));
+                               new VoltType[] {VoltType.STRING},
+                               ""));
         listing.put("@UpdateApplicationCatalog",
                     new Config("org.voltdb.sysprocs.UpdateApplicationCatalog",
                                false, true,  false, true, true, false,
                                true, "@UpdateApplicationCatalog",
-                               new VoltType[] {}));
+                               new VoltType[] {VoltType.STRING,
+                                               VoltType.STRING},
+                               ""));
         listing.put("@UpdateLogging",
                     new Config("org.voltdb.sysprocs.UpdateLogging",
                                false, true,  false, false, true, true,
                                true, "@UpdateLogging",
-                               new VoltType[] {}));
+                               new VoltType[] {VoltType.STRING},
+                               ""));
     }
 }

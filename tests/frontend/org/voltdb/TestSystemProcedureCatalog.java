@@ -33,22 +33,6 @@ import junit.framework.TestCase;
 
 public class TestSystemProcedureCatalog extends TestCase {
 
-    public void testSerializeConfigToJson() throws JSONException
-    {
-        SystemProcedureCatalog.Config dut = SystemProcedureCatalog.listing.get("@Promote");
-        JSONObject blah = dut.serializeToJson();
-        System.out.println(blah.toString(2));
-        assertTrue(blah.toString() != null);
-        assertTrue(!blah.toString().isEmpty());
-    }
-
-    public void testSerializeSysprocCatalogToJson() throws JSONException, UnsupportedEncodingException
-    {
-        String blah = SystemProcedureCatalog.serializeSysprocCatalogToJson().toString();
-        assertTrue(blah.toString() != null);
-        assertTrue(!blah.toString().isEmpty());
-    }
-
     public void testEasyStuff() throws JSONException, UnsupportedEncodingException
     {
         JSONObject blah = SystemProcedureCatalog.serializeSysprocCatalogToJson();
