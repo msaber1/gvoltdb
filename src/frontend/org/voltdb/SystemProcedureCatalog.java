@@ -167,15 +167,35 @@ public class SystemProcedureCatalog {
                                true, "@AdHocSP",
                                new VoltType[] {VoltType.STRING,
                                                VoltType.STRING}));
+        listing.put("@BalancePartitions",
+                    new Config("org.voltdb.sysprocs.BalancePartitions",
+                               false, false, true, true, true, false,
+                               false, "@BalancePartitions",
+                               new VoltType[] {}));
+        listing.put("@LoadMultipartitionTable",
+                    new Config("org.voltdb.sysprocs.LoadMultipartitionTable",
+                               false, false, false, false, false, false,
+                               true, "@LoadMultipartitionTable",
+                               new VoltType[] {}));
+        listing.put("@LoadSinglepartitionTable",
+                    new Config("org.voltdb.sysprocs.LoadSinglepartitionTable",
+                               false, false, false, false, false, false,
+                               true, "@LoadSinglePartitionTable",
+                               new VoltType[] {}));
         listing.put("@Pause",
                     new Config("org.voltdb.sysprocs.Pause",
                                false, true,  false, false, true, true,
                                true, "@Pause",
                                new VoltType[] {}));
-        listing.put("@Resume",
-                    new Config("org.voltdb.sysprocs.Resume",
-                               false, true,  false, false, true, true,
-                               true, "@Resume",
+        listing.put("@ProfCtl",
+                    new Config("org.voltdb.sysprocs.ProfCtl",
+                               false, false, false, false, true, true,
+                               false, "@ProfCtl",
+                               new VoltType[] {}));
+        listing.put("@Promote",
+                    new Config("org.voltdb.sysprocs.Promote",
+                               false, true, false, false, true, true,
+                               true, "@Promote",
                                new VoltType[] {}));
         listing.put("@Quiesce",
                     new Config("org.voltdb.sysprocs.Quiesce",
@@ -187,40 +207,40 @@ public class SystemProcedureCatalog {
                                false, false, false, false, true, true,
                                true, "@Rejoin",
                                new VoltType[] {}));
-        listing.put("@SnapshotSave",
-                    new Config("org.voltdb.sysprocs.SnapshotSave",
-                               false, false, false, false, true, true,
-                               true, "@SnapshotSave",
-                               new VoltType[] {}));
-        listing.put("@SnapshotRestore",
-                    new Config("org.voltdb.sysprocs.SnapshotRestore",
-                               false, false, false, true, true, false,
-                               true, "@SnapshotRestore",
-                               new VoltType[] {}));
-        listing.put("@SnapshotStatus",
-                    new Config("org.voltdb.sysprocs.SnapshotStatus",
-                               false, false, false, false, true, true,
-                               true, "@SnapshotStatus",
-                               new VoltType[] {}));
-        listing.put("@SnapshotScan",
-                    new Config("org.voltdb.sysprocs.SnapshotScan",
-                               false, false, false, false, true, true,
-                               true, "@SnapshotScan",
-                               new VoltType[] {}));
-        listing.put("@SnapshotDelete",
-                    new Config("org.voltdb.sysprocs.SnapshotDelete",
-                               false, false, false, false, true, true,
-                               true, "@SnapshotDelete",
+        listing.put("@Resume",
+                    new Config("org.voltdb.sysprocs.Resume",
+                               false, true,  false, false, true, true,
+                               true, "@Resume",
                                new VoltType[] {}));
         listing.put("@Shutdown",
                     new Config("org.voltdb.sysprocs.Shutdown",
                                false, false, false, false, true, true,
                                true, "@Shutdown",
                                new VoltType[] {}));
-        listing.put("@ProfCtl",
-                    new Config("org.voltdb.sysprocs.ProfCtl",
+        listing.put("@SnapshotDelete",
+                    new Config("org.voltdb.sysprocs.SnapshotDelete",
                                false, false, false, false, true, true,
-                               false, "@ProfCtl",
+                               true, "@SnapshotDelete",
+                               new VoltType[] {}));
+        listing.put("@SnapshotRestore",
+                    new Config("org.voltdb.sysprocs.SnapshotRestore",
+                               false, false, false, true, true, false,
+                               true, "@SnapshotRestore",
+                               new VoltType[] {}));
+        listing.put("@SnapshotSave",
+                    new Config("org.voltdb.sysprocs.SnapshotSave",
+                               false, false, false, false, true, true,
+                               true, "@SnapshotSave",
+                               new VoltType[] {}));
+        listing.put("@SnapshotScan",
+                    new Config("org.voltdb.sysprocs.SnapshotScan",
+                               false, false, false, false, true, true,
+                               true, "@SnapshotScan",
+                               new VoltType[] {}));
+        listing.put("@SnapshotStatus",
+                    new Config("org.voltdb.sysprocs.SnapshotStatus",
+                               false, false, false, false, true, true,
+                               true, "@SnapshotStatus",
                                new VoltType[] {}));
         listing.put("@Statistics",
                     new Config("org.voltdb.sysprocs.Statistics",
@@ -237,35 +257,15 @@ public class SystemProcedureCatalog {
                                true,  false, false, false, true, true,
                                true, "@SystemInformation",
                                new VoltType[] {}));
-        listing.put("@UpdateLogging",
-                    new Config("org.voltdb.sysprocs.UpdateLogging",
-                               false, true,  false, false, true, true,
-                               true, "@UpdateLogging",
-                               new VoltType[] {}));
-        listing.put("@BalancePartitions",
-                    new Config("org.voltdb.sysprocs.BalancePartitions",
-                               false, false, true, true, true, false,
-                               false, "@BalancePartitions",
-                               new VoltType[] {}));
         listing.put("@UpdateApplicationCatalog",
                     new Config("org.voltdb.sysprocs.UpdateApplicationCatalog",
                                false, true,  false, true, true, false,
                                true, "@UpdateApplicationCatalog",
                                new VoltType[] {}));
-        listing.put("@LoadMultipartitionTable",
-                    new Config("org.voltdb.sysprocs.LoadMultipartitionTable",
-                               false, false, false, false, false, false,
-                               true, "@LoadMultipartitionTable",
-                               new VoltType[] {}));
-        listing.put("@LoadSinglepartitionTable",
-                    new Config("org.voltdb.sysprocs.LoadSinglepartitionTable",
-                               false, false, false, false, false, false,
-                               true, "@LoadSinglePartitionTable",
-                               new VoltType[] {}));
-        listing.put("@Promote",
-                    new Config("org.voltdb.sysprocs.Promote",
-                               false, true, false, false, true, true,
-                               true, "@Promote",
+        listing.put("@UpdateLogging",
+                    new Config("org.voltdb.sysprocs.UpdateLogging",
+                               false, true,  false, false, true, true,
+                               true, "@UpdateLogging",
                                new VoltType[] {}));
     }
 }
