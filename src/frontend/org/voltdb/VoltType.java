@@ -105,7 +105,7 @@ public enum VoltType {
     /**
      * VoltTable type for Procedure parameters
      */
-    VOLTTABLE ((byte)21, -1, null, new Class[] {VoltTable.class}, '0'),
+    VOLTTABLE ((byte)21, -1, "volttable", new Class[] {VoltTable.class}, '0'),
 
     /**
      * Fixed precision=38, scale=12 storing sign and null-status in a preceding byte

@@ -321,6 +321,14 @@ public class ConnectionUtil {
             byte buildStringBytes[] = new byte[buildStringLength];
             loginResponse.get(buildStringBytes);
             returnArray[2] = new String(buildStringBytes, "UTF-8");
+            String ad_string = null;
+            if (loginResponse.remaining() > 0)
+            {
+                int ad_length = loginResponse.getInt();
+                byte[] ad_bytes = new byte[ad_length];
+                loginResponse.get(ad_bytes);
+                ad_string = new String(ad_bytes, "UTF-8");
+            }
 
             aChannel.configureBlocking(false);
             aChannel.socket().setTcpNoDelay(false);

@@ -239,7 +239,8 @@ public class SystemProcedureCatalog {
                     new Config("org.voltdb.sysprocs.SnapshotDelete",
                                false, false, false, false, true, true,
                                true, "@SnapshotDelete",
-                               new VoltType[] {},
+                               new VoltType[] {VoltType.STRING,
+                                               VoltType.STRING},
                                ""));
         listing.put("@SnapshotRestore",
                     new Config("org.voltdb.sysprocs.SnapshotRestore",
