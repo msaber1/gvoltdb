@@ -21,6 +21,7 @@ import struct
 import datetime
 import time
 import decimal
+import json
 try:
     from hashlib import sha1 as sha
 except ImportError:
@@ -241,12 +242,14 @@ class FastSerializer:
         if status != 0:
             raise SystemExit("Authentication failed.")
 
-        self.readInt32()
-        self.readInt64()
-        self.readInt64()
-        self.readInt32()
+        self.readInt32() # host ID
+        self.readInt64() # connection ID
+        self.readInt64() # cluster instance ID part 1
+        self.readInt32() # cluster instance ID part 2
         for x in range(self.readInt32()):
-            self.readByte()
+            self.readByte() # buildstring bytes
+
+        self.ads = json.loads(self.readString())
 
     def setInputByteOrder(self, bom):
         # assuming bom is high bit set?
@@ -999,6 +1002,50 @@ class VoltProcedure:
         try:
             self.fser.socket.settimeout(timeout) # timeout exception will be raised
             res = VoltResponse(self.fser)
+        except IOError, err:
+            res = VoltResponse(None)
+            res.statusString = str(err)
+        return response and res or None
+
+class VoltProcedureNew:
+    TYPES = {"tinyint": FastSerializer.VOLTTYPE_TINYINT,
+             "smallint": FastSerializer.VOLTTYPE_SMALLINT,
+             "integer": FastSerializer.VOLTTYPE_INTEGER,
+             "bigint": FastSerializer.VOLTTYPE_BIGINT,
+             "float": FastSerializer.VOLTTYPE_FLOAT,
+             "varchar": FastSerializer.VOLTTYPE_STRING,
+             "varbinary": FastSerializer.VOLTTYPE_STRING,
+             "timestamp": FastSerializer.VOLTTYPE_TIMESTAMP,
+             "volttable": FastSerializer.VOLTTYPE_VOLTTABLE}
+
+    "VoltDB called procedure interface"
+    def __init__(self, proc):
+        self.name = proc['procedure']
+        self.paramtypes = [self.__class__.TYPES[x] for x in proc['parameters']]
+
+
+    def call(self, fser, params = None, response = True, timeout = None):
+        fser.writeByte(0)  # version number
+        fser.writeString(self.name)
+        fser.writeInt64(1)            # client handle
+        fser.writeInt16(len(self.paramtypes))
+        for i in xrange(len(self.paramtypes)):
+            try:
+                iter(params[i]) # Test if this is an array
+                if isinstance(params[i], basestring): # String is a special case
+                    raise TypeError
+
+                fser.writeByte(FastSerializer.ARRAY)
+                fser.writeByte(self.paramtypes[i])
+                fser.writeArray(self.paramtypes[i], params[i])
+            except TypeError:
+                fser.writeWireType(self.paramtypes[i], params[i])
+        fser.prependLength() # prepend the total length of the invocation
+        fser.flush()
+
+        try:
+            fser.socket.settimeout(timeout) # timeout exception will be raised
+            res = VoltResponse(fser)
         except IOError, err:
             res = VoltResponse(None)
             res.statusString = str(err)

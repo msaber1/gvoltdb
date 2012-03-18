@@ -22,14 +22,15 @@ from datetime import datetime
 from voltdbclient import *
 
 class VoltQueryClient(cmd.Cmd):
-    TYPES = {"byte": FastSerializer.VOLTTYPE_TINYINT,
-             "short": FastSerializer.VOLTTYPE_SMALLINT,
-             "int": FastSerializer.VOLTTYPE_INTEGER,
-             "long": FastSerializer.VOLTTYPE_BIGINT,
+    TYPES = {"tinyint": FastSerializer.VOLTTYPE_TINYINT,
+             "smallint": FastSerializer.VOLTTYPE_SMALLINT,
+             "integer": FastSerializer.VOLTTYPE_INTEGER,
+             "bigint": FastSerializer.VOLTTYPE_BIGINT,
              "float": FastSerializer.VOLTTYPE_FLOAT,
-             "string": FastSerializer.VOLTTYPE_STRING,
+             "varchar": FastSerializer.VOLTTYPE_STRING,
              "varbinary": FastSerializer.VOLTTYPE_STRING,
-             "date": FastSerializer.VOLTTYPE_TIMESTAMP}
+             "timestamp": FastSerializer.VOLTTYPE_TIMESTAMP,
+             "volttable": FastSerializer.VOLTTYPE_VOLTTABLE}
 
     TRANSFORMERS = {FastSerializer.VOLTTYPE_TINYINT: eval,
                     FastSerializer.VOLTTYPE_SMALLINT: eval,
@@ -53,45 +54,17 @@ class VoltQueryClient(cmd.Cmd):
     def __initialize(self, host, port, username, password, dump_file):
         self.fs = FastSerializer(host, port, username, password, dump_file)
 
-        self.adhoc = VoltProcedure(self.fs, "@AdHoc",
-                                   [FastSerializer.VOLTTYPE_STRING])
+        sysprocs = self.fs.ads['sysprocs']
+        print "SYSPROCS: " + str(sysprocs)
 
-        self.stat = VoltProcedure(self.fs, "@Statistics",
-                                  [FastSerializer.VOLTTYPE_STRING,
-                                   FastSerializer.VOLTTYPE_TINYINT])
-
-        self.snapshotsave = VoltProcedure(self.fs, "@SnapshotSave",
-                                          [FastSerializer.VOLTTYPE_STRING,
-                                           FastSerializer.VOLTTYPE_STRING,
-                                           FastSerializer.VOLTTYPE_TINYINT])
-        self.snapshotscan = VoltProcedure(self.fs, "@SnapshotScan",
-                                          [FastSerializer.VOLTTYPE_STRING])
-        self.snapshotdelete = VoltProcedure(self.fs, "@SnapshotDelete",
-                                            [FastSerializer.VOLTTYPE_STRING,
-                                             FastSerializer.VOLTTYPE_STRING])
-        self.snapshotrestore = VoltProcedure(self.fs, "@SnapshotRestore",
-                                             [FastSerializer.VOLTTYPE_STRING,
-                                              FastSerializer.VOLTTYPE_STRING])
-        self.snapshotstatus = VoltProcedure(self.fs, "@SnapshotStatus")
-
-        self.systeminformation = VoltProcedure(self.fs, "@SystemInformation",
-                                               [FastSerializer.VOLTTYPE_STRING])
-
-        self.updatecatalog = VoltProcedure(self.fs, "@UpdateApplicationCatalog",
-                                             [FastSerializer.VOLTTYPE_STRING,
-                                              FastSerializer.VOLTTYPE_STRING])
-
-        self.quiesce = VoltProcedure(self.fs, "@Quiesce")
-
-        self.pause = VoltProcedure(self.fs, "@Pause")
-
-        self.resume = VoltProcedure(self.fs, "@Resume")
-
-        self.shutdown = VoltProcedure(self.fs, "@Shutdown")
-
-        self.promote = VoltProcedure(self.fs, "@Promote")
-
-        self.response = None
+        for proc in sysprocs:
+            print 'PARAMS FOR %s: %s' % (proc['procedure'], str(proc['parameters']))
+            params = [self.__class__.TYPES[x] for x in proc['parameters']]
+            params = [self.__class__.TYPES[x] for x in proc['parameters']]
+            print 'PARAMS FOR %s: %s' % (proc['procedure'], str(params))
+            command = str(proc['procedure'][1:]).lower()
+            print "COMMAND: " + command
+            self.__dict__[command] = VoltProcedureNew(proc)
 
     def __safe_call(self, proc, params = None, response = True, timeout = None):
         if not proc:
@@ -100,7 +73,7 @@ class VoltQueryClient(cmd.Cmd):
         self.response = None
 
         try:
-            return proc.call(params, response, timeout)
+            return proc.call(self.fs, params, response, timeout)
         except IOError, err:
             self.safe_print("Error: %s" % (err))
             if not response:
