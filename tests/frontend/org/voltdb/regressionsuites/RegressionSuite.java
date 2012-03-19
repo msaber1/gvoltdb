@@ -36,6 +36,7 @@ import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.client.ConnectionUtil.ConnectionResponse;
 import org.voltdb.sysprocs.SnapshotRestore;
 
 /**
@@ -165,10 +166,11 @@ public class RegressionSuite extends TestCase {
         final Random r = new Random();
         final String listener = listeners.get(r.nextInt(listeners.size()));
         byte[] hashedPassword = ConnectionUtil.getHashedPassword(m_password);
-        final SocketChannel channel = (SocketChannel)
+        final ConnectionResponse response =
             ConnectionUtil.getAuthenticatedConnection(
                     listener,
-                    m_username, hashedPassword, Client.VOLTDB_SERVER_PORT)[0];
+                    m_username, hashedPassword, Client.VOLTDB_SERVER_PORT);
+        final SocketChannel channel = response.m_channel;
         channel.configureBlocking(true);
         if (!noTearDown) {
             synchronized (m_clientChannels) {

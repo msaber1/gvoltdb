@@ -26,6 +26,7 @@ import java.util.HashMap;
 import java.util.Queue;
 
 import org.voltdb.client.ConnectionUtil;
+import org.voltdb.client.ConnectionUtil.ConnectionResponse;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.logging.VoltLogger;
@@ -93,13 +94,13 @@ public class ExportConnection {
     {
         m_logger.info("Starting EL Client socket to: " + serverAddr);
         byte hashedPassword[] = ConnectionUtil.getHashedPassword(m_password);
-        Object[] cxndata =
+        ConnectionResponse response =
             ConnectionUtil.
             getAuthenticatedExportConnection(serverAddr,
                                              m_username,
                                              hashedPassword);
 
-        m_socket = (SocketChannel) cxndata[0];
+        m_socket = response.m_channel;
         m_socket.socket().setTcpNoDelay(true);
         m_logger.info("Opened socket from " + m_socket.socket().getLocalSocketAddress() + " to " + m_socket.socket().getRemoteSocketAddress());
         if (m_state == CLOSED) {

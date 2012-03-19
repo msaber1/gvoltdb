@@ -64,6 +64,16 @@ public class ConnectionUtil {
 
     private static final TF m_tf = new TF();
 
+    public static class ConnectionResponse {
+        public SocketChannel m_channel;
+        public int m_hostId;
+        public long m_connectionId;
+        public long m_instanceIdTime;
+        public int m_instanceIdAddr;
+        public String m_buildString;
+        public String m_adJsonString;
+    }
+
     public static class ExecutorPair {
         public final ExecutorService m_writeExecutor;
         public final ExecutorService m_readExecutor;
@@ -121,7 +131,7 @@ public class ConnectionUtil {
      * Integer hostId, Long connectionId, Long timestamp (part of instanceId), Int leaderAddress (part of instanceId).
      * The last object is the build string
      */
-    public static Object[] getAuthenticatedConnection(
+    public static ConnectionResponse getAuthenticatedConnection(
             String host, String username, byte[] hashedPassword, int port) throws IOException
     {
         return getAuthenticatedConnection("database", host, username, hashedPassword, port);
@@ -139,7 +149,7 @@ public class ConnectionUtil {
      * Integer hostId, Long connectionId, Long timestamp (part of instanceId), Int leaderAddress (part of instanceId).
      * The last object is the build string
      */
-    public static Object[] getAuthenticatedExportConnection(InetSocketAddress address,
+    public static ConnectionResponse getAuthenticatedExportConnection(InetSocketAddress address,
             String username, byte[] hashedPassword) throws IOException
     {
         return getAuthenticatedConnection("export", address, username, hashedPassword);
@@ -203,29 +213,27 @@ public class ConnectionUtil {
         }
     }
 
-    private static Object[] getAuthenticatedConnection(
+    private static ConnectionResponse getAuthenticatedConnection(
             String service, String host, String username, byte[] hashedPassword, int port)
     throws IOException {
         InetSocketAddress address = new InetSocketAddress(host, port);
         return getAuthenticatedConnection(service, address, username, hashedPassword);
     }
-    private static Object[] getAuthenticatedConnection(
+    private static ConnectionResponse getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username, byte[] hashedPassword)
     throws IOException {
-        Object returnArray[] = new Object[3];
+        ConnectionResponse response = new ConnectionResponse();
         boolean success = false;
         if (addr.isUnresolved()) {
             throw new java.net.UnknownHostException(addr.getHostName());
         }
         SocketChannel aChannel = SocketChannel.open(addr);
-        returnArray[0] = aChannel;
+        response.m_channel = aChannel;
         assert(aChannel.isConnected());
         if (!aChannel.isConnected()) {
             // TODO Can open() be asynchronous if configureBlocking(true)?
             throw new IOException("Failed to open host " + addr.getHostName());
         }
-        final long retvals[] = new long[4];
-        returnArray[1] = retvals;
         try {
             /*
              * Send login info
@@ -313,14 +321,14 @@ public class ConnectionUtil {
                     throw new IOException("Authentication rejected");
                 }
             }
-            retvals[0] = loginResponse.getInt();
-            retvals[1] = loginResponse.getLong();
-            retvals[2] = loginResponse.getLong();
-            retvals[3] = loginResponse.getInt();
+            response.m_hostId = loginResponse.getInt();
+            response.m_connectionId = loginResponse.getLong();
+            response.m_instanceIdTime = loginResponse.getLong();
+            response.m_instanceIdAddr = loginResponse.getInt();
             int buildStringLength = loginResponse.getInt();
             byte buildStringBytes[] = new byte[buildStringLength];
             loginResponse.get(buildStringBytes);
-            returnArray[2] = new String(buildStringBytes, "UTF-8");
+            response.m_buildString = new String(buildStringBytes, "UTF-8");
             String ad_string = null;
             if (loginResponse.remaining() > 0)
             {
@@ -329,7 +337,7 @@ public class ConnectionUtil {
                 loginResponse.get(ad_bytes);
                 ad_string = new String(ad_bytes, "UTF-8");
             }
-
+            response.m_adJsonString = ad_string;
             aChannel.configureBlocking(false);
             aChannel.socket().setTcpNoDelay(false);
             aChannel.socket().setKeepAlive(true);
@@ -339,7 +347,7 @@ public class ConnectionUtil {
                 aChannel.close();
             }
         }
-        return returnArray;
+        return response;
     }
 
     public static void closeConnection(SocketChannel connection) throws InterruptedException, IOException {

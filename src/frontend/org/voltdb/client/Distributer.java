@@ -37,6 +37,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
+import org.voltdb.client.ConnectionUtil.ConnectionResponse;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
@@ -268,10 +269,10 @@ class Distributer {
         private long m_invocationErrors = 0;
         private long m_lastInvocationErrors = 0;
 
-        public NodeConnection(long ids[]) {
+        public NodeConnection(int hostId, long connectionId) {
             m_callbacks = new HashMap<Long, CallbackBookeeping>();
-            m_hostId = (int)ids[0];
-            m_connectionId = ids[1];
+            m_hostId = hostId;
+            m_connectionId = connectionId;
         }
 
         public void createWork(long handle, String name, BBContainer c, ProcedureCallback callback) {
@@ -629,13 +630,12 @@ class Distributer {
     synchronized void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
         throws UnknownHostException, IOException
     {
-        final Object connectionStuff[] =
+        final ConnectionResponse response =
             ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port);
-        final SocketChannel aChannel = (SocketChannel)connectionStuff[0];
-        final long numbers[] = (long[])connectionStuff[1];
+        final SocketChannel aChannel = response.m_channel;
         if (m_clusterInstanceId == null) {
-            long timestamp = numbers[2];
-            int addr = (int)numbers[3];
+            long timestamp = response.m_instanceIdTime;
+            int addr = response.m_instanceIdAddr;
             m_clusterInstanceId = new Object[] { timestamp, addr };
             if (m_statsLoader != null) {
                 try {
@@ -645,16 +645,17 @@ class Distributer {
                 }
             }
         } else {
-            if (!(((Long)m_clusterInstanceId[0]).longValue() == numbers[2]) ||
-                !(((Integer)m_clusterInstanceId[1]).longValue() == numbers[3])) {
+            if (!(((Long)m_clusterInstanceId[0]).longValue() == response.m_instanceIdTime) ||
+                !(((Integer)m_clusterInstanceId[1]).longValue() == response.m_instanceIdAddr)) {
                 aChannel.close();
                 throw new IOException(
                         "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1]
-                        + " and server's was " + numbers[2] + "," + numbers[3]);
+                        + " and server's was " + response.m_instanceIdTime + "," + response.m_instanceIdAddr);
             }
         }
-        m_buildString = (String)connectionStuff[2];
-        NodeConnection cxn = new NodeConnection(numbers);
+        m_buildString = response.m_buildString;
+        NodeConnection cxn = new NodeConnection(response.m_hostId,
+                                                response.m_connectionId);
         m_connections.add(cxn);
         Connection c = m_network.registerChannel( aChannel, cxn);
         cxn.m_hostname = c.getHostnameOrIP();
