@@ -510,6 +510,11 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
+    public String getAdJsonString() {
+        return m_distributer.getAdJsonString();
+    }
+
+    @Override
     public boolean blocking() {
         return m_blockingQueue;
     }

@@ -333,4 +333,11 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "");
     }
+
+    @Override
+    public String getAdJsonString()
+    {
+        // TODO Auto-generated method stub
+        return null;
+    }
 }

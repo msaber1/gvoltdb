@@ -99,7 +99,7 @@ public class TestVoltType extends TestCase {
         assertEquals("decimal", VoltType.DECIMAL.toSQLString());
         assertEquals("varchar", VoltType.STRING.toSQLString());
         assertEquals("varbinary", VoltType.VARBINARY.toSQLString());
-        assertNull(VoltType.VOLTTABLE.toSQLString());
+        assertEquals("volttable", VoltType.VOLTTABLE.toSQLString());
     }
 
     public void testTypeFromObject() {

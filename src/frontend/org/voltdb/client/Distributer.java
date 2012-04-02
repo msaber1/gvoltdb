@@ -96,6 +96,7 @@ class Distributer {
 
     private final ClientStatsLoader m_statsLoader;
     private String m_buildString;
+    private String m_adJsonString;
 
     private static class ProcedureStats {
         private final String m_name;
@@ -654,6 +655,7 @@ class Distributer {
             }
         }
         m_buildString = response.m_buildString;
+        m_adJsonString = response.m_adJsonString;
         NodeConnection cxn = new NodeConnection(response.m_hostId,
                                                 response.m_connectionId);
         m_connections.add(cxn);
@@ -1067,5 +1069,10 @@ class Distributer {
 
     public ArrayList<Long> getThreadIds() {
         return m_network.getThreadIds();
+    }
+
+    public String getAdJsonString()
+    {
+        return m_adJsonString;
     }
 }

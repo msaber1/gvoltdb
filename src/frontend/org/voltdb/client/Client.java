@@ -285,4 +285,6 @@ public interface Client {
      * @return true if callProcedure will block until backpressure ceases and false otherwise
      */
     boolean blocking();
+
+    public String getAdJsonString();
 }

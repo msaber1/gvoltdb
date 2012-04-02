@@ -33,6 +33,10 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.text.SimpleDateFormat;
 import java.math.BigDecimal;
+
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -699,23 +703,64 @@ public class SQLCommand
     private static Map<String,List<String>> Procedures = Collections.synchronizedMap(new HashMap<String,List<String>>());
     private static void loadSystemProcedures()
     {
-        Procedures.put("@Pause", new ArrayList<String>());
-        Procedures.put("@Quiesce", new ArrayList<String>());
-        Procedures.put("@Resume", new ArrayList<String>());
-        Procedures.put("@Shutdown", new ArrayList<String>());
-        Procedures.put("@SnapshotDelete", Arrays.asList("varchar", "varchar"));
-        Procedures.put("@SnapshotRestore", Arrays.asList("varchar", "varchar"));
-        Procedures.put("@SnapshotSave", Arrays.asList("varchar", "varchar", "bit"));
-        Procedures.put("@SnapshotScan", Arrays.asList("varchar"));
-        Procedures.put("@Statistics", Arrays.asList("statisticscomponent", "bit"));
-        Procedures.put("@SystemCatalog", Arrays.asList("metadataselector"));
-        Procedures.put("@SystemInformation", Arrays.asList("sysinfoselector"));
-        Procedures.put("@UpdateApplicationCatalog", Arrays.asList("varchar", "varchar"));
-        Procedures.put("@UpdateLogging", Arrays.asList("varchar"));
-        Procedures.put("@Promote", new ArrayList<String>());
-        Procedures.put("@SnapshotStatus", new ArrayList<String>());
-        Procedures.put("@AdHoc", new ArrayList<String>(Arrays.asList("varchar")));
-        Procedures.put("@AdHocSP", new ArrayList<String>(Arrays.asList("varchar", "bigint")));
+        String blah = VoltDB.getAdJsonString();
+        JSONObject ads = null;
+        JSONArray procs = null;
+        try
+        {
+            ads = new JSONObject(blah);
+            procs = ads.getJSONArray("sysprocs");
+        }
+        catch (JSONException e)
+        {
+            e.printStackTrace();
+            procs = null;
+        }
+
+        if (procs == null)
+        {
+            System.out.println("Unable to find system procedure advertisement from server...using defaults.");
+            Procedures.put("@Pause", new ArrayList<String>());
+            Procedures.put("@Quiesce", new ArrayList<String>());
+            Procedures.put("@Resume", new ArrayList<String>());
+            Procedures.put("@Shutdown", new ArrayList<String>());
+            Procedures.put("@SnapshotDelete", Arrays.asList("varchar", "varchar"));
+            Procedures.put("@SnapshotRestore", Arrays.asList("varchar", "varchar"));
+            Procedures.put("@SnapshotSave", Arrays.asList("varchar", "varchar", "bit"));
+            Procedures.put("@SnapshotScan", Arrays.asList("varchar"));
+            Procedures.put("@Statistics", Arrays.asList("statisticscomponent", "bit"));
+            Procedures.put("@SystemCatalog", Arrays.asList("metadataselector"));
+            Procedures.put("@SystemInformation", Arrays.asList("sysinfoselector"));
+            Procedures.put("@UpdateApplicationCatalog", Arrays.asList("varchar", "varchar"));
+            Procedures.put("@UpdateLogging", Arrays.asList("varchar"));
+            Procedures.put("@Promote", new ArrayList<String>());
+            Procedures.put("@SnapshotStatus", new ArrayList<String>());
+            Procedures.put("@AdHoc", new ArrayList<String>(Arrays.asList("varchar")));
+            Procedures.put("@AdHocSP", new ArrayList<String>(Arrays.asList("varchar", "bigint")));
+        }
+        else
+        {
+            for (int i = 0; i < procs.length(); i++)
+            {
+                try
+                {
+                    JSONObject proc;
+                    proc = procs.getJSONObject(i);
+                    JSONArray params = proc.getJSONArray("parameters");
+                    ArrayList<String> param_list = new ArrayList<String>();
+                    for (int j = 0; j < params.length(); j++)
+                    {
+                        param_list.add(params.getString(j));
+                    }
+                    Procedures.put(proc.getString("procedure"), param_list);
+                }
+                catch (JSONException e)
+                {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+            }
+        }
     }
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
@@ -931,14 +976,14 @@ public class SQLCommand
             // Split server list
             String[] servers = serverList.split(",");
 
-            // Load system procedures
-            loadSystemProcedures();
-
             // Don't ask... Java is such a crippled language!
             DateParser.setLenient(true);
 
             // Create connection
             VoltDB = getClient(new ClientConfig(user, password), servers,port);
+
+            // Load system procedures
+            loadSystemProcedures();
 
             // Load user stored procs
             loadStoredProcedures(Procedures);
