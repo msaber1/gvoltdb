@@ -19,6 +19,8 @@ package org.voltdb.client.exampleutils;
 import java.util.HashMap;
 import java.util.concurrent.ConcurrentHashMap;
 
+import org.voltdb.client.ClientStatusListenerExt;
+
 /**
  * Provides support for database connection pooling, allowing for optimal
  * application performance.  From benchmarking results, optimal TCP socket
@@ -53,7 +55,7 @@ public class ClientConnectionPool
      */
     public static ClientConnection get(String servers, int port) throws Exception
     {
-        return get(servers.split(","), port, "", "", false, 0);
+        return get(servers.split(","), port, "", "", false, 0, null);
     }
 
     /**
@@ -69,7 +71,7 @@ public class ClientConnectionPool
      */
     public static ClientConnection getWithRetry(String servers, int port) throws Exception
     {
-        return getWithRetry(servers.split(","), port, "", "", false, 0);
+        return getWithRetry(servers.split(","), port, "", "", false, 0, null);
     }
 
     /**
@@ -84,7 +86,7 @@ public class ClientConnectionPool
      */
     public static ClientConnection get(String[] servers, int port) throws Exception
     {
-        return get(servers, port, "", "", false, 0);
+        return get(servers, port, "", "", false, 0, null);
     }
 
     /**
@@ -100,7 +102,7 @@ public class ClientConnectionPool
      */
     public static ClientConnection getWithRetry(String[] servers, int port) throws Exception
     {
-        return getWithRetry(servers, port, "", "", false, 0);
+        return getWithRetry(servers, port, "", "", false, 0, null);
     }
 
     /**
@@ -121,14 +123,17 @@ public class ClientConnectionPool
      *        By default the connection allows 3,000 open transactions before preventing the client from posting more work,
      *        thus preventing server fire-hosing.  In some cases however, with very fast, small transactions, this limit
      *        can be raised.
+     * @param listener the optional listener, if not null, to receive status notifications.
      * @return the client connection object the caller should use to post requests.
      * @see #get(String servers, int port)
      * @see #get(String[] servers, int port)
      * @see #get(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
      */
-    public static ClientConnection get(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
+    public static ClientConnection get(String servers, int port, String user, String password,
+    								   boolean isHeavyWeight, int maxOutstandingTxns,
+    								   ClientStatusListenerExt listener) throws Exception
     {
-        return get(servers.split(","), port, user, password, isHeavyWeight, maxOutstandingTxns);
+        return get(servers.split(","), port, user, password, isHeavyWeight, maxOutstandingTxns, listener);
     }
 
     /**
@@ -150,14 +155,17 @@ public class ClientConnectionPool
      *        By default the connection allows 3,000 open transactions before preventing the client from posting more work,
      *        thus preventing server fire-hosing.  In some cases however, with very fast, small transactions, this limit
      *        can be raised.
+     * @param listener the optional listener, if not null, to receive status notifications.
      * @return the client connection object the caller should use to post requests.
      * @see #getWithRetry(String servers, int port)
      * @see #getWithRetry(String[] servers, int port)
      * @see #getWithRetry(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
      */
-    public static ClientConnection getWithRetry(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
+    public static ClientConnection getWithRetry(String servers, int port, String user, String password,
+    											boolean isHeavyWeight, int maxOutstandingTxns,
+    											ClientStatusListenerExt listener) throws Exception
     {
-        return getWithRetry(servers.split(","), port, user, password, isHeavyWeight, maxOutstandingTxns);
+        return getWithRetry(servers.split(","), port, user, password, isHeavyWeight, maxOutstandingTxns, listener);
     }
 
     /**
@@ -178,12 +186,15 @@ public class ClientConnectionPool
      *        By default the connection allows 3,000 open transactions before preventing the client from posting more work,
      *        thus preventing server fire-hosing.  In some cases however, with very fast, small transactions, this limit
      *        can be raised.
+     * @param listener the optional listener, if not null, to receive status notifications.
      * @return the client connection object the caller should use to post requests.
      * @see #get(String servers, int port)
      * @see #get(String[] servers, int port)
      * @see #get(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
      */
-    public static ClientConnection get(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
+    public static ClientConnection get(String[] servers, int port, String user, String password,
+    								   boolean isHeavyWeight, int maxOutstandingTxns,
+    								   ClientStatusListenerExt listener) throws Exception
     {
         String clientConnectionKeyBase = getClientConnectionKeyBase(servers, port, user, password, isHeavyWeight, maxOutstandingTxns);
         String clientConnectionKey = clientConnectionKeyBase;
@@ -200,7 +211,8 @@ public class ClientConnectionPool
                                 user,
                                 password,
                                 isHeavyWeight,
-                                maxOutstandingTxns));
+                                maxOutstandingTxns,
+                                listener));
             return ClientConnections.get(clientConnectionKey).use();
         }
     }
@@ -224,12 +236,15 @@ public class ClientConnectionPool
      *        By default the connection allows 3,000 open transactions before preventing the client from posting more work,
      *        thus preventing server fire-hosing.  In some cases however, with very fast, small transactions, this limit
      *        can be raised.
+     * @param listener the optional listener, if not null, to receive status notifications.
      * @return the client connection object the caller should use to post requests.
      * @see #getWithRetry(String servers, int port)
      * @see #getWithRetry(String[] servers, int port)
      * @see #getWithRetry(String servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns)
      */
-    public static ClientConnection getWithRetry(String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
+    public static ClientConnection getWithRetry(String[] servers, int port, String user, String password,
+    											boolean isHeavyWeight, int maxOutstandingTxns,
+    											ClientStatusListenerExt listener) throws Exception
     {
         ClientConnection con = null;
         System.out.println("Connecting to servers: ");
@@ -245,7 +260,8 @@ public class ClientConnectionPool
         {
             try
             {
-                con = ClientConnectionPool.get(servers, port);
+                con = ClientConnectionPool.get(servers, port, user, password, isHeavyWeight,
+                							   maxOutstandingTxns, listener);
                 break;
             }
             catch (Exception e)

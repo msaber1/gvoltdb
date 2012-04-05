@@ -60,7 +60,8 @@ public class Driver implements java.sql.Driver
         {
             try
             {
-                Matcher m = Pattern.compile("^jdbc:voltdb://([^:]+):(\\d+)$", Pattern.CASE_INSENSITIVE).matcher(url);
+                String pattern = "^" + Driver.URL_PREFIX + "//([^:]+):(\\d+)$";
+                Matcher m = Pattern.compile(pattern, Pattern.CASE_INSENSITIVE).matcher(url);
                 if (m.matches())
                 {
                     String[] servers = m.group(1).split(",");
@@ -69,7 +70,7 @@ public class Driver implements java.sql.Driver
                     String password = "";
                     boolean heavyweight = false;
                     int maxoutstandingtxns = 0;
-                    for (Enumeration e = info.propertyNames(); e.hasMoreElements();)
+                    for (Enumeration<?> e = info.propertyNames(); e.hasMoreElements();)
                     {
                         String key = (String) e.nextElement();
                         String value = info.getProperty(key);
@@ -85,7 +86,7 @@ public class Driver implements java.sql.Driver
                     }
 
                     // Return JDBC connection wrapper for the client
-                    return new JDBC4Connection(ClientConnectionPool.get(servers,port,user,password,heavyweight,maxoutstandingtxns), user);
+                    return new JDBC4Connection(ClientConnectionPool.get(servers,port,user,password,heavyweight,maxoutstandingtxns, null), user);
                 }
             }
             catch(Exception x)
@@ -99,7 +100,8 @@ public class Driver implements java.sql.Driver
     @Override
     public boolean acceptsURL(String url) throws SQLException
     {
-        return Pattern.compile("^jdbc:voltdb://.+", Pattern.CASE_INSENSITIVE).matcher(url).matches();
+        String pattern = "^" + Driver.URL_PREFIX + "//.+";
+        return Pattern.compile(pattern, Pattern.CASE_INSENSITIVE).matcher(url).matches();
     }
 
     @Override

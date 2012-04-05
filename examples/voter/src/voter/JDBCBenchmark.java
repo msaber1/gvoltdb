@@ -20,269 +20,270 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 /*
- * This samples uses multiple threads to post synchronous requests to the
- * VoltDB server, simulating multiple client application posting
- * synchronous requests to the database, using the standard JDBC interface
- * available for VoltDB.
- *
- * While synchronous processing can cause performance bottlenecks (each
- * caller waits for a transaction answer before calling another
- * transaction), the VoltDB cluster at large is still able to perform at
- * blazing speeds when many clients are connected to it.
+ * This implements the JDBC database interface used by
+ * BenchmarkRunner to perform the tests.
  */
 
 package voter;
 
+import java.io.IOException;
 import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
-import java.util.ArrayList;
-import java.util.Timer;
-import java.util.TimerTask;
+import java.sql.SQLException;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicLongArray;
 
+import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.exampleutils.AppHelper;
+import org.voltdb.client.exampleutils.PerfCounter;
 import org.voltdb.jdbc.IVoltDBConnection;
 
-public class JDBCBenchmark
+import voter.PhoneCallGenerator.PhoneCall;
+
+public class JDBCBenchmark implements BenchmarkDBInterface
 {
-    // Initialize some common constants and variables
-    private static final String ContestantNamesCSV = "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway,Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster,Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
-    private static final AtomicLongArray VotingBoardResults = new AtomicLongArray(4);
+    // Database connection for main thread
+    private static Connection connMain;
 
-    // Reference to the database connection we will use in them main thread
-    private static Connection Con;
-
-    // Class for each thread that will be run in parallel, performing JDBC requests against the VoltDB server
-    private static class ClientThread implements Runnable
+    // Worker thread data
+    private static class ThreadData
     {
-        private final String url;
-        private final long duration;
-        private final PhoneCallGenerator switchboard;
-        private final int maxVoteCount;
-        public ClientThread(String url, PhoneCallGenerator switchboard, long duration, int maxVoteCount) throws Exception
+        // Database connection for worker threads
+        private Connection connThread = null;
+        // Prepared statement.
+        private CallableStatement voteCS = null;
+
+        public ThreadData()
         {
-            this.url = url;
-            this.duration = duration;
-            this.switchboard = switchboard;
-            this.maxVoteCount = maxVoteCount;
+            // empty
         }
 
-        @Override
-        public void run()
+        public Connection getConnThread()
         {
-            // Each thread gets its dedicated JDBC connection, and posts votes against it.
-            Connection con = null;
+            return this.connThread;
+        }
+
+        public void setConnThread(Connection connThread)
+        {
+            this.connThread = connThread;
+        }
+
+        public CallableStatement getVoteCS()
+        {
+            return this.voteCS;
+        }
+
+        public void setVoteCS(CallableStatement voteCS)
+        {
+            this.voteCS = voteCS;
+        }
+    }
+
+    @Override
+    public void initializeMain(String servers, int port, ClientStatusListenerExt listener) throws BenchmarkException
+    {
+        // We need only do this once, to "hot cache" the JDBC driver reference so the JVM may
+        // realize it's there.
+        try
+        {
+            Class.forName("org.voltdb.jdbc.Driver");
+        }
+        catch (ClassNotFoundException e1)
+        {
+            throw new BenchmarkException("VoltDB JDBC driver class not found");
+        }
+
+        // Prepare the JDBC URL for the VoltDB driver
+        String url = "jdbc:voltdb://" + servers + ":" + port;
+
+        // Get a client connection - we retry for a while in case the server hasn't started yet
+        System.out.printf("Connecting to: %s\n", url);
+        int sleep = 1000;
+        while(true)
+        {
             try
             {
-                con = DriverManager.getConnection(url, "", "");
-                final CallableStatement voteCS = con.prepareCall("{call Vote(?,?,?)}");
-                long endTime = System.currentTimeMillis() + (1000l * this.duration);
-                while (endTime > System.currentTimeMillis())
-                {
-                    PhoneCallGenerator.PhoneCall call = this.switchboard.receive();
-                    voteCS.setLong(1, call.phoneNumber);
-                    voteCS.setInt(2, call.contestantNumber);
-                    voteCS.setLong(3, this.maxVoteCount);
-                    try
-                    {
-                        VotingBoardResults.incrementAndGet(voteCS.executeUpdate());
-                    }
-                    catch(Exception x)
-                    {
-                        VotingBoardResults.incrementAndGet(3);
-                    }
-                }
+                JDBCBenchmark.connMain = DriverManager.getConnection(url, "", "");
+                break;
             }
-            catch(Exception x)
+            catch (Exception e)
             {
-                System.err.println("Exception: " + x);
-                x.printStackTrace();
-            }
-            finally
-            {
-                try { con.close(); } catch (Exception x) {}
+                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep/1000);
+                try {Thread.sleep(sleep);} catch(Exception tie){/*ignore*/}
+                if (sleep < 8000)
+                    sleep += sleep;
             }
         }
     }
 
-    // Application entry point
-    public static void main(String[] args)
+    @Override
+    public Object initializeThread(String servers, int port, ClientStatusListenerExt listener) throws BenchmarkException
+    {
+        String url = "jdbc:voltdb://" + servers + ":" + port;
+        try
+        {
+            ThreadData data = new ThreadData();
+            data.setConnThread(DriverManager.getConnection(url, "", ""));
+            data.setVoteCS(data.getConnThread().prepareCall("{call Vote(?,?,?)}"));
+            return data;
+        }
+        catch (SQLException e)
+        {
+            throw new BenchmarkException("SyncBenchmark: SQL Exception in initializeThread(): " + e);
+        }
+    }
+
+    @Override
+    public void terminateMain()
     {
         try
         {
+            JDBCBenchmark.connMain.close();
+        }
+        catch(Exception e)
+        {
+            System.err.println("JDBCBenchmark: SQL Exception in terminateMain(): " + e);
+        }
+    }
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Use the AppHelper utility class to retrieve command line application parameters
-
-            // Define parameters and pull from command line
-            AppHelper apph = new AppHelper(JDBCBenchmark.class.getCanonicalName())
-                .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
-                .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
-                .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
-                .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
-                .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("contestants", "contestant_count", "Number of contestants in the voting contest (from 1 to 10).", 6)
-                .add("max-votes", "max_votes_per_phone_number", "Maximum number of votes accepted for a given voter (phone number).", 2)
-                .setArguments(args)
-            ;
-
-            // Retrieve parameters
-            int threadCount      = apph.intValue("threads");
-            long displayInterval = apph.longValue("display-interval");
-            long duration        = apph.longValue("duration");
-            String servers       = apph.stringValue("servers");
-            int port             = apph.intValue("port");
-            int contestantCount  = apph.intValue("contestants");
-            int maxVoteCount     = apph.intValue("max-votes");
-            final String csv     = apph.stringValue("stats");
-
-            // Validate parameters
-            apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
-                .validate("threads", (threadCount > 0))
-                .validate("contestants", (contestantCount > 0))
-                .validate("max-votes", (maxVoteCount > 0))
-            ;
-
-            // Display actual parameters, for reference
-            apph.printActualUsage();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // We need only do this once, to "hot cache" the JDBC driver reference so the JVM may realize it's there.
-            Class.forName("org.voltdb.jdbc.Driver");
-
-            // Prepare the JDBC URL for the VoltDB driver
-            String url = "jdbc:voltdb://" + servers + ":" + port;
-
-            // Get a client connection - we retry for a while in case the server hasn't started yet
-            System.out.printf("Connecting to: %s\n", url);
-            int sleep = 1000;
-            while(true)
+    @Override
+    public void terminateThread(Object data)
+    {
+        ThreadData threadData = (ThreadData)data;
+        if (threadData != null)
+        {
+            try
             {
-                try
-                {
-                    Con = DriverManager.getConnection(url, "", "");
-                    break;
-                }
-                catch (Exception e)
-                {
-                    System.err.printf("Connection failed - retrying in %d second(s).\n", sleep/1000);
-                    try {Thread.sleep(sleep);} catch(Exception tie){}
-                    if (sleep < 8000)
-                        sleep += sleep;
-                }
+                threadData.getConnThread().close();
             }
-            System.out.println("Connected.  Starting benchmark.");
+            catch(Exception e)
+            {
+                System.err.println("JDBCBenchmark: SQL Exception in terminateThread(): " + e);
+            }
+        }
+    }
 
-            // Initialize the application
-            final CallableStatement initializeCS = Con.prepareCall("{call Initialize(?,?)}");
+    @Override
+    public int getMaxContestants(int contestantCount, String ContestantNamesCSV) throws BenchmarkException
+    {
+        // Initialize the application and return maxContestants.
+        CallableStatement initializeCS;
+        try
+        {
+            initializeCS = JDBCBenchmark.connMain.prepareCall("{call Initialize(?,?)}");
             initializeCS.setInt(1, contestantCount);
             initializeCS.setString(2, ContestantNamesCSV);
-            final int maxContestants = initializeCS.executeUpdate();
-
-            // Get a Phone Call Generator that will simulate voter entries from the call center
-            PhoneCallGenerator switchboard = new PhoneCallGenerator(maxContestants);
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Create a Timer task to display performance data on the Vote procedure
-            Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask()
-            {
-                @Override
-                public void run()
-                {
-                    try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Vote")); } catch(Exception x) {}
-                }
-            }
-            , displayInterval*1000l
-            , displayInterval*1000l
-            );
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Create multiple processing threads
-            ArrayList<Thread> threads = new ArrayList<Thread>();
-            for (int i = 0; i < threadCount; i++)
-                threads.add(new Thread(new ClientThread(url, switchboard, duration, maxVoteCount)));
-
-            // Start threads
-            for (Thread thread : threads)
-                thread.start();
-
-            // Wait for threads to complete
-            for (Thread thread : threads)
-                thread.join();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // We're done - stop the performance statistics display task
-            timer.cancel();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Now print application results:
-
-            // 1. Voting Board statistics, Voting results and performance statistics
-            System.out.printf(
-              "-------------------------------------------------------------------------------------\n"
-            + " Voting Results\n"
-            + "-------------------------------------------------------------------------------------\n\n"
-            + "A total of %d votes was received...\n"
-            + " - %,9d Accepted\n"
-            + " - %,9d Rejected (Invalid Contestant)\n"
-            + " - %,9d Rejected (Maximum Vote Count Reached)\n"
-            + " - %,9d Failed (Transaction Error)\n"
-            + "\n\n"
-            + "-------------------------------------------------------------------------------------\n"
-            + "Contestant Name\t\tVotes Received\n"
-            , Con.unwrap(IVoltDBConnection.class).getStatistics("Vote").getExecutionCount()
-            , VotingBoardResults.get(0)
-            , VotingBoardResults.get(1)
-            , VotingBoardResults.get(2)
-            , VotingBoardResults.get(3)
-            );
-
-            // 2. Voting results
-            final CallableStatement resultsCS = Con.prepareCall("{call Results}");
-            ResultSet result = resultsCS.executeQuery();
-            String winner = "";
-            long winnerVoteCount = 0;
-            while (result.next())
-            {
-                if (result.getLong(3) > winnerVoteCount)
-                {
-                    winnerVoteCount = result.getLong(3);
-                    winner = result.getString(1);
-                }
-                System.out.printf("%s\t\t%,14d\n", result.getString(1), result.getLong(3));
-            }
-            System.out.printf("\n\nThe Winner is: %s\n-------------------------------------------------------------------------------------\n", winner);
-
-            // 3. Performance statistics (we only care about the Vote procedure that we're benchmarking)
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " System Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Vote").toString(false));
-
-            // Dump statistics to a CSV file
-            Con.unwrap(IVoltDBConnection.class).saveStatistics(csv);
-
-            Con.close();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
+            return initializeCS.executeUpdate();
         }
-        catch(Exception x)
+        catch (SQLException e)
         {
-            System.out.println("Exception: " + x);
-            x.printStackTrace();
+            throw new BenchmarkException("JDBCBenchmark: SQL Exception in initializeMain(): " + e);
         }
+    }
+
+    @Override
+    public void updateCall(PhoneCall call, int maxVoteCount, Object data, AtomicLongArray votingBoardResults) throws BenchmarkException
+    {
+        ThreadData threadData = (ThreadData)data;
+        if (threadData != null)
+        {
+            try
+            {
+                CallableStatement voteCS = threadData.getVoteCS();
+                voteCS.setLong(1, call.phoneNumber);
+                voteCS.setInt(2, call.contestantNumber);
+                voteCS.setLong(3, maxVoteCount);
+                votingBoardResults.incrementAndGet(voteCS.executeUpdate());
+            }
+            catch (SQLException e)
+            {
+                votingBoardResults.incrementAndGet(3);
+            }
+        }
+    }
+
+    @Override
+    public PerfCounter getStatistics(String name) throws BenchmarkException
+    {
+        try
+        {
+            return JDBCBenchmark.connMain.unwrap(IVoltDBConnection.class).getStatistics("Vote");
+        }
+        catch (SQLException e)
+        {
+            throw new BenchmarkException("JDBCBenchmark: SQL Exception in getStatistics(): " + e);
+        }
+    }
+
+    @Override
+    public void saveStatistics(String csv) throws BenchmarkException
+    {
+        try
+        {
+            JDBCBenchmark.connMain.unwrap(IVoltDBConnection.class).saveStatistics(csv);
+        }
+        catch (SQLException e)
+        {
+            throw new BenchmarkException("JDBCBenchmark: SQL Exception in saveStatistics(): " + e);
+        }
+        catch (IOException e)
+        {
+            throw new BenchmarkException("JDBCBenchmark: I/O Exception in saveStatistics(): " + e);
+        }
+    }
+
+    @Override
+    public void getResults(String procName, List<BenchmarkVote> results) throws BenchmarkException
+    {
+        try
+        {
+            CallableStatement resultsCS = JDBCBenchmark.connMain.prepareCall("{call " + procName + "}");
+            ResultSet jdbcResults = resultsCS.executeQuery();
+            while (jdbcResults.next())
+            {
+                results.add(new BenchmarkVote(jdbcResults.getString(1), jdbcResults.getLong(3)));
+            }
+        }
+        catch (SQLException e)
+        {
+            throw new BenchmarkException("JDBC SQL exception: " + e);
+        }
+    }
+
+    @Override
+    public void callProcedure(String procName, boolean ignoreExceptions) throws BenchmarkException
+    {
+        try
+        {
+            JDBCBenchmark.connMain.prepareCall("{call " + procName + "}");
+        }
+        catch (SQLException e)
+        {
+            throw new BenchmarkException("JDBC SQL exception: " + e);
+        }
+    }
+
+    @Override
+    public void addOptions(AppHelper apph)
+    {
+        // empty
+    }
+
+    @Override
+    public void getOptions(AppHelper apph)
+    {
+        // empty
+    }
+
+    /**
+     * @param args command line arguments
+     */
+    public static void main(String[] args)
+    {
+        BenchmarkRunner.run(new JDBCBenchmark(), args);
     }
 }

@@ -76,15 +76,19 @@ public class ClientConnection implements Closeable
      *        By default the connection allows 3,000 open transactions before preventing the client from posting more work,
      *        thus preventing server fire-hosing.  In some cases however, with very fast, small transactions, this limit
      *        can be raised.
+     * @param listener the optional listener, if not null, to receive status notifications.
      */
-    protected ClientConnection(String clientConnectionKeyBase, String clientConnectionKey, String[] servers, int port, String user, String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception
+    protected ClientConnection(String clientConnectionKeyBase, String clientConnectionKey,
+    						   String[] servers, int port, String user, String password,
+    						   boolean isHeavyWeight, int maxOutstandingTxns,
+    						   ClientStatusListenerExt listener) throws Exception
     {
         this.KeyBase = clientConnectionKeyBase;
         this.Key = clientConnectionKey;
         this.Statistics = ClientConnectionPool.getStatistics(clientConnectionKeyBase);
 
         // Create configuration
-        final ClientConfig config = new ClientConfig(user, password);
+        final ClientConfig config = new ClientConfig(user, password, listener);
         config.setHeavyweight(isHeavyWeight);
         if (maxOutstandingTxns > 0)
             config.setMaxOutstandingTxns(maxOutstandingTxns);
@@ -224,7 +228,8 @@ public class ClientConnection implements Closeable
                                                        , procedure
                                                        , new ProcedureCallback()
                                                          {
-                                                             final ExecutionFuture result;
+                                                             @SuppressWarnings("unused")
+															 final ExecutionFuture result;
                                                              {
                                                                  this.result = future;
                                                              }
