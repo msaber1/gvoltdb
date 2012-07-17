@@ -21,7 +21,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -220,7 +219,7 @@ public abstract class ProcedureCompiler {
                 // from trying to infer a constant partitioning value from the statement.
                 partitionParameter = "StatementCompiler dummied up single partitioning for QueryPlanner";
             }
-            PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false, true);
+            PartitioningForStatement partitioning = new PartitioningForStatement(info.singlePartition, partitionParameter, false, true);
             StatementCompiler.compile(compiler, hsql, catalog, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(), partitioning);
 
@@ -524,12 +523,7 @@ public abstract class ProcedureCompiler {
 
         // compile the statement
         Object partitionParameter = null;
-        if (info.singlePartition) {
-            // Dummy up a partitioning value to indicate the intent and prevent the planner
-            // from trying to infer a constant partitioning value from the statement.
-            partitionParameter = "StatementCompiler dummied up single partitioning for QueryPlanner";
-        }
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false, true);
+        PartitioningForStatement partitioning = new PartitioningForStatement(info.singlePartition, partitionParameter, false, true);
         StatementCompiler.compile(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
                 procedureDescriptor.m_joinOrder, partitioning);

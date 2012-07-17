@@ -98,7 +98,7 @@ public class PlannerTestAideDeCamp {
      */
     public CompiledPlan compileAdHocPlan(String sql)
     {
-        compile(sql, 0, null, null, true, false);
+        compile(sql, 0, null, false, null, true, false);
         return m_currentPlan;
     }
 
@@ -113,10 +113,7 @@ public class PlannerTestAideDeCamp {
 
     public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
         Object partitionBy = null;
-        if (singlePartition) {
-            partitionBy = "Forced single partitioning";
-        }
-        return compile(sql, paramCount, joinOrder, partitionBy, true, false);
+        return compile(sql, paramCount, joinOrder, singlePartition, partitionBy, true, false);
     }
 
     /**
@@ -124,7 +121,7 @@ public class PlannerTestAideDeCamp {
      * @param sql
      * @param paramCount
      */
-    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP)
+    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, boolean hasPartitionParameter, Object partitionParameter, boolean inferSP, boolean lockInSP)
     {
         Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
         catalogStmt.setSqltext(sql);
@@ -153,7 +150,7 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, inferSP, lockInSP);
+        PartitioningForStatement partitioning = new PartitioningForStatement(hasPartitionParameter, partitionParameter, inferSP, lockInSP);
         QueryPlanner planner =
             new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
                              hsql, estimates, false);

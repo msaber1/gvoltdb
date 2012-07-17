@@ -40,7 +40,7 @@ public class AdHocCompilerCache {
     public synchronized AdHocPlannedStatement get(String sql, boolean singlePartition) {
         AdHocPlannedStatement candidate = m_cache.get(sql);
         if (candidate == null) return null;
-        if ((candidate.partitionParam != null) == singlePartition) return candidate;
+        if (candidate.hasPartitionParam == singlePartition) return candidate;
         return null;
     }
 

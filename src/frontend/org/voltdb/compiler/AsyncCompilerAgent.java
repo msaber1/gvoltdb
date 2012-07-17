@@ -19,7 +19,6 @@ package org.voltdb.compiler;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -38,7 +37,6 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 
 public class AsyncCompilerAgent {
@@ -135,6 +133,7 @@ public class AsyncCompilerAgent {
 
         AdHocPlannedStmtBatch plannedStmtBatch =
                 new AdHocPlannedStmtBatch(work.sqlBatchText,
+                                          work.hasPartitionParam,
                                           work.partitionParam,
                                           context.catalogVersion,
                                           work.clientHandle,
@@ -151,11 +150,14 @@ public class AsyncCompilerAgent {
             // Single statement batch.
             try {
                 String sqlStatement = work.sqlStatements[0];
-                PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
+                PlannerTool.Result result = ptool.planSql(sqlStatement, work.hasPartitionParam, work.partitionParam,
                                                           work.inferSinglePartition, work.allowParameterization);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
-                plannedStmtBatch.partitionParam = result.partitionParam;
+                if (result.hasPartitionParam) {
+                    plannedStmtBatch.hasPartitionParam = true;
+                    plannedStmtBatch.partitionParam = result.partitionParam;
+                }
                 plannedStmtBatch.addStatement(sqlStatement,
                                               result.onePlan,
                                               result.allPlan,
@@ -171,7 +173,7 @@ public class AsyncCompilerAgent {
             // Multi-statement batch.
             for (final String sqlStatement : work.sqlStatements) {
                 try {
-                    PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
+                    PlannerTool.Result result = ptool.planSql(sqlStatement, work.hasPartitionParam, work.partitionParam,
                                                                 false, work.allowParameterization);
 
                     plannedStmtBatch.addStatement(sqlStatement,

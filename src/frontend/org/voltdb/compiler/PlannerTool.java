@@ -54,6 +54,7 @@ public class PlannerTool {
         byte[] allPlan = null;
         boolean replicatedDML = false;
         boolean nonDeterministic = false;
+        boolean hasPartitionParam;
         Object partitionParam;
         List<ParameterInfo> params;
 
@@ -64,6 +65,7 @@ public class PlannerTool {
             sb.append("  ONE: ").append(onePlan == null ? "null" : new String(onePlan, VoltDB.UTF8ENCODING)).append("\n");
             sb.append("  ALL: ").append(allPlan == null ? "null" : new String(allPlan, VoltDB.UTF8ENCODING)).append("\n");
             sb.append("  RTD: ").append(replicatedDML ? "true" : "false").append("\n");
+            sb.append("  HASPARAM: ").append(hasPartitionParam ? "true" : "false").append("\n");
             sb.append("  PARAM: ").append(partitionParam == null ? "null" : partitionParam.toString()).append("\n");
             sb.append("}");
             return sb.toString();
@@ -99,7 +101,7 @@ public class PlannerTool {
         hostLog.info("hsql loaded");
     }
 
-    public Result planSql(String sqlIn, Object partitionParam, boolean inferSP, boolean allowParameterization) {
+    public Result planSql(String sqlIn, boolean hasPartitionParam, Object partitionParam, boolean inferSP, boolean allowParameterization) {
         if ((sqlIn == null) || (sqlIn.length() == 0)) {
             throw new RuntimeException("Can't plan empty or null SQL.");
         }
@@ -116,7 +118,7 @@ public class PlannerTool {
         //////////////////////
 
         TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, inferSP, inferSP);
+        PartitioningForStatement partitioning = new PartitioningForStatement(hasPartitionParam, partitionParam, inferSP, inferSP);
         QueryPlanner planner = new QueryPlanner(
                 m_cluster, m_database, partitioning, m_hsql, new DatabaseEstimates(), true);
         CompiledPlan plan = null;
@@ -180,7 +182,9 @@ public class PlannerTool {
 
         retval.replicatedDML = plan.replicatedTableDML;
         retval.nonDeterministic = !plan.isContentDeterministic() || !plan.isOrderDeterministic();
-        retval.partitionParam = partitioning.effectivePartitioningValue();
+        if (partitioning.hasEffectivePartitioning())
+            retval.hasPartitionParam = true;
+            retval.partitionParam = partitioning.effectivePartitioningValue();
         return retval;
     }
 }

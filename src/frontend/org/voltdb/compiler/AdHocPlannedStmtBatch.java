@@ -33,6 +33,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
 
     public final String sqlBatchText;
     // May be reassigned if the planner infers single partition work.
+    public boolean hasPartitionParam;
     public Object partitionParam;
     public final int catalogVersion;
 
@@ -63,6 +64,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      */
     public AdHocPlannedStmtBatch(
             String sqlBatchText,
+            boolean hasPartitionParam,
             Object partitionParam,
             int catalogVersion,
             long clientHandle,
@@ -71,6 +73,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             boolean adminConnection,
             Object clientData) {
         this.sqlBatchText = sqlBatchText;
+        this.hasPartitionParam = hasPartitionParam;
         this.partitionParam = partitionParam;
         this.catalogVersion = catalogVersion;
         this.clientHandle = clientHandle;
@@ -83,6 +86,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     @Override
     public String toString() {
         String retval = super.toString();
+        retval += "\n  has partition param: " + (hasPartitionParam ? "true" : "false");
         retval += "\n  partition param: " + ((partitionParam != null) ? partitionParam.toString() : "null");
         retval += "\n  sql: " + ((sqlBatchText != null) ? sqlBatchText : "null");
         return retval;
@@ -174,6 +178,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                                                         collectorFragment,
                                                         isReplicatedTableDML,
                                                         isNonDeterministic,
+                                                        hasPartitionParam,
                                                         partitionParam,
                                                         catalogVersion);
         // The first non-select statement makes it not read-only.

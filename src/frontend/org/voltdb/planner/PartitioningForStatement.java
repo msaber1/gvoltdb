@@ -55,6 +55,7 @@ public class PartitioningForStatement {
      * have the same result as the same query run on all partitions. That is for the caller to decide.
      */
     private final Object m_specifiedValue;
+    private boolean m_hasSpecifiedPartitioning;
     /**
      * This value can be initialized to true to give the planner permission
      * to not only analyze whether the statement CAN be run single-partition,
@@ -78,6 +79,7 @@ public class PartitioningForStatement {
      * If null, SP may not be safe, or the partitioning may be based on something less obvious like a parameter or constant expression.
      */
     private Object m_inferredValue = null;
+    private boolean m_hasEffectivePartitioning;
     /*
      * Any constant/parameter-based expressions found to be equality-filtering partitioning columns.
      */
@@ -110,7 +112,9 @@ public class PartitioningForStatement {
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
      */
-    public PartitioningForStatement(Object specifiedValue, boolean lockInInferredPartitioningConstant, boolean inferSP) {
+    public PartitioningForStatement(boolean wasSpecified, Object specifiedValue, boolean lockInInferredPartitioningConstant, boolean inferSP) {
+        m_hasSpecifiedPartitioning = wasSpecified;
+        m_hasEffectivePartitioning = wasSpecified;
         m_specifiedValue = specifiedValue;
         m_lockIn = lockInInferredPartitioningConstant;
         m_inferSP = inferSP;
@@ -120,7 +124,7 @@ public class PartitioningForStatement {
      * accessor
      */
     public boolean wasSpecifiedAsSingle() {
-        return m_specifiedValue != null;
+        return m_hasSpecifiedPartitioning;
     }
 
 
@@ -128,12 +132,13 @@ public class PartitioningForStatement {
      * smart accessor that doesn't allow contradiction of an original non-null value setting.
      */
     public void setInferredValue(Object best) {
-        if (m_specifiedValue != null) {
+        if (m_hasSpecifiedPartitioning) {
             // The only correct value is the one that was specified.
             // TODO: A later implementation may support gentler "validation" of a specified partitioning value
-            assert(m_specifiedValue.equals(best));
+            assert((m_specifiedValue == null && best == null) || m_specifiedValue.equals(best));
             return;
         }
+        m_hasEffectivePartitioning = true;
         m_inferredValue = best;
     }
 
@@ -153,7 +158,7 @@ public class PartitioningForStatement {
      * @return
      */
     public Object effectivePartitioningValue() {
-        if (m_specifiedValue != null) {
+        if (m_hasSpecifiedPartitioning) {
             // For now, the only correct value is the one that was specified.
             // TODO: A later implementation may support gentler "validation" of a specified partitioning value
             assert(m_inferredValue == null);
@@ -240,7 +245,7 @@ public class PartitioningForStatement {
      * smart accessor
      */
     public boolean hasPartitioningConstantLockedIn() {
-        return m_lockIn && (m_inferredValue != null);
+        return m_lockIn && m_hasEffectivePartitioning;
     }
 
     /**
@@ -328,5 +333,9 @@ public class PartitioningForStatement {
                 }
             }
         }
+    }
+
+    public boolean hasEffectivePartitioning() {
+        return m_hasEffectivePartitioning;
     }
 }

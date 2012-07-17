@@ -29,13 +29,14 @@ import org.voltdb.planner.ParameterInfo;
  */
 public class AdHocPlannedStatement extends AsyncCompilerResult implements Cloneable {
     private static final long serialVersionUID = 1144100816601598092L;
-    public String sql;
-    public byte[] aggregatorFragment;
-    public byte[] collectorFragment;
-    public boolean isReplicatedTableDML;
-    public boolean isNonDeterministic;
-    public Object partitionParam;
-    public int catalogVersion;
+    public final String sql;
+    public final byte[] aggregatorFragment;
+    public final byte[] collectorFragment;
+    public final boolean isReplicatedTableDML;
+    public final boolean isNonDeterministic;
+    final boolean hasPartitionParam;
+    private final Object partitionParam;
+    public final int catalogVersion;
     public List<ParameterInfo> params;
 
     /***
@@ -47,6 +48,7 @@ public class AdHocPlannedStatement extends AsyncCompilerResult implements Clonea
      * @param isReplicatedTableDML      replication flag
      * @param isNonDeterministic        non-deterministic SQL flag
      * @param partitionParam partition  parameter
+     * @param partitionParam
      * @param catalogVersion            catalog version
      */
     public AdHocPlannedStatement(String sql,
@@ -54,13 +56,14 @@ public class AdHocPlannedStatement extends AsyncCompilerResult implements Clonea
                                  byte[] collectorFragment,
                                  boolean isReplicatedTableDML,
                                  boolean isNonDeterministic,
-                                 Object partitionParam,
-                                 int catalogVersion) {
+                                 boolean hasPartitionParam,
+                                 Object partitionParam, int catalogVersion) {
         this.sql = sql;
         this.aggregatorFragment = aggregatorFragment;
         this.collectorFragment = collectorFragment;
         this.isReplicatedTableDML = isReplicatedTableDML;
         this.isNonDeterministic = isNonDeterministic;
+        this.hasPartitionParam = hasPartitionParam;
         this.partitionParam = partitionParam;
         this.catalogVersion = catalogVersion;
     }

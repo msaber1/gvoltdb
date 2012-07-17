@@ -30,6 +30,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Random;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
@@ -77,9 +78,9 @@ import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
+import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
-import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
@@ -1042,16 +1043,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // get the partition param if it exists
         // null means MP-txn
+        boolean hasPartitionParam = false;
         Object partitionParam = null;
         if (params.toArray().length > 1) {
-            if (params.toArray()[1] == null) {
-                // nulls map to zero
-                partitionParam = new Long(0);
-                // skip actual null value because it means MP txn
-            }
-            else {
-                partitionParam = params.toArray()[1];
-            }
+            hasPartitionParam = true;
+            partitionParam = params.toArray()[1];
         }
 
         // try the cache
@@ -1061,6 +1057,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
         AdHocPlannedStmtBatch planBatch =
                 new AdHocPlannedStmtBatch(sql,
+                                          hasPartitionParam,
                                           partitionParam,
                                           m_catalogContext.get().catalogVersion,
                                           task.clientHandle,
@@ -1092,7 +1089,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     false, task.clientHandle, handler.connectionId(),
                     handler.m_hostname, handler.isAdmin(), ccxn,
-                    sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler));
+                    sql, sqlStatements, hasPartitionParam, partitionParam, null, false, true, m_adhocCompletionHandler));
 
         m_mailbox.send(m_plannerSiteId, work);
         return null;
@@ -1438,7 +1435,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else {
                 task.procName = "@AdHoc_RW_SP";
             }
-            partitions = new int[] { TheHashinator.hashToPartition(plannedStmtBatch.partitionParam) };
+            if (plannedStmtBatch.hasPartitionParam) {
+                partitions = new int[] { TheHashinator.hashToPartition(plannedStmtBatch.partitionParam) };
+            } else {
+                Random pick = new Random();
+                partitions = new int[] { m_allPartitions[pick.nextInt(m_allPartitions.length)] };
+            }
         }
         else {
             if (plannedStmtBatch.isReadOnly()) {
@@ -1546,6 +1548,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                          plannedStmtBatch.clientData,
                                                          plannedStmtBatch.sqlBatchText,
                                                          plannedStmtBatch.getSQLStatements(),
+                                                         plannedStmtBatch.hasPartitionParam,
                                                          plannedStmtBatch.partitionParam,
                                                          null,
                                                          false,

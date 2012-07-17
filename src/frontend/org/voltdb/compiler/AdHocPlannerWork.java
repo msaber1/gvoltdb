@@ -27,6 +27,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
 
     final String sqlBatchText;
     final String[] sqlStatements;
+    final boolean hasPartitionParam;
     final Object partitionParam;
     final CatalogContext catalogContext;
     final boolean allowParameterization;
@@ -34,7 +35,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
 
     public AdHocPlannerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection, Object clientData,
-            String sqlBatchText, List<String> sqlStatements, Object partitionParam, CatalogContext context,
+            String sqlBatchText, List<String> sqlStatements, boolean hasPartitionParam, Object partitionParam, CatalogContext context,
             boolean allowParameterization, final boolean inferSinglePartition,
             AsyncCompilerWorkCompletionHandler completionHandler)
     {
@@ -42,6 +43,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
               adminConnection, clientData, completionHandler);
         this.sqlBatchText = sqlBatchText;
         this.sqlStatements = sqlStatements.toArray(new String[sqlStatements.size()]);
+        this.hasPartitionParam = hasPartitionParam;
         this.partitionParam = partitionParam;
         this.catalogContext = context;
         this.allowParameterization = allowParameterization;
@@ -51,6 +53,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     @Override
     public String toString() {
         String retval = super.toString();
+        retval += "\n  has partition param: " + (hasPartitionParam ? "true" : "false");
         retval += "\n  partition param: " + ((partitionParam != null) ? partitionParam.toString() : "null");
         assert(sqlStatements != null);
         if (sqlStatements.length == 0) {
