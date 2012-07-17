@@ -276,7 +276,8 @@ public class TestClientInterface {
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
                 "select * from a", false, null, 0, 0, 0, "localhost", false, null);
-        plannedStmtBatch.addStatement("select * from a", null, null, false, false, null);
+                "select * from a", false, null, 0, 0, 0, "localhost", false, null);
+        plannedStmtBatch.addStatement("select * from a", new byte[0], new byte[0], false, false, null);
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
         ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
