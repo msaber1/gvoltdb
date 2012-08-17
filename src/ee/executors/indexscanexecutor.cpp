@@ -291,8 +291,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // setting up the search keys.
             // e.g. TINYINT > 200 or INT <= 6000000000
 
-            // rethow if not an overflow - currently, it's expected to always be an overflow
-            if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+            // rethrow if not an underflow/overflow - currently, it's expected to always be one
+            if ((e.getInternalFlags() & (SQLException::TYPE_UNDERFLOW | SQLException::TYPE_OVERFLOW)) == 0) {
                 throw e;
             }
 
