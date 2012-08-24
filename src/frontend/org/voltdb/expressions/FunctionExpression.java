@@ -17,6 +17,8 @@
 
 package org.voltdb.expressions;
 
+import java.util.List;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -37,11 +39,8 @@ public class FunctionExpression extends AbstractExpression {
     private String m_name;
     private String m_alias;
     private int m_functionId;
-    private int m_parameterArg = NOT_PARAMETERIZED;
 
-    public int getParameterArg() {
-        return m_parameterArg;
-    }
+    private int m_parameterArg = NOT_PARAMETERIZED;
 
     public FunctionExpression() {
         //
@@ -55,6 +54,18 @@ public class FunctionExpression extends AbstractExpression {
         m_name = name;
         m_alias = volt_alias;
         m_functionId = id;
+    }
+
+    public int getFunctionId() {
+        return m_functionId;
+    }
+
+    public List<AbstractExpression> getArgs() {
+        return m_args;
+    }
+
+    public int getParameterArg() {
+        return m_parameterArg;
     }
 
     public void setParameterArgAndNegotiateInitialValueTypes(int parameterArg) {

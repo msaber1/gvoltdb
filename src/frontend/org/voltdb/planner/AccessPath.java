@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
@@ -36,6 +37,32 @@ public class AccessPath {
     ArrayList<AbstractExpression> endExprs = new ArrayList<AbstractExpression>();
     ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
     ArrayList<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
+
+    // Generally enable/disable index rank processing
+    boolean m_track_rank;
+    // Configure the rank range -- how it is bounded inclusively/exclusively/not at each end.
+    IndexLookupType m_rank_range_type;
+    // The high and low end rank values of a rank range -- both optional
+    AbstractExpression m_rank_range_min;
+    AbstractExpression m_rank_range_max;
+    // An optional "search key" representing the location of "rank = 1" if not ranking over the entire index.
+    List<AbstractExpression> m_rank_offset_key_expressions;
+
+    public void enableIndexRank() {
+        m_track_rank = true;
+    }
+
+    public void setIndexRankOffsetOptions(List<AbstractExpression> rank_offset_key_expressions) {
+        m_track_rank = true;
+        m_rank_offset_key_expressions = rank_offset_key_expressions;
+    }
+
+    public void setIndexRankRangeOptions(IndexLookupType rank_range_type, AbstractExpression rank_range_min, AbstractExpression rank_range_max) {
+        m_track_rank = true;
+        m_rank_range_type = rank_range_type;
+        m_rank_range_min = rank_range_min;
+        m_rank_range_max = rank_range_max;
+    }
 
     @Override
     public String toString() {

@@ -32,6 +32,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt.TablePair;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
@@ -115,6 +116,24 @@ public abstract class SubPlanAssembler {
 
         CatalogMap<Index> indexes = table.getIndexes();
 
+        //The point of this initial check is to ensure that the wrong index isn't being used when a specific ranking index is intended
+        FunctionExpression ranking = m_parsedStmt.getRanking();
+        if (ranking != null) {
+            String ranking_index_name = m_parsedStmt.getRankIndexName();
+            AccessPath path = null;
+            for (Index index : indexes) {
+                if (index.getTypeName().equals(ranking_index_name)) {
+                    path = getRelevantAccessPathForRankingIndex(table, allExprs, index, ranking);
+                    if (path != null) {
+                        paths.add(path);
+                        return paths;
+                    }
+                    break;
+                }
+            }
+
+        }
+
         for (Index index : indexes) {
             AccessPath path = getRelevantAccessPathForIndex(table, allExprs, index);
             if (path != null) {
@@ -123,6 +142,321 @@ public abstract class SubPlanAssembler {
         }
 
         return paths;
+    }
+
+    private AccessPath getRelevantAccessPathForRankingIndex(Table table,List<AbstractExpression> allExprs,
+                                                            Index index, FunctionExpression ranking) {
+        assert(index != null);
+        assert(table != null);
+
+        AccessPath retval = new AccessPath();
+        retval.use = IndexUseType.COVERING_UNIQUE_EQUALITY;
+        retval.index = index;
+
+        // Non-scannable indexes require equality, full coverage expressions
+        final boolean indexScannable =
+            (index.getType() == IndexType.BALANCED_TREE.getValue()) ||
+            (index.getType() == IndexType.BTREE.getValue());
+
+        if ( ! indexScannable )
+            return null;
+
+        // build a set of all columns we can filter on
+        // sort expressions in to the proper buckets within the access path
+        HashMap<Column, ArrayList<AbstractExpression>> eqColumns = new HashMap<Column, ArrayList<AbstractExpression>>();
+        HashMap<Column, ArrayList<AbstractExpression>> gtColumns = new HashMap<Column, ArrayList<AbstractExpression>>();
+        HashMap<Column, ArrayList<AbstractExpression>> ltColumns = new HashMap<Column, ArrayList<AbstractExpression>>();
+        List<AbstractExpression> filters = getRankingExprs(ranking);
+        for (AbstractExpression ae : filters) {
+            AbstractExpression expr = getIndexableExpressionForFilter(table, ae);
+            if (expr == null) {
+                // in-rank filter does not suit index.
+                throw new RuntimeException("Invalid filter for named index in index_rank invocation.");
+            } else {
+                AbstractExpression indexable = expr.getLeft();
+                assert(indexable.getExpressionType() == ExpressionType.VALUE_TUPLE);
+
+                TupleValueExpression tve = (TupleValueExpression)indexable;
+                Column col = getTableColumn(table, tve.getColumnName());
+                assert(col != null);
+
+                if (expr.getExpressionType() == ExpressionType.COMPARE_EQUAL)
+                {
+                    if (eqColumns.containsKey(col) == false)
+                        eqColumns.put(col, new ArrayList<AbstractExpression>());
+                    eqColumns.get(col).add(expr);
+                    continue;
+                }
+                if ((expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) ||
+                        (expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO))
+                {
+                    if (gtColumns.containsKey(col) == false)
+                        gtColumns.put(col, new ArrayList<AbstractExpression>());
+                    gtColumns.get(col).add(expr);
+                    continue;
+                }
+                if ((expr.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) ||
+                        (expr.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO))
+                {
+                    if (ltColumns.containsKey(col) == false)
+                        ltColumns.put(col, new ArrayList<AbstractExpression>());
+                    ltColumns.get(col).add(expr);
+                    continue;
+                }
+
+            }
+        }
+
+        AbstractExpression rank_range_min = null;
+        AbstractExpression rank_range_max = null;
+        ExpressionType rank_min_type = ExpressionType.INVALID;
+        ExpressionType rank_max_type = ExpressionType.INVALID;
+
+        for (AbstractExpression ae : allExprs)
+        {
+            // TODO: May need to discover supported uses of index_rank in WHERE clauses seemingly (to the SubPlanAssembler)
+            // unrelated to the current index(/table) to determine the complete set of index-enforced rank bounds.
+            AbstractExpression expr = getIndexableExpressionForRankFilter(table, ae, ranking);
+            if (expr != null && rank_min_type != ExpressionType.COMPARE_EQUAL) { // Nothing improves on an equality match.
+                AbstractExpression indexable = expr.getLeft();
+                assert(indexable == ranking);
+
+                AbstractExpression limit = expr.getRight();
+
+                if (expr.getExpressionType() == ExpressionType.COMPARE_EQUAL)
+                {
+                    rank_range_min = limit;
+                    rank_range_max = limit;
+                    rank_min_type = ExpressionType.COMPARE_EQUAL;
+                    rank_max_type = ExpressionType.COMPARE_EQUAL;
+                    continue;
+                }
+                if ((expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) ||
+                        (expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO))
+                {
+                    rank_range_min = limit;
+                    rank_min_type = expr.getExpressionType();
+                    continue;
+                }
+                if ((expr.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) ||
+                        (expr.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO))
+                {
+                    rank_range_max = limit;
+                    rank_max_type = expr.getExpressionType();
+                    continue;
+                }
+            }
+            retval.otherExprs.add(ae);
+        }
+
+        IndexLookupType rank_range_type = composeLookupTypeFromComparisons(rank_min_type, rank_max_type);
+        if (rank_range_type != IndexLookupType.INVALID) {
+            retval.setIndexRankRangeOptions(rank_range_type, rank_range_min, rank_range_max);
+        }
+        // See if we can use index scan for ORDER BY.
+        // The only scenario where we can use index scan is when the ORDER BY
+        // columns is a subset of the tree index columns, in the same order from
+        // left to right. It also requires that all columns are ordered in the
+        // same direction. For example, if a table has a tree index of columns
+        // A, B, C, then 'ORDER BY A, B', 'ORDER BY A DESC, B DESC, C DESC'
+        // work, but not 'ORDER BY A, C' or 'ORDER BY A, B DESC'.
+        if (m_parsedStmt instanceof ParsedSelectStmt) {
+            ParsedSelectStmt parsedSelectStmt = (ParsedSelectStmt) m_parsedStmt;
+            if (!parsedSelectStmt.orderColumns.isEmpty()) {
+                //TODO: Detect ranking as the sole ORDER BY criteria and claim an early victory by setting retval.sortDirection = SortDirectionType.ASC; !WOOT
+                List<ColumnRef> sortedColumns = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
+                Iterator<ColumnRef> colRefIter = sortedColumns.iterator();
+
+                boolean ascending = parsedSelectStmt.orderColumns.get(0).ascending;
+                for (ParsedColInfo colInfo : parsedSelectStmt.orderColumns) {
+                    if (!colRefIter.hasNext()) {
+                        retval.sortDirection = SortDirectionType.INVALID;
+                        break;
+                    }
+
+                    ColumnRef colRef = colRefIter.next();
+                    if (colInfo.expression instanceof TupleValueExpression &&
+                        colInfo.tableName.equals(table.getTypeName()) &&
+                        colInfo.columnName.equals(colRef.getColumn().getTypeName()) &&
+                        colInfo.ascending == ascending) {
+
+                        if (ascending)
+                            retval.sortDirection = SortDirectionType.ASC;
+                        else
+                            retval.sortDirection = SortDirectionType.DESC;
+
+                        retval.use = IndexUseType.INDEX_SCAN;
+                    } else {
+                        retval.sortDirection = SortDirectionType.INVALID;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // cover as much of the index as possible with expressions that use
+        // index columns
+        for (ColumnRef colRef : CatalogUtil.getSortedCatalogItems(index.getColumns(), "index")) {
+            Column col = colRef.getColumn();
+            if (eqColumns.containsKey(col) && (eqColumns.get(col).size() >= 0)) {
+                AbstractExpression expr = eqColumns.get(col).remove(0);
+                retval.indexExprs.add(expr);
+                retval.endExprs.add(expr);
+
+                /*
+                 * The index executor cannot handle desc order if the lookup
+                 * type is equal. This includes partial index coverage cases
+                 * with only equality expressions.
+                 *
+                 * Setting the sort direction to invalid here will make
+                 * PlanAssembler generate a suitable order by plan node after
+                 * the scan.
+                 */
+                if (retval.sortDirection == SortDirectionType.DESC) {
+                    retval.sortDirection = SortDirectionType.INVALID;
+                }
+            } else {
+                if (gtColumns.containsKey(col) && (gtColumns.get(col).size() >= 0)) {
+                    AbstractExpression expr = gtColumns.get(col).remove(0);
+                    if (retval.sortDirection != SortDirectionType.DESC)
+                        retval.indexExprs.add(expr);
+                    if (retval.sortDirection == SortDirectionType.DESC)
+                        retval.endExprs.add(expr);
+
+                    if (expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN)
+                        retval.lookupType = IndexLookupType.GT;
+                    else if (expr.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO) {
+                        retval.lookupType = IndexLookupType.GTE;
+                    } else
+                        assert (false);
+
+                    retval.use = IndexUseType.INDEX_SCAN;
+                }
+
+                if (ltColumns.containsKey(col) && (ltColumns.get(col).size() >= 0)) {
+                    AbstractExpression expr = ltColumns.get(col).remove(0);
+                    retval.endExprs.add(expr);
+                    if (retval.indexExprs.size() == 0) {
+                        // SearchKey is null,but has end key
+                        retval.lookupType = IndexLookupType.GTE;
+                    }
+                }
+
+                // if we didn't find an equality match, we can stop looking
+                // whether we found a non-equality comp or not
+                break;
+            }
+        }
+
+        // If IndexUseType is the default of COVERING_UNIQUE_EQUALITY, and not
+        // all columns are covered (but some are with equality)
+        // then it is possible to scan use GTE. The columns not covered will have
+        // null supplied. This will not execute if there is already a GT or LT lookup
+        // type set because those also change the IndexUseType to INDEX_SCAN
+        // Maybe setting the IndexUseType should be done separately from
+        // determining if the last expression is GT/LT?
+        if (retval.use == IndexUseType.COVERING_UNIQUE_EQUALITY &&
+            retval.indexExprs.size() < index.getColumns().size())
+        {
+            retval.use = IndexUseType.INDEX_SCAN;
+            retval.lookupType = IndexLookupType.GTE;
+        }
+
+        if ((indexScannable == false)) {
+            // partial coverage
+            if (retval.indexExprs.size() < index.getColumns().size())
+                return null;
+
+            // non-equality
+            if ((retval.use == IndexUseType.INDEX_SCAN))
+                return null;
+        }
+
+        // Complain of any unusable expressions in the index_rank filter
+        if ( ! eqColumns.isEmpty()) {
+            throw new RuntimeException("Invalid filter for named index in index_rank invocation.");
+        }
+        if ( ! gtColumns.isEmpty()) {
+            throw new RuntimeException("Invalid filter for named index in index_rank invocation.");
+        }
+        if ( ! ltColumns.isEmpty()) {
+            throw new RuntimeException("Invalid filter for named index in index_rank invocation.");
+        }
+        return retval;
+    }
+
+    private static IndexLookupType composeLookupTypeFromComparisons(ExpressionType rank_min_type, ExpressionType rank_max_type) {
+        if (rank_min_type == ExpressionType.COMPARE_EQUAL) {
+            return IndexLookupType.EQ;
+        }
+        if (rank_min_type == ExpressionType.COMPARE_GREATERTHAN) {
+            if (rank_max_type == ExpressionType.COMPARE_LESSTHAN) {
+                return IndexLookupType.GT_LT;
+            }
+            if (rank_max_type == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+                return IndexLookupType.GT_LTE;
+            }
+            if (rank_max_type == ExpressionType.INVALID) {
+                return IndexLookupType.GT;
+            }
+        }
+        else if (rank_min_type == ExpressionType.COMPARE_GREATERTHANOREQUALTO) {
+            if (rank_max_type == ExpressionType.COMPARE_LESSTHAN) {
+                return IndexLookupType.GTE_LT;
+            }
+            if (rank_max_type == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+                return IndexLookupType.GTE_LTE;
+            }
+            if (rank_max_type == ExpressionType.INVALID) {
+                return IndexLookupType.GTE;
+            }
+        }
+        else if (rank_min_type == ExpressionType.INVALID) {
+            if (rank_max_type == ExpressionType.COMPARE_LESSTHAN) {
+                return IndexLookupType.LT;
+            }
+            if (rank_max_type == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+                return IndexLookupType.LTE;
+            }
+        }
+        return IndexLookupType.INVALID;
+    }
+
+    private List<AbstractExpression> getRankingExprs(FunctionExpression ranking) {
+        // TODO Extract from argument list, skipping argument 0 (the index name) and processing the remaining argument(s) in some TBD format
+        return null;
+    }
+
+    private AbstractExpression getIndexableExpressionForRankFilter(Table table, AbstractExpression expr, FunctionExpression ranking) {
+        if (expr == null)
+            return null;
+
+        // Expression type must be resolvable by an index scan
+        if ((expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) &&
+            (expr.getExpressionType() != ExpressionType.COMPARE_GREATERTHAN) &&
+            (expr.getExpressionType() != ExpressionType.COMPARE_GREATERTHANOREQUALTO) &&
+            (expr.getExpressionType() != ExpressionType.COMPARE_LESSTHAN) &&
+            (expr.getExpressionType() != ExpressionType.COMPARE_LESSTHANOREQUALTO))
+        {
+            return null;
+        }
+
+        boolean indexableOnLeft = (ranking == expr.getLeft());
+        boolean indexableOnRight = (ranking == expr.getRight());
+
+        ComparisonExpression normalizedExpr = (ComparisonExpression) expr;
+        AbstractExpression candidateConstant = null;
+        if (indexableOnLeft) {
+            candidateConstant = expr.getRight();
+        } else if (indexableOnRight) {
+            candidateConstant = expr.getLeft();
+            normalizedExpr = normalizedExpr.reverseOperator();
+        }
+
+        if (isOperandDependentOnTable(table, candidateConstant)) {
+            return null;
+        }
+        return normalizedExpr;
     }
 
     /**
@@ -134,7 +468,7 @@ public abstract class SubPlanAssembler {
      * @param index The index we want to use to access the data.
      * @return A valid access path using the data or null if none found.
      */
-    protected AccessPath getRelevantAccessPathForIndex(Table table, List<AbstractExpression> exprs, Index index) {
+    private AccessPath getRelevantAccessPathForIndex(Table table, List<AbstractExpression> exprs, Index index) {
         assert(index != null);
         assert(table != null);
 
@@ -385,8 +719,6 @@ public abstract class SubPlanAssembler {
             return null;
         }
 
-        // EE index key comparator should not lose precision when casting keys to indexed type.
-        // Do not choose an index that requires such a cast.
         VoltType otherType = null;
         ComparisonExpression normalizedExpr = (ComparisonExpression) expr;
         if (indexableOnLeft) {
@@ -409,6 +741,8 @@ public abstract class SubPlanAssembler {
             otherType = expr.getLeft().getValueType();
         }
 
+        // EE index key comparator should not lose precision when casting keys to indexed type.
+        // Do not choose an index that requires such a cast.
         VoltType keyType = indexableExpr.getValueType();
         if (! keyType.canExactlyRepresentAnyValueOf(otherType))
         {
@@ -422,6 +756,7 @@ public abstract class SubPlanAssembler {
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
             //TODO: This clumsy testing of table names regardless of table aliases is
             // EXACTLY why we can't have nice things like self-joins.
+            // It begins early with missing some of the subtleties of the HSQL schema.
             if (table.getTypeName().equals(tve.getTableName()))
             {
                 return true;
@@ -441,6 +776,7 @@ public abstract class SubPlanAssembler {
             TupleValueExpression tve = (TupleValueExpression)expr;
             //TODO: This clumsy testing of table names regardless of table aliases is
             // EXACTLY why we can't have nice things like self-joins.
+            // It begins early with missing some of the subtleties of the HSQL schema.
             if (table.getTypeName().equals(tve.getTableName()))
             {
                 return true;

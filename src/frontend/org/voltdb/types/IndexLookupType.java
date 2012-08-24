@@ -33,7 +33,7 @@ public enum IndexLookupType {
     LTE     (5),
     GT_LT   (6),
     GTE_LT  (7),
-    GTL_TE  (8),
+    GT_LTE  (8),
     GTE_LTE (9);
 
     IndexLookupType(int val) {

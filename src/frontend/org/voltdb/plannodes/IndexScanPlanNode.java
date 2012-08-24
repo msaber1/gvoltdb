@@ -50,7 +50,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         SEARCHKEY_EXPRESSIONS,
         KEY_ITERATE,
         LOOKUP_TYPE,
-        SORT_DIRECTION;
+        SORT_DIRECTION,
+        // TODO: add to JSON protocol
+        TRACK_RANK,
+        RANK_TANGE_TYPE,
+        RANK_RANGE_MIN,
+        RANK_TANGE_MAX,
+        RANK_OFFSET_KEY_EXPRESSION,
     }
 
     /**
@@ -80,6 +86,17 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     // The sorting direction
     protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
+
+
+    // Generally enable/disable index rank processing
+    private boolean m_track_rank;
+    // Configure the rank range -- how it is bounded inclusively/exclusively/not at each end.
+    private IndexLookupType m_rank_range_type;
+    // The high and low end rank values of a rank range -- both optional
+    private AbstractExpression m_rank_range_min;
+    private AbstractExpression m_rank_range_max;
+    // An optional "search key" representing the location of "rank = 1" if not ranking over the entire index.
+    private List<AbstractExpression> m_rank_offset_key_expressions;
 
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
@@ -414,13 +431,33 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (indexSize > keySize)
             cover = String.format("%d/%d cols", keySize, indexSize);
 
-        String usageInfo = String.format("(%s %s)", scanType, cover);
+        String usageInfo = String.format(" (%s %s)", scanType, cover);
         if (keySize == 0)
-            usageInfo = "(for sort order only)";
+            usageInfo = " (for sort order only)";
+
+        if (m_track_rank)
+            usageInfo += " tracking index rank";
 
         String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
         retval += " using \"" + m_targetIndexName + "\"";
-        retval += " " + usageInfo;
+        retval += usageInfo;
         return retval;
     }
+
+    public void enableIndexRank() {
+        m_track_rank = true;
+    }
+
+    public void setIndexRankOffsetOptions(List<AbstractExpression> rank_offset_key_expressions) {
+        m_track_rank = true;
+        m_rank_offset_key_expressions = rank_offset_key_expressions;
+    }
+
+    public void setIndexRankRangeOptions(IndexLookupType rank_range_type, AbstractExpression rank_range_min, AbstractExpression rank_range_max) {
+        m_track_rank = true;
+        m_rank_range_type = rank_range_type;
+        m_rank_range_min = rank_range_min;
+        m_rank_range_max = rank_range_max;
+    }
+
 }

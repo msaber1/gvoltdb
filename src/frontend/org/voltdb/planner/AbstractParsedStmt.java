@@ -95,6 +95,21 @@ public abstract class AbstractParsedStmt {
     // if this is null, that means ALL the columns get used.
     public HashMap<String, ArrayList<SchemaColumn>> scanColumns = null;
 
+    // Slightly hacked "statement global" peek into the one (allowed) non-standard VoltDB proprietary index_rank function in use.
+    private FunctionExpression ranking = null;
+    private String rank_index_name = null;
+
+    public FunctionExpression getRanking() {
+        return ranking;
+    }
+
+    public String getRankIndexName() {
+        // Should have validated hasIndexRanking prior to this call
+        assert(ranking != null);
+        assert(rank_index_name != null);
+        return rank_index_name;
+    }
+
     /**
      *
      * @param sql
@@ -713,6 +728,31 @@ public abstract class AbstractParsedStmt {
         where = parseExpressionTree(exprNode, db);
         assert(where != null);
         ExpressionUtil.finalizeValueTypes(where);
+        extractRankFunction(where);
+    }
+
+    //TODO: FIX ME!
+    static final int INDEX_RANK_FUNCTION_ID =  21; // Keying erroneously off of SUBSTRING's ID FOR NOW FIXME!
+
+    protected void extractRankFunction(AbstractExpression expr) {
+        // TODO Auto-generated method stub
+        List<AbstractExpression> functions = expr.findAllSubexpressionsOfClass(FunctionExpression.class);
+        for (AbstractExpression abstractExpression : functions) {
+            FunctionExpression fn = (FunctionExpression)abstractExpression;
+            if (fn.getFunctionId() == INDEX_RANK_FUNCTION_ID) {
+                if (ranking == null) {
+                    ranking = fn;
+                    AbstractExpression arg0 = fn.getArgs().get(0);
+                    if (! ( arg0 instanceof ConstantValueExpression)) {
+                        throw new RuntimeException("Can't support parameterized planning with index_rank function. This should normally fall back to literal planning.");
+                    }
+                    rank_index_name = ((ConstantValueExpression)arg0).getValue();
+                } else if ( ! ranking.equals(fn)) {
+                    throw new RuntimeException("Unsupported combination of index_rank functions with different arguments within one statement.");
+                }
+            }
+
+        }
     }
 
 }

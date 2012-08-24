@@ -52,10 +52,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         public boolean groupBy = false;
     }
 
-    public ArrayList<ParsedColInfo> displayColumns = new ArrayList<ParsedColInfo>();
-    public ArrayList<ParsedColInfo> orderColumns = new ArrayList<ParsedColInfo>();
+    public final ArrayList<ParsedColInfo> displayColumns = new ArrayList<ParsedColInfo>();
+    public final ArrayList<ParsedColInfo> orderColumns = new ArrayList<ParsedColInfo>();
     public AbstractExpression having = null;
-    public ArrayList<ParsedColInfo> groupByColumns = new ArrayList<ParsedColInfo>();
+    public final ArrayList<ParsedColInfo> groupByColumns = new ArrayList<ParsedColInfo>();
 
     public long limit = -1;
     public long offset = 0;
@@ -105,6 +105,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (col.expression instanceof ConstantValueExpression) {
                 assert(col.expression.getValueType() != VoltType.NUMERIC);
             }
+            extractRankFunction(col.expression);
             ExpressionUtil.finalizeValueTypes(col.expression);
             assert(col.expression != null);
             col.alias = child.attributes.get("alias");
