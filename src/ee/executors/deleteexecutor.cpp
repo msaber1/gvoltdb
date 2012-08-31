@@ -50,7 +50,7 @@
 #include "common/tabletuple.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "indexes/tableindex.h"
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
@@ -120,8 +120,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         assert(m_inputTable);
         assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
         assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
-        TableIterator inputIterator = m_inputTable->iterator();
-        while (inputIterator.next(m_inputTuple)) {
+        TupleIterator *inputIterator = m_inputTable->singletonIterator();
+        while (inputIterator->next(m_inputTuple)) {
             //
             // OPTIMIZATION: Single-Sited Query Plans
             // If our beloved DeletePlanNode is apart of a single-site query plan,

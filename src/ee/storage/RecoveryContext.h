@@ -17,7 +17,7 @@
 #ifndef RECOVERYCONTEXT_H_
 #define RECOVERYCONTEXT_H_
 
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "common/DefaultTupleSerializer.h"
 
 /*
@@ -50,13 +50,7 @@ private:
      * to scan every data block and ignore updates
      * during the iteration process
      */
-    TableIterator m_iterator;
-
-    /*
-     * Integer indices of tuples that have been updated since being shipped
-     * in a recovery message
-     */
-//    boost::unordered_set<uint32_t> m_updatedTupleIndices;
+    TupleIterator *m_iterator;
 
     /*
      * Not implemented yet, but a boost::unordered_set of the primary keys of tuples that were deleted

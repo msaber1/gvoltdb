@@ -14,8 +14,10 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #ifndef TUPLEITERATOR_H_
 #define TUPLEITERATOR_H_
+
 #include "common/tabletuple.h"
 
 /**
@@ -25,6 +27,7 @@ namespace voltdb {
 class TupleIterator {
 public:
     virtual bool next(TableTuple &out) = 0;
+    virtual bool hasNext() = 0;
     virtual ~TupleIterator() {}
 };
 }

@@ -25,7 +25,6 @@
 #include "expressions/expressionutil.h"
 #include "plannodes/indexcountnode.h"
 #include "storage/table.h"
-#include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"

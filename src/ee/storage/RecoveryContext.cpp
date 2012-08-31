@@ -26,7 +26,7 @@ namespace voltdb {
 RecoveryContext::RecoveryContext(PersistentTable *table, int32_t tableId) :
         m_table(table),
         m_firstMessage(true),
-        m_iterator(m_table->iterator()),
+        m_iterator(m_table->singletonIterator()),
         m_tableId(tableId),
         m_recoveryPhase(RECOVERY_MSG_TYPE_SCAN_TUPLES) {
 }
@@ -48,12 +48,12 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
     // us with an inconsistent iterator).
     if (m_firstMessage)
     {
-        m_iterator = m_table->iterator();
+        m_iterator = m_table->singletonIterator();
         m_firstMessage = false;
 
     }
 
-    if (!m_iterator.hasNext()) {
+    if (!m_iterator->hasNext()) {
         m_recoveryPhase = RECOVERY_MSG_TYPE_COMPLETE;
         out->writeByte(static_cast<int8_t>(RECOVERY_MSG_TYPE_COMPLETE));
         out->writeInt(m_tableId);
@@ -77,7 +77,7 @@ bool RecoveryContext::nextMessage(ReferenceSerializeOutput *out) {
             &m_serializer,
             m_table->schema());
     TableTuple tuple(m_table->schema());
-    while (message.canAddMoreTuples() && m_iterator.next(tuple)) {
+    while (message.canAddMoreTuples() && m_iterator->next(tuple)) {
         message.addTuple(tuple);
     }
     message.finalize();

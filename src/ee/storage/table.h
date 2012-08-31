@@ -73,7 +73,7 @@ class TableIndex;
 class TableColumn;
 class TableTuple;
 class TableFactory;
-class TableIterator;
+class TupleIterator;
 class CopyOnWriteIterator;
 class CopyOnWriteContext;
 class UndoLog;
@@ -99,7 +99,6 @@ const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name leng
  */
 class Table {
     friend class TableFactory;
-    friend class TableIterator;
     friend class CopyOnWriteContext;
     friend class ExecutionEngine;
     friend class TableStats;
@@ -137,8 +136,8 @@ class Table {
     // ------------------------------------------------------------------
     // ACCESS METHODS
     // ------------------------------------------------------------------
-    virtual TableIterator& iterator() = 0;
-    virtual TableIterator *makeIterator() = 0;
+    virtual TupleIterator *singletonIterator() = 0;
+    virtual TupleIterator *makeIterator() = 0;
 
     // ------------------------------------------------------------------
     // OPERATIONS
@@ -339,7 +338,7 @@ protected:
 public:
 
     virtual bool equals(voltdb::Table *other);
-    virtual voltdb::TableStats* getTableStats();
+    virtual TableStats* getTableStats();
 
 protected:
     // virtual block management functions

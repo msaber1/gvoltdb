@@ -43,13 +43,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTORETEMPTABLE_H
-#define HSTORETEMPTABLE_H
+#ifndef TEMPTABLE_H
+#define TEMPTABLE_H
 
 #include "table.h"
 #include "common/tabletuple.h"
 #include "common/ThreadLocalPool.h"
-#include "storage/tableiterator.h"
+#include "storage/TempTableIterator.h"
 #include "storage/TempTableLimits.h"
 #include "storage/TupleBlock.h"
 
@@ -70,7 +70,6 @@ class TableStats;
  */
 class TempTable : public Table {
     friend class TableFactory;
-    friend class TableIterator;
 
   private:
     // no copies, no assignment
@@ -78,17 +77,17 @@ class TempTable : public Table {
     TempTable operator=(TempTable const&);
 
     // default iterator
-    TableIterator m_iter;
+    TempTableIterator m_iter;
 
   public:
     // Return the table iterator by reference
-    TableIterator& iterator() {
-        m_iter.reset(m_data.begin());
-        return m_iter;
+    virtual TupleIterator *singletonIterator() {
+        m_iter.reset(m_data.begin(), m_tupleCount, m_tuplesPerBlock, m_tupleLength);
+        return &m_iter;
     }
 
-    TableIterator* makeIterator() {
-        return new TableIterator(this, m_data.begin());
+    virtual TupleIterator *makeIterator() {
+        return new TempTableIterator(m_data.begin(), m_tupleCount, m_tuplesPerBlock, m_tupleLength);
     }
 
     virtual ~TempTable();
@@ -130,7 +129,7 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     std::string tableType() const;
     void getNextFreeTupleInlined(TableTuple *tuple);
-    voltdb::TableStats* getTableStats();
+    virtual TableStats* getTableStats();
 
     // ptr to global integer tracking temp table memory allocated per frag
     // should be null for persistent tables
@@ -211,7 +210,7 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     // Don't call deleteTuple() here.
     const uint16_t uninlinedStringColumnCount = m_schema->getUninlinedObjectColumnCount();
     if (freeAllocatedStrings && uninlinedStringColumnCount > 0) {
-        TableIterator iter(this, m_data.begin());
+        TempTableIterator iter(m_data.begin(), m_tupleCount, m_tuplesPerBlock, m_tupleLength);
         while (iter.hasNext()) {
             iter.next(m_tmpTarget1);
             m_tmpTarget1.freeObjectColumns();
@@ -262,4 +261,4 @@ inline void TempTable::nextFreeTuple(TableTuple *tuple) {
 
 }
 
-#endif
+#endif // TEMPTABLE_H_

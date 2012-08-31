@@ -38,5 +38,5 @@ namespace voltdb {
     IndexTableUndoInsertAction::~IndexTableUndoInsertAction() {
         // TODO Auto-generated destructor stub
     }
-    
+
 }

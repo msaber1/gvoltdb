@@ -59,7 +59,7 @@
 #include "storage/persistenttable.h"
 #include "storage/temptable.h"
 #include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/tablefactory.h"
 
 using namespace std;
@@ -335,7 +335,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     //
     TableTuple outer_tuple(outer_table->schema());
     TableTuple inner_tuple(inner_table->schema());
-    TableIterator outer_iterator = outer_table->iterator();
+    TupleIterator *outer_iterator = outer_table->singletonIterator();
     int num_of_outer_cols = outer_table->columnCount();
     int num_of_inner_cols = inner_table->columnCount();
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
@@ -343,7 +343,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableTuple &join_tuple = output_table->tempTuple();
 
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
-    while (outer_iterator.next(outer_tuple)) {
+    while (outer_iterator->next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
 

@@ -69,6 +69,7 @@ namespace voltdb {
 #define PENDING_DELETE_ON_UNDO_RELEASE_MASK 8
 
 class TableColumn;
+class TempTable;
 
 class TableTuple {
     friend class TableFactory;

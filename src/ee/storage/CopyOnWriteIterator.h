@@ -14,9 +14,12 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 #ifndef COPYONWRITEITERATOR_H_
 #define COPYONWRITEITERATOR_H_
+
 #include <vector>
+
 #include "common/tabletuple.h"
 #include "storage/TupleIterator.h"
 #include "stx/btree_map.h"
@@ -56,7 +59,8 @@ public:
         }
     }
 
-    bool next(TableTuple &out);
+    virtual bool next(TableTuple &out);
+    virtual bool hasNext();
 
     virtual ~CopyOnWriteIterator() {}
 private:

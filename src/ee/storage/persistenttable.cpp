@@ -48,6 +48,7 @@
 #include <cstdio>
 #include <boost/foreach.hpp>
 #include <boost/scoped_ptr.hpp>
+
 #include "storage/persistenttable.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
@@ -62,7 +63,7 @@
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
 #include "storage/table.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
@@ -72,7 +73,7 @@
 #include "storage/ConstraintFailureException.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/CopyOnWriteContext.h"
-#include "storage/tableiterator.h"
+#include "storage/PersistentTableIterator.h"
 
 using namespace voltdb;
 
@@ -83,7 +84,7 @@ TableTuple keyTuple;
 
 PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
     Table(TABLE_BLOCKSIZE),
-    m_iter(this, m_data.begin()),
+    m_iter(m_data.begin(), 0, m_tuplesPerBlock, m_tupleLength),
     m_executorContext(ctx),
     m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
     m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL),
@@ -105,10 +106,10 @@ PersistentTable::~PersistentTable() {
     }
 
     // delete all tuples to free strings
-    TableIterator ti(this, m_data.begin());
+    TupleIterator *ti = singletonIterator();
     TableTuple tuple(m_schema);
 
-    while (ti.next(tuple)) {
+    while (ti->next(tuple)) {
         // indexes aren't released as they don't have ownership of strings
         tuple.freeObjectColumns();
         tuple.setActiveFalse();
@@ -206,9 +207,9 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
 
 void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
     // nothing interesting
-    TableIterator ti(this, m_data.begin());
+    TupleIterator *ti = singletonIterator();
     TableTuple tuple(m_schema);
-    while (ti.next(tuple)) {
+    while (ti->next(tuple)) {
         deleteTuple(tuple, true);
     }
 }
@@ -567,9 +568,8 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
          * Do a table scan.
          */
         TableTuple tableTuple(m_schema);
-        TableIterator ti(this, m_data.begin());
-        while (ti.hasNext()) {
-            ti.next(tableTuple);
+        TupleIterator *ti = singletonIterator();
+        while (ti->next(tableTuple)) {
             if (tableTuple.equalsNoSchemaCheck(tuple)) {
                 return tableTuple;
             }
@@ -860,9 +860,9 @@ size_t PersistentTable::hashCode() {
     TableIndexScheme sourceScheme = m_pkeyIndex->getScheme();
     sourceScheme.setTree();
     boost::scoped_ptr<TableIndex> pkeyIndex(TableIndexFactory::getInstance(sourceScheme));
-    TableIterator iter(this, m_data.begin());
+    TupleIterator *iter = singletonIterator();
     TableTuple tuple(schema());
-    while (iter.next(tuple)) {
+    while (iter->next(tuple)) {
         pkeyIndex->addEntry(&tuple);
     }
 

@@ -51,7 +51,7 @@
 #include "execution/VoltDBEngine.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/tableutil.h"
 
 namespace voltdb {

@@ -46,7 +46,7 @@
 #include <vector>
 
 #include "temptable.h"
-#include "tableiterator.h"
+#include "TupleIterator.h"
 #include "common/tabletuple.h"
 #include "common/serializeio.h"
 #include "common/debuglog.h"
@@ -58,7 +58,7 @@ namespace voltdb {
 
 TempTable::TempTable()
   : Table(TABLE_BLOCKSIZE),
-    m_iter(this, m_data.begin()),
+    m_iter(m_data.begin(), 0, m_tuplesPerBlock, m_tupleLength),
     m_limits(NULL)
 {
 }

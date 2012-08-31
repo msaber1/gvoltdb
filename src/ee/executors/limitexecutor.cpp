@@ -50,7 +50,7 @@
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
-#include "storage/tableiterator.h"
+#include "storage/tupleiterator.h"
 #include "storage/tablefactory.h"
 
 using namespace voltdb;
@@ -98,7 +98,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     // we have copy enough tuples for the limit specified by the node
     //
     TableTuple tuple(input_table->schema());
-    TableIterator iterator = input_table->iterator();
+    TupleIterator *iterator = input_table->singletonIterator();
     int tuple_ctr = 0;
 
     int limit = 0, offset = 0;
@@ -115,7 +115,8 @@ LimitExecutor::p_execute(const NValueArray &params)
     }
 
     bool start = (offset == 0);
-    while (iterator.next(tuple) && (tuple_ctr < limit))
+    int64_t visitedTuples = 0;
+    while (iterator->next(tuple) && (tuple_ctr < limit))
     {
         // TODO: need a way to skip / iterate N items.
         if (start) {
@@ -130,8 +131,9 @@ LimitExecutor::p_execute(const NValueArray &params)
             tuple_ctr++;
         } else
         {
-            start = (iterator.getLocation() >= offset);
+            start = (visitedTuples >= offset);
         }
+        visitedTuples++;
     }
 
     return true;

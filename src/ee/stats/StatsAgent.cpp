@@ -21,7 +21,7 @@
 #include "common/TupleSchema.h"
 #include "storage/PersistentTableStats.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include <cassert>
 #include <string>
 #include <vector>

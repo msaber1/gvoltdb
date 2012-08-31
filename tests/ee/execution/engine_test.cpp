@@ -65,7 +65,7 @@
 #include "indexes/tableindex.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/temptable.h"
 #include "storage/tableutil.h"
 #include "catalog/catalog.h"
@@ -217,12 +217,12 @@ void ExecutionEngineTest::compareTables(Table *first, Table *second) {
     const TupleSchema *secondSchema = second->schema();
     ASSERT_TRUE(firstSchema->equals(secondSchema));
 
-    TableIterator firstTI = first->iterator();
-    TableIterator secondTI = second->iterator();
+    TupleIterator *firstTI = first->singletonIterator();
+    TupleIterator *secondTI = second->singletonIterator();
     TableTuple firstTuple(firstSchema);
     TableTuple secondTuple(secondSchema);
-    while(firstTI.next(firstTuple)) {
-        ASSERT_TRUE(secondTI.next(secondTuple));
+    while(firstTI->next(firstTuple)) {
+        ASSERT_TRUE(secondTI->next(secondTuple));
         ASSERT_TRUE(firstTuple.equals(secondTuple));
     }
 }

@@ -31,6 +31,7 @@ namespace voltdb {
 class Topend;
 class ExecutorContext;
 class TupleStreamWrapper;
+class TupleIterator;
 
 /**
  * A streamed table does not store data. It may not be read. It may
@@ -52,8 +53,8 @@ class StreamedTable : public Table {
 
     // virtual Table functions
     // Return a table iterator BY VALUE
-    virtual TableIterator& iterator();
-    virtual TableIterator* makeIterator();
+    virtual TupleIterator *singletonIterator();
+    virtual TupleIterator *makeIterator();
 
     virtual void deleteAllTuples(bool freeAllocatedStrings);
     virtual bool insertTuple(TableTuple &source);

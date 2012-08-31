@@ -103,9 +103,9 @@ namespace voltdb {
         inline void needToRevertIndexes() {
             m_revertIndexes = true;
         }
-        
+
         virtual ~IndexTableUndoUpdateAction();
-        
+
     private:
         TableTuple m_oldTuple;
         TableTuple m_newTuple;
@@ -114,7 +114,7 @@ namespace voltdb {
         std::vector<const char*> newUninlineableColumns;
         bool m_revertIndexes;
     };
-    
+
 }
 
 #endif // INDEXTABLEUNDOUPDATEACTION_H

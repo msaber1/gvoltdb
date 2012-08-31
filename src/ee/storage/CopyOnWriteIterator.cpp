@@ -76,4 +76,10 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
     }
     return false;
 }
+
+bool CopyOnWriteIterator::hasNext() {
+    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                  "CopyOnWriteIterator.hasNext() is not supported.");
+}
+
 }

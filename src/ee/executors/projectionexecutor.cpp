@@ -51,7 +51,7 @@
 #include "expressions/expressionutil.h"
 #include "plannodes/projectionnode.h"
 #include "storage/table.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
 
@@ -144,9 +144,9 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     // expression This will generate new tuple values that we will insert into
     // our output table
     //
-    TableIterator iterator = input_table->iterator();
+    TupleIterator *iterator = input_table->singletonIterator();
     assert (tuple.sizeInValues() == input_table->columnCount());
-    while (iterator.next(tuple)) {
+    while (iterator->next(tuple)) {
         //
         // Project (or replace) values from input tuple
         //

@@ -55,7 +55,7 @@ namespace voltdb {
         voltdb::TableTuple m_tuple;
         IndexBasedPersistentTable *m_table;
     };
-    
+
 }
 
 #endif // INDEXBASEDPERSISTENTTABLE_H

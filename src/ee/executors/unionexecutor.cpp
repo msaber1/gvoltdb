@@ -51,7 +51,7 @@
 #include "plannodes/unionnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/tablefactory.h"
 
 namespace voltdb {
@@ -135,9 +135,9 @@ bool UnionExecutor::p_execute(const NValueArray &params) {
     for (int ctr = 0, cnt = (int)node->getInputTables().size(); ctr < cnt; ctr++) {
         Table* input_table = node->getInputTables()[ctr];
         assert(input_table);
-        TableIterator iterator = input_table->iterator();
+        TupleIterator *iterator = input_table->singletonIterator();
         TableTuple tuple(input_table->schema());
-        while (iterator.next(tuple)) {
+        while (iterator->next(tuple)) {
             if (!output_table->insertTuple(tuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                            " output table '%s'",

@@ -53,7 +53,7 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "storage/table.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 
 namespace tableutil {
 
@@ -62,8 +62,8 @@ bool getRandomTuple(const voltdb::Table* table, voltdb::TableTuple &out) {
     int cnt = (int)table->usedTupleCount();
     if (cnt > 0) {
         int idx = (rand() % cnt);
-        voltdb::TableIterator it = table2->iterator();
-        while (it.next(out)) {
+        voltdb::TupleIterator *it = table2->singletonIterator();
+        while (it->next(out)) {
             if (idx-- == 0) {
                 return true;
             }
@@ -130,9 +130,9 @@ bool equals(const voltdb::Table* table, voltdb::TableTuple *tuple0, voltdb::Tabl
 bool copy(const voltdb::Table *from_table, voltdb::Table* to_table) {
     voltdb::Table* fromtable2 = const_cast<voltdb::Table*>(from_table);
     assert(from_table->columnCount() == to_table->columnCount());
-    voltdb::TableIterator iterator = fromtable2->iterator();
+    voltdb::TupleIterator *iterator = fromtable2->singletonIterator();
     voltdb::TableTuple tuple(fromtable2->schema());
-    while (iterator.next(tuple)) {
+    while (iterator->next(tuple)) {
         if (!to_table->insertTuple(tuple)) {
             return (false);
         }
@@ -143,9 +143,9 @@ bool copy(const voltdb::Table *from_table, voltdb::Table* to_table) {
 bool getTupleAt(const voltdb::Table* table, int64_t position, voltdb::TableTuple &out) {
     assert(table);
     voltdb::Table* table2 = const_cast<voltdb::Table*>(table);
-    voltdb::TableIterator iterator = table2->iterator();
+    voltdb::TupleIterator *iterator = table2->singletonIterator();
     int64_t ctr = 0;
-    while (iterator.next(out)) {
+    while (iterator->next(out)) {
         if (ctr++ == position) {
             return true;
         }

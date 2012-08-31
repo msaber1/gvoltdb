@@ -56,7 +56,7 @@
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 
 using namespace voltdb;
 
@@ -175,7 +175,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         // our expression, we'll insert them into the output table.
         //
         TableTuple tuple(target_table->schema());
-        TableIterator iterator = target_table->iterator();
+        TupleIterator *iterator = target_table->singletonIterator();
         AbstractExpression *predicate = node->getPredicate();
         VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
 
@@ -189,7 +189,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         int tuple_ctr = 0;
         int tuple_skipped = 0;
-        while (iterator.next(tuple))
+        while (iterator->next(tuple))
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(target_table->name()).c_str(), tuple_ctr,

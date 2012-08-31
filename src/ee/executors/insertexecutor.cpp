@@ -55,7 +55,7 @@
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/table.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/tableutil.h"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
@@ -148,8 +148,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // and insert any tuple that we find into our m_targetTable. It doesn't get any easier than that!
     //
     assert (m_tuple.sizeInValues() == m_inputTable->columnCount());
-    TableIterator iterator = m_inputTable->iterator();
-    while (iterator.next(m_tuple)) {
+    TupleIterator *iterator = m_inputTable->singletonIterator();
+    while (iterator->next(m_tuple)) {
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
                    m_tuple.debug(m_targetTable->name()).c_str(), m_targetTable->name().c_str(),
                    m_targetTable->schema()->debug().c_str());

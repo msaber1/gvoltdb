@@ -58,7 +58,7 @@
 #include "plannodes/limitnode.h"
 
 #include "storage/table.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/tablefactory.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"

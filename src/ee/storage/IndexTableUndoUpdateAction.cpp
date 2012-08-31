@@ -69,8 +69,8 @@ namespace voltdb {
             NValue::deserializeFromTupleStorage( &(*i), VALUE_TYPE_VARCHAR, false ).free();
         }
     }
-    
+
     IndexTableUndoUpdateAction::~IndexTableUndoUpdateAction() {
     }
-    
+
 }

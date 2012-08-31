@@ -18,15 +18,16 @@
 #ifndef STATSSOURCE_H_
 #define STATSSOURCE_H_
 
-#include "common/tabletuple.h"
-#include "common/ids.h"
-#include "boost/scoped_ptr.hpp"
-
 #include <string>
 #include <vector>
 #include <map>
 
+#include "common/tabletuple.h"
+#include "common/ids.h"
+#include "boost/scoped_ptr.hpp"
+
 namespace voltdb {
+
 class Table;
 class TableFactory;
 class TupleSchema;
@@ -53,7 +54,7 @@ public:
      * every stats table.  Usage by derived classes takes the same
      * pattern as generateBaseStatsColumnNames.
      */
-    static void populateBaseSchema(std::vector<voltdb::ValueType>& types,
+    static void populateBaseSchema(std::vector<ValueType>& types,
                                    std::vector<int32_t>& columnLengths,
                                    std::vector<bool>& allowNull);
 
@@ -74,11 +75,11 @@ public:
      */
     void configure(
             std::string name,
-            voltdb::CatalogId hostId,
+            CatalogId hostId,
             std::string hostname,
             int64_t siteId,
-            voltdb::CatalogId partitionId,
-            voltdb::CatalogId databaseId);
+            CatalogId partitionId,
+            CatalogId databaseId);
 
     /*
      * Destructor that frees tupleSchema_, and statsTable_
@@ -132,7 +133,7 @@ protected:
      * Same pattern as generateStatsColumnNames except the return value is used as an offset into the tuple schema instead of appending to
      * end of a list.
      */
-    virtual void populateSchema(std::vector<voltdb::ValueType> &types, std::vector<int32_t> &columnLengths, std::vector<bool> &allowNull);
+    virtual void populateSchema(std::vector<ValueType> &types, std::vector<int32_t> &columnLengths, std::vector<bool> &allowNull);
 
     /**
      * Map describing the mapping from column names to column indices in the stats tuple. Necessary because classes in the

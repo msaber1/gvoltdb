@@ -54,7 +54,7 @@
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/tablefactory.h"
 
 using namespace voltdb;
@@ -161,10 +161,10 @@ OrderByExecutor::p_execute(const NValueArray &params)
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
-    TableIterator iterator = input_table->iterator();
+    TupleIterator *iterator = input_table->singletonIterator();
     TableTuple tuple(input_table->schema());
     vector<TableTuple> xs;
-    while (iterator.next(tuple))
+    while (iterator->next(tuple))
     {
         assert(tuple.isActive());
         xs.push_back(tuple);

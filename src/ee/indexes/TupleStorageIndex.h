@@ -241,32 +241,32 @@ namespace voltdb {
         {
             m_match = TableTuple(m_tupleSchema);
         }
-        
+
         inline bool addEntryPrivate(const TableTuple* tuple, const KeyType &key)
         {
             ++m_inserts;
             return m_entries.insert(std::pair<KeyType, const void*>(key, tuple->address()));
         }
-        
+
         inline bool deleteEntryPrivate(const KeyType &key)
         {
             ++m_deletes;
             return m_entries.erase(key);
         }
-        
+
         MapType m_entries;
         KeyType m_tmp1;
         KeyType m_tmp2;
-        
+
         // iteration stuff
         bool m_begin;
         typename MapType::iterator m_keyIter;
         TableTuple m_match;
-        
+
         // comparison stuff
         TupleStorageIndexKeyEqualityChecker m_eq;
     };
-    
+
 }
 
 #endif // TUPLESTORAGEINDEX_H_

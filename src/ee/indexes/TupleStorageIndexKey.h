@@ -158,7 +158,7 @@ public:
         }
         return true;
     }
-    
+
     TupleSchema *m_schema;
 };
 

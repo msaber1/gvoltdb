@@ -51,7 +51,7 @@
 #include "plannodes/distinctnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/tablefactory.h"
 
 #include <set>
@@ -91,7 +91,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     Table* input_table = node->getInputTables()[0];
     assert(input_table);
 
-    TableIterator iterator = input_table->iterator();
+    TupleIterator *iterator = input_table->singletonIterator();
     TableTuple tuple(input_table->schema());
 
     // substitute params for distinct expression
@@ -99,7 +99,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     distinctExpression->substitute(params);
 
     std::set<NValue, NValue::ltNValue> found_values;
-    while (iterator.next(tuple)) {
+    while (iterator->next(tuple)) {
         //
         // Check whether this value already exists in our list
         //

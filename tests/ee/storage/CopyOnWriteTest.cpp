@@ -32,7 +32,7 @@
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
 #include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
@@ -273,7 +273,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
 #endif
     addRandomUniqueTuples( m_table, tupleCount);
 
-    voltdb::TableIterator& iterator = m_table->iterator();
+    voltdb::TupleIterator *iterator = m_table->singletonIterator();
     TBMap blocks(m_table->m_data);
     DefaultTupleSerializer serializer;
     m_table->m_blocksPendingSnapshot.swap(m_table->m_blocksNotPendingSnapshot);
@@ -285,7 +285,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     int iteration = 0;
     while (true) {
         iteration++;
-        if (!iterator.next(tuple)) {
+        if (!iterator->next(tuple)) {
             break;
         }
         ASSERT_TRUE(COWIterator.next(COWTuple));
@@ -329,9 +329,9 @@ TEST_F(CopyOnWriteTest, BigTest) {
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
         stx::btree_set<int64_t> originalTuples;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        voltdb::TupleIterator *iterator = m_table->singletonIterator();
         TableTuple tuple(m_table->schema());
-        while (iterator.next(tuple)) {
+        while (iterator->next(tuple)) {
             const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
                     originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
@@ -390,8 +390,8 @@ TEST_F(CopyOnWriteTest, BigTest) {
         }
 
         int numTuples = 0;
-        iterator = m_table->iterator();
-        while (iterator.next(tuple)) {
+        iterator = m_table->singletonIterator();
+        while (iterator->next(tuple)) {
             if (tuple.isDirty()) {
                 printf("Found tuple %d is active and dirty at end of COW\n",
                         ValuePeeker::peekAsInteger(tuple.getNValue(0)));
@@ -419,9 +419,9 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
         stx::btree_set<int64_t> originalTuples;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        voltdb::TupleIterator *iterator = m_table->singletonIterator();
         TableTuple tuple(m_table->schema());
-        while (iterator.next(tuple)) {
+        while (iterator->next(tuple)) {
             const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
                     originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
@@ -481,8 +481,8 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         }
 
         int numTuples = 0;
-        iterator = m_table->iterator();
-        while (iterator.next(tuple)) {
+        iterator = m_table->singletonIterator();
+        while (iterator->next(tuple)) {
             if (tuple.isDirty()) {
                 printf("Found tuple %d is active and dirty at end of COW\n",
                         ValuePeeker::peekAsInteger(tuple.getNValue(0)));
@@ -513,9 +513,9 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
         stx::btree_set<int64_t> originalTuples;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        voltdb::TupleIterator *iterator = m_table->singletonIterator();
         TableTuple tuple(m_table->schema());
-        while (iterator.next(tuple)) {
+        while (iterator->next(tuple)) {
             const std::pair<stx::btree_set<int64_t>::iterator, bool> p =
                     originalTuples.insert(*reinterpret_cast<int64_t*>(tuple.address() + 1));
             const bool inserted = p.second;
@@ -577,8 +577,8 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         }
 
         int numTuples = 0;
-        iterator = m_table->iterator();
-        while (iterator.next(tuple)) {
+        iterator = m_table->singletonIterator();
+        while (iterator->next(tuple)) {
             if (tuple.isDirty()) {
                 printf("Found tuple %d is active and dirty at end of COW\n",
                         ValuePeeker::peekAsInteger(tuple.getNValue(0)));

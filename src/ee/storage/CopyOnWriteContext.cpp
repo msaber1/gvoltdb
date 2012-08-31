@@ -18,7 +18,7 @@
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "storage/CopyOnWriteIterator.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "common/FatalException.hpp"
 #include <algorithm>
 #include <cassert>

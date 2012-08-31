@@ -16,6 +16,7 @@
  */
 
 #include <iostream>
+
 #include "tablecountexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -27,7 +28,6 @@
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
 
 using namespace voltdb;
 

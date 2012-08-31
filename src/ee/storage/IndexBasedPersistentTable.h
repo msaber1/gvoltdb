@@ -39,7 +39,6 @@ namespace voltdb {
 
     class TableColumn;
     class TableIndex;
-    class TableIterator;
     class TableFactory;
     class TupleSerializer;
     class SerializeInput;

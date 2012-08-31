@@ -60,7 +60,6 @@
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"

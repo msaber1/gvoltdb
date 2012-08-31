@@ -60,7 +60,7 @@
 #include "expressions/functionexpression.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 
 #define TUPLES 1000
 
@@ -133,9 +133,9 @@ TEST_F(FilterTest, SimpleFilter) {
     // ::printf("\nFilter:%s\n", equal->debug().c_str());
 
     int count = 0;
-    TableIterator iter = table->iterator();
+    TupleIterator *iter = table->singletonIterator();
     TableTuple match(table->schema());
-    while (iter.next(match)) {
+    while (iter->next(match)) {
         if (equal->eval(&match, NULL).isTrue()) {
             //::printf("  match:%s", match->debug(table).c_str());
             ++count;
@@ -165,9 +165,9 @@ TEST_F(FilterTest, FunctionAbs1Filter) {
     // ::printf("\nFilter:%s\n", equal->debug().c_str());
 
     int count = 0;
-    TableIterator iter = table->iterator();
+    TupleIterator *iter = table->singletonIterator();
     TableTuple match(table->schema());
-    while (iter.next(match)) {
+    while (iter->next(match)) {
         if (equal->eval(&match, NULL).isTrue()) {
             //::printf("  match:%s", match->debug(table).c_str());
             ++count;
@@ -199,9 +199,9 @@ TEST_F(FilterTest, FunctionAbs2Filter) {
     // ::printf("\nFilter:%s\n", equal->debug().c_str());
 
     int count = 0;
-    TableIterator iter = table->iterator();
+    TupleIterator *iter = table->singletonIterator();
     TableTuple match(table->schema());
-    while (iter.next(match)) {
+    while (iter->next(match)) {
         if (equal->eval(&match, NULL).isTrue()) {
             // ::printf("  match:%s\n", match.debug(std::string("tablename")).c_str());
             ++count;
@@ -236,9 +236,9 @@ TEST_F(FilterTest, OrFilter) {
     // ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     int count = 0;
-    TableIterator iter = table->iterator();
+    TupleIterator *iter = table->singletonIterator();
     TableTuple match(table->schema());
-    while (iter.next(match)) {
+    while (iter->next(match)) {
         if (predicate->eval(&match, NULL).isTrue()) {
             //::printf("  match:%s\n", match->debug(table).c_str());
             ++count;
@@ -276,9 +276,9 @@ TEST_F(FilterTest, AndFilter) {
     // ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     int count = 0;
-    TableIterator iter = table->iterator();
+    TupleIterator *iter = table->singletonIterator();
     TableTuple match(table->schema());
-    while (iter.next(match)) {
+    while (iter->next(match)) {
         if (predicate->eval(&match, NULL).isTrue()) {
             //::printf("  match:%s\n", match->debug(table).c_str());
             ++count;
@@ -333,9 +333,9 @@ TEST_F(FilterTest, ComplexFilter) {
     // ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     int count = 0;
-    TableIterator iter = table->iterator();
+    TupleIterator *iter = table->singletonIterator();
     TableTuple match(table->schema());
-    while (iter.next(match)) {
+    while (iter->next(match)) {
         if (predicate->eval(&match, NULL).isTrue()) {
             //::printf("  match:%s\n", match->debug(table).c_str());
             ++count;
@@ -378,9 +378,9 @@ TEST_F(FilterTest, SubstituteFilter) {
         // ::printf("\tRIGHT: %s\n", predicate->getRight()->debug().c_str());
 
         int count = 0;
-        TableIterator iter = table->iterator();
+        TupleIterator *iter = table->singletonIterator();
         TableTuple match(table->schema());
-        while (iter.next(match)) {
+        while (iter->next(match)) {
             if (predicate->eval(&match, NULL).isTrue()) {
                 ++count;
             }

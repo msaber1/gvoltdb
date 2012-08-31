@@ -403,7 +403,7 @@ typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key
         else if (cmp > 0) {
             x = x->left;
         }
-        else if (cmp == 0) {
+        else /*if (cmp == 0)*/ {
             retval = x;
             x = x->left;
         }
@@ -682,45 +682,51 @@ bool CompactingMap<Key, Data, Compare, hasRank>::isReachableNode(const TreeNode*
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
 inline int64_t CompactingMap<Key, Data, Compare, hasRank>::getSubct(const TreeNode* x) const {
-    if (x == &NIL) return 0;
-
-    if (x->subct == INVALIDCT)
-        return getSubct(x->left) + getSubct(x->right) + 1;
-    // return 32_t, cast it to 64_t automatically
-    else
+    if (x->subct != INVALIDCT) {
         return x->subct;
+    }
+    else if (x == &NIL) {
+        return 0;
+    }
+    else {
+        return getSubct(x->left) + getSubct(x->right) + 1;
+    }
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
 inline void CompactingMap<Key, Data, Compare, hasRank>::incSubct(TreeNode* x) {
-    if (x == &NIL)
-        return;
-    if (x->subct == INVALIDCT)
-        return;
-    if (x->subct == SUBCTMAX)
+    if (x->subct < SUBCTMAX) {
+        ++x->subct;
+    }
+    else {
+        // covers NIL and nodes that have or will now overflow
         x->subct = INVALIDCT;
-    else if (x->subct < SUBCTMAX)
-        x->subct++;
-
+    }
 }
+
 template<typename Key, typename Data, typename Compare, bool hasRank>
 inline void CompactingMap<Key, Data, Compare, hasRank>::decSubct(TreeNode* x) {
-    if (x == &NIL) return;
-    if (x->subct == INVALIDCT) {
-        updateSubct(x);
-    } else
-        x->subct--;
+    if (x->subct != INVALIDCT) {
+        --x->subct;
+    }
+    else {
+        if (x == &NIL) return;
+        else updateSubct(x);
+    }
 }
+
 template<typename Key, typename Data, typename Compare, bool hasRank>
 inline void CompactingMap<Key, Data, Compare, hasRank>::updateSubct(TreeNode* x) {
-    if (x == &NIL) return;
-
-    int64_t sumct = getSubct(x->left) + getSubct(x->right) + 1;
-    if (sumct <= SUBCTMAX)
-        // assign the lower 32 value to subct
-        x->subct = static_cast<NodeCount>(sumct);
-    else
-        x->subct = INVALIDCT;
+    if (x != &NIL) {
+        int64_t sumct = getSubct(x->left) + getSubct(x->right) + 1;
+        if (sumct <= SUBCTMAX) {
+            // assign the lower 32 value to subct
+            x->subct = static_cast<NodeCount>(sumct);
+        }
+        else {
+            x->subct = INVALIDCT;
+        }
+    }
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>

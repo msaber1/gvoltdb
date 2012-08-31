@@ -51,6 +51,16 @@
 #ifndef HSTOREAGGREGATEEXECUTOR_H
 #define HSTOREAGGREGATEEXECUTOR_H
 
+#include <algorithm>
+#include <exception>
+#include <limits>
+#include <set>
+#include <stdint.h>
+#include <utility>
+#include <vector>
+#include <cassert>
+#include <boost/unordered_map.hpp>
+
 #include "common/Pool.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/common.h"
@@ -65,18 +75,7 @@
 #include "plannodes/projectionnode.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
-
-#include "boost/unordered_map.hpp"
-
-#include <algorithm>
-#include <exception>
-#include <limits>
-#include <set>
-#include <stdint.h>
-#include <utility>
-#include <vector>
-#include <cassert>
+#include "storage/TupleIterator.h"
 
 namespace voltdb {
 
@@ -953,7 +952,7 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
         col_types[i] = expr->getValueType();
     }
 
-    TableIterator it = input_table->iterator();
+    TupleIterator *it = input_table->singletonIterator();
 
     const std::vector<bool> distinctAggs =
         node->getDistinctAggregates();
@@ -973,7 +972,7 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
                                          groupByExpressions, &col_types);
 
     VOLT_TRACE("looping..");
-    for (TableTuple cur(input_table->schema()); it.next(cur);
+    for (TableTuple cur(input_table->schema()); it->next(cur);
          prev.move(cur.address()))
     {
         if (!aggregator.nextTuple( cur, prev))

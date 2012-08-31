@@ -67,9 +67,9 @@ namespace voltdb {
             }
         }
     }
-    
+
     IndexTableUndoDeleteAction::~IndexTableUndoDeleteAction() {
         // TODO Auto-generated destructor stub
     }
-    
+
 }

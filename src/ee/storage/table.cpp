@@ -55,7 +55,7 @@
 #include "common/Pool.hpp"
 #include "common/FatalException.hpp"
 #include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
+#include "storage/TupleIterator.h"
 #include "storage/persistenttable.h"
 
 using std::string;
@@ -205,13 +205,13 @@ std::string Table::debug() {
     buffer << "===========================================================\n";
     buffer << "\tDATA\n";
 
-    TableIterator iter = iterator();
+    TupleIterator *iter = singletonIterator();
     TableTuple tuple(m_schema);
-    if (this->activeTupleCount() == 0) {
+    if (activeTupleCount() == 0) {
         buffer << "\t<NONE>\n";
     } else {
         std::string lastTuple = "";
-        while (iter.next(tuple)) {
+        while (iter->next(tuple)) {
             if (tuple.isActive()) {
                 buffer << "\t" << tuple.debug(this->name().c_str()) << "\n";
             }
@@ -321,9 +321,9 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
     // active tuple counts
     serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
     int64_t written_count = 0;
-    TableIterator titer = iterator();
+    TupleIterator *titer = singletonIterator();
     TableTuple tuple(m_schema);
-    while (titer.next(tuple)) {
+    while (titer->next(tuple)) {
         tuple.serializeTo(serialize_io);
         ++written_count;
     }
@@ -380,12 +380,12 @@ bool Table::equals(voltdb::Table *other) {
     const voltdb::TupleSchema *otherSchema = other->schema();
     if ((!m_schema->equals(otherSchema))) return false;
 
-    voltdb::TableIterator firstTI = iterator();
-    voltdb::TableIterator secondTI = iterator();
+    voltdb::TupleIterator *firstTI = singletonIterator();
+    voltdb::TupleIterator *secondTI = other->singletonIterator();
     voltdb::TableTuple firstTuple(m_schema);
     voltdb::TableTuple secondTuple(otherSchema);
-    while(firstTI.next(firstTuple)) {
-        if (!(secondTI.next(secondTuple))) return false;
+    while(firstTI->next(firstTuple)) {
+        if (!(secondTI->next(secondTuple))) return false;
         if (!(firstTuple.equals(secondTuple))) return false;
     }
     return true;
