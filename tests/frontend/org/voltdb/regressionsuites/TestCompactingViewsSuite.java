@@ -32,11 +32,11 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestCompatictingViewsSuite extends RegressionSuite {
+public class TestCompactingViewsSuite extends RegressionSuite {
 
     static final Class<?>[] PROCEDURES = {};
 
-    public TestCompatictingViewsSuite(String name) {
+    public TestCompactingViewsSuite(String name) {
         super(name);
     }
 
@@ -96,13 +96,12 @@ public class TestCompatictingViewsSuite extends RegressionSuite {
         }
 
         // adding view duplicates for half of the rows
-        // this currently crashes due to a bug in updating tuplekey indices
-        /*System.out.printf("Inserting duplicates of half of the tuples (with unique primary keys)\n");
+        System.out.printf("Inserting duplicates of half of the tuples (with unique primary keys)\n");
         for (int i = MAX_ROWS + 1; i < (MAX_ROWS * 2); i += 2) {
             VoltTable table = client.callProcedure(insertName, i, String.valueOf(i / 2),
                     filler, filler, filler, filler, filler, filler, filler, filler).getResults()[0];
             assertEquals(1, table.asScalarLong());
-        }*/
+        }
 
         // delete all of the rows again, but in three passes to trigger more compaction
         System.out.printf("Deleting all %d rows\n", MAX_ROWS);
@@ -114,21 +113,25 @@ public class TestCompatictingViewsSuite extends RegressionSuite {
             VoltTable table = client.callProcedure(deleteName, i).getResults()[0];
             assertEquals(1, table.asScalarLong());
         }
-        // this goes with the commented out code above
-        /*for (int i = MAX_ROWS + 1; i < (MAX_ROWS * 2); i += 2) {
+        for (int i = MAX_ROWS + 1; i < (MAX_ROWS * 2); i += 2) {
             VoltTable table = client.callProcedure(deleteName, i).getResults()[0];
             assertEquals(1, table.asScalarLong());
-        }*/
+        }
     }
 
     public void testPartitionedCompactingViews() throws Exception {
+        // hard to test compaction in valgrind via java (at the moment)
+        if (isValgrind()) {
+            return;
+        }
+
         runCompactingViewsForTable("PP.insert", "PP.delete", "selectPP");
         runCompactingViewsForTable("PR.insert", "deletePR", "selectPR");
     }
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCompatictingViewsSuite.class);
+        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCompactingViewsSuite.class);
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
 
@@ -141,7 +144,7 @@ public class TestCompatictingViewsSuite extends RegressionSuite {
                     "PRIMARY KEY (id)); "
             );
             project.addLiteralSchema(
-                    "CREATE UNIQUE INDEX FOO ON PP (value, e1, e2, e3, e4, e5, e6, e7, e8);"
+                    "CREATE INDEX FOO ON PP (value, e1, e2, e3, e4, e5, e6, e7, e8);"
             );
             project.addLiteralSchema(
                     "CREATE VIEW VP(value, e1, e2, e3, e4, e5, e6, e7, e8, c) " +
@@ -170,24 +173,11 @@ public class TestCompatictingViewsSuite extends RegressionSuite {
             fail(error.getMessage());
         }
 
-        // JNI
+        // JNI local with 1 site
         config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);
-
-        // CLUSTER
-        /*config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean t2 = config.compile(project);
-        assertTrue(t2);
-        builder.addServerConfig(config);
-
-        // IV2 CLUSTER
-        config = new LocalCluster("sqltypes-iv2cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
-                false, true); // LocalCluster constructor to enable IV2.  We have to drag along the isRejoinTest arg
-        boolean t3 = config.compile(project);
-        assertTrue(t3);
-        builder.addServerConfig(config);*/
 
         return builder;
     }
