@@ -157,7 +157,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
 bool IndexCountExecutor::p_execute(const NValueArray &params)
 {
     assert(m_node);
-    assert(m_node == dynamic_cast<IndexCountPlanNode*>(m_abstractNode));
+    assert(m_node == dynamic_cast<IndexCountPlanNode*>(getPlanNode()));
     assert(m_outputTable);
     assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
     assert(m_targetTable);
