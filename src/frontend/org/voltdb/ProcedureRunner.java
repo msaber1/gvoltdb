@@ -206,7 +206,7 @@ public class ProcedureRunner {
             }
 
             if (paramList.length != m_paramTypes.length) {
-                m_statsCollector.endProcedure( false, true);
+                m_statsCollector.endProcedure(false, true, null, null);
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
                 status = ClientResponse.GRACEFUL_FAILURE;
@@ -223,7 +223,7 @@ public class ProcedureRunner {
                             m_paramTypeComponentType[i],
                             paramList[i]);
                 } catch (Exception e) {
-                    m_statsCollector.endProcedure( false, true);
+                    m_statsCollector.endProcedure(false, true, null, null);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
                             ": " + e.getMessage();
                     status = ClientResponse.GRACEFUL_FAILURE;
@@ -258,7 +258,7 @@ public class ProcedureRunner {
                         error = true;
                     }
                     if (ex instanceof Error) {
-                        m_statsCollector.endProcedure( false, true);
+                        m_statsCollector.endProcedure(false, true, null, null);
                         throw (Error)ex;
                     }
 
@@ -291,7 +291,10 @@ public class ProcedureRunner {
                 }
             }
 
-            m_statsCollector.endProcedure( abort, error);
+            // Record statistics for procedure call.
+            StoredProcedureInvocation invoc = (m_txnState != null ? m_txnState.getInvocation() : null);
+            ParameterSet paramSet = (invoc != null ? invoc.getParams() : null);
+            m_statsCollector.endProcedure(abort, error, results, paramSet);
 
             // don't leave empty handed
             if (results == null)
@@ -350,8 +353,7 @@ public class ProcedureRunner {
     }
 
     public Date getTransactionTime() {
-        long ts = TransactionIdManager.getTimestampFromTransactionId(getTransactionId());
-        return new Date(ts);
+        return new Date(m_txnState.timestamp);
     }
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
@@ -362,6 +364,10 @@ public class ProcedureRunner {
         queuedSQL.expectation = expectation;
         queuedSQL.params = getCleanParams(stmt, args);
         queuedSQL.stmt = stmt;
+        // log SQL run by all adhocs
+        if (stmt.plan != null) {
+            getTxnState().appendAdHocSQL(stmt.sqlText);
+        }
         m_batch.add(queuedSQL);
     }
 
@@ -955,15 +961,20 @@ public class ProcedureRunner {
            m_localTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                  siteId,
                                                  m_txnState.txnId,
+                                                 m_txnState.timestamp,
                                                  m_txnState.isReadOnly(),
-                                                 false);
+                                                 false,
+                                                 txnState.isForReplay());
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                        siteId,
                                                        m_txnState.txnId,
+                                                       m_txnState.timestamp,
                                                        m_txnState.isReadOnly(),
-                                                       finalTask);
+                                                       finalTask,
+                                                       txnState.isForReplay());
+
        }
 
        /*

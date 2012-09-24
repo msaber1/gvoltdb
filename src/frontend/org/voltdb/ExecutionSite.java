@@ -109,6 +109,8 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
+import com.google.common.collect.ImmutableMap;
+
 /**
  * The main executor of transactional work in the system. Controls running
  * stored procedures and manages the execution engine's running of plan
@@ -219,6 +221,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         @Override
         public CountDownLatch snapshotCompleted(String nonce,
                                                 long txnId,
+                                                long partitionTxnIds[],
                                                 boolean truncationSnapshot) {
             if (m_rejoinSnapshotTxnId != -1) {
                 if (m_rejoinSnapshotTxnId == txnId) {
@@ -731,14 +734,22 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public Database getDatabase()                           { return m_context.database; }
         @Override
         public Cluster getCluster()                             { return m_context.cluster; }
+
+        /*
+         * Pre-iv2 the transaction id and sp handle are absolutely always the same.
+         * This is because there is a global order. In IV2 there is no global order
+         * so there is a per partition order/txn-id called SpHandle which may/may not
+         * be the same as the txn-id for a given transaction. If the transaction
+         * is multi-part then the txnid and SpHandle will not be the same.
+         */
         @Override
-        public long getLastCommittedTxnId()                     { return lastCommittedTxnId; }
+        public long getLastCommittedSpHandle()                     { return lastCommittedTxnId; }
         @Override
         public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
         public long getNextUndo()                               { return getNextUndoToken(); }
         @Override
-        public HashMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
+        public ImmutableMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
         @Override
         public long getSiteId()                                 { return m_siteId; }
         @Override
@@ -817,7 +828,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
-                  String serializedCatalog,
+                  String serializedCatalogIn,
                   RestrictedPriorityQueue transactionQueue,
                   ProcedureRunnerFactory runnerFactory,
                   boolean recovering,
@@ -858,6 +869,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             ee = new MockExecutionEngine();
         }
         else {
+            String serializedCatalog = serializedCatalogIn;
             if (serializedCatalog == null) {
                 serializedCatalog = voltdb.getCatalogContext().catalog.serialize();
             }
@@ -1343,11 +1355,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
          * snapshot request, or it may fail.
          */
         SnapshotResponseHandler handler = new SnapshotResponseHandler() {
+            @SuppressWarnings("static-access")
             @Override
             public void handleResponse(ClientResponse resp) {
                 if (resp == null) {
                     VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot",
                                             false, null);
+                    // Prevent potential null warnings below.
+                    return;
                 } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
                     VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: " +
                             resp.getStatusString(), false, null);
@@ -1473,7 +1488,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
             if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
-                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
+                    String adhocParam = null;
+                    if (invocation.procName.startsWith("@AdHoc")) {
+                        adhocParam = txnState.getBatchFormattedAdHocSQLString();
+                    }
+                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId,
+                                                                   invocation,
+                                                                   txnState.getResults(),
+                                                                   adhocParam);
                 }
             }
 
@@ -1759,6 +1781,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       SnapshotFormat.NATIVE,
                                       (byte) 0x1,
                                       snapshotMsg.m_roadblockTransactionId,
+                                      Long.MIN_VALUE,
+                                      new long[0],//this param not used pre-iv2
                                       null,
                                       m_systemProcedureContext,
                                       CoreUtils.getHostnameOrAddress());
@@ -2058,12 +2082,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         + CoreUtils.hsIdCollectionToString(newFailedSiteIds));
                 return false;
             }
-
-            hostLog.info("Received failure message from " + CoreUtils.hsIdToString(fm.m_sourceHSId) +
-                    " for failed sites " +
-                    CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
-                    CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
-                    " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
+            // Won't be non-null here, but prevent Eclipse warnings by testing.
+            if (fm != null) {
+                hostLog.info("Received failure message from " + CoreUtils.hsIdToString(fm.m_sourceHSId) +
+                        " for failed sites " +
+                        CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
+                        CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
+                        " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
+            }
         } while(!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, false));
 
         return true;
@@ -2711,6 +2737,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     // this can't be null, initiate task must have an invocation
                     if (invocation == null) {
                         VoltDB.crashLocalVoltDB("Initiate task " + txnId + " missing invocation", false, null);
+                        // Prevent potential null warnings below.
+                        return null;
                     }
                     if ((invocation.getType() == ProcedureInvocationType.REPLICATED)) {
                         txnId = invocation.getOriginalTxnId();
@@ -2821,7 +2849,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     // do-nothing implementation of IV2 SiteProcedeConnection API
     @Override
-    public void truncateUndoLog(boolean rollback, long token, long txnId) {
+    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle) {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
 
@@ -2891,5 +2919,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     @Override
     public void setRejoinComplete() {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
+    }
+
+    @Override
+    public ProcedureRunner getProcedureRunner(String procedureName) {
+        throw new RuntimeException("getProcedureRunner is an IV2-only interface.");
+    }
+
+    @Override
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
+        //A noop pre-IV2
     }
 }

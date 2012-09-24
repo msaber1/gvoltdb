@@ -46,14 +46,13 @@
 #ifndef HSTOREINDEXSCANEXECUTOR_H
 #define HSTOREINDEXSCANEXECUTOR_H
 
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
+
+#include "common/tabletuple.h"
 
 #include "boost/shared_array.hpp"
 #include "boost/scoped_ptr.hpp"
-#include <set>
-#include <memory>
+//#include <memory>
 
 namespace voltdb {
 
@@ -81,13 +80,15 @@ public:
     IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode);
     ~IndexScanExecutor();
 
+    // methods made public for use by NestLoopIndexJoinExecutor
+    void p_pre_execute_pull(const NValueArray& params);
+    TableTuple p_next_pull();
+    void set_expressions_pull(const NValueArray &params);
+    void set_search_key_pull(const TableTuple* other);
     static bool handleExceptionalSearchKeyValue(SQLException& e, const NValue& candidateValue,
                                                 bool isPrefixKey, int& activeNumOfSearchKeys,
                                                 IndexLookupType& localLookupType,
                                                 SortDirectionType& localSortDirection);
-
-    void set_search_key_pull(const TableTuple* other);
-    void set_expressions_pull(const NValueArray &params);
 
 private:
     bool support_pull() const;
@@ -96,6 +97,7 @@ private:
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
+private:
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
@@ -120,11 +122,6 @@ private:
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;
 
-    // Inline Limit
-    LimitPlanNode* m_limitNode;
-    int m_limitSize;
-    int m_limitOffset;
-
     // IndexScan Information
     TempTable* m_outputTable;
     PersistentTable* m_targetTable;
@@ -142,11 +139,6 @@ private:
         m_searchKeyBeforeSubstituteArrayPtr;
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
-
-private:
-
-    TableTuple p_next_pull();
-    void p_pre_execute_pull(const NValueArray& params);
 
     boost::scoped_ptr<detail::IndexScanExecutorState> m_state;
 };

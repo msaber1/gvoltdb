@@ -63,8 +63,8 @@
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
-
 namespace voltdb {
+
 namespace detail {
 
     struct IndexScanExecutorState
@@ -98,7 +98,7 @@ IndexScanExecutor::IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abs
     m_searchKey(), m_searchKeyBeforeSubstituteArray(NULL),
     m_needsSubstituteProject(NULL), m_needsSubstituteSearchKey(NULL),
     m_needsSubstitutePostExpression(false), m_needsSubstituteEndExpression(false),
-    m_lookupType(), m_sortDirection(), m_limitNode (NULL), m_limitSize(0), m_limitOffset(0),
+    m_lookupType(), m_sortDirection(),
     m_outputTable(NULL), m_targetTable(NULL), m_index(NULL), m_dummy(), m_tuple(),
     m_needsSubstituteSearchKeyPtr(), m_needsSubstituteProjectPtr(), m_projectionAllTupleArrayPtr(),
     m_searchKeyBeforeSubstituteArrayPtr(), m_searchKeyBackingStore(NULL),
@@ -112,7 +112,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     VOLT_TRACE("init IndexScan Executor");
 
     m_projectionNode = NULL;
-    m_limitNode = NULL;
 
     m_node = dynamic_cast<IndexScanPlanNode*>(abstractNode);
     assert(m_node);
@@ -169,16 +168,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
             m_projectionExpressions[ctr] =
               m_projectionNode->getOutputColumnExpressions()[ctr];
         }
-    }
-
-    //
-    // INLINE LIMIT
-    //
-    if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT) != NULL)
-    {
-        m_limitNode =
-            static_cast<LimitPlanNode*>
-            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
     }
 
     //
@@ -361,11 +350,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // INLINE LIMIT
     //
-    if (m_limitNode != NULL)
-    {
-        m_limitNode->getLimitAndOffsetByReference(params, m_limitSize, m_limitOffset);
-    }
-
+    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(getPlanNode()->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
     //
     // SEARCH KEY
@@ -420,9 +405,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
 
-    int tuples_written = 0;
-    int tuples_skipped = 0;     // for offset
-
     //
     // An index scan has three parts:
     //  (1) Lookup tuples using the search key
@@ -471,14 +453,22 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         m_index->moveToEnd(true);
     }
 
+    int tuple_ctr = 0;
+    int tuples_skipped = 0;     // for offset
+    int limit = -1;
+    int offset = -1;
+    if (limit_node != NULL) {
+        limit_node->getLimitAndOffsetByReference(params, limit, offset);
+    }
+
     //
     // We have to different nextValue() methods for different lookup types
     //
-    while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-            !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
+    while ((limit == -1 || tuple_ctr < limit) &&
+           ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
+             !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
            ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
-            !(m_tuple = m_index->nextValue()).isNullTuple()))
-    {
+            !(m_tuple = m_index->nextValue()).isNullTuple()))) {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
         //
         // First check whether the end_expression is now false
@@ -498,11 +488,12 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             //
             // INLINE OFFSET
             //
-            if (m_limitNode != NULL && tuples_skipped < m_limitOffset)
+            if (tuples_skipped < offset)
             {
                 tuples_skipped++;
                 continue;
             }
+            tuple_ctr++;
 
             if (m_projectionNode != NULL)
             {
@@ -525,7 +516,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                     }
                 }
                 m_outputTable->insertTupleNonVirtual(temp_tuple);
-                tuples_written++;
             }
             else
                 //
@@ -536,15 +526,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                 // Try to put the tuple into our output table
                 //
                 m_outputTable->insertTupleNonVirtual(m_tuple);
-                tuples_written++;
-            }
-
-            //
-            // INLINE LIMIT
-            //
-            if (m_limitNode != NULL && tuples_written >= m_limitSize)
-            {
-                break;
             }
         }
     }

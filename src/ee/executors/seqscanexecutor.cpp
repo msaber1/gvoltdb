@@ -189,12 +189,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     // OPTIMIZATION: NESTED LIMIT
     // How nice! We can also cut off our scanning with a nested limit!
     //
-    int limit = -1;
-    int offset = -1;
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
-    if (limit_node != NULL) {
-        limit_node->getLimitAndOffsetByReference(params, limit, offset);
-    }
 
     //
     // OPTIMIZATION:
@@ -225,9 +220,15 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                        predicate->debug(true).c_str());
         }
 
+        int limit = -1;
+        int offset = -1;
+        if (limit_node) {
+            limit_node->getLimitAndOffsetByReference(params, limit, offset);
+        }
+
         int tuple_ctr = 0;
         int tuple_skipped = 0;
-        while (iterator.next(tuple))
+        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
         {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(target_table->name()).c_str(), tuple_ctr,
@@ -242,6 +243,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     tuple_skipped++;
                     continue;
                 }
+                ++tuple_ctr;
 
                 //
                 // Nested Projection
@@ -278,11 +280,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                                    output_table->name().c_str());
                         return false;
                     }
-                }
-                ++tuple_ctr;
-                // Check whether we have gone past our limit
-                if (limit >= 0 && tuple_ctr >= limit) {
-                    break;
                 }
             }
         }
