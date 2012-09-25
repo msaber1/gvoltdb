@@ -43,22 +43,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
-#include <stdexcept>
 #include "limitnode.h"
-#include "common/serializeio.h"
+
+#include <sstream>
+
+#include "common/SQLException.h"
 #include "common/ValuePeeker.hpp"
-#include "common/FatalException.hpp"
-#include "storage/table.h"
 
 namespace voltdb {
 
 LimitPlanNode::~LimitPlanNode() {
     delete limitExpression;
-    if (!isInline()) {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
 }
 
 /*

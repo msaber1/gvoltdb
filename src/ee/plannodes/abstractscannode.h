@@ -46,44 +46,26 @@
 #ifndef HSTORESCANNODE_H
 #define HSTORESCANNODE_H
 
-#include "abstractplannode.h"
+#include "abstracttableionode.h"
 #include "expressions/abstractexpression.h"
 
 namespace voltdb
 {
 
-class AbstractScanPlanNode : public AbstractPlanNode
+class AbstractScanPlanNode : public AbstractTableIOPlanNode
 {
 public:
     virtual ~AbstractScanPlanNode();
 
-    Table* getTargetTable() const;
-    void setTargetTable(Table* val);
-
-    std::string getTargetTableName() const;
-    void setTargetTableName(std::string name);
-
-    void setPredicate(AbstractExpression* predicate);
-    AbstractExpression* getPredicate() const;
+    AbstractExpression* getPredicate() const { return m_predicate; }
 
     virtual std::string debugInfo(const std::string& spacer) const;
 
 protected:
+    AbstractScanPlanNode() : m_predicate(NULL) {}
     virtual void loadFromJSONObject(json_spirit::Object &obj);
-    AbstractScanPlanNode(int32_t id);
-    AbstractScanPlanNode();
 
-    // Target Table
-    // These tables are different from the input and the output tables
-    // The plannode can read in tuples from the input table(s) and
-    // apply them to the target table
-    // The results of the operations will be written to the the output table
-    //
-    std::string m_targetTableName;
-    Table* m_targetTable; // volatile
-    //
     // This is the predicate used to filter out tuples during the scan
-    //
     AbstractExpression* m_predicate;
 };
 

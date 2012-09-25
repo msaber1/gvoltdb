@@ -46,31 +46,24 @@
 #ifndef HSTOREINSERTNODE_H
 #define HSTOREINSERTNODE_H
 
-#include <sstream>
-#include "abstractoperationnode.h"
+#include "abstracttableionode.h"
 
 namespace voltdb {
 
 /**
  *
  */
-class InsertPlanNode : public AbstractOperationPlanNode {
-    public:
-        InsertPlanNode(CatalogId id) : AbstractOperationPlanNode(id) {
-            // Do nothing
-        }
-        InsertPlanNode() : AbstractOperationPlanNode() {
-            // Do nothing
-        }
+class InsertPlanNode : public AbstractTableIOPlanNode {
+public:
+    InsertPlanNode() : m_multiPartition(false) { }
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INSERT); }
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INSERT); }
+    bool isMultiPartition() { return m_multiPartition; }
 
-        bool isMultiPartition() { return m_multiPartition; }
+private:
+    virtual void loadFromJSONObject(json_spirit::Object &obj);
 
-    protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
-
-        bool m_multiPartition;
+    bool m_multiPartition;
 };
 
 }

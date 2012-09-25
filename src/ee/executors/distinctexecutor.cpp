@@ -49,50 +49,27 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "plannodes/distinctnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
+
 
 #include <set>
 #include <cassert>
 
 using namespace voltdb;
 
-bool DistinctExecutor::p_init(AbstractPlanNode*,
-                              TempTableLimits* limits)
+bool DistinctExecutor::p_init()
 {
     VOLT_DEBUG("init Distinct Executor");
-    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
-    assert(node);
-    //
-    // Create a duplicate of input table
-    //
-    if (!node->isInline()) {
-        assert(node->getInputTables().size() == 1);
-        assert(node->getInputTables()[0]->columnCount() > 0);
-        assert(node->getChildren()[0] != NULL);
-
-        node->
-            setOutputTable(TableFactory::
-                           getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
-                                              limits));
-    }
     return (true);
 }
 
 bool DistinctExecutor::p_execute(const NValueArray &params) {
     DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
     assert(node);
-    Table* output_table = node->getOutputTable();
-    assert(output_table);
-    Table* input_table = node->getInputTables()[0];
-    assert(input_table);
 
-    TableIterator iterator = input_table->iterator();
-    TableTuple tuple(input_table->schema());
+    TableIterator iterator = m_inputTable->iterator();
+    TableTuple tuple(m_inputTable->schema());
 
     // substitute params for distinct expression
     AbstractExpression *distinctExpression = node->getDistinctExpression();
@@ -106,11 +83,11 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
         NValue tuple_value = distinctExpression->eval(&tuple, NULL);
         if (found_values.find(tuple_value) == found_values.end()) {
             found_values.insert(tuple_value);
-            if (!output_table->insertTuple(tuple)) {
+            if (!m_outputTable->insertTuple(tuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                            " output table '%s'",
-                           input_table->name().c_str(),
-                           output_table->name().c_str());
+                           m_inputTable->name().c_str(),
+                           m_outputTable->name().c_str());
                 return false;
             }
         }

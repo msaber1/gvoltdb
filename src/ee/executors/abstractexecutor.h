@@ -62,8 +62,17 @@ class AbstractExecutor {
   public:
     virtual ~AbstractExecutor();
 
+    /**
+     * Set/get the plannode that generated this executor.
+     */
+    void initPlanNode(AbstractPlanNode* abstractNode) { m_abstractNode = abstractNode; }
+    inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
+
+    // By default, executors don't need to be engine-aware, but a few do.
+    virtual bool initEngine(VoltDBEngine* engine) { return true; }
+
     /** Executors are initialized once when the catalog is loaded */
-    bool init(VoltDBEngine*, TempTableLimits* limits);
+    bool init(TempTableLimits* limits);
 
     /** Invoke a plannode's associated executor */
     bool execute(const NValueArray& params);
@@ -76,51 +85,50 @@ class AbstractExecutor {
      */
     virtual bool needsPostExecuteClear() { return false; }
 
-    /**
-     * Returns the plannode that generated this executor.
-     */
-    inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
+    //
+    // Output Table
+    // This is where we will write the results of the plan node's
+    // execution out to
+    //
+    Table *getOutputTable() const;
 
-  protected:
-    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
-        m_abstractNode = abstractNode;
-        m_tmpOutputTable = NULL;
-    }
+protected:
+    AbstractExecutor() :
+        m_abstractNode(NULL),
+        m_inputTable(NULL),
+        m_outputTable(NULL),
+        m_inputTables()
+    {}
+
+    // By default, executors get a node-schema-based temp table named "temp".
+    // Exceptions include DML nodes, pass-through executors, and scans.
+    virtual void p_setOutputTable(TempTableLimits* limits) { setTempOutputTable(limits); }
 
     /** Concrete executor classes implement initialization in p_init() */
-    virtual bool p_init(AbstractPlanNode*,
-                        TempTableLimits* limits) = 0;
+    virtual bool p_init() = 0;
 
     /** Concrete executor classes impelmenet execution in p_execute() */
     virtual bool p_execute(const NValueArray& params) = 0;
 
     /**
-     * Returns true if the output table for the plannode must be
-     * cleared before p_execute().  <b>Default is true (clear each
-     * time)</b>. Override this method if the executor receives a
-     * plannode instance that must not be cleared.
-     * @return true if output table must be cleared; false otherwise.
-     */
-    virtual bool needsOutputTableClear() { return true; };
-
-    /**
      * Set up a multi-column temp output table for those executors that require one.
-     * Called from p_init.
+     * Called from p_setOutputTable.
      */
     void setTempOutputTable(TempTableLimits* limits, const std::string tempTableName="temp");
+    void setPassThroughTempOutputTable(TempTableLimits* limits);
 
-    /**
-     * Set up a single-column temp output table for DML executors that require one to return their counts.
-     * Called from p_init.
-     */
-    void setDMLCountOutputTable(TempTableLimits* limits);
+    const std::vector<Table*> &getInputTables();
 
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
-    TempTable* m_tmpOutputTable;
 
-    // cache to avoid runtime virtual function call
-    bool needs_outputtable_clear_cached;
+    // The input table may be NULL OR the one and only OR the first of many input tables
+    // which are the cached output tables from m_abstractNode->m_child[i]->m_executor->m_outputTable
+    Table* m_inputTable;
+    Table* m_outputTable; // either a TempTable or, for some seqscans, m_abstractNode->m_targetTable
+
+private:
+    std::vector<Table*> m_inputTables;
 };
 
 inline bool AbstractExecutor::execute(const NValueArray& params)
@@ -129,21 +137,29 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     VOLT_TRACE("Starting execution of plannode(id=%d)...",
                m_abstractNode->getPlanNodeId());
 
-    if (m_tmpOutputTable)
+    if (dynamic_cast<TempTable*>(m_outputTable))
     {
         VOLT_TRACE("Clearing output table...");
-        m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
-    }
-
-    // substitute params for output schema
-    for (int i = 0; i < m_abstractNode->getOutputSchema().size(); i++) {
-        m_abstractNode->getOutputSchema()[i]->getExpression()->substitute(params);
+        dynamic_cast<TempTable*>(m_outputTable)->TempTable::deleteAllTuples(false);
     }
 
     // run the executor
     return p_execute(params);
 }
 
-}
+class AbstractTableIOExecutor : public AbstractExecutor {
+protected:
+    bool initEngine(VoltDBEngine* engine);
 
+    /** reference to the engine/context to store the number of modified tuples, etc. */
+    VoltDBEngine* m_engine;
+    Table* m_targetTable;
+};
+
+class AbstractOperationExecutor : public AbstractTableIOExecutor {
+private:
+    virtual void p_setOutputTable(TempTableLimits* limits);
+};
+
+}
 #endif

@@ -43,17 +43,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdio>
-#include <sstream>
-#include <stdexcept>
 #include "updatenode.h"
-#include "common/serializeio.h"
-#include "common/FatalException.hpp"
+
+#include "common/SerializableEEException.h"
 
 namespace voltdb {
 
 void UpdatePlanNode::loadFromJSONObject(json_spirit::Object &obj) {
-    AbstractOperationPlanNode::loadFromJSONObject(obj);
+    AbstractTableIOPlanNode::loadFromJSONObject(obj);
     json_spirit::Value updatesIndexesValue = json_spirit::find_value( obj, "UPDATES_INDEXES");
     if (updatesIndexesValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

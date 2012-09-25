@@ -61,6 +61,7 @@
 namespace voltdb
 {
 class AbstractExecutor;
+class SchemaColumn;
 class Table;
 class TupleSchema;
 
@@ -94,18 +95,14 @@ public:
     // ------------------------------------------------------------------
     // DATA MEMBER METHODS
     // ------------------------------------------------------------------
-    int32_t getPlanNodeId() const;
+    int32_t getPlanNodeId() const { return m_planNodeId; }
 
     // currently a hack needed to initialize the executors.
     CatalogId databaseId() const { return 1; }
 
-    void setExecutor(AbstractExecutor* executor);
+    void initExecutor(AbstractExecutor* executor) { m_executor = executor; }
     inline AbstractExecutor* getExecutor() const { return m_executor; }
 
-    void setInputTables(const std::vector<Table*> &val);
-    std::vector<Table*>& getInputTables();
-
-    void setOutputTable(Table* val);
     Table *getOutputTable() const;
 
     //
@@ -155,8 +152,8 @@ public:
 
 protected:
     virtual void loadFromJSONObject(json_spirit::Object& obj) = 0;
-    AbstractPlanNode(int32_t plannode_id);
-    AbstractPlanNode();
+
+    AbstractPlanNode() : m_planNodeId(-1), m_executor(NULL), m_isInline(false) { }
 
     void setPlanNodeId(int32_t plannode_id);
 
@@ -164,17 +161,7 @@ protected:
     // Every PlanNode will have a unique id assigned to it at compile time
     //
     int32_t m_planNodeId;
-    //
-    // Output Table
-    // This is where we will write the results of the plan node's
-    // execution out to
-    //
-    Table* m_outputTable; // volatile
-    //
-    // Input Tables
-    // These tables are derived from the output of this node's children
-    //
-    std::vector<Table*> m_inputTables; // volatile
+
     //
     // A node can have multiple children and parents
     //

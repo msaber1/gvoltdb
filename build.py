@@ -218,14 +218,15 @@ CTX.INPUT['execution'] = """
  VoltDBEngine.cpp
 """
 
+# list executorutil.cpp before the alphabetical list to shake out header issues early
+# saving wasted compiles/recompiles for header changes.
 CTX.INPUT['executors'] = """
+ executorutil.cpp
  abstractexecutor.cpp
  deleteexecutor.cpp
  distinctexecutor.cpp
- executorutil.cpp
- indexscanexecutor.cpp
  indexcountexecutor.cpp
- tablecountexecutor.cpp
+ indexscanexecutor.cpp
  insertexecutor.cpp
  limitexecutor.cpp
  materializeexecutor.cpp
@@ -236,41 +237,44 @@ CTX.INPUT['executors'] = """
  receiveexecutor.cpp
  sendexecutor.cpp
  seqscanexecutor.cpp
+ tablecountexecutor.cpp
  unionexecutor.cpp
  updateexecutor.cpp
 """
 
+# list expressionutil.cpp before the alphabetical list to shake out header issues early
+# saving wasted compiles/recompiles for header changes.
 CTX.INPUT['expressions'] = """
- abstractexpression.cpp
  expressionutil.cpp
+ abstractexpression.cpp
  functionexpression.cpp
  tupleaddressexpression.cpp
 """
 
+# list plannodeutil.cpp before the alphabetical list to shake out header issues early
+# saving wasted compiles/recompiles for header changes.
 CTX.INPUT['plannodes'] = """
+ plannodeutil.cpp
  abstractjoinnode.cpp
- abstractoperationnode.cpp
  abstractplannode.cpp
  abstractscannode.cpp
+ abstracttableionode.cpp
  aggregatenode.cpp
  deletenode.cpp
  distinctnode.cpp
- indexscannode.cpp
  indexcountnode.cpp
- tablecountnode.cpp
+ indexscannode.cpp
  insertnode.cpp
  limitnode.cpp
  materializenode.cpp
- nestloopindexnode.cpp
- nestloopnode.cpp
  orderbynode.cpp
  plannodefragment.cpp
- plannodeutil.cpp
  projectionnode.cpp
  receivenode.cpp
  SchemaColumn.cpp
  sendnode.cpp
  seqscannode.cpp
+ tablecountnode.cpp
  unionnode.cpp
  updatenode.cpp
 """

@@ -54,11 +54,10 @@ namespace voltdb
 class AggregatePlanNode : public AbstractPlanNode
 {
 public:
-    AggregatePlanNode(CatalogId id);
-    AggregatePlanNode(PlanNodeType type);
+    AggregatePlanNode(PlanNodeType type) : m_type(type) { }
     ~AggregatePlanNode();
 
-    virtual PlanNodeType getPlanNodeType() const;
+    virtual PlanNodeType getPlanNodeType() const { return m_type; }
 
     std::vector<ExpressionType> getAggregates();
     const std::vector<ExpressionType> getAggregates() const;

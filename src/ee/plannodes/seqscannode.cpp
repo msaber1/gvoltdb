@@ -43,31 +43,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
 #include "seqscannode.h"
-#include "common/common.h"
+
 #include "expressions/abstractexpression.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
-
-/*
- * If the output table needs to be cleared then this SeqScanNode is for an executor that created
- * its own output table rather then forwarding a reference to the persistent table being scanned.
- * It still isn't necessarily safe to delete the output table since an inline projection node/executor
- * may have created the table so check if there is an inline projection node.
- *
- * This is a fragile approach to determining whether or not to delete the output table. Maybe
- * it is safer to have the inline nodes be deleted first and set the output table of the
- * enclosing plannode to NULL so the delete can be safely repeated.
- */
-SeqScanPlanNode::~SeqScanPlanNode() {
-    if (needsOutputTableClear())
-    {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
-}
 
 std::string SeqScanPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;

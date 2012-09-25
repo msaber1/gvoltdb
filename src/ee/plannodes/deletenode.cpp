@@ -43,27 +43,23 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdexcept>
-#include <sstream>
 #include "deletenode.h"
-#include "common/common.h"
-#include "common/serializeio.h"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
+
+#include "common/SerializableEEException.h"
 
 using namespace std;
 
 namespace voltdb {
 
 void DeletePlanNode::loadFromJSONObject(json_spirit::Object &obj) {
-    AbstractOperationPlanNode::loadFromJSONObject(obj);
+    AbstractTableIOPlanNode::loadFromJSONObject(obj);
     json_spirit::Value truncateValue = json_spirit::find_value( obj, "TRUNCATE");
     if (truncateValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "DeletePlanNode::loadFromJSONObject: "
                                       "Couldn't find TRUNCATE value");
     }
-    truncate = truncateValue.get_bool();
+    m_truncate = truncateValue.get_bool();
 }
 
 }

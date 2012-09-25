@@ -58,24 +58,14 @@ class SendPlanNode;
 class SendExecutor : public AbstractExecutor
 {
 public:
-    SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode)
-        : AbstractExecutor(engine, abstractNode)
-    {
-        m_inputTable = NULL;
-        m_engine = engine;
-    }
+    SendExecutor() {}
 
 protected:
-    bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+    bool initEngine(VoltDBEngine* engine) { m_engine = engine; return true; }
+    bool p_init();
     bool p_execute(const NValueArray &params);
 
-    // SendExecutors don't actually have output tables, so they
-    // don't require them to be cleared before executing
-    virtual bool needsOutputTableClear() { return false; };
-
 private:
-    Table* m_inputTable;
     VoltDBEngine *m_engine;
 };
 

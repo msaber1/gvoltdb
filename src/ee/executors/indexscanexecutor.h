@@ -52,10 +52,6 @@
 #include "boost/shared_array.hpp"
 
 namespace voltdb {
-
-class TempTable;
-class PersistentTable;
-
 class AbstractExpression;
 
 //
@@ -65,19 +61,22 @@ class IndexScanPlanNode;
 class ProjectionPlanNode;
 class LimitPlanNode;
 
-class IndexScanExecutor : public AbstractExecutor
+class IndexScanExecutor : public AbstractTableIOExecutor
 {
 public:
-    IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
-        : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL)
-    {
-        m_projectionExpressions = NULL;
-    }
+    IndexScanExecutor() :
+        m_projectionExpressions(NULL),
+        m_searchKeyBackingStore(NULL)
+    {}
     ~IndexScanExecutor();
 
 private:
-    bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+    // By default, executors get a node-schema-based temp table.
+    // Override so the temp table can be named after the base table
+    // Is this too trivial for the effort?
+    void p_setOutputTable(TempTableLimits* limits);
+
+    bool p_init();
     bool p_execute(const NValueArray &params);
 
     // Data in this class is arranged roughly in the order it is read for
@@ -96,10 +95,6 @@ private:
     TableTuple m_searchKey;
     // search_key_beforesubstitute_array_ptr[]
     AbstractExpression** m_searchKeyBeforeSubstituteArray;
-    bool* m_needsSubstituteProject; // needs_substitute_project_ptr[]
-    bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
-    bool m_needsSubstitutePostExpression;
-    bool m_needsSubstituteEndExpression;
 
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;
@@ -114,11 +109,8 @@ private:
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
-    boost::shared_array<bool> m_needsSubstituteSearchKeyPtr;
-    boost::shared_array<bool> m_needsSubstituteProjectPtr;
     boost::shared_array<int> m_projectionAllTupleArrayPtr;
-    boost::shared_array<AbstractExpression*>
-        m_searchKeyBeforeSubstituteArrayPtr;
+    boost::shared_array<AbstractExpression*> m_searchKeyBeforeSubstituteArrayPtr;
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
 };

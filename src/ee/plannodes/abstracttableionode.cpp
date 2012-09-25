@@ -43,33 +43,25 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "nestloopnode.h"
+#include "abstracttableionode.h"
 
-#include "storage/table.h"
-
+using namespace std;
 using namespace voltdb;
 
-NestLoopPlanNode::NestLoopPlanNode(CatalogId id)
-  : AbstractJoinPlanNode(id)
-{
-    // Do nothing
+
+string AbstractTableIOPlanNode::debugInfo(const string &spacer) const {
+    ostringstream buffer;
+    buffer << spacer << "TargetTable[" << m_targetTableName << "]\n";
+    return (buffer.str());
 }
 
-NestLoopPlanNode::NestLoopPlanNode()
-  : AbstractJoinPlanNode()
-{
-    // Do nothing
-}
-
-NestLoopPlanNode::~NestLoopPlanNode()
-{
-    // must delete the output table that was created in the
-    // executor (and stored here in the plannode).
-    delete getOutputTable();
-}
-
-PlanNodeType
-NestLoopPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_NESTLOOP;
+void AbstractTableIOPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
+    json_spirit::Value targetTableNameValue = json_spirit::find_value( obj, "TARGET_TABLE_NAME");
+    if (targetTableNameValue == json_spirit::Value::null) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AbstractOperationPlanNode::"
+                                      "loadFromJSONObject: "
+                                      "Couldn't find TARGET_TABLE_NAME value");
+    }
+    m_targetTableName = targetTableNameValue.get_str();
 }

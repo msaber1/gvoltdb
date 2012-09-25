@@ -159,16 +159,12 @@ namespace
     }
 }
 
-bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
-                              TempTableLimits* limits)
+bool NestLoopExecutor::p_init()
 {
     VOLT_TRACE("init NestLoop Executor");
 
-    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(abstract_node);
+    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
     assert(node);
-
-    // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
 
     // for each tuple value expression in the predicate, determine
     // which tuple is being represented. Tuple could come from outer
@@ -176,8 +172,8 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
     // eval() tuple parameter. By convention, eval's first parameter
     // will always be the outer table and its second parameter the inner
     bool retval = assignTupleValueIndexes(node->getPredicate(),
-                                          node->getInputTables()[0]->name(),
-                                          node->getInputTables()[1]->name());
+                                          getInputTables()[0]->name(),
+                                          getInputTables()[1]->name());
     return retval;
 }
 
@@ -187,19 +183,12 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
     assert(node);
-    assert(node->getInputTables().size() == 2);
+    assert(getInputTables().size() == 2);
 
-    Table* output_table_ptr = node->getOutputTable();
-    assert(output_table_ptr);
-
-    // output table must be a temp table
-    TempTable* output_table = dynamic_cast<TempTable*>(output_table_ptr);
-    assert(output_table);
-
-    Table* outer_table = node->getInputTables()[0];
+    Table* outer_table = getInputTables()[0];
     assert(outer_table);
 
-    Table* inner_table = node->getInputTables()[1];
+    Table* inner_table = getInputTables()[1];
     assert(inner_table);
 
     VOLT_TRACE ("input table left:\n %s", outer_table->debug().c_str());
@@ -217,9 +206,13 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
     int outer_cols = outer_table->columnCount();
     int inner_cols = inner_table->columnCount();
-    TableTuple outer_tuple(node->getInputTables()[0]->schema());
-    TableTuple inner_tuple(node->getInputTables()[1]->schema());
-    TableTuple &joined = output_table->tempTuple();
+    TableTuple outer_tuple(outer_table->schema());
+    TableTuple inner_tuple(inner_table->schema());
+    TableTuple &joined = m_outputTable->tempTuple();
+
+    // output must be a temp table
+    TempTable* output_table = dynamic_cast<TempTable*>(m_outputTable);
+    assert(output_table);
 
     TableIterator iterator0 = outer_table->iterator();
     while (iterator0.next(outer_tuple)) {
@@ -238,7 +231,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                 for (int col_ctr = 0; col_ctr < inner_cols; col_ctr++) {
                     joined.setNValue(col_ctr + outer_cols, inner_tuple.getNValue(col_ctr));
                 }
-                output_table->insertTupleNonVirtual(joined);
+                output_table->TempTable::insertTuple(joined);
             }
         }
     }

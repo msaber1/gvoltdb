@@ -51,19 +51,14 @@
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
-
-class UndoLog;
-class ReadWriteSet;
-
 /**
  *
  */
 class NestLoopExecutor : public AbstractExecutor {
     public:
-        NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) { }
+        NestLoopExecutor() {}
     protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
+        bool p_init();
         bool p_execute(const NValueArray &params);
 };
 

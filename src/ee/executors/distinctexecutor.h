@@ -52,24 +52,16 @@
 #include "plannodes/distinctnode.h"
 
 namespace voltdb {
-
-class UndoLog;
-class ReadWriteSet;
-
 class DistinctExecutor : public AbstractExecutor
 {
 public:
-    DistinctExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
-    {
-        this->distinct_column_type = VALUE_TYPE_INVALID;
-    }
+    DistinctExecutor() : distinct_column_type(VALUE_TYPE_INVALID) {}
 
     ~DistinctExecutor();
 
-protected:
-    bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+private:
+    virtual void p_setOutputTable(TempTableLimits* limits) { setPassThroughTempOutputTable(limits); }
+    bool p_init();
     bool p_execute(const NValueArray &params);
 
     ValueType distinct_column_type;

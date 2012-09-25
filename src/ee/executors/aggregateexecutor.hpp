@@ -383,14 +383,11 @@ template<PlanNodeType aggregateType>
 class AggregateExecutor : public AbstractExecutor
 {
 public:
-    AggregateExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AbstractExecutor(engine, abstract_node), m_groupByKeySchema(NULL)
-    { };
+    AggregateExecutor() : m_groupByKeySchema(NULL) { }
     ~AggregateExecutor();
 
 protected:
-    bool p_init(AbstractPlanNode* abstract_node,
-                TempTableLimits* limits);
+    bool p_init();
     bool p_execute(const NValueArray &params);
 
     /*
@@ -844,14 +841,12 @@ private:
 
 template<PlanNodeType aggregateType>
 bool
-AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
-                                         TempTableLimits* limits)
+AggregateExecutor<aggregateType>::p_init()
 {
-    AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(abstract_node);
+    AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
     assert(node);
-    assert(limits);
 
-    assert(node->getInputTables().size() == 1);
+    assert(getInputTables().size() == 1);
 
     assert(node->getChildren()[0] != NULL);
     for (int i = 0; i < node->getAggregateInputExpressions().size(); i++)
@@ -892,8 +887,6 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
         }
     }
 
-    setTempOutputTable(limits);
-
     std::vector<ValueType> groupByColumnTypes;
     std::vector<int32_t> groupByColumnSizes;
     std::vector<bool> groupByColumnAllowNull;
@@ -923,11 +916,14 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
     VOLT_DEBUG("started AGGREGATE");
     AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
     assert(node);
-    Table* output_table = node->getOutputTable();
-    assert(output_table);
-    Table* input_table = node->getInputTables()[0];
-    assert(input_table);
-    VOLT_TRACE("input table\n%s", input_table->debug().c_str());
+    assert(m_outputTable);
+    VOLT_TRACE("input table\n%s", m_inputTable->debug().c_str());
+
+    // substitute params in output expressions
+    const std::vector<SchemaColumn*>& outputs = m_abstractNode->getOutputSchema();
+    for (int i = 0; i < outputs.size(); i++) {
+        outputs[i]->getExpression()->substitute(params);
+    }
 
     std::vector<ExpressionType> agg_types = node->getAggregates();
     std::vector<ValueType> col_types(node->getAggregateInputExpressions().size());
@@ -939,7 +935,7 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
         col_types[i] = expr->getValueType();
     }
 
-    TableIterator it = input_table->iterator();
+    TableIterator it = m_inputTable->iterator();
 
     const std::vector<bool> distinctAggs =
         node->getDistinctAggregates();
@@ -950,16 +946,16 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
         groupByExpressions[i]->substitute(params);
     }
 
-    TableTuple prev(input_table->schema());
+    TableTuple prev(m_inputTable->schema());
 
     Aggregator<aggregateType> aggregator(&m_memoryPool, m_groupByKeySchema,
                                          node, &m_passThroughColumns,
-                                         input_table, output_table,
+                                         m_inputTable, m_outputTable,
                                          &agg_types, distinctAggs,
                                          groupByExpressions, &col_types);
 
     VOLT_TRACE("looping..");
-    for (TableTuple cur(input_table->schema()); it.next(cur);
+    for (TableTuple cur(m_inputTable->schema()); it.next(cur);
          prev.move(cur.address()))
     {
         if (!aggregator.nextTuple( cur, prev))
@@ -972,7 +968,7 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
         return false;
 
     VOLT_TRACE("finished");
-    VOLT_TRACE("output table\n%s", output_table->debug().c_str());
+    VOLT_TRACE("output table\n%s", m_outputTable->debug().c_str());
 
     return true;
 }

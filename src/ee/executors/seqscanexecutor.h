@@ -52,20 +52,20 @@
 
 namespace voltdb
 {
-    class UndoLog;
-    class ReadWriteSet;
 
-    class SeqScanExecutor : public AbstractExecutor {
-    public:
-        SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-        {}
-    protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray& params);
-        bool needsOutputTableClear();
-    };
+class SeqScanExecutor : public AbstractTableIOExecutor {
+public:
+    SeqScanExecutor() {}
+private:
+    // By default, executors get a node-schema-based temp output table.
+    // Override so the temp table can be named after the base table,
+    // or in some simple cases, so the target table can be used directly as the output table.
+    void p_setOutputTable(TempTableLimits* limits);
+
+    bool p_init();
+    bool p_execute(const NValueArray& params);
+};
+
 }
 
 #endif

@@ -48,38 +48,17 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
+
 
 using namespace voltdb;
 
 bool
-LimitExecutor::p_init(AbstractPlanNode* abstract_node,
-                      TempTableLimits* limits)
+LimitExecutor::p_init()
 {
     VOLT_TRACE("init limit Executor");
-
-    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(abstract_node);
-    assert(node);
-
-    //
-    // Skip if we are inline
-    //
-    if (!node->isInline())
-    {
-        //
-        // Just copy the table schema of our input table
-        //
-        assert(node->getInputTables().size() == 1);
-        node->
-            setOutputTable(TableFactory::
-                           getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
-                                              limits));
-    }
+    assert(dynamic_cast<LimitPlanNode*>(m_abstractNode));
     return true;
 }
 
@@ -88,17 +67,14 @@ LimitExecutor::p_execute(const NValueArray &params)
 {
     LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
     assert(node);
-    Table* output_table = node->getOutputTable();
-    assert(output_table);
-    Table* input_table = node->getInputTables()[0];
-    assert(input_table);
+    assert(m_inputTable);
 
     //
     // Grab the iterator for our input table, and loop through until
     // we have copy enough tuples for the limit specified by the node
     //
-    TableTuple tuple(input_table->schema());
-    TableIterator iterator = input_table->iterator();
+    TableTuple tuple(m_inputTable->schema());
+    TableIterator iterator = m_inputTable->iterator();
 
     int tuple_ctr = 0;
     int tuples_skipped = 0;
@@ -116,12 +92,12 @@ LimitExecutor::p_execute(const NValueArray &params)
         }
         tuple_ctr++;
 
-        if (!output_table->insertTuple(tuple))
+        if (!m_outputTable->insertTuple(tuple))
         {
             VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                        " output table '%s'",
-                       input_table->name().c_str(),
-                       output_table->name().c_str());
+                       m_inputTable->name().c_str(),
+                       m_outputTable->name().c_str());
             return false;
         }
     }

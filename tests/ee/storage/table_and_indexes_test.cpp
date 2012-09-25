@@ -297,7 +297,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(8, ValueFactory::getDoubleValue(static_cast<double>(.0825)));
     temp_tuple->setNValue(9, ValueFactory::getDoubleValue(static_cast<double>(15241.45)));
     temp_tuple->setNValue(10, ValueFactory::getIntegerValue(static_cast<int32_t>(21)));
-    districtTempTable->insertTupleNonVirtual(*temp_tuple);
+    districtTempTable->TempTable::insertTuple(*temp_tuple);
 
     temp_tuple = &warehouseTempTable->tempTuple();
     temp_tuple->setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(3)));
@@ -315,7 +315,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(6, cachedStringValues.back());
     temp_tuple->setNValue(7, ValueFactory::getDoubleValue(static_cast<double>(.1234)));
     temp_tuple->setNValue(8, ValueFactory::getDoubleValue(static_cast<double>(15241.45)));
-    warehouseTempTable->insertTupleNonVirtual(*temp_tuple);
+    warehouseTempTable->TempTable::insertTuple(*temp_tuple);
 
     temp_tuple = &customerTempTable->tempTuple();
     temp_tuple->setNValue(0, ValueFactory::getIntegerValue(static_cast<int32_t>(42)));
@@ -349,7 +349,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(18, ValueFactory::getIntegerValue(static_cast<int32_t>(0)));
     temp_tuple->setNValue(19, ValueFactory::getIntegerValue(static_cast<int32_t>(15)));
     temp_tuple->setNValue(20, ValueFactory::getStringValue("Some History"));
-    customerTempTable->insertTupleNonVirtual(*temp_tuple);
+    customerTempTable->TempTable::insertTuple(*temp_tuple);
 
     TableTuple districtTuple = TableTuple(districtTempTable->schema());
     TableIterator districtIterator = districtTempTable->iterator();
@@ -360,7 +360,7 @@ TEST_F(TableAndIndexTest, BigTest) {
                  << districtTable->name() << "'" << endl;
         }
     }
-    districtTempTable->deleteAllTuplesNonVirtual(true);
+    districtTempTable->TempTable::deleteAllTuples(true);
 
     TableTuple warehouseTuple = TableTuple(warehouseTempTable->schema());
     TableIterator warehouseIterator = warehouseTempTable->iterator();
@@ -369,7 +369,7 @@ TEST_F(TableAndIndexTest, BigTest) {
             cout << "Failed to insert tuple from input table '" << warehouseTempTable->name() << "' into target table '" << warehouseTable->name() << "'" << endl;
         }
     }
-    warehouseTempTable->deleteAllTuplesNonVirtual(true);
+    warehouseTempTable->TempTable::deleteAllTuples(true);
 
     TableTuple customerTuple = TableTuple(customerTempTable->schema());
     TableIterator customerIterator = customerTempTable->iterator();
@@ -379,7 +379,7 @@ TEST_F(TableAndIndexTest, BigTest) {
             cout << "Failed to insert tuple from input table '" << warehouseTempTable->name() << "' into target table '" << warehouseTable->name() << "'" << endl;
         }
     }
-    customerTempTable->deleteAllTuplesNonVirtual(true);
+    customerTempTable->TempTable::deleteAllTuples(true);
 
     temp_tuple->setNValue(0, ValueFactory::getIntegerValue(static_cast<int32_t>(43)));
     temp_tuple->setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(7)));
@@ -412,7 +412,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(18, ValueFactory::getIntegerValue(static_cast<int32_t>(1)));
     temp_tuple->setNValue(19, ValueFactory::getIntegerValue(static_cast<int32_t>(15)));
     temp_tuple->setNValue(20, ValueFactory::getStringValue("Some History"));
-    customerTempTable->insertTupleNonVirtual(*temp_tuple);
+    customerTempTable->TempTable::insertTuple(*temp_tuple);
 
     customerIterator = customerTempTable->iterator();
     while (customerIterator.next(customerTuple)) {
@@ -421,7 +421,7 @@ TEST_F(TableAndIndexTest, BigTest) {
             cout << "Failed to insert tuple from input table '" << warehouseTempTable->name() << "' into target table '" << warehouseTable->name() << "'" << endl;
         }
     }
-    customerTempTable->deleteAllTuplesNonVirtual(true);
+    customerTempTable->TempTable::deleteAllTuples(true);
 
     for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
         (*i).free();

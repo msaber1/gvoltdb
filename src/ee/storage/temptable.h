@@ -96,15 +96,19 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     // OPERATIONS
     // ------------------------------------------------------------------
-    void deleteAllTuples(bool freeAllocatedStrings);
-    bool insertTuple(TableTuple &source);
+    inline void deleteAllTuples(bool freeAllocatedStrings);
+    /**
+     * Does a shallow copy that copies the pointer to uninlined columns.
+     */
+    inline bool insertTuple(TableTuple &source);
+    void updateTempTuple(TableTuple &target, TableTuple &source);
+
     bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                         TableTuple &sourceTupleWithNewValues,
                                         std::vector<TableIndex*> &indexesToUpdate);
 
     // deleting tuple from temp table is not supported. use deleteAllTuples instead
     bool deleteTuple(TableTuple &tuple, bool);
-    void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
 
     /**
      * Uses the pool to do a deep copy of the tuple including allocations
@@ -112,12 +116,6 @@ class TempTable : public Table {
      * before they are dirtied
      */
     void insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool);
-
-    /**
-     * Does a shallow copy that copies the pointer to uninlined columns.
-     */
-    void insertTupleNonVirtual(TableTuple &source);
-    void updateTupleNonVirtual(TableTuple &target, TableTuple &source);
 
     // ------------------------------------------------------------------
     // INDEXES
@@ -174,7 +172,7 @@ inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Poo
     m_tmpTarget1.setActiveTrue();
 }
 
-inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
+inline bool TempTable::insertTuple(TableTuple &source) {
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
@@ -193,15 +191,16 @@ inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
     m_tmpTarget1.setActiveTrue();
     m_tmpTarget1.setPendingDeleteFalse();
     m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
+    return true;
 }
 
-inline void TempTable::updateTupleNonVirtual(TableTuple &targetTupleToUpdate,
-                                             TableTuple &sourceTupleWithNewValues) {
+inline void TempTable::updateTempTuple(TableTuple &targetTupleToUpdate,
+                                       TableTuple &sourceTupleWithNewValues) {
     // Copy the source tuple into the target
     targetTupleToUpdate.copy(sourceTupleWithNewValues);
 }
 
-inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
+inline void TempTable::deleteAllTuples(bool freeAllocatedStrings) {
 
     if (m_tupleCount == 0) {
         return;

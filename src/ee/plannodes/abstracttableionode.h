@@ -43,8 +43,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREOPERATIONNODE_H
-#define HSTOREOPERATIONNODE_H
+#ifndef HSTORETABLEIONODE_H
+#define HSTORETABLEIONODE_H
 
 #include "abstractplannode.h"
 #include "json_spirit/json_spirit.h"
@@ -52,40 +52,33 @@
 namespace voltdb {
 
 class Table;
+class VoltDBEngine;
 
 /**
  *
  */
-class AbstractOperationPlanNode : public AbstractPlanNode {
-    public:
-        virtual ~AbstractOperationPlanNode();
-        Table* getTargetTable() const;
-        void setTargetTable(Table* val);
+class AbstractTableIOPlanNode : public AbstractPlanNode {
+public:
+    Table* resolveTargetTable(VoltDBEngine* engine);
+    Table* getTargetTable() const;
 
-        std::string getTargetTableName() const;
-        void setTargetTableName(std::string name);
+    std::string debugInfo(const std::string &spacer) const;
 
-        virtual std::string debugInfo(const std::string &spacer) const;
+protected:
+    void loadFromJSONObject(json_spirit::Object &obj);
+        
+    AbstractTableIOPlanNode() : m_targetTableName("NOT_SPECIFIED"), m_targetTable(NULL) {}
 
-    protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
-        AbstractOperationPlanNode(int32_t id) : AbstractPlanNode(id) {
-            target_table = NULL;
-            target_table_name = "NOT_SPECIFIED";
-        }
-        AbstractOperationPlanNode() : AbstractPlanNode() {
-            target_table = NULL;
-            target_table_name = "NOT SPECIFIED";
-        }
-
-        //
-        // Target Table
-        // These tables are different from the input and the output tables
-        // The plannode can read in tuples from the input table(s) and apply them to the target table
-        // The results of the operations will be written to the the output table
-        //
-        std::string target_table_name;
-        Table* target_table; // volatile
+    // Target Table
+    // This table is different from the temp output tables managed by the executors.
+    // An operation executor reads tuples from its input table(s) and applies them to the target table.
+    // Its output table stores only the count of rows affected.
+    // A scan executor may either read in tuples from its target table and write tuples to a temp ouput table,
+    // OR, as an optimization for simple cases, it may identify its target table as its output table.
+    // This abstracts away the distinction between persistent table and temp table when
+    // accessed as an input table by the parent node's executor.
+    std::string m_targetTableName;
+    Table* m_targetTable; // volatile
 };
 
 }

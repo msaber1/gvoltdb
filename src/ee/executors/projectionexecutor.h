@@ -54,28 +54,20 @@
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
-
 class AbstractExpression;
-class TempTable;
-class Table;
 
 /**
  *
  */
 class ProjectionExecutor : public AbstractExecutor {
     public:
-        ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) {
-            output_table = NULL;
-        }
+        ProjectionExecutor() : AbstractExecutor() {}
         ~ProjectionExecutor();
     protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
+        bool p_init();
         bool p_execute(const NValueArray &params);
 
     private:
-        TempTable* output_table;
-        Table* input_table;
         int m_columnCount;
         boost::shared_array<int> all_tuple_array_ptr;
         int* all_tuple_array;

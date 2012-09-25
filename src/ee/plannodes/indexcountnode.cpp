@@ -15,18 +15,11 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-#include <stdexcept>
-#include <sstream>
 #include "indexcountnode.h"
+
 #include "common/debuglog.h"
-#include "common/serializeio.h"
-#include "common/types.h"
-#include "common/FatalException.hpp"
+#include "common/SerializableEEException.h"
 #include "expressions/abstractexpression.h"
-#include "catalog/table.h"
-#include "catalog/index.h"
-#include "storage/table.h"
 
 namespace voltdb {
 
@@ -37,8 +30,6 @@ IndexCountPlanNode::~IndexCountPlanNode() {
     for (int ii = 0; ii < endkey_expressions.size(); ii++) {
         delete endkey_expressions[ii];
     }
-    delete getOutputTable();
-    setOutputTable(NULL);
 }
 
 void IndexCountPlanNode::setLookupType(IndexLookupType lookup_type) {

@@ -52,28 +52,21 @@
 #include <iostream>
 
 namespace voltdb {
-
-class UndoLog;
-class ReadWriteSet;
-
 /**
  *
  */
 class ReceiveExecutor : public AbstractExecutor {
-    public:
-        ReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-    {
-        this->engine = engine;
-    }
-        ~ReceiveExecutor();
-        bool needsPostExecuteClear() { return true; }
-    protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
-    private:
-        VoltDBEngine *engine;
+public:
+    ReceiveExecutor() {}
+
+    ~ReceiveExecutor();
+
+private:
+    bool initEngine(VoltDBEngine* engine) { m_engine = engine; return true; }
+    bool p_init();
+    bool p_execute(const NValueArray &params);
+
+    VoltDBEngine *m_engine;
 };
 
 }

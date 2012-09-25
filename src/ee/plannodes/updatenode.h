@@ -46,24 +46,16 @@
 #ifndef HSTOREUPDATENODE_H
 #define HSTOREUPDATENODE_H
 
-#include <vector>
-#include "common/common.h"
-#include "common/debuglog.h"
-#include "abstractoperationnode.h"
+#include "abstracttableionode.h"
 
 namespace voltdb {
 
 /**
  *
  */
-class UpdatePlanNode : public AbstractOperationPlanNode {
+class UpdatePlanNode : public AbstractTableIOPlanNode {
     public:
-        UpdatePlanNode(CatalogId id) : AbstractOperationPlanNode(id), m_updatesIndexes(false) {
-            // Do nothing
-        }
-        UpdatePlanNode() : AbstractOperationPlanNode(), m_updatesIndexes(false) {
-            // Do nothing
-        }
+        UpdatePlanNode() : m_updatesIndexes(false) {}
 
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UPDATE); }
 

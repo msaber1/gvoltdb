@@ -45,35 +45,16 @@
 
 #include "aggregatenode.h"
 
-#include "common/types.h"
-#include "storage/table.h"
+#include "expressions/abstractexpression.h"
 
 #include <sstream>
-#include <stdexcept>
 
 using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
-AggregatePlanNode::AggregatePlanNode(CatalogId id)
-  : AbstractPlanNode(id)
-{
-    // Do nothing
-}
-
-AggregatePlanNode::AggregatePlanNode(PlanNodeType type)
-  : AbstractPlanNode(), m_type(type)
-{
-    // Do nothing
-}
-
 AggregatePlanNode::~AggregatePlanNode()
 {
-    if (!isInline())
-    {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
     for (int i = 0; i < m_aggregateInputExpressions.size(); i++)
     {
         delete m_aggregateInputExpressions[i];
@@ -82,12 +63,6 @@ AggregatePlanNode::~AggregatePlanNode()
     {
         delete m_groupByExpressions[i];
     }
-}
-
-PlanNodeType
-AggregatePlanNode::getPlanNodeType() const
-{
-    return m_type;
 }
 
 vector<ExpressionType>

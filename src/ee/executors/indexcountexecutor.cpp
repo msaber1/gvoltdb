@@ -22,28 +22,20 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
-#include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "plannodes/indexcountnode.h"
-#include "storage/table.h"
-#include "storage/tableiterator.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
 using namespace voltdb;
 
-bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
-                                TempTableLimits* limits)
+bool IndexCountExecutor::p_init()
 {
     VOLT_DEBUG("init IndexCount Executor");
 
-    m_node = dynamic_cast<IndexCountPlanNode*>(abstractNode);
+    m_node = dynamic_cast<IndexCountPlanNode*>(m_abstractNode);
     assert(m_node);
-    assert(m_node->getTargetTable());
     assert(m_node->getPredicate() == NULL);
-
-    // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
 
     //
     // Make sure that we have search keys and that they're not null
@@ -53,9 +45,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         boost::shared_array<AbstractExpression*>
     (new AbstractExpression*[m_numOfSearchkeys]);
     m_searchKeyBeforeSubstituteArray = m_searchKeyBeforeSubstituteArrayPtr.get();
-    m_needsSubstituteSearchKeyPtr =
-        boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
-    m_needsSubstituteSearchKey = m_needsSubstituteSearchKeyPtr.get();
 
     for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
     {
@@ -65,8 +54,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
                 " PlanNode '%s'", ctr, m_node->debug().c_str());
             return false;
         }
-        m_needsSubstituteSearchKeyPtr[ctr] =
-            m_node->getSearchKeyExpressions()[ctr]->hasParameter();
         m_searchKeyBeforeSubstituteArrayPtr[ctr] =
             m_node->getSearchKeyExpressions()[ctr];
     }
@@ -76,9 +63,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         m_endKeyBeforeSubstituteArrayPtr =
             boost::shared_array<AbstractExpression*> (new AbstractExpression*[m_numOfEndkeys]);
         m_endKeyBeforeSubstituteArray = m_endKeyBeforeSubstituteArrayPtr.get();
-        m_needsSubstituteEndKeyPtr =
-            boost::shared_array<bool>(new bool[m_numOfEndkeys]);
-        m_needsSubstituteEndKey = m_needsSubstituteEndKeyPtr.get();
         for (int ctr = 0; ctr < m_numOfEndkeys; ctr++)
         {
             if (m_node->getEndKeyExpressions()[ctr] == NULL) {
@@ -86,8 +70,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
                     " PlanNode '%s'", ctr, m_node->debug().c_str());
                 return false;
             }
-            m_needsSubstituteEndKeyPtr[ctr] =
-                m_node->getEndKeyExpressions()[ctr]->hasParameter();
             m_endKeyBeforeSubstituteArrayPtr[ctr] =
                 m_node->getEndKeyExpressions()[ctr];
         }
@@ -100,7 +82,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     //output table should be temptable
     m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
     //target table should be persistenttable
-    m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
+    assert(m_targetTable);
+    assert(m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable));
     m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
 
     assert(m_numOfColumns == 1);
@@ -149,7 +132,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert(m_outputTable);
     assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
     assert(m_targetTable);
-    assert(m_targetTable == m_node->getTargetTable());
+    assert(m_targetTable == m_node->getTargetTable(NULL));
     VOLT_DEBUG("IndexCount: %s.%s\n", m_targetTable->name().c_str(),
                m_index->getName().c_str());
 
@@ -168,9 +151,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     m_searchKey.setAllNulls();
     VOLT_DEBUG("<Index Count>Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-        if (m_needsSubstituteSearchKey[ctr]) {
-            m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
-        }
+        m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
         NValue candidateValue = m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
         try {
             m_searchKey.setNValue(ctr, candidateValue);
@@ -222,9 +203,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         m_endKey.setAllNulls();
         VOLT_DEBUG("Initial (all null) end key: '%s'", m_endKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < m_numOfEndkeys; ctr++) {
-            if (m_needsSubstituteEndKey[ctr]) {
-                m_endKeyBeforeSubstituteArray[ctr]->substitute(params);
-            }
+            m_endKeyBeforeSubstituteArray[ctr]->substitute(params);
             NValue endKeyValue = m_endKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
             try {
                 m_endKey.setNValue(ctr, endKeyValue);

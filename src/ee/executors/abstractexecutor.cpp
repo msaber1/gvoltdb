@@ -45,9 +45,8 @@
 
 #include "abstractexecutor.h"
 
-#include "execution/VoltDBEngine.h"
-#include "plannodes/abstractoperationnode.h"
-#include "plannodes/abstractscannode.h"
+#include "plannodes/abstracttableionode.h"
+#include "storage/table.h"
 #include "storage/tablefactory.h"
 
 #include <vector>
@@ -55,8 +54,7 @@
 using namespace std;
 using namespace voltdb;
 
-bool AbstractExecutor::init(VoltDBEngine* engine,
-                            TempTableLimits* limits)
+bool AbstractExecutor::init(TempTableLimits* limits)
 {
     assert (m_abstractNode);
     //
@@ -74,74 +72,28 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
                        m_abstractNode->getChildren()[ctr]->debug().c_str());
             return false;
         }
-        input_tables.push_back(table);
-    }
-    m_abstractNode->setInputTables(input_tables);
-
-    // Some tables have target tables (scans + operations) that are
-    // based on tables under the control of the local storage manager
-    // (as opposed to an intermediate result table). We'll grab them
-    // from the VoltDBEngine. This is kind of a hack job here... is
-    // there a better way?
-
-    AbstractScanPlanNode* scan_node =
-        dynamic_cast<AbstractScanPlanNode*>(m_abstractNode);
-    AbstractOperationPlanNode* oper_node =
-        dynamic_cast<AbstractOperationPlanNode*>(m_abstractNode);
-    if (scan_node || oper_node)
-    {
-        Table* target_table = NULL;
-
-        string targetTableName;
-        if (scan_node) {
-            targetTableName = scan_node->getTargetTableName();
-            target_table = scan_node->getTargetTable();
-        } else if (oper_node) {
-            targetTableName = oper_node->getTargetTableName();
-            target_table = oper_node->getTargetTable();
-        }
-
-        // If the target_table is NULL, then we need to ask the engine
-        // for a reference to what we need
-        // Really, we can't enforce this when we load the plan? --izzy 7/3/2010
-        if (target_table == NULL) {
-            target_table = engine->getTable(targetTableName);
-            if (target_table == NULL) {
-                VOLT_ERROR("Failed to retrieve target table '%s' "
-                           "from execution engine for PlanNode '%s'",
-                           targetTableName.c_str(),
-                           m_abstractNode->debug().c_str());
-                return false;
-            }
-            if (scan_node) {
-                scan_node->setTargetTable(target_table);
-            } else if (oper_node) {
-                oper_node->setTargetTable(target_table);
-            }
+        m_inputTables.push_back(table);
+        if (cnt == 0) {
+            m_inputTable = table;
         }
     }
-    needs_outputtable_clear_cached = needsOutputTableClear();
 
-    // Call the p_init() method on our derived class
     try {
-        if (!p_init(m_abstractNode, limits))
+        // Initialize the output table just as needed by the derived class.
+        // This step is separate from p_init since it has only a handful of possible
+        // implementations that can often be inherited.
+        p_setOutputTable(limits);
+
+        // Call the p_init() method on our derived class.
+        if ( ! p_init()) {
             return false;
+        }
     } catch (exception& err) {
         char message[128];
         snprintf(message, 128, "The Executor failed to initialize PlanNode '%s'",
                 m_abstractNode->debug().c_str());
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       message);
-    }
-    Table* tmp_output_table_base = m_abstractNode->getOutputTable();
-    m_tmpOutputTable = dynamic_cast<TempTable*>(tmp_output_table_base);
-
-    // determines whether the output table should be cleared or not.
-    // specific executor might not need (and must not do) clearing.
-    if (!needs_outputtable_clear_cached) {
-        VOLT_TRACE("Did not clear output table because the derived class"
-                   " answered so");
-        m_tmpOutputTable = NULL;
     }
     return true;
 }
@@ -152,38 +104,76 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
  */
 void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
     assert(limits);
+    CatalogId databaseId = m_abstractNode->databaseId();
     TupleSchema* schema = m_abstractNode->generateTupleSchema(true);
     int column_count = (int)m_abstractNode->getOutputSchema().size();
-    std::vector<std::string> column_names(column_count);
+    vector<string> column_names(column_count);
     assert(column_count >= 1);
     for (int ctr = 0; ctr < column_count; ctr++)
     {
         column_names[ctr] = m_abstractNode->getOutputSchema()[ctr]->getColumnName();
     }
-    m_abstractNode->setOutputTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                              tempTableName,
-                                                              schema,
-                                                              column_names,
-                                                              limits));
+    m_outputTable = TableFactory::getTempTable(databaseId,
+                                               tempTableName,
+                                               schema,
+                                               column_names,
+                                               limits);
+}
+
+/**
+ * Set up a temp table to pass through tuples from a child node.
+ * Called from p_init.
+ */
+void AbstractExecutor::setPassThroughTempOutputTable(TempTableLimits* limits) {
+    assert(m_inputTable);
+    assert(m_abstractNode->getChildren()[0] != NULL);
+    CatalogId databaseId = m_abstractNode->databaseId();
+    const string &name = m_inputTable->name();
+    m_outputTable = TableFactory::getCopiedTempTable(databaseId,
+                                                     name,
+                                                     m_inputTable,
+                                                     limits);
+}
+
+AbstractExecutor::~AbstractExecutor()
+{
+    // If it's not a TempTable, it's not owned by this executor, so delete nothing.
+    delete dynamic_cast<TempTable*>(m_outputTable);
+}
+
+
+// Hook up abstract scan and (write) operation executors with the engine
+// and with the target table known to the engine.
+// Other executors (Send, Recieve, and Materialize) also provide initEngine specializations
+// to access the engine for various other purposes.
+bool AbstractTableIOExecutor::initEngine(VoltDBEngine* engine)
+{
+    m_engine = engine;
+
+    AbstractTableIOPlanNode* node = dynamic_cast<AbstractTableIOPlanNode*>(m_abstractNode);
+    assert(node);
+    if (!node) {
+        return false;
+    }
+    m_targetTable = node->resolveTargetTable(engine);
+    return (m_targetTable != NULL);
 }
 
 /**
  * Set up a single-column temp output table for DML executors that require one to return their counts.
- * Called from p_init.
  */
-void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
+void AbstractOperationExecutor::p_setOutputTable(TempTableLimits* limits) {
     TupleSchema* schema = m_abstractNode->generateTupleSchema(false);
     // The column count (1) and column name for the DML counter column is hard-coded in the planner
     // and passed via the output schema -- kind of pointless since they could just as easily be hard-coded here,
     // possibly saving the trouble of serializing an outputSchema at all for DML nodes.
     assert(m_abstractNode->getOutputSchema().size() == 1);
-    std::vector<std::string> columnNames(1, m_abstractNode->getOutputSchema()[0]->getColumnName());
-    m_abstractNode->setOutputTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
-                                                              "temp",
-                                                              schema,
-                                                              columnNames,
-                                                              limits));
+    CatalogId databaseId = m_abstractNode->databaseId();
+    const string name("temp");
+    vector<string> columnNames(1, m_abstractNode->getOutputSchema()[0]->getColumnName());
+    m_outputTable = TableFactory::getTempTable(databaseId,
+                                               name,
+                                               schema,
+                                               columnNames,
+                                               limits);
 }
-
-
-AbstractExecutor::~AbstractExecutor() {}

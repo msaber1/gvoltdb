@@ -50,25 +50,28 @@
 
 namespace voltdb
 {
-    /**
-     *
-     */
-    class LimitExecutor : public AbstractExecutor
+/**
+ *
+ */
+class LimitExecutor : public AbstractExecutor
+{
+public:
+    LimitExecutor() {}
+    ~LimitExecutor() {}
+
+private:
+    void p_setOutputTable(TempTableLimits* limits)
     {
-    public:
-        LimitExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
+        if (m_abstractNode->isInline())
         {
+            return;
         }
+        setPassThroughTempOutputTable(limits);
+    }
 
-        ~LimitExecutor() {
-        }
-
-    private:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
-    };
+    bool p_init();
+    bool p_execute(const NValueArray &params);
+};
 
 }
 

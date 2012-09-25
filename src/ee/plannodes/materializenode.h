@@ -54,11 +54,10 @@ namespace voltdb {
 class Table;
 
 /**
- *
+ * A node to convert parameters into one or more tuples (such as new tuples for an insert).
  */
 class MaterializePlanNode : public ProjectionPlanNode {
-    //
-    // It is not clear whether we are actually going to need this node
+    // The following comment describes an idea that was NOT implemented in VoltDB:
     // A MaterializePlanNode is sort of like a special case ProjectionPlanNode where
     // we can auto-generate any primary keys that we may need. For the initial system, this
     // doesn't mean anything because we are going to require that all tables have a pkey. In
@@ -69,11 +68,7 @@ class MaterializePlanNode : public ProjectionPlanNode {
     // Andy - 06/25/2008
     //
     public:
-        MaterializePlanNode(CatalogId id): ProjectionPlanNode(id), batched(false) {
-        }
-        MaterializePlanNode(): ProjectionPlanNode(), batched(false) {
-        }
-        virtual ~MaterializePlanNode();
+        MaterializePlanNode() : batched(false) { }
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_MATERIALIZE); }
 
         std::string debugInfo(const std::string &spacer) const;

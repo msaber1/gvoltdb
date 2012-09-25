@@ -46,34 +46,27 @@
 #ifndef HSTOREORDERBYEXECUTOR_H
 #define HSTOREORDERBYEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
+class LimitPlanNode;
 
-    class UndoLog;
-    class ReadWriteSet;
-    class LimitPlanNode;
+/**
+ *
+ */
+class OrderByExecutor : public AbstractExecutor {
+public:
+    OrderByExecutor() : limit_node(NULL) {}
+    ~OrderByExecutor();
 
-    /**
-     *
-     */
-    class OrderByExecutor : public AbstractExecutor {
-    public:
-        OrderByExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node), limit_node(NULL)
-            { }
-        ~OrderByExecutor();
+private:
+    void p_setOutputTable(TempTableLimits* limits) { setPassThroughTempOutputTable(limits); }
+    bool p_init();
+    bool p_execute(const NValueArray &params);
 
-    protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
-
-    private:
-        LimitPlanNode *limit_node;
-    };
+private:
+    LimitPlanNode *limit_node;
+};
 
 }
 

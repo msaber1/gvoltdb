@@ -15,65 +15,55 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
 #include "tablecountexecutor.h"
+
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "common/ValueFactory.hpp"
-#include "expressions/abstractexpression.h"
 #include "plannodes/tablecountnode.h"
-#include "storage/table.h"
-#include "storage/temptable.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
+#include "storage/persistenttable.h"
 
 using namespace voltdb;
 
-bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
-                             TempTableLimits* limits)
+bool TableCountExecutor::p_init()
 {
     VOLT_TRACE("init Table Count Executor");
 
-    assert(dynamic_cast<TableCountPlanNode*>(abstract_node));
-    assert(dynamic_cast<TableCountPlanNode*>(abstract_node)->getTargetTable());
+    assert(dynamic_cast<TableCountPlanNode*>(m_abstractNode));
+    assert(m_targetTable);
+    assert(m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable));
 
-    assert(abstract_node->getOutputSchema().size() == 1);
+    assert(m_abstractNode->getOutputSchema().size() == 1);
 
-    // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
     return true;
 }
 
-bool TableCountExecutor::p_execute(const NValueArray &params) {
-    TableCountPlanNode* node = dynamic_cast<TableCountPlanNode*>(m_abstractNode);
-    assert(node);
-    Table* output_table = node->getOutputTable();
-    assert(output_table);
-    assert ((int)output_table->columnCount() == 1);
+bool TableCountExecutor::p_execute(const NValueArray &params)
+{
+    assert(dynamic_cast<TableCountPlanNode*>(m_abstractNode));
+    assert(m_outputTable);
+    assert ((int)m_outputTable->columnCount() == 1);
 
-    Table* target_table = dynamic_cast<Table*>(node->getTargetTable());
-    assert(target_table);
+    assert(m_targetTable);
     VOLT_TRACE("Table Count table :\n %s",
-               target_table->debug().c_str());
+               m_targetTable->debug().c_str());
     VOLT_DEBUG("Table Count table : %s which has %d active, %d"
                " allocated, %d used tuples",
-               target_table->name().c_str(),
-               (int)target_table->activeTupleCount(),
-               (int)target_table->allocatedTupleCount(),
-               (int)target_table->usedTupleCount());
+               m_targetTable->name().c_str(),
+               (int)m_targetTable->activeTupleCount(),
+               (int)m_targetTable->allocatedTupleCount(),
+               (int)m_targetTable->usedTupleCount());
 
-    assert (node->getPredicate() == NULL);
+    assert(dynamic_cast<TableCountPlanNode*>(m_abstractNode)->getPredicate() == NULL);
 
-    TableTuple& tmptup = output_table->tempTuple();
-    tmptup.setNValue(0, ValueFactory::getBigIntValue( target_table->activeTupleCount() ));
-    output_table->insertTuple(tmptup);
-
+    TableTuple& tmptup = m_outputTable->tempTuple();
+    tmptup.setNValue(0, ValueFactory::getBigIntValue( m_targetTable->activeTupleCount() ));
+    m_outputTable->insertTuple(tmptup);
 
     //printf("Table count answer: %d", iterator.getSize());
-    //printf("\n%s\n", output_table->debug().c_str());
-    VOLT_TRACE("\n%s\n", output_table->debug().c_str());
+    //printf("\n%s\n", m_outputTable->debug().c_str());
+    VOLT_TRACE("\n%s\n", m_outputTable->debug().c_str());
     VOLT_DEBUG("Finished Table Counting");
 
     return true;

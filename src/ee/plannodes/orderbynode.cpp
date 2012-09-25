@@ -45,40 +45,19 @@
 
 #include "orderbynode.h"
 
-#include "common/types.h"
-#include "storage/table.h"
+#include "expressions/abstractexpression.h"
 
 #include <sstream>
-#include <stdexcept>
-#include <string>
 
 using namespace std;
 using namespace voltdb;
 
-OrderByPlanNode::OrderByPlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-    //DO NOTHING
-}
-
-OrderByPlanNode::OrderByPlanNode() : AbstractPlanNode()
-{
-    //DO NOTHING
-}
-
 OrderByPlanNode::~OrderByPlanNode()
 {
-    delete getOutputTable();
-    setOutputTable(NULL);
     for (int i = 0; i < m_sortExpressions.size(); i++)
     {
         delete m_sortExpressions[i];
     }
-}
-
-PlanNodeType
-OrderByPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_ORDERBY;
 }
 
 vector<AbstractExpression*>&

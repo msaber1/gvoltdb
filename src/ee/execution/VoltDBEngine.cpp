@@ -1022,10 +1022,12 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId,
 
     // Executor is created here. An executor is *devoted* to this plannode
     // so that it can cache anything for the plannode
-    AbstractExecutor* executor = getNewExecutor(this, node);
+    AbstractExecutor* executor = getNewExecutor(node->getPlanNodeType());
     if (executor == NULL)
         return false;
-    node->setExecutor(executor);
+    executor->initEngine(this);
+    node->initExecutor(executor);
+    executor->initPlanNode(node);
 
     // If this PlanNode has an internal PlanNode (e.g., AbstractScanPlanNode can
     // have internal Projections), then we need to make sure that we set that
@@ -1045,8 +1047,8 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId,
         }
     }
 
-    // Now use the executor to initialize the plannode for execution later on
-    if (!executor->init(this, limits))
+    // Now initialize the executor for execution later on
+    if (!executor->init(limits))
     {
         VOLT_ERROR("The Executor failed to initialize PlanNode '%s' for"
                    " PlanFragment '%jd'", node->debug().c_str(),

@@ -51,10 +51,11 @@
 #include "boost/shared_array.hpp"
 
 #include "common/common.h"
-#include "expressions/abstractexpression.h"
 
 #include "json_spirit/json_spirit.h"
+
 namespace voltdb {
+class AbstractExpression;
 
 class ExpressionUtil {
 public:
@@ -62,7 +63,8 @@ public:
     static AbstractExpression* expressionFactory(json_spirit::Object &obj,
                                                  ExpressionType et, ValueType vt, int vs,
                                                  AbstractExpression* lc, AbstractExpression* rc,
-                                                 const std::vector<AbstractExpression*>* arguments);
+                                                 const std::vector<AbstractExpression*>* arguments,
+                                                 bool hasParam);
 
     static AbstractExpression* comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
     static AbstractExpression* conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);

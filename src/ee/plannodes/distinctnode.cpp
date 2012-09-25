@@ -45,35 +45,16 @@
 
 #include "distinctnode.h"
 
-#include "storage/table.h"
+#include "expressions/abstractexpression.h"
 
 #include <sstream>
-#include <stdexcept>
 
 using namespace voltdb;
 using namespace std;
 
-DistinctPlanNode::DistinctPlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-}
-
-DistinctPlanNode::DistinctPlanNode() : AbstractPlanNode()
-{
-}
-
 DistinctPlanNode::~DistinctPlanNode()
 {
-    if (!isInline()) {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
     delete m_distinctExpression;
-}
-
-PlanNodeType
-DistinctPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_DISTINCT;
 }
 
 AbstractExpression*

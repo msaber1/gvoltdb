@@ -32,11 +32,6 @@ class AbstractExpression;
  */
 class IndexCountPlanNode : public AbstractScanPlanNode {
     public:
-        IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            this->key_iterate = false;
-            this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->end_type = INDEX_LOOKUP_TYPE_EQ;
-        }
         IndexCountPlanNode() : AbstractScanPlanNode() {
             this->key_iterate = false;
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;

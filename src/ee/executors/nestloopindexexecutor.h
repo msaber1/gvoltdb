@@ -57,9 +57,6 @@ namespace voltdb {
 
 class NestLoopIndexPlanNode;
 class IndexScanPlanNode;
-class PersistentTable;
-class Table;
-class TempTable;
 class TableIndex;
 
 /**
@@ -73,30 +70,24 @@ class TableIndex;
 class NestLoopIndexExecutor : public AbstractExecutor
 {
 public:
-    NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node),
+    NestLoopIndexExecutor() :
+        node(NULL),
+        inline_node(NULL),
+        m_lookupType(INDEX_LOOKUP_TYPE_INVALID),
+        inner_table(NULL),
+        index(NULL),
         index_values_backing_store(NULL)
-    {
-        node = NULL;
-        inline_node = NULL;
-        output_table = NULL;
-        inner_table = NULL;
-        index = NULL;
-        outer_table = NULL;
-        m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
-    }
+    {}
 
     ~NestLoopIndexExecutor();
 
 protected:
-    bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+    bool p_init();
     bool p_execute(const NValueArray &params);
 
     NestLoopIndexPlanNode* node;
     IndexScanPlanNode* inline_node;
     IndexLookupType m_lookupType;
-    TempTable* output_table;
     PersistentTable* inner_table;
     TableIndex *index;
     TableTuple index_values;

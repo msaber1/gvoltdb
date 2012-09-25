@@ -58,18 +58,12 @@ class Table;
  *
  */
 class SendPlanNode : public AbstractPlanNode {
-    public:
-        SendPlanNode(CatalogId id) : AbstractPlanNode(id) {
-        }
-        SendPlanNode() : AbstractPlanNode() {
-        }
-        ~SendPlanNode() {}
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEND); }
+public:
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEND); }
+    std::string debugInfo(const std::string &spacer) const;
 
-        std::string debugInfo(const std::string &spacer) const;
-
-    protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
+protected:
+    virtual void loadFromJSONObject(json_spirit::Object &obj) { /* Do nothing */ }
 };
 
 }

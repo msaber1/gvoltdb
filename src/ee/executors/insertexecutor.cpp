@@ -64,23 +64,16 @@
 using namespace std;
 using namespace voltdb;
 
-bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
-                            TempTableLimits* limits)
+bool InsertExecutor::p_init()
 {
     VOLT_TRACE("init Insert Executor");
 
-    m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
+    m_node = dynamic_cast<InsertPlanNode*>(m_abstractNode);
     assert(m_node);
-    assert(m_node->getTargetTable());
-    assert(m_node->getInputTables().size() == 1);
-
-    setDMLCountOutputTable(limits);
-
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
-    assert(m_inputTable);
+    assert(m_targetTable);
+    assert(getInputTables().size() == 1);
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
-    m_targetTable = m_node->getTargetTable();
     assert(m_targetTable);
     assert((m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable)) ||
            (m_targetTable == dynamic_cast<StreamedTable*>(m_targetTable)));
@@ -89,15 +82,9 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 
     PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_targetTable);
     m_partitionColumn = -1;
-    m_partitionColumnIsString = false;
     m_isStreamed = (persistentTarget == NULL);
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
-        if (m_partitionColumn != -1) {
-            if (m_inputTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
-                m_partitionColumnIsString = true;
-            }
-        }
     }
 
     m_multiPartition = m_node->isMultiPartition();
@@ -107,7 +94,6 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 bool InsertExecutor::p_execute(const NValueArray &params) {
     assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
     assert(m_node);
-    assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
     assert(m_inputTable);
     assert(m_targetTable);
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());

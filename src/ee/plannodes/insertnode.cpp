@@ -43,17 +43,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
 #include "insertnode.h"
-#include "common/common.h"
-#include "common/FatalException.hpp"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
+#include "common/SerializableEEException.h"
 
 namespace voltdb {
 
 void InsertPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
-    AbstractOperationPlanNode::loadFromJSONObject(obj);
+    AbstractTableIOPlanNode::loadFromJSONObject(obj);
     json_spirit::Value multiPartitionValue = json_spirit::find_value(obj, "MULTI_PARTITION");
     if (multiPartitionValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

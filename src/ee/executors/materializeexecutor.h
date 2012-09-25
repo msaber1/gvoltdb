@@ -55,8 +55,6 @@
 namespace voltdb {
 
 class AbstractExpression;
-class TempTable;
-class Table;
 class MaterializePlanNode;
 
 /**
@@ -64,25 +62,19 @@ class MaterializePlanNode;
  */
 class MaterializeExecutor : public AbstractExecutor {
   public:
-    MaterializeExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
-        AbstractExecutor(engine, abstract_node)
-    {
-        node = NULL;
-        output_table = NULL;
-        input_table = NULL;
-        expression_array = NULL;
-        this->engine = engine;
-    }
+    MaterializeExecutor() :
+        node(NULL),
+        expression_array(NULL)
+    {}
+
     ~MaterializeExecutor();
   protected:
-    bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+    bool initEngine(VoltDBEngine* engine) { m_engine = engine; return true; }
+    bool p_init();
     bool p_execute(const NValueArray &params);
 
   private:
     MaterializePlanNode* node;
-    TempTable* output_table;
-    Table* input_table;
     int m_columnCount;
 
     boost::shared_array<int> all_param_array_ptr;
@@ -97,7 +89,7 @@ class MaterializeExecutor : public AbstractExecutor {
     AbstractExpression** expression_array;
 
     bool batched;
-    VoltDBEngine *engine;
+    VoltDBEngine *m_engine;
 };
 
 }

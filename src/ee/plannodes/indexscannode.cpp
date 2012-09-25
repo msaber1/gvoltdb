@@ -43,17 +43,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdexcept>
-#include <sstream>
 #include "indexscannode.h"
+
+#include <sstream>
+
 #include "common/debuglog.h"
-#include "common/serializeio.h"
-#include "common/types.h"
-#include "common/FatalException.hpp"
+
+#include "common/SerializableEEException.h"
 #include "expressions/abstractexpression.h"
-#include "catalog/table.h"
-#include "catalog/index.h"
-#include "storage/table.h"
 
 namespace voltdb {
 
@@ -62,8 +59,6 @@ IndexScanPlanNode::~IndexScanPlanNode() {
         delete searchkey_expressions[ii];
     }
     delete end_expression;
-    delete getOutputTable();
-    setOutputTable(NULL);
 }
 
 void IndexScanPlanNode::setKeyIterate(bool val) {

@@ -47,14 +47,8 @@
 
 #include "common/debuglog.h"
 #include "common/ValueFactory.hpp"
-#include "common/FatalException.hpp"
-#include "expressions/abstractexpression.h"
+#include "common/SerializableEEException.h"
 #include "expressions/expressions.h"
-
-#include <cassert>
-#include <sstream>
-#include <cstdlib>
-#include <stdexcept>
 
 #include "json_spirit/json_spirit.h"
 
@@ -385,7 +379,8 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
                   ExpressionType et, ValueType vt, int vs,
                   AbstractExpression* lc,
                   AbstractExpression* rc,
-                  const std::vector<AbstractExpression*>* args)
+                  const std::vector<AbstractExpression*>* args,
+                  bool hasParam)
 {
     AbstractExpression *ret = NULL;
 
@@ -489,6 +484,7 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
 
     ret->setValueType(vt);
     ret->setValueSize(vs);
+    ret->setHasParameter((EXPRESSION_TYPE_VALUE_PARAMETER == et) || hasParam);
     // written thusly to ease testing/inspecting return content.
     VOLT_TRACE("Created expression %p", ret);
     return ret;

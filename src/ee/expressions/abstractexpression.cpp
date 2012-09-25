@@ -89,11 +89,8 @@ AbstractExpression::~AbstractExpression()
 }
 
 void
-AbstractExpression::substitute(const NValueArray &params)
+AbstractExpression::p_substitute(const NValueArray &params)
 {
-    if (!m_hasParameter)
-        return;
-
     // descend. nodes with parameters overload substitute()
     VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
     if (m_left) {
@@ -104,20 +101,6 @@ AbstractExpression::substitute(const NValueArray &params)
         VOLT_TRACE("Substitute processing right child...");
         m_right->substitute(params);
     }
-}
-
-bool
-AbstractExpression::hasParameter() const
-{
-    if (m_left && m_left->hasParameter())
-        return true;
-    return (m_right && m_right->hasParameter());
-}
-
-bool
-AbstractExpression::initParamShortCircuits()
-{
-    return (m_hasParameter = hasParameter());
 }
 
 std::string
@@ -169,17 +152,6 @@ AbstractExpression::debug(const std::string &spacer) const
 AbstractExpression*
 AbstractExpression::buildExpressionTree(json_spirit::Object &obj)
 {
-    AbstractExpression * exp =
-      AbstractExpression::buildExpressionTree_recurse(obj);
-
-    if (exp)
-        exp->initParamShortCircuits();
-    return exp;
-}
-
-AbstractExpression*
-AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
-{
     // build a tree recursively from the bottom upwards.
     // when the expression node is instantiated, its type,
     // value and child types will have been discovered.
@@ -227,16 +199,23 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
     }
     int valueSize = valueSizeValue.get_int();
 
+    bool hasParam = false;
     // recurse to children
     try {
         json_spirit::Value leftValue = json_spirit::find_value(obj, "LEFT");
         if (!(leftValue == json_spirit::Value::null)) {
             left_child = AbstractExpression::buildExpressionTree_recurse(leftValue.get_obj());
+            if (left_child->m_hasParameter) {
+                hasParam = true;
+            }
         }
 
         json_spirit::Value rightValue = json_spirit::find_value( obj, "RIGHT");
         if (!(rightValue == json_spirit::Value::null)) {
             right_child = AbstractExpression::buildExpressionTree_recurse(rightValue.get_obj());
+            if (right_child->m_hasParameter) {
+                hasParam = true;
+            }
         }
 
         // NULL argsVector corresponds to a missing ARGS value
@@ -250,6 +229,9 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
             for (int ii = 0; ii < argsArray.size(); ii++) {
                 json_spirit::Value argValue = argsArray[ii];
                 AbstractExpression* argExpr = AbstractExpression::buildExpressionTree_recurse(argValue.get_obj());
+                if (argExpr->m_hasParameter) {
+                    hasParam = true;
+                }
                 argsVector->push_back(argExpr);
             }
         }
@@ -258,7 +240,7 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
         // to read. yes, the per-class data really does follow the
         // child serializations.
         return ExpressionUtil::expressionFactory(obj, peek_type, value_type, valueSize,
-                                                 left_child, right_child, argsVector);
+                                                 left_child, right_child, argsVector, hasParam);
     }
     catch (SerializableEEException &ex) {
         delete left_child;

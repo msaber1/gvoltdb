@@ -145,8 +145,8 @@ class Table {
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
     virtual bool insertTuple(TableTuple &tuple) = 0;
-    virtual bool updateTuple(TableTuple &targetTupleToUpdate,
-                             TableTuple &sourceTupleWithNewValues);
+    bool updateTuple(TableTuple &targetTupleToUpdate,
+                     TableTuple &sourceTupleWithNewValues);
     // optimized version of update that only updates specific indexes
     // if the caller knows which indexes need to be updated
     virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,

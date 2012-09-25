@@ -56,29 +56,22 @@ class AbstractExpression;
 class AbstractJoinPlanNode : public AbstractPlanNode
 {
 public:
-    AbstractJoinPlanNode(CatalogId id);
-    AbstractJoinPlanNode();
+    AbstractJoinPlanNode() : m_predicate(NULL) { }
     virtual ~AbstractJoinPlanNode();
 
-    void setJoinType(JoinType join_type);
-    JoinType getJoinType() const;
+    JoinType getJoinType() const { return m_joinType; }
 
-    void setPredicate(AbstractExpression* predicate);
-    AbstractExpression* getPredicate() const;
+    AbstractExpression* getPredicate() const { return m_predicate; }
 
     virtual std::string debugInfo(const std::string& spacer) const;
 
 protected:
     virtual void loadFromJSONObject(json_spirit::Object& obj);
 
-    //
+private:
     // This is the predicate to figure out whether a joined tuple should
     // be put into the output table
-    //
     AbstractExpression* m_predicate;
-    //
-    // We currently don't do anything with this...
-    //
     JoinType m_joinType;
 };
 

@@ -72,11 +72,6 @@ public:
         return this->m_paramValue;
     }
 
-    bool hasParameter() const {
-        // this class represents a parameter.
-        return true;
-    }
-
     void substitute(const NValueArray &params) {
         assert (this->m_valueIdx < params.size());
         m_paramValue = params[this->m_valueIdx];

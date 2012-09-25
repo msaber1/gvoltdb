@@ -46,69 +46,14 @@
 #include "abstractscannode.h"
 
 #include "storage/table.h"
-#include "catalog/table.h"
-#include "catalog/column.h"
 
 using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
-AbstractScanPlanNode::AbstractScanPlanNode(int32_t id)
-    : AbstractPlanNode(id), m_predicate(NULL)
-{
-    m_targetTable = NULL;
-}
-
-AbstractScanPlanNode::AbstractScanPlanNode()
-    : AbstractPlanNode(), m_predicate(NULL)
-{
-    m_targetTable = NULL;
-}
-
 AbstractScanPlanNode::~AbstractScanPlanNode()
 {
     delete m_predicate;
-}
-
-void
-AbstractScanPlanNode::setPredicate(AbstractExpression* predicate)
-{
-    assert(!m_predicate);
-    if (m_predicate != predicate)
-    {
-        delete m_predicate;
-    }
-    m_predicate = predicate;
-}
-
-AbstractExpression*
-AbstractScanPlanNode::getPredicate() const
-{
-    return m_predicate;
-}
-
-Table*
-AbstractScanPlanNode::getTargetTable() const
-{
-    return m_targetTable;
-}
-
-void
-AbstractScanPlanNode::setTargetTable(Table* table)
-{
-    m_targetTable = table;
-}
-
-string
-AbstractScanPlanNode::getTargetTableName() const
-{
-    return m_targetTableName;
-}
-
-void
-AbstractScanPlanNode::setTargetTableName(string table_name)
-{
-    m_targetTableName = table_name;
 }
 
 string
@@ -122,16 +67,7 @@ AbstractScanPlanNode::debugInfo(const string &spacer) const
 void
 AbstractScanPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
-    json_spirit::Value targetTableNameValue =
-        json_spirit::find_value(obj, "TARGET_TABLE_NAME");
-    if (targetTableNameValue == json_spirit::Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractScanPlanNode::loadFromJSONObject:"
-                                      " Couldn't find TARGET_TABLE_NAME value");
-    }
-
-    m_targetTableName = targetTableNameValue.get_str();
+    AbstractTableIOPlanNode::loadFromJSONObject(obj);
 
     json_spirit::Value predicateValue = json_spirit::find_value(obj, "PREDICATE");
     if (!(predicateValue == json_spirit::Value::null))

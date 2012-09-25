@@ -95,7 +95,7 @@ public:
         const std::string &name,
         TupleSchema* schema,
         const std::vector<std::string> &columnNames,
-        TempTableLimits* limits);
+        TempTableLimits* limits = 0);
 
     /**
     * Creates an empty temp table with given template table.
@@ -104,7 +104,7 @@ public:
         const voltdb::CatalogId databaseId,
         const std::string &name,
         const Table* templateTablezz,
-        TempTableLimits* limits);
+        TempTableLimits* limits = 0);
 
 private:
     static void initCommon(

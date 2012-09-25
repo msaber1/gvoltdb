@@ -46,25 +46,19 @@
 #ifndef HSTOREUNIONEXECUTOR_H
 #define HSTOREUNIONEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
-
-class UndoLog;
-class ReadWriteSet;
-
 /**
  *
  */
 class UnionExecutor : public AbstractExecutor {
-    public:
-        UnionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) { }
-    protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
+public:
+    UnionExecutor() { }
+private:
+    virtual void p_setOutputTable(TempTableLimits* limits) { setPassThroughTempOutputTable(limits); }
+    bool p_init();
+    bool p_execute(const NValueArray &params);
 };
 
 }

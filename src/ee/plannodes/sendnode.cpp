@@ -43,10 +43,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
-#include <stdexcept>
 #include "sendnode.h"
-#include "common/serializeio.h"
+
+#include <sstream>
 
 namespace voltdb {
 
@@ -54,9 +53,6 @@ std::string SendPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << spacer << "SendNode\n";
     return (buffer.str());
-}
-
-void SendPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
 }
 
 }

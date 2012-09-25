@@ -43,21 +43,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
-#include <stdexcept>
 #include "materializenode.h"
-#include "common/common.h"
-#include "common/serializeio.h"
-#include "common/FatalException.hpp"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
+
+#include "common/SerializableEEException.h"
+
+#include <sstream>
 
 namespace voltdb {
-
-MaterializePlanNode::~MaterializePlanNode() {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
 
 std::string MaterializePlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;

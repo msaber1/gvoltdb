@@ -58,7 +58,7 @@ public:
     NestLoopPlanNode();
     ~NestLoopPlanNode();
 
-    virtual PlanNodeType getPlanNodeType() const;
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_NESTLOOP); }
 };
 
 }

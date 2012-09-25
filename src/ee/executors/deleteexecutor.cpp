@@ -48,12 +48,11 @@
 #include "common/ValueFactory.hpp"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
+#include "execution/VoltDBEngine.h"
+#include "indexes/tableindex.h"
+#include "plannodes/deletenode.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "indexes/tableindex.h"
-#include "storage/tableutil.h"
-#include "storage/temptable.h"
-#include "storage/persistenttable.h"
 
 #include <vector>
 #include <cassert>
@@ -61,28 +60,21 @@
 using namespace std;
 using namespace voltdb;
 
-bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
-                            TempTableLimits* limits)
+bool DeleteExecutor::p_init()
 {
     VOLT_TRACE("init Delete Executor");
 
-    m_node = dynamic_cast<DeletePlanNode*>(abstract_node);
+    m_node = dynamic_cast<DeletePlanNode*>(m_abstractNode);
     assert(m_node);
-    assert(m_node->getTargetTable());
-    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
     assert(m_targetTable);
-
-    setDMLCountOutputTable(limits);
 
     m_truncate = m_node->getTruncate();
     if (m_truncate) {
-        assert(m_node->getInputTables().size() == 0);
+        assert(getInputTables().size() == 0);
         return true;
     }
 
-    assert(m_node->getInputTables().size() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
-    assert(m_inputTable);
+    assert(getInputTables().size() == 1);
 
     m_inputTuple = TableTuple(m_inputTable->schema());
     m_targetTuple = TableTuple(m_targetTable->schema());

@@ -45,52 +45,17 @@
 
 #include "abstractjoinnode.h"
 
-#include "expressions/abstractexpression.h"
+#include "common/SerializableEEException.h"
 
-#include <stdexcept>
+#include "expressions/abstractexpression.h"
 
 using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
-AbstractJoinPlanNode::AbstractJoinPlanNode(CatalogId id)
-    : AbstractPlanNode(id), m_predicate(NULL)
-{
-}
-
-AbstractJoinPlanNode::AbstractJoinPlanNode()
-    : AbstractPlanNode(), m_predicate(NULL)
-{
-}
-
 AbstractJoinPlanNode::~AbstractJoinPlanNode()
 {
     delete m_predicate;
-}
-
-JoinType AbstractJoinPlanNode::getJoinType() const
-{
-    return m_joinType;
-}
-
-void AbstractJoinPlanNode::setJoinType(JoinType join_type)
-{
-    m_joinType = join_type;
-}
-
-void AbstractJoinPlanNode::setPredicate(AbstractExpression* predicate)
-{
-    assert(!m_predicate);
-    if (m_predicate != predicate)
-    {
-        delete m_predicate;
-    }
-    m_predicate = predicate;
-}
-
-AbstractExpression* AbstractJoinPlanNode::getPredicate() const
-{
-    return m_predicate;
 }
 
 string AbstractJoinPlanNode::debugInfo(const string& spacer) const

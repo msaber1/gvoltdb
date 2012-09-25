@@ -45,36 +45,12 @@
 
 #include "receivenode.h"
 
-#include "storage/table.h"
-
 #include <sstream>
 
 using namespace std;
 using namespace voltdb;
 
-ReceivePlanNode::ReceivePlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-    // Do nothing
-}
-
-ReceivePlanNode::ReceivePlanNode() : AbstractPlanNode()
-{
-    // Do nothing
-}
-
-ReceivePlanNode::~ReceivePlanNode()
-{
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
-PlanNodeType
-ReceivePlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_RECEIVE;
-}
-string
-ReceivePlanNode::debugInfo(const string& spacer) const
+std::string ReceivePlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
     buffer << spacer << "Incoming Table Columns["
@@ -88,10 +64,4 @@ ReceivePlanNode::debugInfo(const string& spacer) const
         buffer << "type=" << col->getType() << "\n";
     }
     return (buffer.str());
-}
-
-void
-ReceivePlanNode::loadFromJSONObject(json_spirit::Object& obj)
-{
-    // This space intentionally left blank.
 }

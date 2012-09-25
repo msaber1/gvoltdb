@@ -52,30 +52,27 @@
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 
 namespace voltdb {
 
-bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
-                           TempTableLimits* limits)
+bool UnionExecutor::p_init()
 {
     VOLT_TRACE("init Union Executor");
 
-    UnionPlanNode* node = dynamic_cast<UnionPlanNode*>(abstract_node);
-    assert(node);
+    assert(dynamic_cast<UnionPlanNode*>(m_abstractNode));
 
     //
     // First check to make sure they have the same number of columns
     //
-    assert(node->getInputTables().size() > 0);
-    for (int table_ctr = 1, table_cnt = (int)node->getInputTables().size(); table_ctr < table_cnt; table_ctr++) {
-        if (node->getInputTables()[0]->columnCount() != node->getInputTables()[table_ctr]->columnCount()) {
+    assert(getInputTables().size() > 0);
+    for (int table_ctr = 1, table_cnt = (int)getInputTables().size(); table_ctr < table_cnt; table_ctr++) {
+        if (m_inputTable->columnCount() != getInputTables()[table_ctr]->columnCount()) {
             VOLT_ERROR("Table '%s' has %d columns, but table '%s' has %d"
                        " columns",
-                       node->getInputTables()[0]->name().c_str(),
-                       node->getInputTables()[0]->columnCount(),
-                       node->getInputTables()[table_ctr]->name().c_str(),
-                       node->getInputTables()[table_ctr]->columnCount());
+                       m_inputTable->name().c_str(),
+                       m_inputTable->columnCount(),
+                       getInputTables()[table_ctr]->name().c_str(),
+                       getInputTables()[table_ctr]->columnCount());
             return false;
         }
     }
@@ -86,63 +83,52 @@ bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
     //
 
     // get the first table
-    const TupleSchema *table0Schema = node->getInputTables()[0]->schema();
+    const TupleSchema *table0Schema = m_inputTable->schema();
     // iterate over all columns in the first table
     for (int col_ctr = 0, col_cnt = table0Schema->columnCount(); col_ctr < col_cnt; col_ctr++) {
         // get the type for the current column
         ValueType type0 = table0Schema->columnType(col_ctr);
 
         // iterate through all the other tables, comparing one column at a time
-        for (int table_ctr = 1, table_cnt = (int)node->getInputTables().size(); table_ctr < table_cnt; table_ctr++) {
+        for (int table_ctr = 1, table_cnt = (int)getInputTables().size(); table_ctr < table_cnt; table_ctr++) {
             // get another table
-            const TupleSchema *table1Schema = node->getInputTables()[table_ctr]->schema();
+            const TupleSchema *table1Schema = getInputTables()[table_ctr]->schema();
             ValueType type1 = table1Schema->columnType(col_ctr);
             if (type0 != type1) {
                 // TODO: DEBUG
                 VOLT_ERROR("Table '%s' has value type '%s' for column '%d',"
                            " table '%s' has value type '%s' for column '%d'",
-                           node->getInputTables()[0]->name().c_str(),
+                           m_inputTable->name().c_str(),
                            getTypeName(type0).c_str(),
                            col_ctr,
-                           node->getInputTables()[table_ctr]->name().c_str(),
+                           getInputTables()[table_ctr]->name().c_str(),
                            getTypeName(type1).c_str(), col_ctr);
                 return false;
             }
         }
     }
-    //
-    // Create our output table that will hold all the tuples that we are appending into.
-    // Since we're are assuming that all of the tables have the same number of columns with
-    // the same format. Therefore, we will just grab the first table in the list
-    //
-    node->setOutputTable(TableFactory::getCopiedTempTable(node->databaseId(),
-                                                          node->getInputTables()[0]->name(),
-                                                          node->getInputTables()[0],
-                                                          limits));
-    return true;
+    return (true);
 }
 
 bool UnionExecutor::p_execute(const NValueArray &params) {
-    UnionPlanNode* node = dynamic_cast<UnionPlanNode*>(m_abstractNode);
-    assert(node);
-    Table* output_table = node->getOutputTable();
-    assert(output_table);
+    assert(dynamic_cast<UnionPlanNode*>(m_abstractNode));
+    assert(m_outputTable);
 
     //
     // For each input table, grab their TableIterator and then append all of its tuples
     // to our ouput table
     //
-    for (int ctr = 0, cnt = (int)node->getInputTables().size(); ctr < cnt; ctr++) {
-        Table* input_table = node->getInputTables()[ctr];
+    for (int ctr = 0, cnt = (int)getInputTables().size(); ctr < cnt; ctr++) {
+        Table* input_table = getInputTables()[ctr];
         assert(input_table);
         TableIterator iterator = input_table->iterator();
         TableTuple tuple(input_table->schema());
         while (iterator.next(tuple)) {
-            if (!output_table->insertTuple(tuple)) {
+            if (!m_outputTable->insertTuple(tuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                            " output table '%s'",
                            input_table->name().c_str(),
-                           output_table->name().c_str());
+                           m_outputTable->name().c_str());
                 return false;
             }
         }

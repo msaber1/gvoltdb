@@ -53,17 +53,12 @@ namespace voltdb
 
 class ReceivePlanNode : public AbstractPlanNode
 {
- public:
-    ReceivePlanNode(CatalogId id);
-    ReceivePlanNode();
-    ~ReceivePlanNode();
-
-    virtual PlanNodeType getPlanNodeType() const;
-
+public:
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_RECEIVE); }
     std::string debugInfo(const std::string& spacer) const;
 
 protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj);
+    virtual void loadFromJSONObject(json_spirit::Object& obj) { /* Do nothing */ }
 };
 
 }

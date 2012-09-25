@@ -43,74 +43,66 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "updateexecutor.h"
+
 #include <cassert>
 #include <boost/scoped_ptr.hpp>
 #include <boost/foreach.hpp>
 
-#include "updateexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
 #include "common/types.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "execution/VoltDBEngine.h"
 #include "plannodes/updatenode.h"
 #include "plannodes/projectionnode.h"
 #include "storage/table.h"
-#include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
-#include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
 using namespace std;
 using namespace voltdb;
 
-bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
-                            TempTableLimits* limits)
+bool UpdateExecutor::p_init()
 {
     VOLT_TRACE("init Update Executor");
 
-    m_node = dynamic_cast<UpdatePlanNode*>(abstract_node);
+    m_node = dynamic_cast<UpdatePlanNode*>(m_abstractNode);
     assert(m_node);
-    assert(m_node->getTargetTable());
-    assert(m_node->getInputTables().size() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
+    assert(getInputTables().size() == 1);
     assert(m_inputTable);
-    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
     assert(m_targetTable);
-    assert(m_node->getTargetTable());
-
-    setDMLCountOutputTable(limits);
 
     AbstractPlanNode *child = m_node->getChildren()[0];
-    ProjectionPlanNode *proj_node = NULL;
     if (NULL == child) {
         VOLT_ERROR("Attempted to initialize update executor with NULL child");
         return false;
     }
 
+    ProjectionPlanNode *proj_node = NULL;
     PlanNodeType pnt = child->getPlanNodeType();
     if (pnt == PLAN_NODE_TYPE_PROJECTION) {
         proj_node = dynamic_cast<ProjectionPlanNode*>(child);
-    } else if (pnt == PLAN_NODE_TYPE_SEQSCAN ||
-            pnt == PLAN_NODE_TYPE_INDEXSCAN) {
+        assert(NULL != proj_node);
+    } else if (pnt == PLAN_NODE_TYPE_SEQSCAN || pnt == PLAN_NODE_TYPE_INDEXSCAN) {
         proj_node = dynamic_cast<ProjectionPlanNode*>(child->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
         assert(NULL != proj_node);
     }
 
-    vector<string> output_column_names = proj_node->getOutputColumnNames();
     const vector<string> &targettable_column_names = m_targetTable->getColumnNames();
 
     /*
      * The first output column is the tuple address expression and it isn't part of our output so we skip
      * it when generating the map from input columns to the target table columns.
      */
-    for (int ii = 1; ii < output_column_names.size(); ii++) {
+    for (int ii = 1; ii < proj_node->getOutputSchema().size(); ii++) {
+        string column_name = proj_node->getOutputSchema()[ii]->getColumnName();
         for (int jj=0; jj < targettable_column_names.size(); ++jj) {
-            if (targettable_column_names[jj].compare(output_column_names[ii]) == 0) {
+            if (targettable_column_names[jj].compare(column_name) == 0) {
                 m_inputTargetMap.push_back(pair<int,int>(ii, jj));
                 break;
             }
@@ -123,12 +115,6 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     m_targetTuple = TableTuple(m_targetTable->schema());
 
     m_partitionColumn = m_targetTable->partitionColumn();
-    m_partitionColumnIsString = false;
-    if (m_partitionColumn != -1) {
-        if (m_targetTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
-            m_partitionColumnIsString = true;
-        }
-    }
 
     // determine which indices are updated by this executor
     // iterate through all target table indices and see if they contain
@@ -210,14 +196,14 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         }
     }
 
-    TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
+    TableTuple& count_tuple = m_outputTable->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->activeTupleCount()));
     // try to put the tuple into the output table
-    if (!m_node->getOutputTable()->insertTuple(count_tuple)) {
+    if (!m_outputTable->insertTuple(count_tuple)) {
         VOLT_ERROR("Failed to insert tuple count (%ld) into"
                    " output table '%s'",
                    static_cast<long int>(m_inputTable->activeTupleCount()),
-                   m_node->getOutputTable()->name().c_str());
+                   m_outputTable->name().c_str());
         return false;
     }
 

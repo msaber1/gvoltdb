@@ -54,29 +54,19 @@
 #include "execution/VoltDBEngine.h"
 
 #include "storage/table.h"
-#include "storage/tablefactory.h"
-#include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/tableutil.h"
 #include "storage/temptable.h"
 
 namespace voltdb {
 
-bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
-                          TempTableLimits* limits)
+bool SendExecutor::p_init()
 {
     VOLT_TRACE("init Send Executor");
 
-    SendPlanNode* node = dynamic_cast<SendPlanNode*>(abstractNode);
-    assert(node);
-    assert(node->getInputTables().size() == 1);
-    m_inputTable = node->getInputTables()[0];
+    assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
+    assert(getInputTables().size() == 1);
     assert(m_inputTable);
-
-    //
-    // Just pass our input table on through...
-    //
-    node->setOutputTable(node->getInputTables()[0]);
 
     return true;
 }

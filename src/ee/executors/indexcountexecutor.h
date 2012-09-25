@@ -19,36 +19,25 @@
 #ifndef HSTOREINDEXCOUNTEXECUTOR_H
 #define HSTOREINDEXSCANEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
 
+#include "common/tabletuple.h"
 #include "boost/shared_array.hpp"
-#include "boost/unordered_set.hpp"
-#include "boost/pool/pool_alloc.hpp"
-#include <set>
-#include <memory>
 
 namespace voltdb {
-
-class TempTable;
-class PersistentTable;
 class AbstractExpression;
 class IndexCountPlanNode;
 
-class IndexCountExecutor : public AbstractExecutor
+class IndexCountExecutor : public AbstractTableIOExecutor
 {
 public:
-    IndexCountExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
-        : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL), m_endKeyBackingStore(NULL)
-    {
-    }
+    IndexCountExecutor()
+        : m_searchKeyBackingStore(NULL), m_endKeyBackingStore(NULL)
+    {}
     ~IndexCountExecutor();
 
 protected:
-    bool p_init(AbstractPlanNode*,
-            TempTableLimits* limits);
+    bool p_init();
     bool p_execute(const NValueArray &params);
 
     // Data in this class is arranged roughly in the order it is read for
@@ -64,9 +53,7 @@ protected:
     TableTuple m_endKey;
     // search_key_beforesubstitute_array_ptr[]
     AbstractExpression** m_searchKeyBeforeSubstituteArray;
-    bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
     AbstractExpression** m_endKeyBeforeSubstituteArray;
-    bool* m_needsSubstituteEndKey;
 
     IndexLookupType m_lookupType;
     IndexLookupType m_endType;
@@ -78,10 +65,8 @@ protected:
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
-    boost::shared_array<bool> m_needsSubstituteSearchKeyPtr;
     boost::shared_array<AbstractExpression*>
         m_searchKeyBeforeSubstituteArrayPtr;
-    boost::shared_array<bool> m_needsSubstituteEndKeyPtr;
     boost::shared_array<AbstractExpression*>
             m_endKeyBeforeSubstituteArrayPtr;
 

@@ -68,16 +68,10 @@ TempTable::~TempTable() {}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-void TempTable::deleteAllTuples(bool freeAllocatedStrings) { deleteAllTuplesNonVirtual(freeAllocatedStrings); }
-bool TempTable::insertTuple(TableTuple &source) {
-    insertTupleNonVirtual(source);
-    return true;
-}
-
 bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                TableTuple &sourceTupleWithNewValues,
                                                std::vector<TableIndex*> &indexesToUpdate) {
-    updateTupleNonVirtual(targetTupleToUpdate, sourceTupleWithNewValues);
+    updateTempTuple(targetTupleToUpdate, sourceTupleWithNewValues);
     return true;
 }
 

@@ -47,19 +47,16 @@
 
 #include "abstractplannode.h"
 
-#include <vector>
-
 namespace voltdb
 {
 
 class OrderByPlanNode : public AbstractPlanNode
 {
 public:
-    OrderByPlanNode(CatalogId id);
     OrderByPlanNode();
     ~OrderByPlanNode();
 
-    virtual PlanNodeType getPlanNodeType() const;
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_ORDERBY); }
 
     std::vector<AbstractExpression*>& getSortExpressions();
 

@@ -51,8 +51,7 @@
 #include "plannodes/abstractplannode.h"
 
 namespace voltdb {
-class VoltDBEngine;
-AbstractExecutor* getNewExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+AbstractExecutor* getNewExecutor(PlanNodeType type);
 }
 
 #endif

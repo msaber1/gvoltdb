@@ -49,52 +49,37 @@
 #include "expressions/abstractexpression.h"
 #include "plannodes/abstractplannode.h"
 
+#include "boost/shared_array.hpp"
+
 namespace voltdb
 {
 
 class ProjectionPlanNode : public AbstractPlanNode
 {
  public:
-    ProjectionPlanNode(CatalogId id);
-    ProjectionPlanNode();
-    virtual ~ProjectionPlanNode();
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_PROJECTION); }
 
-    virtual PlanNodeType getPlanNodeType() const;
+    const std::vector<AbstractExpression*>& getOutputColumnExpressions() const { return m_outputColumnExpressions; }
 
-    void setOutputColumnNames(std::vector<std::string>& names);
-    std::vector<std::string>& getOutputColumnNames();
-    const std::vector<std::string>& getOutputColumnNames() const;
-
-    void setOutputColumnTypes(std::vector<ValueType>& types);
-    std::vector<ValueType>& getOutputColumnTypes();
-    const std::vector<ValueType>& getOutputColumnTypes() const;
-
-    void setOutputColumnSizes(std::vector<int32_t>& sizes);
-    std::vector<int32_t>& getOutputColumnSizes();
-    const std::vector<int32_t>& getOutputColumnSizes() const;
-
-    void setOutputColumnExpressions(std::vector<AbstractExpression*>& exps);
-    std::vector<AbstractExpression*>& getOutputColumnExpressions();
-    const std::vector<AbstractExpression*>& getOutputColumnExpressions() const;
+    /** If the projection contains only ParameterValueExpression, it
+     * returns their ParamIds, otherwise NULL.*/
+    boost::shared_array<int> convertOutputIfAllParameterValues();
+    
+    /** If the projection contains only TupleValueExpression, it
+     * returns their column Ids, otherwise NULL.*/
+    boost::shared_array<int> convertOutputIfAllTupleValues();
 
     std::string debugInfo(const std::string& spacer) const;
 
  protected:
-    virtual void loadFromJSONObject(json_spirit::Object& obj);
-    //
-    // The node must define what the columns in the output table are
-    // going to look like
-    //
-    std::vector<std::string> m_outputColumnNames;
-    std::vector<ValueType> m_outputColumnTypes;
-    std::vector<int32_t> m_outputColumnSizes;
+    void loadFromJSONObject(json_spirit::Object& obj);
 
     // indicate how to project (or replace) each column value. indices
     // are same as output table's.
     // note that this might be a PlaceholderExpression (for substituted value)
     // It will become ConstantValueExpression for implanted value
     // or TupleValueExpression for pure projection,
-    // or CalculatedValueExpression for projection with arithmetic calculation.
+    // or other kind of AbstractExpression for projection with arithmetic calculation, etc.
     // in ProjectionPlanNode
     std::vector<AbstractExpression*> m_outputColumnExpressions;
 };

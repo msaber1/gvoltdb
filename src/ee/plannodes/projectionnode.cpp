@@ -45,118 +45,30 @@
 
 #include "projectionnode.h"
 
-#include "storage/table.h"
+#include "expressions/expressionutil.h"
 
 using namespace std;
 using namespace voltdb;
 
-ProjectionPlanNode::ProjectionPlanNode(CatalogId id) : AbstractPlanNode(id)
+boost::shared_array<int> ProjectionPlanNode::convertOutputIfAllParameterValues()
 {
-    // Do nothing
+    return ExpressionUtil::convertIfAllParameterValues(m_outputColumnExpressions);
+}
+    
+boost::shared_array<int> ProjectionPlanNode::convertOutputIfAllTupleValues()
+{
+    return ExpressionUtil::convertIfAllTupleValues(m_outputColumnExpressions);
 }
 
-ProjectionPlanNode::ProjectionPlanNode() : AbstractPlanNode()
-{
-    // Do nothing
-}
-
-ProjectionPlanNode::~ProjectionPlanNode()
-{
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
-PlanNodeType
-ProjectionPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_PROJECTION;
-}
-
-void
-ProjectionPlanNode::setOutputColumnNames(vector<string>& names)
-{
-    m_outputColumnNames = names;
-}
-
-vector<string>&
-ProjectionPlanNode::getOutputColumnNames()
-{
-    return m_outputColumnNames;
-}
-
-const vector<string>&
-ProjectionPlanNode::getOutputColumnNames() const
-{
-    return m_outputColumnNames;
-}
-
-void
-ProjectionPlanNode::setOutputColumnTypes(vector<ValueType>& types)
-{
-    m_outputColumnTypes = types;
-}
-
-vector<ValueType>&
-ProjectionPlanNode::getOutputColumnTypes()
-{
-    return m_outputColumnTypes;
-}
-
-const vector<ValueType>&
-ProjectionPlanNode::getOutputColumnTypes() const
-{
-    return m_outputColumnTypes;
-}
-
-
-void ProjectionPlanNode::setOutputColumnSizes(vector<int32_t>& sizes)
-{
-    m_outputColumnSizes = sizes;
-
-}
-
-vector<int32_t>&
-ProjectionPlanNode::getOutputColumnSizes()
-{
-    return m_outputColumnSizes;
-}
-
-const vector<int32_t>&
-ProjectionPlanNode::getOutputColumnSizes() const
-{
-    return m_outputColumnSizes;
-}
-
-void
-ProjectionPlanNode::setOutputColumnExpressions(vector<AbstractExpression*>& exps)
-{
-    m_outputColumnExpressions = exps;
-}
-
-vector<AbstractExpression*>&
-ProjectionPlanNode::getOutputColumnExpressions()
-{
-    return m_outputColumnExpressions;
-}
-
-const vector<AbstractExpression*>&
-ProjectionPlanNode::getOutputColumnExpressions() const
-{
-    return m_outputColumnExpressions;
-}
-
-string
-ProjectionPlanNode::debugInfo(const string& spacer) const
+string ProjectionPlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
     buffer << spacer << "Projection Output["
-           << m_outputColumnNames.size() << "]:\n";
-    for (int ctr = 0, cnt = (int)m_outputColumnNames.size(); ctr < cnt; ctr++)
+           << getOutputSchema().size() << "]:\n";
+    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++)
     {
         buffer << spacer << "  [" << ctr << "] ";
-        buffer << "name=" << m_outputColumnNames[ctr] << " : ";
-        buffer << "size=" << m_outputColumnSizes[ctr] << " : ";
-        buffer << "type=" << getTypeName(m_outputColumnTypes[ctr]) << "\n";
+        buffer << "name=" << getOutputSchema()[ctr]->getColumnName() << " : ";
         if (m_outputColumnExpressions[ctr] != NULL)
         {
             buffer << m_outputColumnExpressions[ctr]->debug(spacer + "   ");
@@ -169,17 +81,12 @@ ProjectionPlanNode::debugInfo(const string& spacer) const
     return buffer.str();
 }
 
-
-void
-ProjectionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
+void ProjectionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
     // XXX-IZZY move this to init at some point
     for (int ii = 0; ii < getOutputSchema().size(); ii++)
     {
         SchemaColumn* outputColumn = getOutputSchema()[ii];
-        m_outputColumnNames.push_back(outputColumn->getColumnName());
-        m_outputColumnTypes.push_back(outputColumn->getType());
-        m_outputColumnSizes.push_back(outputColumn->getSize());
         m_outputColumnExpressions.push_back(outputColumn->getExpression());
     }
 }

@@ -46,19 +46,16 @@
 #ifndef HSTOREABSTRACTEXPRESSION_H
 #define HSTOREABSTRACTEXPRESSION_H
 
-#include "boost/shared_ptr.hpp"
-#include "common/types.h"
 #include "common/valuevector.h"
 
-#include <string>
-#include <vector>
+#include "boost/shared_ptr.hpp"
+
 #include "json_spirit/json_spirit.h"
 
 namespace voltdb {
 
 class SerializeInput;
 class SerializeOutput;
-class NValue;
 class TableTuple;
 
 /**
@@ -77,10 +74,18 @@ class AbstractExpression {
     virtual NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const = 0;
 
     /** set parameter values for this node and its descendents */
-    virtual void substitute(const NValueArray &params);
+    void substitute(const NValueArray &params)
+    {
+        if (m_hasParameter) {
+            p_substitute(params);
+        }
+    }
+    
+    virtual void p_substitute(const NValueArray &params);
 
     /** return true if self or descendent should be substitute()'d */
-    virtual bool hasParameter() const;
+    bool hasParameter() const { return m_hasParameter; }
+    void setHasParameter(bool hasParam) { m_hasParameter = hasParam; }
 
     /* debugging methods - some various ways to create a sring
        describing the expression tree */

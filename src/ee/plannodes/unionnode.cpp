@@ -43,10 +43,9 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
 #include "unionnode.h"
-#include "common/common.h"
-#include "expressions/abstractexpression.h"
+
+#include <sstream>
 
 namespace voltdb {
 

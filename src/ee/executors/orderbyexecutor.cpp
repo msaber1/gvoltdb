@@ -43,44 +43,32 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "orderbyexecutor.h"
+
 #include <algorithm>
 #include <vector>
-#include "orderbyexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 
 using namespace voltdb;
 using namespace std;
 
 bool
-OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
-                        TempTableLimits* limits)
+OrderByExecutor::p_init()
 {
     VOLT_TRACE("init OrderBy Executor");
 
-    OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
+    OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
-    assert(node->getInputTables().size() == 1);
+    assert(getInputTables().size() == 1);
 
     assert(node->getChildren()[0] != NULL);
-
-    //
-    // Our output table should look exactly like out input table
-    //
-    node->
-        setOutputTable(TableFactory::
-                       getCopiedTempTable(node->databaseId(),
-                                          node->getInputTables()[0]->name(),
-                                          node->getInputTables()[0],
-                                          limits));
 
     // pickup an inlined limit, if one exists
     limit_node =
@@ -138,10 +126,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
 {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
-    Table* output_table = node->getOutputTable();
-    assert(output_table);
-    Table* input_table = node->getInputTables()[0];
-    assert(input_table);
+    assert(m_inputTable);
 
     //
     // OPTIMIZATION: NESTED LIMIT
@@ -160,9 +145,9 @@ OrderByExecutor::p_execute(const NValueArray &params)
     }
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
-    VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
-    TableIterator iterator = input_table->iterator();
-    TableTuple tuple(input_table->schema());
+    VOLT_TRACE("Input Table:\n '%s'", m_inputTable->debug().c_str());
+    TableIterator iterator = m_inputTable->iterator();
+    TableTuple tuple(m_inputTable->schema());
     vector<TableTuple> xs;
     while (iterator.next(tuple))
     {
@@ -170,7 +155,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
         xs.push_back(tuple);
     }
     VOLT_TRACE("\n***** Input Table PreSort:\n '%s'",
-               input_table->debug().c_str());
+               m_inputTable->debug().c_str());
     sort(xs.begin(), xs.end(), TupleComparer(node->getSortExpressions(),
                                              node->getSortDirections()));
 
@@ -187,13 +172,13 @@ OrderByExecutor::p_execute(const NValueArray &params)
         }
 
         VOLT_TRACE("\n***** Input Table PostSort:\n '%s'",
-                   input_table->debug().c_str());
-        if (!output_table->insertTuple(*it))
+                   m_inputTable->debug().c_str());
+        if (!m_outputTable->insertTuple(*it))
         {
             VOLT_ERROR("Failed to insert order-by tuple from input table '%s'"
                        " into output table '%s'",
-                       input_table->name().c_str(),
-                       output_table->name().c_str());
+                       m_inputTable->name().c_str(),
+                       m_outputTable->name().c_str());
             return false;
         }
         //
@@ -203,7 +188,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
             break;
         }
     }
-    VOLT_TRACE("Result of OrderBy:\n '%s'", output_table->debug().c_str());
+    VOLT_TRACE("Result of OrderBy:\n '%s'", m_outputTable->debug().c_str());
 
     return true;
 }

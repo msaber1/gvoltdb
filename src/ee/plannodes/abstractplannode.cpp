@@ -57,18 +57,6 @@ using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
-AbstractPlanNode::AbstractPlanNode(int32_t plannode_id)
-    : m_planNodeId(plannode_id), m_outputTable(NULL), m_executor(NULL),
-      m_isInline(false)
-{
-}
-
-AbstractPlanNode::AbstractPlanNode()
-    : m_planNodeId(-1), m_outputTable(NULL), m_executor(NULL),
-      m_isInline(false)
-{
-}
-
 AbstractPlanNode::~AbstractPlanNode()
 {
     delete m_executor;
@@ -184,46 +172,10 @@ AbstractPlanNode::isInline() const
 // ------------------------------------------------------------------
 // DATA MEMBER METHODS
 // ------------------------------------------------------------------
-void
-AbstractPlanNode::setPlanNodeId(int32_t plannode_id)
-{
-    m_planNodeId = plannode_id;
-}
-
-int32_t
-AbstractPlanNode::getPlanNodeId() const
-{
-    return m_planNodeId;
-}
-
-void
-AbstractPlanNode::setExecutor(AbstractExecutor* executor)
-{
-    m_executor = executor;
-}
-
-void
-AbstractPlanNode::setInputTables(const vector<Table*>& val)
-{
-    m_inputTables = val;
-}
-
-vector<Table*>&
-AbstractPlanNode::getInputTables()
-{
-    return m_inputTables;
-}
-
-void
-AbstractPlanNode::setOutputTable(Table* table)
-{
-    m_outputTable = table;
-}
-
 Table*
 AbstractPlanNode::getOutputTable() const
 {
-    return m_outputTable;
+    return m_executor->getOutputTable();
 }
 
 const vector<SchemaColumn*>&
