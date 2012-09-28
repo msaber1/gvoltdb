@@ -62,6 +62,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.TableCompressor;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -1618,7 +1619,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                             PrivateVoltTableFactory.createVoltTableFromBuffer(c.b , true);
                     VoltTable new_table = SavedTableConverter.convertTable(old_table,
                             new_catalog_table);
-                    compressedTable = new_table.getCompressedBytes();
+                    compressedTable = TableCompressor.getCompressedBytes(new_table);
                 } else {
                     compressedTable = CompressionService.compressBuffer(c.b);
                 }
@@ -1828,7 +1829,7 @@ public class SnapshotRestore extends VoltSystemProcedure
          */
         ArrayList<Future<byte[]>> compressTableTasks = new ArrayList<Future<byte[]>>();
         for (int ii = 0; ii < number_of_partitions; ii++) {
-            compressTableTasks.add(partitioned_tables[ii].getCompressedBytesAsync());
+            compressTableTasks.add(TableCompressor.getCompressedBytesAsync(partitioned_tables[ii]));
         }
         byte compressedTables[][] = new byte[number_of_partitions][];
         for (int ii = 0; ii < compressedTables.length; ii++) {

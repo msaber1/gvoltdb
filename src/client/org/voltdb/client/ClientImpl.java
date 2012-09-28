@@ -27,8 +27,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
-import org.voltdb.utils.CatalogUtil;
-
 /**
  *  A client that connects to one or more nodes in a VoltCluster
  *  and provides methods to call stored procedures and receive
@@ -343,8 +341,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     private Object[] getUpdateCatalogParams(File catalogPath, File deploymentPath)
     throws IOException {
         Object[] params = new Object[2];
-        params[0] = CatalogUtil.toBytes(catalogPath);
-        params[1] = new String(CatalogUtil.toBytes(deploymentPath), "UTF-8");
+        params[0] = CatalogUtilForClient.toBytes(catalogPath);
+        params[1] = new String(CatalogUtilForClient.toBytes(deploymentPath), "UTF-8");
         return params;
     }
 

@@ -19,10 +19,10 @@ package org.voltcore.utils;
 
 import java.nio.ByteBuffer;
 import java.util.concurrent.atomic.AtomicLong;
-import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
 
+import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.VoltDB;
+import org.voltdb.CrashService;
 
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
@@ -137,7 +137,7 @@ public final class DBBPool {
                 try {
                     DirectMemoryUtils.destroyDirectByteBuffer(retval);
                 } catch (Throwable e) {
-                    VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
+                    CrashService.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
                 }
             }
 

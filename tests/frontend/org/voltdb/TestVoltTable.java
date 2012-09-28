@@ -291,7 +291,7 @@ public class TestVoltTable extends TestCase {
          * Test the sync method
          */
         byte decompressedBytes[] = CompressionService
-                .decompressBytes(vt.getCompressedBytes());
+                .decompressBytes(TableCompressor.getCompressedBytes(vt));
         vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 ByteBuffer.wrap(decompressedBytes), true);
         fs = new FastSerializer();
@@ -305,7 +305,7 @@ public class TestVoltTable extends TestCase {
          */
         vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
         decompressedBytes = CompressionService
-                .decompressBytes(vt.getCompressedBytes());
+                .decompressBytes(TableCompressor.getCompressedBytes(vt));
         vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 ByteBuffer.wrap(decompressedBytes), true);
         fs = new FastSerializer();
@@ -317,14 +317,14 @@ public class TestVoltTable extends TestCase {
 
     public void testCompression() throws Exception {
         testResizedTable();
-        byte compressedBytes[] = t.getCompressedBytes();
+        byte compressedBytes[] = TableCompressor.getCompressedBytes(t);
         FastSerializer fs = new FastSerializer();
         fs.writeObject(t);
 
         byte uncompressedBytes[] = fs.getBytes();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
-        compressedBytes = t.getCompressedBytesAsync().get();
+        compressedBytes = TableCompressor.getCompressedBytesAsync(t).get();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
         byte decompressedBytes[] = CompressionService
@@ -350,14 +350,14 @@ public class TestVoltTable extends TestCase {
         VoltTable tDirect = PrivateVoltTableFactory.createVoltTableFromBuffer(
                 copy, true);
 
-        byte compressedBytes[] = tDirect.getCompressedBytes();
+        byte compressedBytes[] = TableCompressor.getCompressedBytes(tDirect);
         FastSerializer fs = new FastSerializer();
         fs.writeObject(tDirect);
 
         byte uncompressedBytes[] = fs.getBytes();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
-        compressedBytes = tDirect.getCompressedBytesAsync().get();
+        compressedBytes = TableCompressor.getCompressedBytesAsync(tDirect).get();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
         byte decompressedBytes[] = CompressionService

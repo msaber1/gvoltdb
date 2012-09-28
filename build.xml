@@ -59,12 +59,14 @@
 <property name='base.dir'                   location='.' />
 <property name='build.dir'                   location='obj/${build}' />
 <property name='build.prod.dir'              location='${build.dir}/prod' />
+<property name='build.client.dir'            location='${build.dir}/client' />
 <property name='build.test.dir'              location='${build.dir}/test' />
 <property name='raw.dist.dir'                location='${build.dir}' />
 <property name='dist.dir'                    location='${build.dir}/dist' />
 <property name='dist.examples.dir'           location='${dist.dir}/examples' />
 <property name='doc.dir'                     location='doc' />
 <property name='src.gpl.dir'                 location='src/frontend' />
+<property name='src.client.dir'              location='src/client' />
 <property name='src.hsqldb.dir'              location='src/hsqldb19b3' />
 <property name='src.test.dir'                location='tests/frontend' />
 <property name='src.hsqldb.test.dir'         location='tests/hsqldb' />
@@ -111,6 +113,7 @@
 <path id='project.classpath'>
     <pathelement location='${build.instr.dir}' />
     <pathelement location='${build.prod.dir}' />
+    <pathelement location='${build.client.dir}' />
     <pathelement location='${build.test.dir}' />
     <fileset dir='${lib.dir}'>
         <include name='*.jar' />
@@ -226,7 +229,7 @@ PRIMARY ENTRY POINTS
     description="Do all tasks."
 />
 <target name="jars"
-    depends="voltdb.jar, voltdbfat.jar, voltdbclient.jar"
+    depends="voltdb.jar, voltdbclient.jar"
     description="Create production JAR files."
 />
 <target name="dist"
@@ -268,13 +271,13 @@ DISTRIBUTION
         <link href="${j2se_api}"/>
         <classpath refid='project.classpath' />
         <fileset dir="." defaultexcludes="yes">
-            <include name="src/frontend/org/voltdb/VoltTable.java" />
-            <include name="src/frontend/org/voltdb/VoltTableRow.java" />
+            <include name="src/client/org/voltdb/VoltTable.java" />
+            <include name="src/client/org/voltdb/VoltTableRow.java" />
             <include name="src/frontend/org/voltdb/VoltProcedure.java" />
             <include name="src/frontend/org/voltdb/SQLStmt.java" />
-            <include name="src/frontend/org/voltdb/VoltType.java" />
+            <include name="src/client/org/voltdb/VoltType.java" />
             <include name="src/frontend/org/voltdb/ProcInfo.java" />
-            <include name="src/frontend/org/voltdb/types/TimestampType.java" />
+            <include name="src/client/org/voltdb/types/TimestampType.java" />
         </fileset>
     </javadoc>
 
@@ -290,24 +293,23 @@ DISTRIBUTION
         <link href="${j2se_api}"/>
         <classpath refid='project.classpath' />
         <fileset dir="." defaultexcludes="yes">
-            <include name="src/frontend/org/voltdb/VoltTable.java" />
-            <include name="src/frontend/org/voltdb/VoltTableRow.java" />
-            <include name="src/frontend/org/voltdb/VoltClient.java" />
-            <include name="src/frontend/org/voltdb/VoltType.java" />
-            <include name="src/frontend/org/voltdb/client/Client.java" />
-            <include name="src/frontend/org/voltdb/client/NoConnectionsException.java" />
-            <include name="src/frontend/org/voltdb/client/ProcedureCallback.java" />
-            <include name="src/frontend/org/voltdb/client/ClientConfig.java" />
-            <include name="src/frontend/org/voltdb/client/ClientFactory.java" />
-            <include name="src/frontend/org/voltdb/client/SyncCallback.java" />
-            <include name="src/frontend/org/voltdb/client/NullCallback.java" />
-            <include name="src/frontend/org/voltdb/client/ProcCallException.java" />
-            <include name="src/frontend/org/voltdb/client/ClientStatusListener.java" />
-            <include name="src/frontend/org/voltdb/client/ClientStatusListenerExt.java" />
-            <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
-            <include name="src/frontend/org/voltdb/client/ClientStats.java" />
-            <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
-            <include name="src/frontend/org/voltdb/types/TimestampType.java" />
+            <include name="src/client/org/voltdb/VoltTable.java" />
+            <include name="src/client/org/voltdb/VoltTableRow.java" />
+            <include name="src/client/org/voltdb/VoltType.java" />
+            <include name="src/client/org/voltdb/client/Client.java" />
+            <include name="src/client/org/voltdb/client/NoConnectionsException.java" />
+            <include name="src/client/org/voltdb/client/ProcedureCallback.java" />
+            <include name="src/client/org/voltdb/client/ClientConfig.java" />
+            <include name="src/client/org/voltdb/client/ClientFactory.java" />
+            <include name="src/client/org/voltdb/client/SyncCallback.java" />
+            <include name="src/client/org/voltdb/client/NullCallback.java" />
+            <include name="src/client/org/voltdb/client/ProcCallException.java" />
+            <include name="src/client/org/voltdb/client/ClientStatusListener.java" />
+            <include name="src/client/org/voltdb/client/ClientStatusListenerExt.java" />
+            <include name="src/client/org/voltdb/client/ClientResponse.java" />
+            <include name="src/client/org/voltdb/client/ClientStats.java" />
+            <include name="src/client/org/voltdb/client/ClientStatsContext.java" />
+            <include name="src/client/org/voltdb/types/TimestampType.java" />
         </fileset>
     </javadoc>
 </target>
@@ -450,7 +452,7 @@ DISTRIBUTION
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
             <include name="tools/generate"/>
-            <include name="bin/sqlcmd"/> 
+            <include name="bin/sqlcmd"/>
         </fileset>
     </chmod>
 
@@ -649,6 +651,10 @@ JAR BUILDING
             <include name="org/json_voltpatches/**" />
             <include name="org/mindrot/**" />
         </fileset>
+        <fileset dir="${build.client.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/**"/>
+            <include name="org/voltcore/**"/>
+        </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
             <include name="org/voltdb/benchmark/*" />
@@ -711,10 +717,15 @@ JAR BUILDING
 <target name="voltdbclient.jar" depends="compile, buildinfo">
     <jar destfile="voltdb/voltdbclient-${dist.version}.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
+            <include name="org/apache/**" />
+            <include name="au/com/bytecode/opencsv_voltpatches/**" />
+            <include name="org/json_voltpatches/**" />
+            <include name="org/mindrot/**" />
+            <include name="org/apache/hadoop_voltpatches/**" />
+        </fileset>
+        <fileset dir="${build.client.dir}" defaultexcludes="yes" >
             <include name="org/voltcore/**" />
             <include name="org/voltdb/**" />
-            <include name="org/json_voltpatches/**" />
-            <include name="org/apache/hadoop_voltpatches/**" />
         </fileset>
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
@@ -737,10 +748,16 @@ JAR BUILDING
     <jar destfile="${build.prod.dir}/voltdbthin.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
+            <include name="org/voltcore/**" />
+        </fileset>
+        <fileset dir="${build.client.dir}" defaultexcludes="yes" >
+            <include name="org/voltdb/**" />
+            <include name="org/voltcore/**" />
         </fileset>
     </jar>
 </target>
 
+<!-- Not sure this works anymore JHH 9/27/12
 <target name="voltdbfat.jar" depends="compile, buildinfo">
     <jar destfile="${build.prod.dir}/voltdbfat.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
@@ -776,7 +793,7 @@ JAR BUILDING
             </section>
         </manifest>
     </jar>
-</target>
+</target>-->
 
 <!--
 ***************************************
@@ -789,13 +806,14 @@ JAVA COMPILATION
 
 <target name="compile_core">
     <mkdir dir='${build.prod.dir}' />
+    <mkdir dir='${build.client.dir}' />
     <mkdir dir='${build.test.dir}' />
     <exec
-        dir='${src.gpl.dir}/org/voltdb/utils'
-        executable='${src.gpl.dir}/org/voltdb/utils/generate_logkeys.py'
+        dir='${src.client.dir}/org/voltdb/utils'
+        executable='${src.client.dir}/org/voltdb/utils/generate_logkeys.py'
         failonerror='true' />
     <depend
-        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.gpl.dir}:${src.test.dir}:${vendor.src.dir}"
+        srcdir="${src.hsqldb.dir}:${src.hsqldb.test.dir}:${src.client.dir}:${src.gpl.dir}:${src.test.dir}:${vendor.src.dir}"
         destdir="${build.prod.dir}:${build.test.dir}"
         cache="${depcache}">
         <classpath refid="project.classpath" />
@@ -807,6 +825,10 @@ JAVA COMPILATION
         <fileset dir="${src.gpl.dir}" includes="**/*.properties"/>
         <fileset dir="${src.gpl.dir}" includes="**/*.xml" />
         <fileset dir="${src.gpl.dir}" includes="**/admintemplate.html" />
+    </copy>
+    <copy todir="${build.client.dir}">
+        <fileset dir="${src.client.dir}" includes="**/*.properties"/>
+        <fileset dir="${src.client.dir}" includes="**/*.xml" />
     </copy>
 
     <copy todir='${build.prod.dir}/org/hsqldb_voltpatches/resources'>
@@ -873,12 +895,18 @@ JAVA COMPILATION
     <!-- compile the individual source directories -->
     <!-- hsql -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
+    <!-- client and shared code and voltcore in the client -->
+    <invoke-javac
+        srcdir="${src.client.dir}:${vendor.src.dir}" destdir='${build.client.dir}'
+        includes="org/voltcore/**/*.java
+                  org/voltdb/**/*.java
+                  au/**/*.java
+                  org/json_voltpatches/**/*.java" />
     <!-- voltcore and third-party java (including our zookeeper -->
     <invoke-javac
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
-        includes="org/voltcore/**/*.java,org/apache/**/*.java
-                  au/**/*.java
-                  org/json_voltpatches/**/*.java" />
+        includes="org/voltcore/**/*.java
+                  org/apache/**/*.java" />
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 

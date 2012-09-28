@@ -47,8 +47,8 @@ import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.JdbcDatabaseMetaDataGenerator;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltConstants;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 
@@ -832,9 +832,9 @@ class Distributer {
                 //Data embedded in JSON object in remarks column
                 String jsString = vt.getString(6);
                 JSONObject jsObj = new JSONObject(jsString);
-                if (jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_SINGLE_PARTITION)) {
-                    int partitionParameter = jsObj.getInt(JdbcDatabaseMetaDataGenerator.JSON_PARTITION_PARAMETER);
-                    boolean readOnly = jsObj.getBoolean(JdbcDatabaseMetaDataGenerator.JSON_READ_ONLY);
+                if (jsObj.getBoolean(VoltConstants.JSON_SINGLE_PARTITION)) {
+                    int partitionParameter = jsObj.getInt(VoltConstants.JSON_PARTITION_PARAMETER);
+                    boolean readOnly = jsObj.getBoolean(VoltConstants.JSON_READ_ONLY);
                     String procedureName = vt.getString(2);
                     m_procedureInfo.put(procedureName, new Procedure(readOnly, partitionParameter));
                 }

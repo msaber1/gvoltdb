@@ -534,7 +534,7 @@ import org.voltdb.types.VoltDecimalHelper;
                                 try {
                                     encodedStrings[zz] = strings[zz].getBytes("UTF-8");
                                 } catch (UnsupportedEncodingException e) {
-                                    VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
+                                    CrashService.crashLocalVoltDB("Shouldn't happen", false, e);
                                 }
                                 size += 4 + encodedStrings[zz].length;
                             }
@@ -603,7 +603,7 @@ import org.voltdb.types.VoltDecimalHelper;
                         size += 4 + encodedString.length;
                         m_encodedStrings.add(encodedString);
                     } catch (UnsupportedEncodingException e) {
-                        VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
+                        CrashService.crashLocalVoltDB("Shouldn't happen", false, e);
                     }
                     break;
                 case TIMESTAMP:

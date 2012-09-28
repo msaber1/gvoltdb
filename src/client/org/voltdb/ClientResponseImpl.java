@@ -25,7 +25,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.utils.MiscUtils;
+import org.voltdb.utils.CheesyChecksum;
 
 /**
  * Packages up the data to be sent back to the client as a stored
@@ -155,7 +155,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
     }
 
     @Override
-    public SerializableException getException() {
+    public Exception getException() {
         return m_exception;
     }
 
@@ -210,7 +210,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
                 msgsize += vt.getSerializedSize();
             }
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Error serializing client response", false, e);
+            CrashService.crashLocalVoltDB("Error serializing client response", false, e);
         }
         return msgsize;
     }
@@ -329,7 +329,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
         try {
             long cheesyChecksum = 0;
             for (int i = 0; i < results.length; ++i) {
-                cheesyChecksum += MiscUtils.cheesyBufferCheckSum(results[i].m_buffer);
+                cheesyChecksum += CheesyChecksum.cheesyBufferCheckSum(results[i].m_buffer);
             }
             return (int)cheesyChecksum;
         } catch (Exception e) {

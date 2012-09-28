@@ -25,8 +25,8 @@ import java.util.concurrent.FutureTask;
 
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
@@ -126,7 +126,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         try {
             return params.get();
         } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Interrupted while deserializing a parameter set", false, e);
+            CrashService.crashLocalVoltDB("Interrupted while deserializing a parameter set", false, e);
         } catch (ExecutionException e) {
             throw new RuntimeException(e);
         }

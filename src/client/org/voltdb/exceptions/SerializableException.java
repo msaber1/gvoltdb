@@ -17,19 +17,21 @@
 
 package org.voltdb.exceptions;
 
-import java.io.*;
+import java.io.PrintStream;
+import java.io.PrintWriter;
+import java.io.StringWriter;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.VoltProcedure;
 
 /**
  * Base class for runtime exceptions that can be serialized to ByteBuffers without involving Java's
  * serialization mechanism
  *
  */
-public class SerializableException extends VoltProcedure.VoltAbortException implements JSONString {
+public class SerializableException extends RuntimeException implements JSONString {
 
     /**
      *

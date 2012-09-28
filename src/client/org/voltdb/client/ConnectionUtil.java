@@ -34,8 +34,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
 
-import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltConstants;
 import org.voltdb.messaging.FastSerializer;
 
 /**
@@ -232,16 +232,16 @@ public class ConnectionUtil {
             if (loginResponseCode != 0) {
                 aChannel.close();
                 switch (loginResponseCode) {
-                case ClientInterface.MAX_CONNECTIONS_LIMIT_ERROR:
+                case VoltConstants.MAX_CONNECTIONS_LIMIT_ERROR:
                     throw new IOException("Server has too many connections");
-                case ClientInterface.WIRE_PROTOCOL_TIMEOUT_ERROR:
+                case VoltConstants.WIRE_PROTOCOL_TIMEOUT_ERROR:
                     throw new IOException("Connection timed out during authentication. " +
                     "The VoltDB server may be overloaded.");
-                case ClientInterface.EXPORT_DISABLED_REJECTION:
+                case VoltConstants.EXPORT_DISABLED_REJECTION:
                     throw new IOException("Export not enabled for server");
-                case ClientInterface.WIRE_PROTOCOL_FORMAT_ERROR:
+                case VoltConstants.WIRE_PROTOCOL_FORMAT_ERROR:
                     throw new IOException("Wire protocol format violation error");
-                case ClientInterface.AUTHENTICATION_FAILURE_DUE_TO_REJOIN:
+                case VoltConstants.AUTHENTICATION_FAILURE_DUE_TO_REJOIN:
                     throw new IOException("Failed to authenticate to rejoining node");
                 default:
                     throw new IOException("Authentication rejected");

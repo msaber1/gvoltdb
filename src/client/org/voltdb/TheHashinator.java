@@ -89,12 +89,12 @@ public abstract class TheHashinator {
             return hashinateBytes(bytes);
         } catch (UnsupportedEncodingException e) {
             hostLogger.l7dlog( Level.FATAL, LogKeys.host_TheHashinator_ExceptionHashingString.name(), new Object[] { value }, e);
-            VoltDB.crashLocalVoltDB("No additional info.", false, e);
+            CrashService.crashLocalVoltDB("No additional info.", false, e);
         }
 
         hostLogger.l7dlog(Level.FATAL, LogKeys.host_TheHashinator_AttemptedToHashinateNonLongOrString.name(), new Object[] { value
                 .getClass().getName() }, null);
-        VoltDB.crashLocalVoltDB("No additional info.", false, null);
+        CrashService.crashLocalVoltDB("No additional info.", false, null);
         return -1;
     }
 
