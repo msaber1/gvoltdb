@@ -717,15 +717,16 @@ JAR BUILDING
 <target name="voltdbclient.jar" depends="compile, buildinfo">
     <jar destfile="voltdb/voltdbclient-${dist.version}.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
-            <include name="org/apache/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
-            <include name="org/json_voltpatches/**" />
             <include name="org/mindrot/**" />
             <include name="org/apache/hadoop_voltpatches/**" />
         </fileset>
         <fileset dir="${build.client.dir}" defaultexcludes="yes" >
             <include name="org/voltcore/**" />
             <include name="org/voltdb/**" />
+            <include name="au/com/bytecode/opencsv_voltpatches/**" />
+            <include name="org/json_voltpatches/**" />
+            <include name="org/apache/hadoop_voltpatches/**" />
         </fileset>
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
