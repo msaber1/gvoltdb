@@ -19,10 +19,9 @@
 #ifndef HSTOREINDEXCOUNTEXECUTOR_H
 #define HSTOREINDEXSCANEXECUTOR_H
 
-#include "executors/abstractexecutor.h"
+#include "executors/abstracttableioexecutor.h"
 
 #include "common/tabletuple.h"
-#include "boost/shared_array.hpp"
 
 namespace voltdb {
 class AbstractExpression;
@@ -31,48 +30,28 @@ class IndexCountPlanNode;
 class IndexCountExecutor : public AbstractTableIOExecutor
 {
 public:
-    IndexCountExecutor()
-        : m_searchKeyBackingStore(NULL), m_endKeyBackingStore(NULL)
-    {}
+    IndexCountExecutor() { /* Do nothing. */ }
     ~IndexCountExecutor();
 
 protected:
     bool p_init();
-    bool p_execute(const NValueArray &params);
+    bool p_execute();
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
-    IndexCountPlanNode *m_node;
     int m_numOfColumns;
     int m_numOfSearchkeys;
     int m_numOfEndkeys;
 
     // Search key
-    TableTuple m_searchKey;
-    TableTuple m_endKey;
-    // search_key_beforesubstitute_array_ptr[]
-    AbstractExpression** m_searchKeyBeforeSubstituteArray;
-    AbstractExpression** m_endKeyBeforeSubstituteArray;
+    StorageBackedTempTuple m_searchKey;
+    StorageBackedTempTuple m_endKey;
 
     IndexLookupType m_lookupType;
     IndexLookupType m_endType;
 
-    // IndexCount Information
-    TempTable* m_outputTable;
-    PersistentTable* m_targetTable;
     TableIndex *m_index;
-
-    // arrange the memory mgmt aids at the bottom to try to maximize
-    // cache hits (by keeping them out of the way of useful runtime data)
-    boost::shared_array<AbstractExpression*>
-        m_searchKeyBeforeSubstituteArrayPtr;
-    boost::shared_array<AbstractExpression*>
-            m_endKeyBeforeSubstituteArrayPtr;
-
-    // So Valgrind doesn't complain:
-    char* m_searchKeyBackingStore;
-    char* m_endKeyBackingStore;
 };
 
 }

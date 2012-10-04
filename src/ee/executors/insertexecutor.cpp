@@ -44,19 +44,14 @@
  */
 
 #include "insertexecutor.h"
+
 #include "common/debuglog.h"
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "common/types.h"
 #include "plannodes/insertnode.h"
-#include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
-#include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/tableutil.h"
 #include "storage/temptable.h"
 
 #include <vector>
@@ -68,10 +63,10 @@ bool InsertExecutor::p_init()
 {
     VOLT_TRACE("init Insert Executor");
 
-    m_node = dynamic_cast<InsertPlanNode*>(m_abstractNode);
-    assert(m_node);
+    InsertPlanNode* node = dynamic_cast<InsertPlanNode*>(m_abstractNode);
+    assert(node);
     assert(m_targetTable);
-    assert(getInputTables().size() == 1);
+    assert(hasExactlyOneInputTable());
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     assert(m_targetTable);
@@ -87,13 +82,11 @@ bool InsertExecutor::p_init()
         m_partitionColumn = persistentTarget->partitionColumn();
     }
 
-    m_multiPartition = m_node->isMultiPartition();
+    m_multiPartition = node->isMultiPartition();
     return true;
 }
 
-bool InsertExecutor::p_execute(const NValueArray &params) {
-    assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
-    assert(m_node);
+bool InsertExecutor::p_execute() {
     assert(m_inputTable);
     assert(m_targetTable);
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
@@ -113,9 +106,6 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // count the number of successful inserts
     int modifiedTuples = 0;
 
-    Table* outputTable = m_node->getOutputTable();
-    assert(outputTable);
-
     //
     // An insert is quite simple really. We just loop through our m_inputTable
     // and insert any tuple that we find into our m_targetTable. It doesn't get any easier than that!
@@ -132,10 +122,9 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
             // get the value for the partition column
             NValue value = m_tuple.getNValue(m_partitionColumn);
-            bool isLocal = m_engine->isLocalSite(value);
 
             // if it doesn't map to this site
-            if (!isLocal) {
+            if ( ! valueHashesToTheLocalPartiton(value)) {
                 if (!m_multiPartition) {
                     VOLT_ERROR("Mispartitioned Tuple in single-partition plan.");
                     return false;
@@ -148,9 +137,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
         // for multi partition export tables,
         //  only insert them into one place (the partition with hash(0))
-        if (m_isStreamed && m_multiPartition) {
-            bool isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
-            if (!isLocal) continue;
+        if (m_isStreamed && m_multiPartition && ! onPartitionZero()) {
+            continue;
         }
 
         // try to put the tuple into the target table
@@ -166,19 +154,5 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
         modifiedTuples++;
     }
 
-    TableTuple& count_tuple = outputTable->tempTuple();
-    count_tuple.setNValue(0, ValueFactory::getBigIntValue(modifiedTuples));
-    // try to put the tuple into the output table
-    if (!outputTable->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to insert tuple count (%d) into"
-                   " output table '%s'",
-                   modifiedTuples,
-                   outputTable->name().c_str());
-        return false;
-    }
-
-    // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += modifiedTuples;
-    VOLT_INFO("Finished inserting tuple");
-    return true;
+    return storeModifiedTupleCount(modifiedTuples);
 }

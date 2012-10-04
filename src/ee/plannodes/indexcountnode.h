@@ -19,76 +19,39 @@
 #ifndef HSTOREINDEXCOUNTNODE_H
 #define HSTOREINDEXCOUNTNODE_H
 
-#include <string>
 #include "abstractscannode.h"
-#include "json_spirit/json_spirit.h"
-#include "common/ValueFactory.hpp"
+
 namespace voltdb {
-
-class AbstractExpression;
-
 /**
  *
  */
 class IndexCountPlanNode : public AbstractScanPlanNode {
-    public:
-        IndexCountPlanNode() : AbstractScanPlanNode() {
-            this->key_iterate = false;
-            this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->end_type = INDEX_LOOKUP_TYPE_EQ;
-        }
-        ~IndexCountPlanNode();
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXCOUNT); }
+public:
+    IndexCountPlanNode() : lookup_type(INDEX_LOOKUP_TYPE_EQ), end_type(INDEX_LOOKUP_TYPE_EQ) { }
+    ~IndexCountPlanNode();
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXCOUNT); }
 
-        void setKeyIterate(bool val);
-        bool getKeyIterate() const;
+    IndexLookupType getLookupType() const { return lookup_type; }
+    IndexLookupType getEndType() const { return end_type; }
+    const std::string& getTargetIndexName() const { return target_index_name; }
+    const std::vector<AbstractExpression*>& getEndKeyExpressions() const { return endkey_expressions; }
+    const std::vector<AbstractExpression*>& getSearchKeyExpressions() const { return searchkey_expressions; }
 
-        void setLookupType(IndexLookupType val);
-        IndexLookupType getLookupType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        void setEndType(IndexLookupType val);
-        IndexLookupType getEndType() const;
+private:
+    virtual void loadFromJSONObject(json_spirit::Object &obj);
 
-        void setTargetIndexName(std::string name);
-        std::string getTargetIndexName() const;
-
-        void setSearchKeyExpressions(std::vector<AbstractExpression*> &exps);
-        std::vector<AbstractExpression*>& getSearchKeyExpressions();
-        const std::vector<AbstractExpression*>& getSearchKeyExpressions() const;
-
-        void setEndKeyEndExpressions(std::vector<AbstractExpression*> &exps);
-        std::vector<AbstractExpression*>& getEndKeyExpressions();
-        const std::vector<AbstractExpression*>& getEndKeyExpressions() const;
-
-        std::string debugInfo(const std::string &spacer) const;
-
-    protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
-        //
-        // This is the id of the index to reference during execution
-        //
-        std::string target_index_name;
-
-        //
-        // TODO: Document
-        //
-        std::vector<AbstractExpression*> searchkey_expressions;
-        //
-        // TODO: Document
-        //
-        std::vector<AbstractExpression*> endkey_expressions;
-        //
-        // Enable Index Key Iteration
-        //
-        bool key_iterate;
-        //
-        // Index Lookup Type
-        //
-        IndexLookupType lookup_type;
-        //
-        // Index Lookup End Type
-        //
-        IndexLookupType end_type;
+    // The index to reference during execution
+    std::string target_index_name;
+    // Optional indexed value(s) -- possibly just a prefix -- indicating the lower bound of the counted range
+    std::vector<AbstractExpression*> searchkey_expressions;
+    // Optional indexed value(s) -- possibly just a prefix -- indicating the upper bound of the counted range
+    std::vector<AbstractExpression*> endkey_expressions;
+    // Distinguish random access lookups from range scans and indicate inclusiveness of the lower bound
+    IndexLookupType lookup_type;
+    // Indicate inclusiveness of the upper bound
+    IndexLookupType end_type;
 };
 
 }

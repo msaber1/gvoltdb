@@ -48,14 +48,12 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "plannodes/sendnode.h"
 
 #include "execution/VoltDBEngine.h"
 
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/tableutil.h"
 #include "storage/temptable.h"
 
 namespace voltdb {
@@ -65,13 +63,13 @@ bool SendExecutor::p_init()
     VOLT_TRACE("init Send Executor");
 
     assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
-    assert(getInputTables().size() == 1);
+    assert(hasExactlyOneInputTable());
     assert(m_inputTable);
 
     return true;
 }
 
-bool SendExecutor::p_execute(const NValueArray &params) {
+bool SendExecutor::p_execute() {
     VOLT_DEBUG("started SEND");
 
     assert(m_inputTable);

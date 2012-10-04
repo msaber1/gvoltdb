@@ -32,52 +32,10 @@ IndexCountPlanNode::~IndexCountPlanNode() {
     }
 }
 
-void IndexCountPlanNode::setLookupType(IndexLookupType lookup_type) {
-    this->lookup_type = lookup_type;
-}
-IndexLookupType IndexCountPlanNode::getLookupType() const {
-    return lookup_type;
-}
-
-void IndexCountPlanNode::setEndType(IndexLookupType end_type) {
-    this->end_type = end_type;
-}
-IndexLookupType IndexCountPlanNode::getEndType() const {
-    return end_type;
-}
-
-void IndexCountPlanNode::setTargetIndexName(std::string name) {
-    this->target_index_name = name;
-}
-std::string IndexCountPlanNode::getTargetIndexName() const {
-    return this->target_index_name;
-}
-
-void IndexCountPlanNode::setEndKeyEndExpressions(std::vector<AbstractExpression*> &exps) {
-    this->endkey_expressions = exps;
-}
-std::vector<AbstractExpression*>& IndexCountPlanNode::getEndKeyExpressions() {
-    return (this->endkey_expressions);
-}
-const std::vector<AbstractExpression*>& IndexCountPlanNode::getEndKeyExpressions() const {
-    return (this->endkey_expressions);
-}
-
-void IndexCountPlanNode::setSearchKeyExpressions(std::vector<AbstractExpression*> &exps) {
-    this->searchkey_expressions = exps;
-}
-std::vector<AbstractExpression*>& IndexCountPlanNode::getSearchKeyExpressions() {
-    return (this->searchkey_expressions);
-}
-const std::vector<AbstractExpression*>& IndexCountPlanNode::getSearchKeyExpressions() const {
-    return (this->searchkey_expressions);
-}
-
 std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << this->AbstractScanPlanNode::debugInfo(spacer);
     buffer << spacer << "TargetIndexName[" << this->target_index_name << "]\n";
-    buffer << spacer << "EnableKeyIteration[" << std::boolalpha << this->key_iterate << "]\n";
     buffer << spacer << "IndexLookupType[" << this->lookup_type << "]\n";
 
     buffer << spacer << "SearchKey Expressions:\n";
@@ -101,14 +59,6 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
 
 void IndexCountPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
-    json_spirit::Value keyIterateValue = json_spirit::find_value( obj, "KEY_ITERATE");
-    if (keyIterateValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "IndexCountPlanNode::loadFromJSONObject:"
-                                      " Can't find KEY_ITERATE value");
-    }
-    key_iterate = keyIterateValue.get_bool();
-
     json_spirit::Value endTypeValue = json_spirit::find_value( obj, "END_TYPE");
     if (endTypeValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

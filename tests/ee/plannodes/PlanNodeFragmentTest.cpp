@@ -52,6 +52,7 @@ TEST_F(PlanNodeFragmentTest, HasDeleteTrue)
     AbstractPlanNode* root1 = send_node;
     root1->addChild(delete_node);
     delete_node->addChild(seq_scan_node);
+    root1->assignNextPlanNodeIds();
     PlanNodeFragment dut(root1);
     EXPECT_TRUE(dut.hasDelete());
 }
@@ -63,6 +64,7 @@ TEST_F(PlanNodeFragmentTest, HasDeleteFalse)
 
     AbstractPlanNode* root1 = send_node;
     root1->addChild(seq_scan_node);
+    root1->assignNextPlanNodeIds();
     PlanNodeFragment dut(root1);
     EXPECT_FALSE(dut.hasDelete());
 }
@@ -75,6 +77,7 @@ TEST_F(PlanNodeFragmentTest, HasDeleteInline)
 
     AbstractPlanNode* root1 = send_node;
     root1->addChild(index_scan_node);
+    root1->assignNextPlanNodeIds();
     index_scan_node->addInlinePlanNode(delete_node);
     PlanNodeFragment dut(root1);
     EXPECT_TRUE(dut.hasDelete());

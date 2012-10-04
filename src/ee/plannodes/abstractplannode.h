@@ -48,7 +48,6 @@
 
 #include "SchemaColumn.h"
 
-#include "catalog/database.h"
 #include "common/ids.h"
 #include "common/types.h"
 
@@ -131,8 +130,7 @@ public:
     // ------------------------------------------------------------------
     // UTILITY METHODS
     // ------------------------------------------------------------------
-    static AbstractPlanNode*
-    fromJSONObject(json_spirit::Object& obj);
+    static AbstractPlanNode* fromJSONObject(json_spirit::Object& obj);
 
     // Debugging convenience methods
     std::string debug() const;
@@ -140,26 +138,18 @@ public:
     std::string debug(const std::string& spacer) const;
     virtual std::string debugInfo(const std::string& spacer) const = 0;
 
-    //
-    // Generate a new PlanNodeID
+    // Generate new unique PlanNodeIDs for a plan tree.
     // NOTE: Only use in debugging & testing! The catalogs will
     // generate real ids at deployment
-    //
-    static int32_t getNextPlanNodeId() {
-        static int32_t next = 1000;
-        return next++;
-    }
+    void assignNextPlanNodeIds();
 
 protected:
     virtual void loadFromJSONObject(json_spirit::Object& obj) = 0;
 
     AbstractPlanNode() : m_planNodeId(-1), m_executor(NULL), m_isInline(false) { }
 
-    void setPlanNodeId(int32_t plannode_id);
-
-    //
     // Every PlanNode will have a unique id assigned to it at compile time
-    //
+    // -- or by identifyNodesForTesting for artificially constructed PlanNodes.
     int32_t m_planNodeId;
 
     //

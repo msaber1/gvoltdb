@@ -45,8 +45,7 @@
 
 #include "limitnode.h"
 
-#include <sstream>
-
+#include "common/executorcontext.hpp"
 #include "common/SQLException.h"
 #include "common/ValuePeeker.hpp"
 
@@ -61,11 +60,12 @@ LimitPlanNode::~LimitPlanNode() {
  * is inlined. Centralize it here.
  */
 void
-LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limitOut, int &offsetOut)
+LimitPlanNode::getLimitAndOffsetByReference(int &limitOut, int &offsetOut)
 {
     limitOut = limit;
     offsetOut = offset;
 
+    const NValueArray &params = ExecutorContext::getParams();
     // Limit and offset parameters strictly integers. Can't limit <?=varchar>.
     // Converting the loop counter to NValue's doesn't make it cleaner -
     // and probably makes it slower. Would have to initialize an nvalue for
@@ -91,8 +91,7 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
     if (limitExpression != NULL) {
         // The expression should be an operator expression with either constant
         // value expression or parameter value expression as children
-        limitExpression->substitute(params);
-        limitOut = ValuePeeker::peekAsInteger(limitExpression->eval(NULL, NULL));
+        limitOut = ValuePeeker::peekAsInteger(limitExpression->eval());
         assert(offsetOut == 0);
     }
 }

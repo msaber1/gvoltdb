@@ -44,8 +44,10 @@
  */
 
 #include "projectionexecutor.h"
+
 #include "common/debuglog.h"
 #include "common/common.h"
+#include "common/executorcontext.hpp"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/projectionnode.h"
@@ -58,55 +60,35 @@ namespace voltdb {
 bool ProjectionExecutor::p_init()
 {
     VOLT_TRACE("init Projection Executor");
-    assert(limits);
-
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(m_abstractNode);
     assert(node);
 
-    m_columnCount = static_cast<int>(node->getOutputSchema().size());
-
-    // initialize local variables
-    all_tuple_array_ptr = node->convertOutputIfAllTupleValues();
-    all_tuple_array = all_tuple_array_ptr.get();
-    all_param_array_ptr = node->convertOutputIfAllParameterValues();
-    all_param_array = all_param_array_ptr.get();
-
-    typedef AbstractExpression* ExpRawPtr;
-    expression_array_ptr = boost::shared_array<ExpRawPtr>(new ExpRawPtr[m_columnCount]);
-    expression_array = expression_array_ptr.get();
-    for (int ctr = 0; ctr < m_columnCount; ctr++) {
-        assert (node->getOutputColumnExpressions()[ctr] != NULL);
-        expression_array_ptr[ctr] = node->getOutputColumnExpressions()[ctr];
-    }
-
     if (!node->isInline()) {
-        tuple = TableTuple(m_inputTable->schema());
+        m_tuple = TableTuple(m_inputTable->schema());
     }
     return true;
 }
 
-bool ProjectionExecutor::p_execute(const NValueArray &params) {
-#ifndef NDEBUG
+bool ProjectionExecutor::p_execute() {
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(m_abstractNode);
-#endif
     assert (node);
     assert (!node->isInline()); // inline projection's execute() should not be
                                 // called
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
 
-    //
-    // Since we have the input params, we need to call substitute to change any
-    // nodes in our expression tree to be ready for the projection operations in
-    // execute
-    //
-    assert (m_columnCount == (int)node->getOutputSchema().size());
-    if (all_tuple_array == NULL && all_param_array == NULL) {
-        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-            assert(expression_array[ctr]);
-            expression_array[ctr]->substitute(params);
-            VOLT_TRACE("predicate[%d]: %s", ctr,
-                       expression_array[ctr]->debug(true).c_str());
+    const std::vector<int>& columnsOnly = node->getOutputIfAllTupleValues();
+    const std::vector<const NValue*>& paramsOnly = node->getOutputIfAllParameterValues();
+    const std::vector<AbstractExpression*>& columnExpressions = node->getOutputColumnExpressions();
+
+
+    int columnsOnlyCount = (int) columnsOnly.size();
+    int paramsOnlyCount = 0;
+    int exprsCount = 0;
+    if (columnsOnlyCount == 0) {
+        paramsOnlyCount = (int) paramsOnly.size();
+        if (paramsOnlyCount == 0) {
+            exprsCount = (int) columnExpressions.size();
         }
     }
 
@@ -115,38 +97,39 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     // expression This will generate new tuple values that we will insert into
     // our output table
     //
-    TempTable* output_table = dynamic_cast<TempTable*>(m_outputTable);
-    assert(output_table);
+    TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
+    assert(output_temp_table);
+    TableTuple &temp_tuple = output_temp_table->tempTuple();
     TableIterator iterator = m_inputTable->iterator();
+    TableTuple tuple(m_inputTable->schema());
     assert (tuple.sizeInValues() == m_inputTable->columnCount());
-    while (iterator.next(tuple)) {
-        //
-        // Project (or replace) values from input tuple
-        //
-        TableTuple &temp_tuple = output_table->tempTuple();
-        if (all_tuple_array != NULL) {
-            VOLT_TRACE("sweet, all tuples");
-            for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, tuple.getNValue(all_tuple_array[ctr]));
+    //
+    // Project values from the input tuple
+    //
+    if (columnsOnlyCount != 0) {
+        VOLT_TRACE("sweet, all tuples");
+        while (iterator.next(tuple)) {
+            for (int ctr = columnsOnlyCount - 1; ctr >= 0; --ctr) {
+                temp_tuple.setNValue(ctr, tuple.getNValue(columnsOnly[ctr]));
             }
-        } else if (all_param_array != NULL) {
-            VOLT_TRACE("sweet, all params");
-            for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
-            }
-        } else {
-            for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, expression_array[ctr]->eval(&tuple, NULL));
-            }
+            output_temp_table->insertTempTuple(temp_tuple);
         }
-        output_table->TempTable::insertTuple(temp_tuple);
-        /*if (!output_table->TempTable::insertTuple(temp_tuple)) {
-            // TODO: DEBUG
-            VOLT_ERROR("Failed to insert projection tuple from input table '%s' into output table '%s'", m_inputTable->name().c_str(), m_tmpOutputTable->name().c_str());
-            return (false);
-        }*/
+    } else if (paramsOnlyCount != 0) {
+        VOLT_TRACE("sweet, all params");
+        while (iterator.next(tuple)) {
+            for (int ctr = paramsOnlyCount - 1; ctr >= 0; --ctr) {
+                temp_tuple.setNValue(ctr, *(paramsOnly[ctr]));
+            }
+            output_temp_table->insertTempTuple(temp_tuple);
+        }
+    } else {
+        while (iterator.next(tuple)) {
+            for (int ctr = exprsCount - 1; ctr >= 0; --ctr) {
+                temp_tuple.setNValue(ctr, columnExpressions[ctr]->eval(&tuple));
+            }
+            output_temp_table->insertTempTuple(temp_tuple);
+        }
     }
-
     //VOLT_TRACE("PROJECTED TABLE: %s\n", m_outputTable->debug().c_str());
 
     return (true);

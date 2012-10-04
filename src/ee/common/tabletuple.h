@@ -363,6 +363,67 @@ private:
     }
 };
 
+class StorageBackedTuple : public TableTuple {
+public:
+    StorageBackedTuple() { }
+
+    ~StorageBackedTuple() { delete address(); }
+
+    void allocateTupleWithValidHeader(const TupleSchema* schema)
+    {
+        m_schema = schema;
+        char* storage = new char[schema->tupleLength() + TUPLE_HEADER_SIZE];
+        move(storage);
+        clearTupleWithValidHeader();
+    }
+    void clearTupleWithValidHeader() { ::memset(address(), 0, m_schema->tupleLength() + TUPLE_HEADER_SIZE); }
+};
+
+class PoolBackedTempTuple : public TableTuple {
+public:
+    PoolBackedTempTuple() : m_storage(NULL), m_pool(NULL) { }
+
+    void allocateTupleNoHeader(const TupleSchema* schema, Pool* pool)
+    {
+        m_schema = schema;
+        m_pool = pool;
+        assert(m_pool);
+        m_storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_schema->tupleLength()));
+        moveNoHeader(m_storage);
+    }
+
+    void reallocateTupleNoHeader()
+    {
+        assert(m_pool);
+        m_storage = reinterpret_cast<char*>(m_pool->allocateZeroes(m_schema->tupleLength()));
+        moveNoHeader(m_storage);
+    }
+private:
+    // Without this extant (though unused) pointer to the allocation,
+    // the offset tricks in moveNoHeader confuse valgrind into reporting a leak.
+    char* m_storage;
+    Pool* m_pool;
+};
+
+class StorageBackedTempTuple : public TableTuple {
+public:
+    StorageBackedTempTuple() : m_storage(NULL) { }
+    ~StorageBackedTempTuple() { delete m_storage; }
+
+    void allocateTupleNoHeader(const TupleSchema* schema)
+    {
+        m_schema = schema;
+        m_storage = new char[schema->tupleLength()];
+        moveNoHeader(m_storage);
+        clearTupleNoHeader();
+    }
+
+private:
+    void clearTupleNoHeader() { ::memset(m_storage, 0, m_schema->tupleLength()); }
+private:
+    char* m_storage;
+};
+
 inline TableTuple::TableTuple() :
     m_schema(NULL), m_data(NULL) {
 }

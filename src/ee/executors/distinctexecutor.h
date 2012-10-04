@@ -46,9 +46,9 @@
 #ifndef HSTOREDISTINCTEXECUTOR_H
 #define HSTOREDISTINCTEXECUTOR_H
 
+#include "executors/abstracttableioexecutor.h"
+
 #include "common/common.h"
-#include "common/valuevector.h"
-#include "executors/abstractexecutor.h"
 #include "plannodes/distinctnode.h"
 
 namespace voltdb {
@@ -60,9 +60,9 @@ public:
     ~DistinctExecutor();
 
 private:
-    virtual void p_setOutputTable(TempTableLimits* limits) { setPassThroughTempOutputTable(limits); }
+    void p_setOutputTable(TempTableLimits* limits) { setPassThroughTempOutputTable(limits); }
     bool p_init();
-    bool p_execute(const NValueArray &params);
+    bool p_execute();
 
     ValueType distinct_column_type;
 };

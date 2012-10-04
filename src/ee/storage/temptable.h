@@ -100,7 +100,9 @@ class TempTable : public Table {
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
-    inline bool insertTuple(TableTuple &source);
+    bool insertTuple(TableTuple &source);
+    bool insertTempTuple(TableTuple &source);
+
     void updateTempTuple(TableTuple &target, TableTuple &source);
 
     bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
@@ -115,7 +117,7 @@ class TempTable : public Table {
      * for all uninlined columns. Used by CopyOnWriteContext to back up tuples
      * before they are dirtied
      */
-    void insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool);
+    void insertTempTupleWithDeepCopy(TableTuple &source, Pool *pool);
 
     // ------------------------------------------------------------------
     // INDEXES
@@ -154,7 +156,7 @@ class TempTable : public Table {
     std::vector<TBPtr> m_data;
 };
 
-inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Pool *pool) {
+inline void TempTable::insertTempTupleWithDeepCopy(TableTuple &source, Pool *pool) {
 
     // First get the next free tuple by
     // grabbing a tuple at the end of our chunk of memory
@@ -172,7 +174,7 @@ inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Poo
     m_tmpTarget1.setActiveTrue();
 }
 
-inline bool TempTable::insertTuple(TableTuple &source) {
+inline bool TempTable::insertTempTuple(TableTuple &source) {
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or

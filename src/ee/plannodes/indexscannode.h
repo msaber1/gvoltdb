@@ -46,75 +46,43 @@
 #ifndef HSTOREINDEXSCANNODE_H
 #define HSTOREINDEXSCANNODE_H
 
-#include <string>
 #include "abstractscannode.h"
-#include "json_spirit/json_spirit.h"
 
 namespace voltdb {
-
-class AbstractExpression;
-
 /**
  *
  */
 class IndexScanPlanNode : public AbstractScanPlanNode {
-    public:
-        IndexScanPlanNode() : AbstractScanPlanNode() {
-            this->key_iterate = false;
-            this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->sort_direction = SORT_DIRECTION_TYPE_INVALID;
-            this->end_expression = NULL;
-        }
-        ~IndexScanPlanNode();
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXSCAN); }
+public:
+    IndexScanPlanNode() :
+        end_expression(NULL),
+        lookup_type(INDEX_LOOKUP_TYPE_EQ),
+        sort_direction(SORT_DIRECTION_TYPE_INVALID)
+    { }
+    ~IndexScanPlanNode();
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXSCAN); }
 
-        void setKeyIterate(bool val);
-        bool getKeyIterate() const;
+    IndexLookupType getLookupType() const { return lookup_type; }
+    const std::string& getTargetIndexName() const { return target_index_name; }
+    const std::vector<AbstractExpression*>& getSearchKeyExpressions() const { return searchkey_expressions; }
+    AbstractExpression* getEndExpression() const { return end_expression; }
+    SortDirectionType getSortDirection() const { return sort_direction; }
 
-        void setLookupType(IndexLookupType val);
-        IndexLookupType getLookupType() const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        void setSortDirection(SortDirectionType val);
-        SortDirectionType getSortDirection() const;
+private:
+    virtual void loadFromJSONObject(json_spirit::Object &obj);
 
-        void setTargetIndexName(std::string name);
-        std::string getTargetIndexName() const;
-
-        void setEndExpression(AbstractExpression* val);
-        AbstractExpression* getEndExpression() const;
-
-        void setSearchKeyExpressions(std::vector<AbstractExpression*> &exps);
-        std::vector<AbstractExpression*>& getSearchKeyExpressions();
-        const std::vector<AbstractExpression*>& getSearchKeyExpressions() const;
-
-        std::string debugInfo(const std::string &spacer) const;
-
-    protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
-        //
-        // This is the id of the index to reference during execution
-        //
-        std::string target_index_name;
-
-        //
-        // TODO: Document
-        AbstractExpression* end_expression;
-        //
-        // TODO: Document
-        //
-        std::vector<AbstractExpression*> searchkey_expressions;
-        //
-        // Enable Index Key Iteration
-        //
-        bool key_iterate;
-        //
-        // Index Lookup Type
-        //
-        IndexLookupType lookup_type;
-        //
-        // Sorting Direction
-        //
-        SortDirectionType sort_direction;
+    // The id of the index to reference during execution
+    std::string target_index_name;
+    // Logical expression that stops the scan when true for the current tuple
+    AbstractExpression* end_expression;
+    // Values for indexed columns (possibly just some prefix columns) at which to start scanning.
+    std::vector<AbstractExpression*> searchkey_expressions;
+    // Distinguish random access lookups from range scans
+    IndexLookupType lookup_type;
+    // Identify any output ordering relied upon by the plan -- may trigger reverse scanning.
+    SortDirectionType sort_direction;
 };
 
 }

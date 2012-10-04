@@ -201,11 +201,6 @@ void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
     }
 }
 
-void setSearchKeyFromTuple(TableTuple &source) {
-    keyTuple.setNValue(0, source.getNValue(1));
-    keyTuple.setNValue(1, source.getNValue(2));
-}
-
 /*
  * Regular tuple insertion that does an allocation and copy for
  * uninlined strings and creates and registers an UndoAction.

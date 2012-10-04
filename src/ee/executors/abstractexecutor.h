@@ -75,7 +75,7 @@ class AbstractExecutor {
     bool init(TempTableLimits* limits);
 
     /** Invoke a plannode's associated executor */
-    bool execute(const NValueArray& params);
+    bool execute();
 
     /**
      * Returns true if the output table for the plannode must be cleaned up
@@ -88,9 +88,11 @@ class AbstractExecutor {
     //
     // Output Table
     // This is where we will write the results of the plan node's
-    // execution out to
+    // execution out to.
+    // This public accessor is provided to allow the output table of one executor
+    // to be passed up the plannode chain as the input table of a parent node's executor.
     //
-    Table *getOutputTable() const;
+    Table *getOutputTable() const { return m_outputTable; }
 
 protected:
     AbstractExecutor() :
@@ -108,7 +110,7 @@ protected:
     virtual bool p_init() = 0;
 
     /** Concrete executor classes impelmenet execution in p_execute() */
-    virtual bool p_execute(const NValueArray& params) = 0;
+    virtual bool p_execute() = 0;
 
     /**
      * Set up a multi-column temp output table for those executors that require one.
@@ -117,13 +119,16 @@ protected:
     void setTempOutputTable(TempTableLimits* limits, const std::string tempTableName="temp");
     void setPassThroughTempOutputTable(TempTableLimits* limits);
 
-    const std::vector<Table*> &getInputTables();
+    const std::vector<Table*> &getInputTables() const { return m_inputTables; }
+    bool hasExactlyOneInputTable() const { return m_inputTables.size() == 1; }
 
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
 
     // The input table may be NULL OR the one and only OR the first of many input tables
     // which are the cached output tables from m_abstractNode->m_child[i]->m_executor->m_outputTable
+    // getInputTables() provides more generalized access to all of these input tables in a vector for
+    // those executors that need more than one.
     Table* m_inputTable;
     Table* m_outputTable; // either a TempTable or, for some seqscans, m_abstractNode->m_targetTable
 
@@ -131,7 +136,7 @@ private:
     std::vector<Table*> m_inputTables;
 };
 
-inline bool AbstractExecutor::execute(const NValueArray& params)
+inline bool AbstractExecutor::execute()
 {
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",
@@ -144,22 +149,9 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
     }
 
     // run the executor
-    return p_execute(params);
+    return p_execute();
 }
 
-class AbstractTableIOExecutor : public AbstractExecutor {
-protected:
-    bool initEngine(VoltDBEngine* engine);
-
-    /** reference to the engine/context to store the number of modified tuples, etc. */
-    VoltDBEngine* m_engine;
-    Table* m_targetTable;
-};
-
-class AbstractOperationExecutor : public AbstractTableIOExecutor {
-private:
-    virtual void p_setOutputTable(TempTableLimits* limits);
-};
-
 }
+
 #endif

@@ -53,7 +53,7 @@ namespace voltdb
 class OrderByPlanNode : public AbstractPlanNode
 {
 public:
-    OrderByPlanNode();
+    OrderByPlanNode() { /* Do nothing */ }
     ~OrderByPlanNode();
 
     virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_ORDERBY); }

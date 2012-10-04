@@ -47,10 +47,10 @@
 #define HSTORESCANNODE_H
 
 #include "abstracttableionode.h"
-#include "expressions/abstractexpression.h"
 
 namespace voltdb
 {
+class AbstractExpression;
 
 class AbstractScanPlanNode : public AbstractTableIOPlanNode
 {

@@ -46,12 +46,10 @@
 #ifndef HSTOREPROJECTIONEXECUTOR_H
 #define HSTOREPROJECTIONEXECUTOR_H
 
-#include <vector>
-#include "boost/shared_array.hpp"
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
+
+#include "common/common.h"
+#include "common/tabletuple.h"
 
 namespace voltdb {
 class AbstractExpression;
@@ -65,20 +63,10 @@ class ProjectionExecutor : public AbstractExecutor {
         ~ProjectionExecutor();
     protected:
         bool p_init();
-        bool p_execute(const NValueArray &params);
+        bool p_execute();
 
     private:
-        int m_columnCount;
-        boost::shared_array<int> all_tuple_array_ptr;
-        int* all_tuple_array;
-        boost::shared_array<int> all_param_array_ptr;
-        int* all_param_array;
-        boost::shared_array<bool> needs_substitute_ptr;
-        bool *needs_substitute;
-        TableTuple tuple;
-
-        boost::shared_array<AbstractExpression*> expression_array_ptr;
-        AbstractExpression** expression_array;
+        TableTuple m_tuple;
 };
 
 }

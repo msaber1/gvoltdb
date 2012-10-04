@@ -19,8 +19,9 @@
 #ifndef HSTORETABLECOUNTEXECUTOR_H
 #define HSTORETABLECOUNTEXECUTOR_H
 
+#include "executors/abstracttableioexecutor.h"
+
 #include "common/common.h"
-#include "executors/abstractexecutor.h"
 
 namespace voltdb
 {
@@ -30,7 +31,7 @@ namespace voltdb
         ~TableCountExecutor();
     protected:
         bool p_init();
-        bool p_execute(const NValueArray& params);
+        bool p_execute();
     };
 }
 

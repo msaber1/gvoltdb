@@ -32,6 +32,7 @@
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "common/DefaultTupleSerializer.h"
@@ -164,12 +165,12 @@ public:
         }
     }
 
-    void addRandomUniqueTuples(Table *table, int numTuples) {
-        TableTuple tuple = table->tempTuple();
+    void addRandomUniqueTuples(int numTuples) {
+        TableTuple tuple = m_table->tempTuple();
         for (int ii = 0; ii < numTuples; ii++) {
             tuple.setNValue(0, ValueFactory::getIntegerValue(m_primaryKeyIndex++));
             tuple.setNValue(1, ValueFactory::getIntegerValue(rand()));
-            table->insertTuple(tuple);
+            m_table->insertTuple(tuple);
         }
     }
 
@@ -202,7 +203,7 @@ public:
         m_tuplesInsertedInLastUndo = 0;
     }
 
-    void doRandomTableMutation(Table *table) {
+    void doRandomTableMutation() {
         int rand = ::rand();
         int op = rand % 3;
         switch (op) {
@@ -211,9 +212,9 @@ public:
          * Delete a tuple
          */
         case 0: {
-            TableTuple tuple(table->schema());
-            if (tableutil::getRandomTuple(table, tuple)) {
-                table->deleteTuple(tuple, true);
+            TableTuple tuple(m_table->schema());
+            if (tableutil::getRandomTuple(m_table, tuple)) {
+                m_table->deleteTuple(tuple, true);
                 m_tuplesDeleted++;
                 m_tuplesDeletedInLastUndo++;
             }
@@ -224,7 +225,7 @@ public:
          * Insert a tuple
          */
         case 1: {
-            addRandomUniqueTuples(table, 1);
+            addRandomUniqueTuples(1);
             m_tuplesInserted++;
             m_tuplesInsertedInLastUndo++;
             break;
@@ -234,12 +235,12 @@ public:
          * Update a random tuple
          */
         case 2: {
-            voltdb::TableTuple tuple(table->schema());
-            voltdb::TableTuple tempTuple = table->tempTuple();
-            if (tableutil::getRandomTuple(table, tuple)) {
+            voltdb::TableTuple tuple(m_table->schema());
+            voltdb::TableTuple tempTuple = m_table->tempTuple();
+            if (tableutil::getRandomTuple(m_table, tuple)) {
                 tempTuple.copy(tuple);
                 tempTuple.setNValue(1, ValueFactory::getIntegerValue(::rand()));
-                table->updateTuple(tuple, tempTuple);
+                m_table->updateTuple(tuple, tempTuple);
                 m_tuplesUpdated++;
             }
             break;
@@ -276,7 +277,7 @@ TEST_F(CompactionTest, BasicCompaction) {
 #else
     int tupleCount = 645260;
 #endif
-    addRandomUniqueTuples( m_table, tupleCount);
+    addRandomUniqueTuples(tupleCount);
 
 #ifdef MEMCHECK
     ASSERT_EQ( tupleCount, m_table->m_data.size());
@@ -362,7 +363,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
 #else
     int tupleCount = 645260;
 #endif
-    addRandomUniqueTuples( m_table, tupleCount);
+    addRandomUniqueTuples(tupleCount);
 
 #ifdef MEMCHECK
     ASSERT_EQ( tupleCount, m_table->m_data.size());
@@ -502,7 +503,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
 #ifndef MEMCHECK
 TEST_F(CompactionTest, TestENG897) {
     initTable(true);
-    addRandomUniqueTuples( m_table, 32263 * 5);
+    addRandomUniqueTuples(32263 * 5);
 
     //Delete stuff to put everything in a bucket
     voltdb::TableIndex *pkeyIndex = m_table->primaryKeyIndex();

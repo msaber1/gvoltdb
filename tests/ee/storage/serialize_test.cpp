@@ -105,7 +105,7 @@ class TableSerializeTest : public Test {
                 tuple.setNValueAllocateForObjectCopies(4, stringValue, NULL);
                 stringValue.free();
                 tuple.setNValue(5, ValueFactory::getDoubleValue(3.14f * static_cast<double>(i)));
-                table_->insertTuple(tuple);
+                table_->insertTempTuple(tuple);
             }
 
         }
@@ -116,7 +116,7 @@ class TableSerializeTest : public Test {
     protected:
         CatalogId database_id;
         CatalogId table_id;
-        Table* table_;
+        TempTable* table_;
         std::vector<std::string> columnNames;
 };
 
@@ -171,7 +171,7 @@ TEST_F(TableSerializeTest, NullStrings) {
 
     TableTuple& tuple = table_->tempTuple();
     tuple.setNValue(0, ValueFactory::getNullStringValue());
-    table_->insertTuple(tuple);
+    table_->insertTempTuple(tuple);
 
     // Serialize the table
     CopySerializeOutput serialize_out;

@@ -46,7 +46,8 @@
 #ifndef HSTOREINSERTEXECUTOR_H
 #define HSTOREINSERTEXECUTOR_H
 
-#include "executors/abstractexecutor.h"
+#include "executors/abstracttableioexecutor.h"
+
 #include "common/tabletuple.h"
 
 namespace voltdb {
@@ -57,16 +58,11 @@ class InsertPlanNode;
 class InsertExecutor : public AbstractOperationExecutor
 {
 public:
-    InsertExecutor() :
-        m_partitionColumn(-1),
-        m_multiPartition(false)
-    {}
+    InsertExecutor() : m_partitionColumn(-1), m_multiPartition(false), m_isStreamed(false) {}
 
 protected:
         bool p_init();
-        bool p_execute(const NValueArray &params);
-
-        InsertPlanNode* m_node;
+        bool p_execute();
 
         TableTuple m_tuple;
         int m_partitionColumn;

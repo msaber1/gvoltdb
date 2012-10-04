@@ -48,24 +48,15 @@
 
 #include <string>
 #include <vector>
-#include "boost/shared_ptr.hpp"
 #include "common/ids.h"
 #include "common/types.h"
-#include "common/TupleSchema.h"
-#include "common/Pool.hpp"
-#include "indexes/tableindex.h"
-#include "indexes/tableindexfactory.h"
 
 namespace voltdb {
 
 class Table;
-class PersistentTable;
-class SerializeInput;
 class TempTable;
 class TempTableLimits;
-class TableColumn;
-class TableIndex;
-class ExecutorContext;
+class TupleSchema;
 
 class TableFactory {
 public:

@@ -44,17 +44,15 @@
  */
 
 #include "distinctexecutor.h"
+
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "plannodes/distinctnode.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 
-
 #include <set>
-#include <cassert>
 
 using namespace voltdb;
 
@@ -64,16 +62,16 @@ bool DistinctExecutor::p_init()
     return (true);
 }
 
-bool DistinctExecutor::p_execute(const NValueArray &params) {
+bool DistinctExecutor::p_execute() {
     DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
     assert(node);
+
+    TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
 
     TableIterator iterator = m_inputTable->iterator();
     TableTuple tuple(m_inputTable->schema());
 
-    // substitute params for distinct expression
     AbstractExpression *distinctExpression = node->getDistinctExpression();
-    distinctExpression->substitute(params);
 
     std::set<NValue, NValue::ltNValue> found_values;
     while (iterator.next(tuple)) {
@@ -83,7 +81,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
         NValue tuple_value = distinctExpression->eval(&tuple, NULL);
         if (found_values.find(tuple_value) == found_values.end()) {
             found_values.insert(tuple_value);
-            if (!m_outputTable->insertTuple(tuple)) {
+            if ( ! output_temp_table->insertTempTuple(tuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                            " output table '%s'",
                            m_inputTable->name().c_str(),

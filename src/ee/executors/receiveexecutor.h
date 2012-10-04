@@ -46,10 +46,9 @@
 #ifndef HSTORERECEIVEEXECUTOR_H
 #define HSTORERECEIVEEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
-#include <iostream>
+
+#include "common/common.h"
 
 namespace voltdb {
 /**
@@ -57,14 +56,20 @@ namespace voltdb {
  */
 class ReceiveExecutor : public AbstractExecutor {
 public:
-    ReceiveExecutor() {}
+    ReceiveExecutor() { /* Do nothing */ }
 
     ~ReceiveExecutor();
+    // This function blesses the one (if any) ReceiveExecutor of all the executors in a plan
+    // fragment as the only one to get its temp output table cleared when a query ends,
+    // whether normally or with an error. Why do other, possibly larger, temp tables,
+    // including ALL temp tables in an SP query get left fully loaded until they next
+    // execute or they get flushed from the EE plan cache. --paul
+    bool needsPostExecuteClear() { return true; }
 
 private:
     bool initEngine(VoltDBEngine* engine) { m_engine = engine; return true; }
     bool p_init();
-    bool p_execute(const NValueArray &params);
+    bool p_execute();
 
     VoltDBEngine *m_engine;
 };

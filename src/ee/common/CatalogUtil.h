@@ -28,12 +28,15 @@
   information from the catalog.
 */
 
+// A stateless statics-only struct with static inline methods beats global functions in an include file
+// because it will not suddenly cause a duplicate global definition if included from more than one file.
+struct CatalogUtil {
 
 /**
  * A table is export only if any connector's table list marks it as
  * such. Search through the connector's table lists accordingly.
  */
-bool isTableExportOnly(catalog::Database& database, int32_t tableIndex) {
+static bool isTableExportOnly(const catalog::Database& database, int32_t tableIndex) {
 
     // no export, no export only tables
     if (database.connectors().size() == 0) {
@@ -63,7 +66,7 @@ bool isTableExportOnly(catalog::Database& database, int32_t tableIndex) {
  * a connector's table list and if export is enabled for the
  * database as a whole
  */
-bool isExportEnabledForTable(catalog::Database& database, int32_t tableIndex) {
+static bool isExportEnabledForTable(const catalog::Database& database, int32_t tableIndex) {
 
     // export is disabled unless a connector exists
     if (database.connectors().size() == 0) {
@@ -91,7 +94,7 @@ bool isExportEnabledForTable(catalog::Database& database, int32_t tableIndex) {
 
     return false;
 }
-
+};
 
 #endif
 

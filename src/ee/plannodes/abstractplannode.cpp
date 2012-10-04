@@ -374,3 +374,18 @@ AbstractPlanNode::debug(const string& spacer) const
     }
     return (buffer.str());
 }
+
+void AbstractPlanNode::assignNextPlanNodeIds()
+{
+    static int32_t nextPlanNodeId = 1000;
+    m_planNodeId = nextPlanNodeId++;
+
+    map<PlanNodeType, AbstractPlanNode*>::const_iterator it;
+    for (it = m_inlineNodes.begin(); it != m_inlineNodes.end(); it++) {
+        it->second->assignNextPlanNodeIds();
+    }
+    for (size_t ctr = 0; ctr < m_children.size(); ++ctr) {
+        m_children[ctr]->assignNextPlanNodeIds();
+    }
+}
+

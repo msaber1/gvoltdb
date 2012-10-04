@@ -62,6 +62,7 @@
 #include "storage/tablefactory.h"
 #include "storage/persistenttable.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "execution/VoltDBEngine.h"
 
 

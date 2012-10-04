@@ -36,6 +36,7 @@
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 
 using namespace std;
 using namespace voltdb;

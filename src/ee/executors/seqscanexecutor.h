@@ -46,9 +46,7 @@
 #ifndef HSTORESEQSCANEXECUTOR_H
 #define HSTORESEQSCANEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "executors/abstractexecutor.h"
+#include "executors/abstracttableioexecutor.h"
 
 namespace voltdb
 {
@@ -63,7 +61,7 @@ private:
     void p_setOutputTable(TempTableLimits* limits);
 
     bool p_init();
-    bool p_execute(const NValueArray& params);
+    bool p_execute();
 };
 
 }

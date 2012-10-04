@@ -46,49 +46,26 @@
 #ifndef HSTOREMATERIALIZEEXECUTOR_H
 #define HSTOREMATERIALIZEEXECUTOR_H
 
-#include <vector>
-#include "boost/shared_array.hpp"
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
+
+#include "common/common.h"
 
 namespace voltdb {
 
 class AbstractExpression;
-class MaterializePlanNode;
 
 /**
  *
  */
 class MaterializeExecutor : public AbstractExecutor {
   public:
-    MaterializeExecutor() :
-        node(NULL),
-        expression_array(NULL)
-    {}
-
+    MaterializeExecutor() : m_engine(NULL) {}
     ~MaterializeExecutor();
   protected:
     bool initEngine(VoltDBEngine* engine) { m_engine = engine; return true; }
     bool p_init();
-    bool p_execute(const NValueArray &params);
-
+    bool p_execute();
   private:
-    MaterializePlanNode* node;
-    int m_columnCount;
-
-    boost::shared_array<int> all_param_array_ptr;
-    int* all_param_array;
-
-    // set a flag for each column that requires substitution.
-    boost::shared_array<bool> needs_substitute_ptr;
-    bool *needs_substitute;
-
-    // an array[num_columns] of pointers to expression trees
-    boost::shared_array<AbstractExpression*> expression_array_ptr;
-    AbstractExpression** expression_array;
-
-    bool batched;
     VoltDBEngine *m_engine;
 };
 

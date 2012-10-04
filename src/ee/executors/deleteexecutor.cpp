@@ -48,14 +48,10 @@
 #include "common/ValueFactory.hpp"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
-#include "execution/VoltDBEngine.h"
 #include "indexes/tableindex.h"
 #include "plannodes/deletenode.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-
-#include <vector>
-#include <cassert>
 
 using namespace std;
 using namespace voltdb;
@@ -64,17 +60,17 @@ bool DeleteExecutor::p_init()
 {
     VOLT_TRACE("init Delete Executor");
 
-    m_node = dynamic_cast<DeletePlanNode*>(m_abstractNode);
-    assert(m_node);
+    DeletePlanNode* node = dynamic_cast<DeletePlanNode*>(m_abstractNode);
+    assert(node);
     assert(m_targetTable);
 
-    m_truncate = m_node->getTruncate();
+    m_truncate = node->getTruncate();
     if (m_truncate) {
-        assert(getInputTables().size() == 0);
+        assert(m_inputTable == NULL);
         return true;
     }
 
-    assert(getInputTables().size() == 1);
+    assert(hasExactlyOneInputTable());
 
     m_inputTuple = TableTuple(m_inputTable->schema());
     m_targetTuple = TableTuple(m_targetTable->schema());
@@ -82,14 +78,14 @@ bool DeleteExecutor::p_init()
     return true;
 }
 
-bool DeleteExecutor::p_execute(const NValueArray &params) {
+bool DeleteExecutor::p_execute() {
     assert(m_targetTable);
-    int64_t modified_tuples = 0;
+    int64_t modifiedTuples = 0;
 
     if (m_truncate) {
         VOLT_TRACE("truncating table %s...", m_targetTable->name().c_str());
         // count the truncated tuples as deleted
-        modified_tuples = m_targetTable->activeTupleCount();
+        modifiedTuples = m_targetTable->activeTupleCount();
 
         // actually delete all the tuples
         m_targetTable->deleteAllTuples(true);
@@ -103,7 +99,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         while (inputIterator.next(m_inputTuple)) {
             //
             // OPTIMIZATION: Single-Sited Query Plans
-            // If our beloved DeletePlanNode is apart of a single-site query plan,
+            // If our beloved DeletePlanNode is a part of a single-site query plan,
+            // -- AND, BTW, this code assumes just that --
             // then the first column in the input table will be the address of a
             // tuple on the target table that we will want to blow away. This saves
             // us the trouble of having to do an index lookup
@@ -117,21 +114,9 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                            m_targetTable->name().c_str());
                 return false;
             }
+            ++modifiedTuples;
         }
-        modified_tuples = m_inputTable->activeTupleCount();
     }
 
-    TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
-    count_tuple.setNValue(0, ValueFactory::getBigIntValue(modified_tuples));
-    // try to put the tuple into the output table
-    if (!m_node->getOutputTable()->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to insert tuple count (%ld) into"
-                   " output table '%s'",
-                   static_cast<long int>(modified_tuples),
-                   m_node->getOutputTable()->name().c_str());
-        return false;
-    }
-    m_engine->m_tuplesModified += modified_tuples;
-
-    return true;
+    return storeModifiedTupleCount(modifiedTuples);
 }

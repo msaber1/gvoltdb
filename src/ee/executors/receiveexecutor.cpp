@@ -57,7 +57,7 @@ bool ReceiveExecutor::p_init()
     return true;
 }
 
-bool ReceiveExecutor::p_execute(const NValueArray &params) {
+bool ReceiveExecutor::p_execute() {
     int loadedDeps = 0;
     // iterate dependencies stored in the frontend and union them
     // into m_outputTable. The engine does this work for peanuts.

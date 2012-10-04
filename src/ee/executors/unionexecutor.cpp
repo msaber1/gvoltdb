@@ -64,7 +64,7 @@ bool UnionExecutor::p_init()
     //
     // First check to make sure they have the same number of columns
     //
-    assert(getInputTables().size() > 0);
+    assert(getInputTables().size() > 1);
     for (int table_ctr = 1, table_cnt = (int)getInputTables().size(); table_ctr < table_cnt; table_ctr++) {
         if (m_inputTable->columnCount() != getInputTables()[table_ctr]->columnCount()) {
             VOLT_ERROR("Table '%s' has %d columns, but table '%s' has %d"
@@ -110,9 +110,11 @@ bool UnionExecutor::p_init()
     return (true);
 }
 
-bool UnionExecutor::p_execute(const NValueArray &params) {
+bool UnionExecutor::p_execute() {
     assert(dynamic_cast<UnionPlanNode*>(m_abstractNode));
     assert(m_outputTable);
+
+    TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
 
     //
     // For each input table, grab their TableIterator and then append all of its tuples
@@ -124,7 +126,7 @@ bool UnionExecutor::p_execute(const NValueArray &params) {
         TableIterator iterator = input_table->iterator();
         TableTuple tuple(input_table->schema());
         while (iterator.next(tuple)) {
-            if (!m_outputTable->insertTuple(tuple)) {
+            if ( ! output_temp_table->insertTempTuple(tuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                            " output table '%s'",
                            input_table->name().c_str(),

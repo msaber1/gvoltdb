@@ -484,41 +484,8 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
 
     ret->setValueType(vt);
     ret->setValueSize(vs);
-    ret->setHasParameter((EXPRESSION_TYPE_VALUE_PARAMETER == et) || hasParam);
     // written thusly to ease testing/inspecting return content.
     VOLT_TRACE("Created expression %p", ret);
-    return ret;
-}
-
-boost::shared_array<int>
-ExpressionUtil::convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressions)
-{
-    size_t cnt = expressions.size();
-    boost::shared_array<int> ret(new int[cnt]);
-    for (int i = 0; i < cnt; ++i) {
-        voltdb::TupleValueExpression* casted=
-          dynamic_cast<voltdb::TupleValueExpression*>(expressions[i]);
-        if (casted == NULL) {
-            return boost::shared_array<int>();
-        }
-        ret[i] = casted->getColumnId();
-    }
-    return ret;
-}
-
-boost::shared_array<int>
-ExpressionUtil::convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions)
-{
-    size_t cnt = expressions.size();
-    boost::shared_array<int> ret(new int[cnt]);
-    for (int i = 0; i < cnt; ++i) {
-        voltdb::ParameterValueExpression *casted =
-          dynamic_cast<voltdb::ParameterValueExpression*>(expressions[i]);
-        if (casted == NULL) {
-            return boost::shared_array<int>();
-        }
-        ret[i] = casted->getParameterId();
-    }
     return ret;
 }
 

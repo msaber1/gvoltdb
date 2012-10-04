@@ -219,10 +219,11 @@ CTX.INPUT['execution'] = """
 """
 
 # list executorutil.cpp before the alphabetical list to shake out header issues early
-# saving wasted compiles/recompiles for header changes.
+# saving wasted compiles/recompiles between header changes.
 CTX.INPUT['executors'] = """
  executorutil.cpp
  abstractexecutor.cpp
+ abstracttableioexecutor.cpp
  deleteexecutor.cpp
  distinctexecutor.cpp
  indexcountexecutor.cpp

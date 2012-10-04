@@ -15,6 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "storage/MaterializedViewMetadata.h"
+
 #include <cassert>
 #include <cstdio>
 #include "boost/shared_array.hpp"
@@ -28,7 +30,6 @@
 #include "expressions/abstractexpression.h"
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
-#include "storage/MaterializedViewMetadata.h"
 
 namespace voltdb {
 
@@ -74,28 +75,13 @@ MaterializedViewMetadata::MaterializedViewMetadata(
     }
 
     m_index = m_target->primaryKeyIndex();
-    m_searchKey = TableTuple(m_index->getKeySchema());
-    m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength() + 1];
-    memset(m_searchKeyBackingStore, 0, m_index->getKeySchema()->tupleLength() + 1);
-    m_searchKey.move(m_searchKeyBackingStore);
-
+    m_searchKey.allocateTupleNoHeader(m_index->getKeySchema());
     m_existingTuple = TableTuple(m_target->schema());
-
-    m_updatedTuple = TableTuple(m_target->schema());
-    m_updatedTupleBackingStore = new char[m_target->schema()->tupleLength() + 1];
-    memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
-    m_updatedTuple.move(m_updatedTupleBackingStore);
-
-    m_emptyTuple = TableTuple(m_target->schema());
-    m_emptyTupleBackingStore = new char[m_target->schema()->tupleLength() + 1];
-    memset(m_emptyTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
-    m_emptyTuple.move(m_emptyTupleBackingStore);
+    m_updatedTuple.allocateTupleWithValidHeader(m_target->schema());
+    m_emptyTuple.allocateTupleWithValidHeader(m_target->schema());
 }
 
 MaterializedViewMetadata::~MaterializedViewMetadata() {
-    delete[] m_searchKeyBackingStore;
-    delete[] m_updatedTupleBackingStore;
-    delete[] m_emptyTupleBackingStore;
     delete[] m_groupByColumns;
     delete[] m_outputColumnSrcTableIndexes;
     delete[] m_outputColumnAggTypes;
@@ -124,17 +110,17 @@ void MaterializedViewMetadata::parsePredicate(catalog::MaterializedViewInfo *met
 void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate
-        && (m_filterPredicate->eval(&newTuple, NULL).isFalse()))
+        && (m_filterPredicate->eval(&newTuple).isFalse()))
         return;
 
     bool exists = findExistingTuple(newTuple);
     if (!exists) {
         // create a blank tuple
-        m_existingTuple.move(m_emptyTupleBackingStore);
+        m_existingTuple.move(m_emptyTuple.address());
     }
 
     // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+    m_updatedTuple.clearTupleWithValidHeader();
 
     int colindex = 0;
     // set up the first n columns, based on group-by columns
@@ -198,7 +184,7 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
     findExistingTuple(oldTuple, true);
 
     // clear the tuple that will be built to insert or overwrite
-    memset(m_updatedTupleBackingStore, 0, m_target->schema()->tupleLength() + 1);
+    m_updatedTuple.clearTupleWithValidHeader();
 
     //printf("  Existing tuple: %s.\n", m_existingTuple.debugNoHeader().c_str());
     //fflush(stdout);

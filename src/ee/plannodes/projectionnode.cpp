@@ -45,20 +45,12 @@
 
 #include "projectionnode.h"
 
-#include "expressions/expressionutil.h"
+#include "common/executorcontext.hpp"
+#include "expressions/parametervalueexpression.h"
+#include "expressions/tuplevalueexpression.h"
 
 using namespace std;
 using namespace voltdb;
-
-boost::shared_array<int> ProjectionPlanNode::convertOutputIfAllParameterValues()
-{
-    return ExpressionUtil::convertIfAllParameterValues(m_outputColumnExpressions);
-}
-    
-boost::shared_array<int> ProjectionPlanNode::convertOutputIfAllTupleValues()
-{
-    return ExpressionUtil::convertIfAllTupleValues(m_outputColumnExpressions);
-}
 
 string ProjectionPlanNode::debugInfo(const string& spacer) const
 {
@@ -84,9 +76,30 @@ string ProjectionPlanNode::debugInfo(const string& spacer) const
 void ProjectionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
     // XXX-IZZY move this to init at some point
+    bool paramsBusted = false;
+    bool columnsBusted = false;
     for (int ii = 0; ii < getOutputSchema().size(); ii++)
     {
         SchemaColumn* outputColumn = getOutputSchema()[ii];
-        m_outputColumnExpressions.push_back(outputColumn->getExpression());
+        AbstractExpression* ae = outputColumn->getExpression();
+        m_outputColumnExpressions.push_back(ae);
+        if ( ! columnsBusted ) {
+            voltdb::TupleValueExpression* tve = dynamic_cast<TupleValueExpression*>(ae);
+            if (tve == NULL) {
+                columnsBusted = true;
+                m_outputIfAllTupleValues.resize(0);
+            } else {
+                m_outputIfAllTupleValues[ii] = tve->getColumnId();
+            }
+        }
+        if ( ! paramsBusted ) {
+            voltdb::ParameterValueExpression* pve = dynamic_cast<ParameterValueExpression*>(ae);
+            if (pve == NULL) {
+                paramsBusted = true;
+                m_outputIfAllParameterValues.resize(0);
+            } else {
+                m_outputIfAllParameterValues[ii] = &(ExecutorContext::getParams()[pve->getParameterId()]);
+            }
+        }
     }
 }

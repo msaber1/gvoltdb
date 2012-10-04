@@ -20,6 +20,7 @@
 
 #include "Topend.h"
 #include "common/UndoQuantum.h"
+#include "common/valuevector.h"
 
 namespace voltdb {
 
@@ -119,11 +120,14 @@ class ExecutorContext {
         return singleton->m_tempStringPool;
     }
 
+    static const NValueArray& getParams() { return *(getExecutorContext()->params); }
+
   private:
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
     int64_t m_txnId;
+    const NValueArray* params;
 
   public:
     int64_t m_lastCommittedTxnId;

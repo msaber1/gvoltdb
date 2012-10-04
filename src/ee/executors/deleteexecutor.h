@@ -46,7 +46,8 @@
 #ifndef HSTOREDELETEEXECUTOR_H
 #define HSTOREDELETEEXECUTOR_H
 
-#include "executors/abstractexecutor.h"
+#include "executors/abstracttableioexecutor.h"
+
 #include "common/tabletuple.h"
 
 namespace voltdb {
@@ -60,9 +61,7 @@ public:
 protected:
 
     bool p_init();
-    bool p_execute(const NValueArray &params);
-
-    DeletePlanNode* m_node;
+    bool p_execute();
 
     /** true if all tuples are deleted, truncate is the only case we
         don't need PK to delete tuples. */

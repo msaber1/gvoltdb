@@ -46,10 +46,9 @@
 #ifndef HSTORESENDEXECUTOR_H
 #define HSTORESENDEXECUTOR_H
 
-#include "common/common.h"
-#include "common/ids.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
+
+#include "common/common.h"
 
 namespace voltdb {
 
@@ -63,7 +62,7 @@ public:
 protected:
     bool initEngine(VoltDBEngine* engine) { m_engine = engine; return true; }
     bool p_init();
-    bool p_execute(const NValueArray &params);
+    bool p_execute();
 
 private:
     VoltDBEngine *m_engine;

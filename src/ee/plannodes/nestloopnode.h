@@ -53,11 +53,6 @@ namespace voltdb
 
 class NestLoopPlanNode : public AbstractJoinPlanNode
 {
-public:
-    NestLoopPlanNode(CatalogId id);
-    NestLoopPlanNode();
-    ~NestLoopPlanNode();
-
     virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_NESTLOOP); }
 };
 

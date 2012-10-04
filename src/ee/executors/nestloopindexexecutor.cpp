@@ -43,14 +43,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <vector>
-#include <string>
-#include <stack>
 #include "nestloopindexexecutor.h"
+
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "execution/VoltDBEngine.h"
+#include "common/SQLException.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "plannodes/nestloopindexnode.h"
@@ -60,6 +57,8 @@
 #include "storage/temptable.h"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
+
+#include <stack>
 
 using namespace std;
 using namespace voltdb;
@@ -167,7 +166,7 @@ bool NestLoopIndexExecutor::p_init()
 {
     VOLT_TRACE("init NLIJ Executor");
 
-    node = dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode);
+    NestLoopIndexPlanNode* node = dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode);
     assert(node);
     inline_node = dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
     assert(inline_node);
@@ -178,9 +177,9 @@ bool NestLoopIndexExecutor::p_init()
     m_sortDirection = inline_node->getSortDirection();
 
     //
-    // We need exactly one input table and a target table
+    // We need exactly one input table (and an inline node wih a target table)
     //
-    assert(getInputTables().size() == 1);
+    assert(hasExactlyOneInputTable());
 
     int schema_size = static_cast<int>(node->getOutputSchema().size());
 
@@ -215,7 +214,7 @@ bool NestLoopIndexExecutor::p_init()
     inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
     assert(inner_table);
 
-    assert(getInputTables().size() == 1);
+    assert(hasExactlyOneInputTable());
     outer_table = m_inputTable;
     assert(outer_table);
 
@@ -232,9 +231,7 @@ bool NestLoopIndexExecutor::p_init()
         return false;
     }
 
-    index_values = TableTuple(index->getKeySchema());
-    index_values_backing_store = new char[index->getKeySchema()->tupleLength()];
-    index_values.move( index_values_backing_store - TUPLE_HEADER_SIZE);
+    index_values.allocateTupleNoHeader(index->getKeySchema());
     index_values.setAllNulls();
 
     // for each tuple value expression in the predicate, determine
@@ -262,11 +259,10 @@ bool NestLoopIndexExecutor::p_init()
     return retval;
 }
 
-bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
+bool NestLoopIndexExecutor::p_execute()
 {
-    assert (node == dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
-    assert(node);
-    assert (inline_node == dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN)));
+    assert (dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
+    assert (inline_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN)));
     assert(inline_node);
 
     //inner_table is the table that has the index to be used in this executor
@@ -274,44 +270,33 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert(inner_table);
 
     //outer_table is the input table that have tuples to be iterated
-    assert(getInputTables().size() == 1);
+    assert(hasExactlyOneInputTable());
     assert (outer_table == m_inputTable);
     assert (outer_table);
     VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
                outer_table->debug().c_str(), inner_table->debug().c_str());
 
-    //
-    // Substitute parameter to SEARCH KEY Note that the expressions
-    // will include TupleValueExpression even after this substitution
-    //
     int num_of_searchkeys = (int)inline_node->getSearchKeyExpressions().size();
     for (int ctr = 0; ctr < num_of_searchkeys; ctr++) {
-        VOLT_TRACE("Search Key[%d] before substitution:\n%s",
-                   ctr, inline_node->getSearchKeyExpressions()[ctr]->debug(true).c_str());
-
-        inline_node->getSearchKeyExpressions()[ctr]->substitute(params);
-
-        VOLT_TRACE("Search Key[%d] after substitution:\n%s",
+        VOLT_TRACE("Search Key[%d]:\n%s",
                    ctr, inline_node->getSearchKeyExpressions()[ctr]->debug(true).c_str());
     }
 
     // end expression
     AbstractExpression* end_expression = inline_node->getEndExpression();
     if (end_expression) {
-        end_expression->substitute(params);
         VOLT_TRACE("End Expression:\n%s", end_expression->debug(true).c_str());
     }
 
     // post expression
     AbstractExpression* post_expression = inline_node->getPredicate();
     if (post_expression != NULL) {
-        post_expression->substitute(params);
         VOLT_TRACE("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
 
     // output must be a temp table
-    TempTable* output_table = dynamic_cast<TempTable*>(m_outputTable);
-    assert(output_table);
+    TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
+    assert(output_temp_table);
 
     //
     // OUTER TABLE ITERATION
@@ -348,8 +333,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         //
         index_values.setAllNulls();
         for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-            // in a normal index scan, params would be substituted here,
-            // but this scan fills in params outside the loop
             NValue candidateValue = inline_node->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL);
             try {
                 index_values.setNValue(ctr, candidateValue);
@@ -531,7 +514,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 
                     VOLT_TRACE("MATCH: %s",
                                join_tuple.debug(m_outputTable->name()).c_str());
-                    output_table->TempTable::insertTuple(join_tuple);
+                    output_temp_table->insertTempTuple(join_tuple);
                 }
             }
         }
@@ -550,7 +533,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 value.setNull();
                 join_tuple.setNValue(col_ctr + num_of_outer_cols, value);
             }
-                output_table->TempTable::insertTuple(join_tuple);
+                output_temp_table->insertTempTuple(join_tuple);
         }
     }
 
@@ -559,6 +542,4 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     return (true);
 }
 
-NestLoopIndexExecutor::~NestLoopIndexExecutor() {
-    delete [] index_values_backing_store;
-}
+NestLoopIndexExecutor::~NestLoopIndexExecutor() { }

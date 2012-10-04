@@ -45,11 +45,9 @@
 
 #include "abstractexecutor.h"
 
-#include "plannodes/abstracttableionode.h"
+#include "plannodes/abstractplannode.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
-
-#include <vector>
 
 using namespace std;
 using namespace voltdb;
@@ -84,7 +82,7 @@ bool AbstractExecutor::init(TempTableLimits* limits)
         // implementations that can often be inherited.
         p_setOutputTable(limits);
 
-        // Call the p_init() method on our derived class.
+        // Call the highly specialized p_init() method of the derived class.
         if ( ! p_init()) {
             return false;
         }
@@ -98,9 +96,15 @@ bool AbstractExecutor::init(TempTableLimits* limits)
     return true;
 }
 
+AbstractExecutor::~AbstractExecutor()
+{
+    // If it's not a TempTable, it's not owned by this executor, so delete nothing.
+    delete dynamic_cast<TempTable*>(m_outputTable);
+}
+
 /**
  * Set up a multi-column temp output table for those executors that require one.
- * Called from p_init.
+ * Called from p_setOutputTable.
  */
 void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
     assert(limits);
@@ -122,7 +126,7 @@ void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string 
 
 /**
  * Set up a temp table to pass through tuples from a child node.
- * Called from p_init.
+ * Called from p_setOutputTable.
  */
 void AbstractExecutor::setPassThroughTempOutputTable(TempTableLimits* limits) {
     assert(m_inputTable);
@@ -133,47 +137,4 @@ void AbstractExecutor::setPassThroughTempOutputTable(TempTableLimits* limits) {
                                                      name,
                                                      m_inputTable,
                                                      limits);
-}
-
-AbstractExecutor::~AbstractExecutor()
-{
-    // If it's not a TempTable, it's not owned by this executor, so delete nothing.
-    delete dynamic_cast<TempTable*>(m_outputTable);
-}
-
-
-// Hook up abstract scan and (write) operation executors with the engine
-// and with the target table known to the engine.
-// Other executors (Send, Recieve, and Materialize) also provide initEngine specializations
-// to access the engine for various other purposes.
-bool AbstractTableIOExecutor::initEngine(VoltDBEngine* engine)
-{
-    m_engine = engine;
-
-    AbstractTableIOPlanNode* node = dynamic_cast<AbstractTableIOPlanNode*>(m_abstractNode);
-    assert(node);
-    if (!node) {
-        return false;
-    }
-    m_targetTable = node->resolveTargetTable(engine);
-    return (m_targetTable != NULL);
-}
-
-/**
- * Set up a single-column temp output table for DML executors that require one to return their counts.
- */
-void AbstractOperationExecutor::p_setOutputTable(TempTableLimits* limits) {
-    TupleSchema* schema = m_abstractNode->generateTupleSchema(false);
-    // The column count (1) and column name for the DML counter column is hard-coded in the planner
-    // and passed via the output schema -- kind of pointless since they could just as easily be hard-coded here,
-    // possibly saving the trouble of serializing an outputSchema at all for DML nodes.
-    assert(m_abstractNode->getOutputSchema().size() == 1);
-    CatalogId databaseId = m_abstractNode->databaseId();
-    const string name("temp");
-    vector<string> columnNames(1, m_abstractNode->getOutputSchema()[0]->getColumnName());
-    m_outputTable = TableFactory::getTempTable(databaseId,
-                                               name,
-                                               schema,
-                                               columnNames,
-                                               limits);
 }

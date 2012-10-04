@@ -43,19 +43,34 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef HSTOREEXECUTORUTIL_H
-#define HSTOREEXECUTORUTIL_H
+#ifndef VOLTDBTABLEIOEXECUTOR_H
+#define VOLTDBTABLEIOEXECUTOR_H
 
-#include "common/types.h"
+#include "abstractexecutor.h"
 
 namespace voltdb {
-class AbstractExecutor;
-// A struct with a static method beats a global function because its signature is "closed".
-// An attempt to change the signature of the implementation without changing the signature in the header
-// is caught at implementation compile time, not as an unresolved symbol at link time.
-struct ExecutorUtil {
-    static AbstractExecutor* getNewExecutor(PlanNodeType);
-};
-}
 
+class AbstractTableIOExecutor : public AbstractExecutor {
+protected:
+    bool initEngine(VoltDBEngine* engine);
+    bool valueHashesToTheLocalPartiton(const NValue& value) const;
+    bool onPartitionZero() const;
+
+    Table* m_targetTable;
+
+    VoltDBEngine* getEngine() const { return m_engine; }
+
+private:
+    /** reference to the engine/context to store the number of modified tuples,
+     *  check whether updated/inserted tuples are on the right partition, etc. */
+    VoltDBEngine* m_engine;
+};
+
+class AbstractOperationExecutor : public AbstractTableIOExecutor {
+protected:
+    bool storeModifiedTupleCount(int64_t modifiedTuples);
+    void p_setOutputTable(TempTableLimits* limits);
+};
+
+}
 #endif

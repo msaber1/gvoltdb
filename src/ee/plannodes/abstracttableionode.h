@@ -47,7 +47,6 @@
 #define HSTORETABLEIONODE_H
 
 #include "abstractplannode.h"
-#include "json_spirit/json_spirit.h"
 
 namespace voltdb {
 
@@ -65,18 +64,18 @@ public:
     std::string debugInfo(const std::string &spacer) const;
 
 protected:
-    void loadFromJSONObject(json_spirit::Object &obj);
-        
     AbstractTableIOPlanNode() : m_targetTableName("NOT_SPECIFIED"), m_targetTable(NULL) {}
+
+    void loadFromJSONObject(json_spirit::Object &obj);
 
     // Target Table
     // This table is different from the temp output tables managed by the executors.
     // An operation executor reads tuples from its input table(s) and applies them to the target table.
     // Its output table stores only the count of rows affected.
-    // A scan executor may either read in tuples from its target table and write tuples to a temp ouput table,
+    // A scan executor may either read in tuples from its target table and write tuples to a temp output table,
     // OR, as an optimization for simple cases, it may identify its target table as its output table.
-    // This abstracts away the distinction between persistent table and temp table when
-    // accessed as an input table by the parent node's executor.
+    // The resulting table is provided as an input table to the parent node's executor as a generic Table*
+    // abstracting away the distinction between persistent table and temp table when used for read access.
     std::string m_targetTableName;
     Table* m_targetTable; // volatile
 };

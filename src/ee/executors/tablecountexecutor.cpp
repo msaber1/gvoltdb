@@ -39,11 +39,16 @@ bool TableCountExecutor::p_init()
     return true;
 }
 
-bool TableCountExecutor::p_execute(const NValueArray &params)
+bool TableCountExecutor::p_execute()
 {
-    assert(dynamic_cast<TableCountPlanNode*>(m_abstractNode));
+#ifndef NDEBUG
+    TableCountPlanNode* node = dynamic_cast<TableCountPlanNode*>(m_abstractNode);
+#endif
+    assert(node);
     assert(m_outputTable);
     assert ((int)m_outputTable->columnCount() == 1);
+
+    TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
 
     assert(m_targetTable);
     VOLT_TRACE("Table Count table :\n %s",
@@ -55,11 +60,11 @@ bool TableCountExecutor::p_execute(const NValueArray &params)
                (int)m_targetTable->allocatedTupleCount(),
                (int)m_targetTable->usedTupleCount());
 
-    assert(dynamic_cast<TableCountPlanNode*>(m_abstractNode)->getPredicate() == NULL);
+    assert (node->getPredicate() == NULL);
 
-    TableTuple& tmptup = m_outputTable->tempTuple();
+    TableTuple& tmptup = output_temp_table->tempTuple();
     tmptup.setNValue(0, ValueFactory::getBigIntValue( m_targetTable->activeTupleCount() ));
-    m_outputTable->insertTuple(tmptup);
+    output_temp_table->insertTempTuple(tmptup);
 
     //printf("Table count answer: %d", iterator.getSize());
     //printf("\n%s\n", m_outputTable->debug().c_str());

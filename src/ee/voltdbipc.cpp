@@ -570,7 +570,6 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
             if (m_engine->executeQuery(ntohll(fragmentId[i]),
                                        1,
                                        (int32_t)(ntohll(inputDepId[i])), // Java sends int64 but EE wants int32
-                                       params,
                                        ntohll(queryCommand->txnId),
                                        ntohll(queryCommand->lastCommittedTxnId),
                                        i == 0 ? true : false, //first

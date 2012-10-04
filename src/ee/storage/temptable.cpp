@@ -68,6 +68,10 @@ TempTable::~TempTable() {}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
+bool TempTable::insertTuple(TableTuple &source) {
+    return insertTempTuple(source);
+}
+
 bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                TableTuple &sourceTupleWithNewValues,
                                                std::vector<TableIndex*> &indexesToUpdate) {

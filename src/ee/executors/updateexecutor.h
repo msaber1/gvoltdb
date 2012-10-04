@@ -46,7 +46,8 @@
 #ifndef HSTOREUPDATEEXECUTOR_H
 #define HSTOREUPDATEEXECUTOR_H
 
-#include "executors/abstractexecutor.h"
+#include "executors/abstracttableioexecutor.h"
+
 #include "common/tabletuple.h"
 
 namespace voltdb {
@@ -63,7 +64,7 @@ public:
 
 protected:
     bool p_init();
-    bool p_execute(const NValueArray &params);
+    bool p_execute();
 
     UpdatePlanNode* m_node;
 

@@ -63,11 +63,13 @@ LimitExecutor::p_init()
 }
 
 bool
-LimitExecutor::p_execute(const NValueArray &params)
+LimitExecutor::p_execute()
 {
     LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
     assert(node);
     assert(m_inputTable);
+
+    TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
 
     //
     // Grab the iterator for our input table, and loop through until
@@ -80,7 +82,7 @@ LimitExecutor::p_execute(const NValueArray &params)
     int tuples_skipped = 0;
     int limit = -1;
     int offset = -1;
-    node->getLimitAndOffsetByReference(params, limit, offset);
+    node->getLimitAndOffsetByReference(limit, offset);
 
     while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
     {
@@ -92,10 +94,9 @@ LimitExecutor::p_execute(const NValueArray &params)
         }
         tuple_ctr++;
 
-        if (!m_outputTable->insertTuple(tuple))
+        if ( ! output_temp_table->insertTempTuple(tuple))
         {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                       " output table '%s'",
+            VOLT_ERROR("Failed to insert tuple from input table '%s' into output table '%s'",
                        m_inputTable->name().c_str(),
                        m_outputTable->name().c_str());
             return false;

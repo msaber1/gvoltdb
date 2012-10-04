@@ -159,7 +159,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Execution Functions
         // -------------------------------------------------
         int executeQuery(int64_t planfragmentId, int32_t outputDependencyId, int32_t inputDependencyId,
-                         const NValueArray &params, int64_t txnId, int64_t lastCommittedTxnId, bool first, bool last);
+                         int64_t txnId, int64_t lastCommittedTxnId, bool first, bool last);
 
         // ensure a plan fragment is loaded, given a graph
         // return the fragid and cache statistics

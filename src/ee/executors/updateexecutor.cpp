@@ -45,24 +45,19 @@
 
 #include "updateexecutor.h"
 
-#include <cassert>
-#include <boost/scoped_ptr.hpp>
-#include <boost/foreach.hpp>
-
 #include "common/debuglog.h"
 #include "common/common.h"
-#include "common/ValueFactory.hpp"
 #include "common/types.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "execution/VoltDBEngine.h"
 #include "plannodes/updatenode.h"
 #include "plannodes/projectionnode.h"
 #include "storage/table.h"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
-#include "storage/tableutil.h"
 #include "storage/persistenttable.h"
+
+#include <boost/scoped_ptr.hpp>
+#include <boost/foreach.hpp>
 
 using namespace std;
 using namespace voltdb;
@@ -73,7 +68,7 @@ bool UpdateExecutor::p_init()
 
     m_node = dynamic_cast<UpdatePlanNode*>(m_abstractNode);
     assert(m_node);
-    assert(getInputTables().size() == 1);
+    assert(hasExactlyOneInputTable());
     assert(m_inputTable);
     assert(m_targetTable);
 
@@ -109,7 +104,7 @@ bool UpdateExecutor::p_init()
         }
     }
 
-    assert(m_inputTargetMap.size() == (output_column_names.size() - 1));
+    assert(m_inputTargetMap.size() == (proj_node->getOutputSchema().size() - 1));
     m_inputTargetMapSize = (int)m_inputTargetMap.size();
     m_inputTuple = TableTuple(m_inputTable->schema());
     m_targetTuple = TableTuple(m_targetTable->schema());
@@ -139,7 +134,7 @@ bool UpdateExecutor::p_init()
     return true;
 }
 
-bool UpdateExecutor::p_execute(const NValueArray &params) {
+bool UpdateExecutor::p_execute() {
     assert(m_inputTable);
     assert(m_targetTable);
 
@@ -178,10 +173,8 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             // check for partition problems
             // get the value for the partition column
             NValue value = tempTuple.getNValue(m_partitionColumn);
-            bool isLocal = m_engine->isLocalSite(value);
-
             // if it doesn't map to this site
-            if (!isLocal) {
+            if ( ! valueHashesToTheLocalPartiton(value)) {
                 VOLT_ERROR("Mispartitioned tuple in single-partition plan for"
                            " table '%s'", m_targetTable->name().c_str());
                 return false;
@@ -196,23 +189,5 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         }
     }
 
-    TableTuple& count_tuple = m_outputTable->tempTuple();
-    count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->activeTupleCount()));
-    // try to put the tuple into the output table
-    if (!m_outputTable->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to insert tuple count (%ld) into"
-                   " output table '%s'",
-                   static_cast<long int>(m_inputTable->activeTupleCount()),
-                   m_outputTable->name().c_str());
-        return false;
-    }
-
-    VOLT_TRACE("TARGET TABLE - AFTER: %s\n", m_targetTable->debug().c_str());
-    // TODO lets output result table here, not in result executor. same thing in
-    // delete/insert
-
-    // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += m_inputTable->activeTupleCount();
-
-    return true;
+    return storeModifiedTupleCount(m_inputTable->activeTupleCount());
 }

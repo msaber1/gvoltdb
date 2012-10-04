@@ -46,9 +46,9 @@
 #ifndef HSTORENESTLOOPEXECUTOR_H
 #define HSTORENESTLOOPEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
+
+#include "common/common.h"
 
 namespace voltdb {
 /**
@@ -59,7 +59,7 @@ class NestLoopExecutor : public AbstractExecutor {
         NestLoopExecutor() {}
     protected:
         bool p_init();
-        bool p_execute(const NValueArray &params);
+        bool p_execute();
 };
 
 }

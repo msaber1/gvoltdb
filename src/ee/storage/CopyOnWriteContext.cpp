@@ -217,7 +217,7 @@ void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
          * Don't back up a newly introduced tuple, just mark it as dirty.
          */
         if (!newTuple) {
-            m_backedUpTuples->insertTupleNonVirtualWithDeepCopy(tuple, &m_pool);
+            m_backedUpTuples->insertTempTupleWithDeepCopy(tuple, &m_pool);
         }
     } else {
         tuple.setDirtyFalse();

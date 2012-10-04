@@ -38,6 +38,7 @@
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 
 using namespace voltdb;
 using namespace std;
@@ -297,7 +298,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(8, ValueFactory::getDoubleValue(static_cast<double>(.0825)));
     temp_tuple->setNValue(9, ValueFactory::getDoubleValue(static_cast<double>(15241.45)));
     temp_tuple->setNValue(10, ValueFactory::getIntegerValue(static_cast<int32_t>(21)));
-    districtTempTable->TempTable::insertTuple(*temp_tuple);
+    districtTempTable->insertTempTuple(*temp_tuple);
 
     temp_tuple = &warehouseTempTable->tempTuple();
     temp_tuple->setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(3)));
@@ -315,7 +316,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(6, cachedStringValues.back());
     temp_tuple->setNValue(7, ValueFactory::getDoubleValue(static_cast<double>(.1234)));
     temp_tuple->setNValue(8, ValueFactory::getDoubleValue(static_cast<double>(15241.45)));
-    warehouseTempTable->TempTable::insertTuple(*temp_tuple);
+    warehouseTempTable->insertTempTuple(*temp_tuple);
 
     temp_tuple = &customerTempTable->tempTuple();
     temp_tuple->setNValue(0, ValueFactory::getIntegerValue(static_cast<int32_t>(42)));
@@ -349,7 +350,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(18, ValueFactory::getIntegerValue(static_cast<int32_t>(0)));
     temp_tuple->setNValue(19, ValueFactory::getIntegerValue(static_cast<int32_t>(15)));
     temp_tuple->setNValue(20, ValueFactory::getStringValue("Some History"));
-    customerTempTable->TempTable::insertTuple(*temp_tuple);
+    customerTempTable->insertTempTuple(*temp_tuple);
 
     TableTuple districtTuple = TableTuple(districtTempTable->schema());
     TableIterator districtIterator = districtTempTable->iterator();
@@ -412,7 +413,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     temp_tuple->setNValue(18, ValueFactory::getIntegerValue(static_cast<int32_t>(1)));
     temp_tuple->setNValue(19, ValueFactory::getIntegerValue(static_cast<int32_t>(15)));
     temp_tuple->setNValue(20, ValueFactory::getStringValue("Some History"));
-    customerTempTable->TempTable::insertTuple(*temp_tuple);
+    customerTempTable->insertTempTuple(*temp_tuple);
 
     customerIterator = customerTempTable->iterator();
     while (customerIterator.next(customerTuple)) {

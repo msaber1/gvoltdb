@@ -218,6 +218,13 @@ public:
         return retval;
     }
 
+    /*
+     * Allocate a continous block of memory of the specified size conveniently initialized to 0s
+     */
+    inline void* allocateZeroes(std::size_t size) {
+        return ::memset(allocate(size), 0, size);
+    }
+
     inline void purge() {
         /*
          * Erase any oversize chunks that were allocated

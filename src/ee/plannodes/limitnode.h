@@ -67,7 +67,7 @@ class LimitPlanNode : public AbstractPlanNode {
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_LIMIT); }
 
         // evaluate possibly parameterized limit and offsets.
-        void getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset);
+        void getLimitAndOffsetByReference(int &limit, int &offset);
 
         std::string debugInfo(const std::string &spacer) const;
 

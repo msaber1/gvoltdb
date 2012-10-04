@@ -45,9 +45,26 @@
 
 #include "abstracttableionode.h"
 
+#include "execution/VoltDBEngine.h"
+
 using namespace std;
 using namespace voltdb;
 
+Table* AbstractTableIOPlanNode::resolveTargetTable(VoltDBEngine* engine)
+{
+    m_targetTable = engine->getTable(m_targetTableName);
+    return getTargetTable();
+}
+
+Table* AbstractTableIOPlanNode::getTargetTable() const
+{
+    if (m_targetTable == NULL) {
+        VOLT_ERROR("Failed to retrieve target table '%s' from execution engine for PlanNode '%s'",
+                   m_targetTableName.c_str(),
+                   debug().c_str());
+    }
+    return m_targetTable;
+}
 
 string AbstractTableIOPlanNode::debugInfo(const string &spacer) const {
     ostringstream buffer;

@@ -538,7 +538,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         Pool *stringPool = engine->getStringPool();
         const int paramcnt = deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
         engine->setUsedParamcnt(paramcnt);
-        const int retval = engine->executeQuery(plan_fragment_id, outputDependencyId, inputDependencyId, params, txnId, lastCommittedTxnId, true, true);
+        const int retval = engine->executeQuery(plan_fragment_id, outputDependencyId, inputDependencyId, txnId, lastCommittedTxnId, true, true);
         stringPool->purge();
         return retval;
     } catch (FatalException e) {
@@ -668,7 +668,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
             // success is 0 and error is 1.
             if (engine->executeQuery(fragment_ids_buffer[i], 1, static_cast<int32_t>(input_dep_id),
-                                     params, txnId, lastCommittedTxnId, i == 0,
+                                     txnId, lastCommittedTxnId, i == 0,
                                      i == (batch_size - 1)))
             {
                 ++failures;

@@ -42,20 +42,19 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include <vector>
-#include <string>
-#include <stack>
+
 #include "nestloopexecutor.h"
+
+#include <stack>
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
+#include "plannodes/nestloopnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "plannodes/nestloopnode.h"
 
 #ifdef VOLT_DEBUG_ENABLED
 #include <ctime>
@@ -178,7 +177,7 @@ bool NestLoopExecutor::p_init()
 }
 
 
-bool NestLoopExecutor::p_execute(const NValueArray &params) {
+bool NestLoopExecutor::p_execute() {
     VOLT_DEBUG("executing NestLoop...");
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
@@ -199,7 +198,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     //
     AbstractExpression *predicate = node->getPredicate();
     if (predicate) {
-        predicate->substitute(params);
         VOLT_TRACE ("predicate: %s", predicate == NULL ?
                     "NULL" : predicate->debug(true).c_str());
     }
@@ -211,8 +209,8 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TableTuple &joined = m_outputTable->tempTuple();
 
     // output must be a temp table
-    TempTable* output_table = dynamic_cast<TempTable*>(m_outputTable);
-    assert(output_table);
+    TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
+    assert(output_temp_table);
 
     TableIterator iterator0 = outer_table->iterator();
     while (iterator0.next(outer_tuple)) {
@@ -231,7 +229,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                 for (int col_ctr = 0; col_ctr < inner_cols; col_ctr++) {
                     joined.setNValue(col_ctr + outer_cols, inner_tuple.getNValue(col_ctr));
                 }
-                output_table->TempTable::insertTuple(joined);
+                output_temp_table->insertTempTuple(joined);
             }
         }
     }

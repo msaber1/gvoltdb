@@ -43,11 +43,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "VoltDBEngine.h"
+
 #include "boost/shared_array.hpp"
 #include "boost/scoped_array.hpp"
 #include "boost/foreach.hpp"
 #include "boost/scoped_ptr.hpp"
-#include "VoltDBEngine.h"
 #include "common/common.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
@@ -77,19 +78,17 @@
 #include "plannodes/nodes.h"
 #include "plannodes/plannodeutil.h"
 #include "plannodes/plannodefragment.h"
-#include "executors/executors.h"
+#include "executors/abstractexecutor.h"
 #include "executors/executorutil.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/constraintutil.h"
 #include "storage/persistenttable.h"
 #include "storage/MaterializedViewMetadata.h"
-#include "storage/StreamBlock.h"
 #include "storage/TableCatalogDelegate.hpp"
-#include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 #include "stats/StatsAgent.h"
-#include "voltdbipc.h"
 #include "common/FailureInjection.h"
 
 #include <iostream>
@@ -305,7 +304,6 @@ bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
 int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                int32_t outputDependencyId,
                                int32_t inputDependencyId,
-                               const NValueArray &params,
                                int64_t txnId, int64_t lastCommittedTxnId,
                                bool first, bool last)
 {
@@ -369,7 +367,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
-            if (!executor->execute(params)) {
+            if (!executor->execute()) {
                 VOLT_TRACE("The Executor's execution at position '%d'"
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
@@ -1022,7 +1020,7 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId,
 
     // Executor is created here. An executor is *devoted* to this plannode
     // so that it can cache anything for the plannode
-    AbstractExecutor* executor = getNewExecutor(node->getPlanNodeType());
+    AbstractExecutor* executor = ExecutorUtil::getNewExecutor(node->getPlanNodeType());
     if (executor == NULL)
         return false;
     executor->initEngine(this);
@@ -1266,7 +1264,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     }
 }
 
-
+/* Smart accessor to keep executor context in synch with the engine's currrent valid undoquanta */
 void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
 {
     m_currentUndoQuantum = undoQuantum;

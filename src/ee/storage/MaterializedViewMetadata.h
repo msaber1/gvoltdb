@@ -68,19 +68,15 @@ private:
     // the materialized view table
     PersistentTable *m_target;
     // space to hold the search key for the view table
-    TableTuple m_searchKey;
-    // storage to hold the value for the search key
-    char *m_searchKeyBackingStore;
+    StorageBackedTempTuple m_searchKey;
     // the primary index on the view table whose columns
     // are the same as the group by in the view query
     TableIndex *m_index;
 
     // space to store temp view tuples
     TableTuple m_existingTuple;
-    TableTuple m_updatedTuple;
-    char *m_updatedTupleBackingStore;
-    TableTuple m_emptyTuple;
-    char *m_emptyTupleBackingStore;
+    StorageBackedTuple m_updatedTuple;
+    StorageBackedTuple m_emptyTuple;
 
     // predicate to include or exclude rows from being
     // part of the aggregation in the materialized view

@@ -50,9 +50,10 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
+#include "common/SerializableEEException.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
+#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 
@@ -66,7 +67,7 @@ OrderByExecutor::p_init()
 
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
-    assert(getInputTables().size() == 1);
+    assert(hasExactlyOneInputTable());
 
     assert(node->getChildren()[0] != NULL);
 
@@ -122,11 +123,13 @@ private:
 };
 
 bool
-OrderByExecutor::p_execute(const NValueArray &params)
+OrderByExecutor::p_execute()
 {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
     assert(m_inputTable);
+
+    TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
 
     //
     // OPTIMIZATION: NESTED LIMIT
@@ -136,12 +139,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     int offset = -1;
     if (limit_node != NULL)
     {
-        limit_node->getLimitAndOffsetByReference(params, limit, offset);
-    }
-
-    // substitute parameters in the order by expressions
-    for (int i = 0; i < node->getSortExpressions().size(); i++) {
-        node->getSortExpressions()[i]->substitute(params);
+        limit_node->getLimitAndOffsetByReference(limit, offset);
     }
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
@@ -173,7 +171,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
 
         VOLT_TRACE("\n***** Input Table PostSort:\n '%s'",
                    m_inputTable->debug().c_str());
-        if (!m_outputTable->insertTuple(*it))
+        if ( ! output_temp_table->insertTempTuple(*it))
         {
             VOLT_ERROR("Failed to insert order-by tuple from input table '%s'"
                        " into output table '%s'",

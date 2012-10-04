@@ -29,6 +29,7 @@
 #include "common/types.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/persistenttable.h"
@@ -257,8 +258,8 @@ TableCatalogDelegate::init(catalog::Database &catalogDatabase,
         partitionColumnIndex = partitionColumn->index();
     }
 
-    m_exportEnabled = isExportEnabledForTable(catalogDatabase, table_id);
-    bool tableIsExportOnly = isTableExportOnly(catalogDatabase, table_id);
+    m_exportEnabled = CatalogUtil::isExportEnabledForTable(catalogDatabase, table_id);
+    bool tableIsExportOnly = CatalogUtil::isTableExportOnly(catalogDatabase, table_id);
     const string& tableName = catalogTable.name();
     int32_t databaseId = catalogDatabase.relativeIndex();
     m_table = TableFactory::getPersistentTable(databaseId, tableName,

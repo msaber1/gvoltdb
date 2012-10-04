@@ -32,6 +32,7 @@
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "stx/btree_set.h"
@@ -142,13 +143,13 @@ public:
         m_table->setPrimaryKeyIndex(pkeyIndex);
     }
 
-    void addRandomUniqueTuples(Table *table, int numTuples) {
-        TableTuple tuple = table->tempTuple();
+    void addRandomUniqueTuples(int numTuples) {
+        TableTuple tuple = m_table->tempTuple();
         ::memset(tuple.address() + 1, 0, tuple.tupleLength() - 1);
         for (int ii = 0; ii < numTuples; ii++) {
             tuple.setNValue(0, ValueFactory::getIntegerValue(m_primaryKeyIndex++));
             tuple.setNValue(1, ValueFactory::getIntegerValue(rand()));
-            bool success = table->insertTuple(tuple);
+            bool success = m_table->insertTuple(tuple);
             if (!success) {
                 std::cout << "Failed to add random unique tuple" << std::endl;
                 return;
@@ -185,7 +186,7 @@ public:
         m_tuplesInsertedInLastUndo = 0;
     }
 
-    void doRandomTableMutation(Table *table) {
+    void doRandomTableMutation() {
         int rand = ::rand();
         int op = rand % 3;
         switch (op) {
@@ -194,9 +195,9 @@ public:
          * Delete a tuple
          */
         case 0: {
-            TableTuple tuple(table->schema());
-            if (tableutil::getRandomTuple(table, tuple)) {
-                table->deleteTuple(tuple, true);
+            TableTuple tuple(m_table->schema());
+            if (tableutil::getRandomTuple(m_table, tuple)) {
+                m_table->deleteTuple(tuple, true);
                 m_tuplesDeleted++;
                 m_tuplesDeletedInLastUndo++;
             }
@@ -207,7 +208,7 @@ public:
          * Insert a tuple
          */
         case 1: {
-            addRandomUniqueTuples(table, 1);
+            addRandomUniqueTuples(1);
             m_tuplesInserted++;
             m_tuplesInsertedInLastUndo++;
             break;
@@ -217,12 +218,12 @@ public:
          * Update a random tuple
          */
         case 2: {
-            voltdb::TableTuple tuple(table->schema());
-            voltdb::TableTuple tempTuple = table->tempTuple();
-            if (tableutil::getRandomTuple(table, tuple)) {
+            voltdb::TableTuple tuple(m_table->schema());
+            voltdb::TableTuple tempTuple = m_table->tempTuple();
+            if (tableutil::getRandomTuple(m_table, tuple)) {
                 tempTuple.copy(tuple);
                 tempTuple.setNValue(1, ValueFactory::getIntegerValue(::rand()));
-                table->updateTuple(tuple, tempTuple);
+                m_table->updateTuple(tuple, tempTuple);
                 m_tuplesUpdated++;
             }
             break;
@@ -260,7 +261,7 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
 #else
     int tupleCount = 174762;
 #endif
-    addRandomUniqueTuples( m_table, tupleCount);
+    addRandomUniqueTuples(tupleCount);
 
     voltdb::TableIterator& iterator = m_table->iterator();
     TBMap blocks(m_table->m_data);
@@ -314,7 +315,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
 #else
     int tupleCount = 174762;
 #endif
-    addRandomUniqueTuples( m_table, tupleCount);
+    addRandomUniqueTuples(tupleCount);
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
         stx::btree_set<int64_t> originalTuples;
@@ -358,7 +359,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
                 ii += 68;
             }
             for (int jj = 0; jj < 10; jj++) {
-                doRandomTableMutation(m_table);
+                doRandomTableMutation();
             }
         }
 
@@ -402,7 +403,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 #else
     int tupleCount = 174762;
 #endif
-    addRandomUniqueTuples( m_table, tupleCount);
+    addRandomUniqueTuples(tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0);
     DefaultTupleSerializer serializer;
@@ -448,7 +449,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 ii += 68;
             }
             for (int jj = 0; jj < 10; jj++) {
-                doRandomTableMutation(m_table);
+                doRandomTableMutation();
             }
             doRandomUndo();
         }
@@ -496,7 +497,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
 #else
     int tupleCount = 174762;
 #endif
-    addRandomUniqueTuples( m_table, tupleCount);
+    addRandomUniqueTuples(tupleCount);
     m_engine->setUndoToken(0);
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0);
     DefaultTupleSerializer serializer;
@@ -542,7 +543,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 ii += 68;
             }
             for (int jj = 0; jj < 10; jj++) {
-                doRandomTableMutation(m_table);
+                doRandomTableMutation();
             }
             m_engine->undoUndoToken(m_undoToken);
             m_engine->setUndoToken(++m_undoToken);

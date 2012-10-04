@@ -46,10 +46,9 @@
 #ifndef HSTOREINDEXSCANEXECUTOR_H
 #define HSTOREINDEXSCANEXECUTOR_H
 
-#include "common/tabletuple.h"
-#include "executors/abstractexecutor.h"
+#include "executors/abstracttableioexecutor.h"
 
-#include "boost/shared_array.hpp"
+#include "common/tabletuple.h"
 
 namespace voltdb {
 class AbstractExpression;
@@ -57,17 +56,13 @@ class AbstractExpression;
 //
 // Inline PlanNodes
 //
-class IndexScanPlanNode;
 class ProjectionPlanNode;
 class LimitPlanNode;
 
 class IndexScanExecutor : public AbstractTableIOExecutor
 {
 public:
-    IndexScanExecutor() :
-        m_projectionExpressions(NULL),
-        m_searchKeyBackingStore(NULL)
-    {}
+    IndexScanExecutor() { /* Do nothing */ }
     ~IndexScanExecutor();
 
 private:
@@ -77,42 +72,26 @@ private:
     void p_setOutputTable(TempTableLimits* limits);
 
     bool p_init();
-    bool p_execute(const NValueArray &params);
+    bool p_execute();
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
-    IndexScanPlanNode *m_node;
     int m_numOfColumns;
     int m_numOfSearchkeys;
 
     // Inline Projection
     ProjectionPlanNode* m_projectionNode;
-    int* m_projectionAllTupleArray; // projection_all_tuple_array_ptr[]
-    AbstractExpression** m_projectionExpressions;
 
     // Search key
-    TableTuple m_searchKey;
-    // search_key_beforesubstitute_array_ptr[]
-    AbstractExpression** m_searchKeyBeforeSubstituteArray;
+    StorageBackedTempTuple m_searchKey;
 
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;
 
-    // IndexScan Information
-    TempTable* m_outputTable;
-    PersistentTable* m_targetTable;
-
     TableIndex *m_index;
     TableTuple m_dummy;
     TableTuple m_tuple;
-
-    // arrange the memory mgmt aids at the bottom to try to maximize
-    // cache hits (by keeping them out of the way of useful runtime data)
-    boost::shared_array<int> m_projectionAllTupleArrayPtr;
-    boost::shared_array<AbstractExpression*> m_searchKeyBeforeSubstituteArrayPtr;
-    // So Valgrind doesn't complain:
-    char* m_searchKeyBackingStore;
 };
 
 }

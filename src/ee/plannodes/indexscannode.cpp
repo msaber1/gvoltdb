@@ -61,62 +61,10 @@ IndexScanPlanNode::~IndexScanPlanNode() {
     delete end_expression;
 }
 
-void IndexScanPlanNode::setKeyIterate(bool val) {
-    this->key_iterate = val;
-}
-bool IndexScanPlanNode::getKeyIterate() const {
-    return (this->key_iterate);
-}
-
-void IndexScanPlanNode::setLookupType(IndexLookupType lookup_type) {
-    this->lookup_type = lookup_type;
-}
-IndexLookupType IndexScanPlanNode::getLookupType() const {
-    return lookup_type;
-}
-
-void IndexScanPlanNode::setSortDirection(SortDirectionType val) {
-    this->sort_direction = val;
-}
-SortDirectionType IndexScanPlanNode::getSortDirection() const {
-    return sort_direction;
-}
-
-void IndexScanPlanNode::setTargetIndexName(std::string name) {
-    this->target_index_name = name;
-}
-std::string IndexScanPlanNode::getTargetIndexName() const {
-    return this->target_index_name;
-}
-
-void IndexScanPlanNode::setEndExpression(AbstractExpression* val) {
-    // only expect this to be initialized once
-    if (end_expression && end_expression != val)
-    {
-        throwFatalException("end_expression initialized twice in IndexScanPlanNode?");
-        delete end_expression;
-    }
-    this->end_expression = val;
-}
-AbstractExpression* IndexScanPlanNode::getEndExpression() const {
-    return (this->end_expression);
-}
-
-void IndexScanPlanNode::setSearchKeyExpressions(std::vector<AbstractExpression*> &exps) {
-    this->searchkey_expressions = exps;
-}
-std::vector<AbstractExpression*>& IndexScanPlanNode::getSearchKeyExpressions() {
-    return (this->searchkey_expressions);
-}
-const std::vector<AbstractExpression*>& IndexScanPlanNode::getSearchKeyExpressions() const {
-    return (this->searchkey_expressions);
-}
-
 std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
     buffer << this->AbstractScanPlanNode::debugInfo(spacer);
     buffer << spacer << "TargetIndexName[" << this->target_index_name << "]\n";
-    buffer << spacer << "EnableKeyIteration[" << std::boolalpha << this->key_iterate << "]\n";
     buffer << spacer << "IndexLookupType[" << this->lookup_type << "]\n";
     buffer << spacer << "SortDirection[" << this->sort_direction << "]\n";
 
@@ -143,14 +91,6 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
 
 void IndexScanPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
-
-    json_spirit::Value keyIterateValue = json_spirit::find_value( obj, "KEY_ITERATE");
-    if (keyIterateValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "IndexScanPlanNode::loadFromJSONObject:"
-                                      " Can't find KEY_ITERATE value");
-    }
-    key_iterate = keyIterateValue.get_bool();
 
     json_spirit::Value lookupTypeValue = json_spirit::find_value( obj, "LOOKUP_TYPE");
     if (lookupTypeValue == json_spirit::Value::null) {

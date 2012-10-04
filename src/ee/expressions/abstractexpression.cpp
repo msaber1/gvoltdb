@@ -88,21 +88,6 @@ AbstractExpression::~AbstractExpression()
     delete m_right;
 }
 
-void
-AbstractExpression::p_substitute(const NValueArray &params)
-{
-    // descend. nodes with parameters overload substitute()
-    VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
-    if (m_left) {
-        VOLT_TRACE("Substitute processing left child...");
-        m_left->substitute(params);
-    }
-    if (m_right) {
-        VOLT_TRACE("Substitute processing right child...");
-        m_right->substitute(params);
-    }
-}
-
 std::string
 AbstractExpression::debug() const
 {
@@ -167,8 +152,7 @@ AbstractExpression::buildExpressionTree(json_spirit::Object &obj)
                                                                      "TYPE");
     if (expressionTypeValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractExpression::"
-                                      "buildExpressionTree_recurse:"
+                                      "AbstractExpression::buildExpressionTree:"
                                       " Couldn't find TYPE value");
     }
     assert(stringToExpression(expressionTypeValue.get_str()) != EXPRESSION_TYPE_INVALID);
@@ -179,8 +163,7 @@ AbstractExpression::buildExpressionTree(json_spirit::Object &obj)
                                                                 "VALUE_TYPE");
     if (valueTypeValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractExpression::"
-                                      "buildExpressionTree_recurse:"
+                                      "AbstractExpression::buildExpressionTree:"
                                       " Couldn't find VALUE_TYPE value");
     }
     std::string valueTypeString = valueTypeValue.get_str();
@@ -193,8 +176,7 @@ AbstractExpression::buildExpressionTree(json_spirit::Object &obj)
                                                                 "VALUE_SIZE");
     if (valueSizeValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractExpression::"
-                                      "buildExpressionTree_recurse:"
+                                      "AbstractExpression::buildExpressionTree:"
                                       " Couldn't find VALUE_SIZE value");
     }
     int valueSize = valueSizeValue.get_int();
@@ -204,7 +186,7 @@ AbstractExpression::buildExpressionTree(json_spirit::Object &obj)
     try {
         json_spirit::Value leftValue = json_spirit::find_value(obj, "LEFT");
         if (!(leftValue == json_spirit::Value::null)) {
-            left_child = AbstractExpression::buildExpressionTree_recurse(leftValue.get_obj());
+            left_child = AbstractExpression::buildExpressionTree(leftValue.get_obj());
             if (left_child->m_hasParameter) {
                 hasParam = true;
             }
@@ -212,7 +194,7 @@ AbstractExpression::buildExpressionTree(json_spirit::Object &obj)
 
         json_spirit::Value rightValue = json_spirit::find_value( obj, "RIGHT");
         if (!(rightValue == json_spirit::Value::null)) {
-            right_child = AbstractExpression::buildExpressionTree_recurse(rightValue.get_obj());
+            right_child = AbstractExpression::buildExpressionTree(rightValue.get_obj());
             if (right_child->m_hasParameter) {
                 hasParam = true;
             }
@@ -228,7 +210,7 @@ AbstractExpression::buildExpressionTree(json_spirit::Object &obj)
             json_spirit::Array argsArray = argsValue.get_array();
             for (int ii = 0; ii < argsArray.size(); ii++) {
                 json_spirit::Value argValue = argsArray[ii];
-                AbstractExpression* argExpr = AbstractExpression::buildExpressionTree_recurse(argValue.get_obj());
+                AbstractExpression* argExpr = AbstractExpression::buildExpressionTree(argValue.get_obj());
                 if (argExpr->m_hasParameter) {
                     hasParam = true;
                 }

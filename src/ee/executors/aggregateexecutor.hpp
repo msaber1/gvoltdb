@@ -51,15 +51,14 @@
 #ifndef HSTOREAGGREGATEEXECUTOR_H
 #define HSTOREAGGREGATEEXECUTOR_H
 
+#include "executors/abstractexecutor.h"
+
 #include "common/Pool.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/common.h"
-#include "common/common.h"
 #include "common/debuglog.h"
-#include "common/valuevector.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "executors/abstractexecutor.h"
+#include "common/SerializableEEException.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/aggregatenode.h"
 #include "plannodes/projectionnode.h"
@@ -69,19 +68,12 @@
 #include "boost/unordered_map.hpp"
 
 #include <algorithm>
-#include <exception>
 #include <limits>
 #include <set>
 #include <stdint.h>
 #include <utility>
-#include <vector>
-#include <cassert>
 
 namespace voltdb {
-
-
-typedef std::vector<int> PassThroughColType;
-
 /*
  * Type of the hash set used to check for column aggregate distinctness
  */
@@ -96,14 +88,20 @@ typedef boost::unordered_set<NValue,
 class Agg
 {
 public:
-    Agg(bool isDistinct) : mIsDistinct(isDistinct)
-    {}
+    void* operator new(size_t size, Pool& memoryPool) { return memoryPool.allocate(size); }
+    void operator delete(void*, Pool& memoryPool) { /* NOOP -- on alloc error unroll */ }
+    void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
+
+    Agg(bool isDistinct = false) : m_haveAdvanced(false), mIsDistinct(isDistinct)
+    {
+        m_value.setNull();
+    }
     virtual ~Agg()
     {
         mDistinctVals.clear();
     }
     virtual void advance(const NValue val) = 0;
-    virtual NValue finalize() = 0;
+    virtual NValue finalize() { return m_value; }
 protected:
     bool includeValue(NValue val)
     {
@@ -127,18 +125,16 @@ protected:
         return retval;
     }
 
+    bool m_haveAdvanced;
     bool mIsDistinct;
     AggregateNValueSetType mDistinctVals;
+    NValue m_value;
 };
 
 class SumAgg : public Agg
 {
   public:
-    SumAgg(bool isDistinct) :
-        Agg(isDistinct), m_haveAdvanced(false)
-    {
-        // m_value initialized on first advance
-    }
+    SumAgg(bool isDistinct) : Agg(isDistinct) {}
 
     void advance(const NValue val)
     {
@@ -153,29 +149,12 @@ class SumAgg : public Agg
             m_value = m_value.op_add(val);
         }
     }
-
-    NValue finalize()
-    {
-        if (!m_haveAdvanced)
-        {
-            return ValueFactory::getNullValue();
-        }
-        return m_value;
-    }
-
-private:
-    NValue m_value;
-    bool m_haveAdvanced;
 };
 
 
 class AvgAgg : public Agg {
 public:
-    AvgAgg(bool isDistinct) :
-        Agg(isDistinct), m_count(0)
-    {
-        // m_value initialized on first advance.
-    }
+    AvgAgg(bool isDistinct) : Agg(isDistinct), m_count(0) {}
 
     void advance(const NValue val)
     {
@@ -193,17 +172,12 @@ public:
 
     NValue finalize()
     {
-        if (m_count == 0)
-        {
-            return ValueFactory::getNullValue();
-        }
         const NValue finalizeResult =
             m_value.op_divide(ValueFactory::getBigIntValue(m_count));
         return finalizeResult;
     }
 
 private:
-    NValue m_value;
     int64_t m_count;
 };
 
@@ -211,9 +185,7 @@ private:
 class CountAgg : public Agg
 {
 public:
-    CountAgg(bool isDistinct) :
-        Agg(isDistinct), m_count(0)
-    {}
+    CountAgg(bool isDistinct) : Agg(isDistinct), m_count(0) {}
 
     void advance(const NValue val)
     {
@@ -236,9 +208,7 @@ private:
 class CountStarAgg : public Agg
 {
 public:
-    CountStarAgg(bool isDistinct) :
-        Agg(isDistinct), m_count(0)
-    {}
+    CountStarAgg() : m_count(0) {}
 
     void advance(const NValue val)
     {
@@ -257,15 +227,11 @@ private:
 class MaxAgg : public Agg
 {
 public:
-    MaxAgg(bool isDistinct) :
-        Agg(isDistinct), m_haveAdvanced(false)
-    {
-        m_value.setNull();
-    }
+    MaxAgg() {}
 
     void advance(const NValue val)
     {
-        if (val.isNull() || !includeValue(val))
+        if (val.isNull())
         {
             return;
         }
@@ -279,32 +245,16 @@ public:
             m_value = m_value.op_max(val);
         }
     }
-
-    NValue finalize()
-    {
-        if (!m_haveAdvanced) {
-            return ValueFactory::getNullValue();
-        }
-        return m_value;
-    }
-
-private:
-    NValue m_value;
-    bool m_haveAdvanced;
 };
 
 class MinAgg : public Agg
 {
 public:
-    MinAgg(bool isDistinct) :
-        Agg(isDistinct), m_haveAdvanced(false)
-    {
-        m_value.setNull();
-    }
+    MinAgg() { }
 
     void advance(const NValue val)
     {
-        if (val.isNull() || !includeValue(val))
+        if (val.isNull())
         {
             return;
         }
@@ -318,108 +268,198 @@ public:
             m_value = m_value.op_min(val);
         }
     }
+};
 
-    NValue finalize()
-    {
-        if (!m_haveAdvanced) {
-            return ValueFactory::getNullValue();
-        }
-        return m_value;
-    }
+/**
+ * A list of aggregates for a specific group.
+ */
+struct AggregateList
+{
+    void* operator new(size_t size, Pool& memoryPool, size_t nAggs)
+    { return memoryPool.allocate(size + (sizeof(void*) * nAggs)); }
+    void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
+    void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
-private:
-    NValue m_value;
-    bool m_haveAdvanced;
+    AggregateList(TableTuple& nextTuple) : m_groupTuple(nextTuple) {}
+
+    // A tuple from the group of tuples being aggregated. Source of
+    // pass through columns.
+    TableTuple m_groupTuple;
+
+    // The aggregates for each column for this group
+    Agg* m_aggregates[0];
 };
 
 /*
- * Create an instance of an aggregator for the specified aggregate
- * type, column type, and result type. The object is constructed in
- * memory from the provided memrory pool.
+ * Type of the hash table used to store aggregate lists for each group.
  */
-inline Agg* getAggInstance(Pool* memoryPool, ExpressionType agg_type,
-                           bool isDistinct)
+typedef boost::unordered_map<TableTuple,
+                             AggregateList*,
+                             TableTupleHasher,
+                             TableTupleEqualityChecker> HashAggregateMapType;
+
+/* Working storage whose type and API are dependent on the aaggregate PlanNodeType */
+template<PlanNodeType aggregateType> class AggregatorState {};
+
+template<> struct AggregatorState<PLAN_NODE_TYPE_HASHAGGREGATE> : public HashAggregateMapType {};
+
+template<> struct AggregatorState<PLAN_NODE_TYPE_AGGREGATE>
 {
-    Agg* agg;
-    switch (agg_type) {
-    case EXPRESSION_TYPE_AGGREGATE_COUNT:
-        agg = new (memoryPool->allocate(sizeof(CountAgg))) CountAgg(isDistinct);
-        break;
-    case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
-        agg = new (memoryPool->allocate(sizeof(CountStarAgg))) CountStarAgg(isDistinct);
-        break;
-    case EXPRESSION_TYPE_AGGREGATE_SUM:
-        agg = new (memoryPool->allocate(sizeof(SumAgg))) SumAgg(isDistinct);
-        break;
-    case EXPRESSION_TYPE_AGGREGATE_AVG:
-        agg = new (memoryPool->allocate(sizeof(AvgAgg))) AvgAgg(isDistinct);
-        break;
-    case EXPRESSION_TYPE_AGGREGATE_MIN:
-        agg = new (memoryPool->allocate(sizeof(MinAgg))) MinAgg(isDistinct);
-        break;
-    case EXPRESSION_TYPE_AGGREGATE_MAX  :
-        agg = new (memoryPool->allocate(sizeof(MaxAgg))) MaxAgg(isDistinct);
-        break;
-    default: {
-        char message[128];
-        snprintf(message, 128, "Unknown aggregate type %d", agg_type);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      message);
-    }
-    }
-    return agg;
-}
+    void operator=(Agg** aggs) { m_aggs = aggs; }
+    operator Agg**() { return m_aggs; }
+    //void operator Agg**() { return m_aggs; }
+    Agg** m_aggs;
+};
 
 /**
- * The actual executor class templated on the type of aggregation that
- * should be performed. If it is instantiated using
- * PLAN_NODE_TYPE_AGGREGATE then it will do a constant space
- * aggregation that expects the input table to be sorted on the group
- * by key. If it is instantiated using PLAN_NODE_TYPE_HASHAGGREGATE
- * then the input does not need to be sorted and it will hash the
- * group by key to aggregate the tuples.
+ * The base class for aggregate executors regardless of the type of grouping that should be performed.
  */
-template<PlanNodeType aggregateType>
-class AggregateExecutor : public AbstractExecutor
+class AggregateExecutorBase : public AbstractExecutor
 {
 public:
-    AggregateExecutor() : m_groupByKeySchema(NULL) { }
-    ~AggregateExecutor();
+    AggregateExecutorBase() : m_groupByKeySchema(NULL) {}
+    ~AggregateExecutorBase()
+    {
+        if (m_groupByKeySchema != NULL) {
+            TupleSchema::freeTupleSchema(m_groupByKeySchema);
+        }
+    }
 
 protected:
-    bool p_init();
-    bool p_execute(const NValueArray &params);
+    bool initBase()
+    {
+        AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
+        assert(node);
+        assert(hasExactlyOneInputTable());
+        assert(node->getChildren()[0] != NULL);
+
+        m_inputExpressions = node->getAggregateInputExpressions();
+        for (int i = 0; i < m_inputExpressions.size(); i++)
+        {
+            VOLT_DEBUG("\nAGG INPUT EXPRESSIONS: %s\n",
+                       m_inputExpressions[i]->debug().c_str());
+        }
+
+        /*
+         * Find the difference between the set of aggregate output columns
+         * (output columns resulting from an aggregate) and output columns.
+         * Columns that are not the result of aggregates are being passed
+         * through from the input table. Do this extra work here rather then
+         * serialize yet more data.
+         */
+        m_aggregateOutputColumns = node->getAggregateOutputColumns();
+        std::vector<bool> outputColumnsResultingFromAggregates(node->getOutputSchema().size(), false);
+        for (int ii = 0; ii < m_aggregateOutputColumns.size(); ii++) {
+            outputColumnsResultingFromAggregates[m_aggregateOutputColumns[ii]] = true;
+        }
+
+        /*
+         * Now collect the indices in the output table of the pass
+         * through columns.
+         */
+        for (int ii = 0; ii < outputColumnsResultingFromAggregates.size(); ii++) {
+            if (outputColumnsResultingFromAggregates[ii] == false) {
+                m_passThroughColumns.push_back(ii);
+            }
+        }
+
+        m_aggTypes = node->getAggregates();
+        m_distinctAggs = node->getDistinctAggregates();
+        m_groupByExpressions = node->getGroupByExpressions();
+        node->collectOutputExpressions(m_outputColumnExpressions);
+
+        std::vector<ValueType> groupByColumnTypes;
+        std::vector<int32_t> groupByColumnSizes;
+        std::vector<bool> groupByColumnAllowNull;
+        for (int ii = 0; ii < m_groupByExpressions.size(); ii++)
+        {
+            AbstractExpression* expr = m_groupByExpressions[ii];
+            groupByColumnTypes.push_back(expr->getValueType());
+            groupByColumnSizes.push_back(expr->getValueSize());
+            groupByColumnAllowNull.push_back(true);
+        }
+        m_groupByKeySchema = TupleSchema::createTupleSchema(groupByColumnTypes,
+                                                            groupByColumnSizes,
+                                                            groupByColumnAllowNull,
+                                                            true);
+        m_groupByKeyTuple.allocateTupleNoHeader(m_groupByKeySchema, &m_memoryPool);
+
+        return true;
+    }
+
+    /// Helper method responsible for inserting the results of the
+    /// aggregation into a new tuple in the output table as well as passing
+    /// through any additional columns from the input table.
+    inline bool insertOutputTuple(Agg** aggs, TableTuple prev);
+
+    void advanceAggs(Agg** aggs, const TableTuple& nextTuple)
+    {
+        for (int i = 0; i < m_aggTypes.size(); i++) {
+            aggs[i]->advance(m_inputExpressions[i]->eval(&nextTuple));
+        }
+    }
+
+    /*
+     * Create an instance of an aggregator for the specified aggregate
+     * type, column type, and result type. The object is constructed in
+     * memory from the provided memrory pool.
+     */
+    void initAggInstances(Agg** aggs)
+    {
+        for (int i = 0; i < m_aggTypes.size(); i++) {
+            Agg* agg;
+            switch (m_aggTypes[i]) {
+            case EXPRESSION_TYPE_AGGREGATE_COUNT:
+                agg = new (m_memoryPool) CountAgg(m_distinctAggs[i]);
+                break;
+            case EXPRESSION_TYPE_AGGREGATE_COUNT_STAR:
+                agg = new (m_memoryPool) CountStarAgg();
+                break;
+            case EXPRESSION_TYPE_AGGREGATE_SUM:
+                agg = new (m_memoryPool) SumAgg(m_distinctAggs[i]);
+                break;
+            case EXPRESSION_TYPE_AGGREGATE_AVG:
+                agg = new (m_memoryPool) AvgAgg(m_distinctAggs[i]);
+                break;
+            case EXPRESSION_TYPE_AGGREGATE_MIN:
+                agg = new (m_memoryPool) MinAgg();
+                break;
+            case EXPRESSION_TYPE_AGGREGATE_MAX  :
+                agg = new (m_memoryPool) MaxAgg();
+                break;
+            default: {
+                char message[128];
+                snprintf(message, sizeof(message), "Unknown aggregate type %d", m_aggTypes[i]);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            }
+            }
+            aggs[i] = agg;
+        }
+    }
+
+    void tearDownAggs(Agg** aggs)
+    {
+        for (int ii = 0; ii < m_aggTypes.size(); ii++) {
+            delete aggs[ii]; // does not actually deallocate -- Aggs are pool-managed;
+        }
+    }
 
     /*
      * List of columns in the output schema that are passing through
      * the value from a column in the input table and not doing any
      * aggregation.
      */
-    PassThroughColType m_passThroughColumns;
+    std::vector<int> m_passThroughColumns;
     Pool m_memoryPool;
     TupleSchema* m_groupByKeySchema;
-};
-
-/*
- * Interface for an aggregator (not an an individual aggregate) that
- * will aggregate some number of tuples and produce the results in the
- * provided output table.
- */
-template<PlanNodeType aggregateType>
-class Aggregator {
-public:
-    Aggregator(Pool* memoryPool,
-               TupleSchema* groupByKeySchema,
-               AggregatePlanNode* node,
-               PassThroughColType* passThroughColumns,
-               Table* input_table,
-               Table* output_table,
-               std::vector<ExpressionType>* agg_types,
-               const std::vector<AbstractExpression*>& groupByExpressions,
-               std::vector<ValueType>* col_types);
-    bool nextTuple(TableTuple nextTuple, TableTuple prevTuple);
-    bool finalize(TableTuple prevTuple);
-    void purgeAggs();
+    Table* m_inputTable;
+    std::vector<ExpressionType> m_aggTypes;
+    std::vector<bool> m_distinctAggs;
+    std::vector<AbstractExpression*> m_groupByExpressions;
+    std::vector<AbstractExpression*> m_inputExpressions;
+    std::vector<AbstractExpression*> m_outputColumnExpressions;
+    std::vector<int> m_aggregateOutputColumns;
+    PoolBackedTempTuple m_groupByKeyTuple;
 };
 
 /*
@@ -428,22 +468,18 @@ public:
  * through any additional columns from the input table.
  */
 inline bool
-helper(AggregatePlanNode* node, Agg** aggs,
-       Table* output_table, Table* input_table, TableTuple prev,
-       PassThroughColType* passThroughColumns)
+AggregateExecutorBase::insertOutputTuple(Agg** aggs, TableTuple prev)
 {
-    TableTuple& tmptup = output_table->tempTuple();
+    TableTuple& tmptup = m_outputTable->tempTuple();
 
     /*
      * This first pass is to add all columns that were aggregated on.
      */
-    std::vector<ExpressionType> aggregateTypes = node->getAggregates();
-    std::vector<int> aggregateOutputColumns = node->getAggregateOutputColumns();
-    for (int ii = 0; ii < aggregateOutputColumns.size(); ii++)
+    for (int ii = 0; ii < m_aggregateOutputColumns.size(); ii++)
     {
         if (aggs[ii] != NULL)
         {
-            const int columnIndex = aggregateOutputColumns[ii];
+            const int columnIndex = m_aggregateOutputColumns[ii];
             const ValueType columnType = tmptup.getType(columnIndex);
             tmptup.setNValue(columnIndex,
                              aggs[ii]->finalize().castAs(columnType));
@@ -472,317 +508,144 @@ helper(AggregatePlanNode* node, Agg** aggs,
      * intentional optimization to allow values that are not in the
      * GROUP BY to be passed through.
      */
-    for (int i = 0; i < passThroughColumns->size(); i++)
-    {
-        int output_col_index = (*passThroughColumns)[i];
-        tmptup.setNValue(output_col_index,
-                         node->getOutputSchema()[output_col_index]->
-                         getExpression()->eval(&prev, NULL));
+    for (int i = 0; i < m_passThroughColumns.size(); i++) {
+        int output_col_index = m_passThroughColumns[i];
+        tmptup.setNValue(output_col_index, m_outputColumnExpressions[output_col_index]->eval(&prev));
     }
 
-    if (!output_table->insertTuple(tmptup)) {
+    if ( ! dynamic_cast<TempTable*>(m_outputTable)->insertTempTuple(tmptup)) {
         VOLT_ERROR("Failed to insert order-by tuple from input table '%s' into"
                    " output table '%s'",
-                   input_table->name().c_str(), output_table->name().c_str());
+                   m_inputTable->name().c_str(), m_outputTable->name().c_str());
         return false;
     }
     return true;
 }
 
-/**
- * A list of aggregates for a specific group.
- */
-struct AggregateList
-{
-    // A tuple from the group of tuples being aggregated. Source of
-    // pass through columns.
-    TableTuple m_groupTuple;
 
-    // The aggregates for each column for this group
-    Agg* m_aggregates[0];
+/**
+ * The actual executor class templated on the type of grouping that
+ * should be performed. If it is instantiated using
+ * PLAN_NODE_TYPE_AGGREGATE then it will do a constant space
+ * aggregation that expects the input table to be sorted on the group
+ * by key. If it is instantiated using PLAN_NODE_TYPE_HASHAGGREGATE
+ * then the input does not need to be sorted and it will hash the
+ * group by key to aggregate the tuples.
+ */
+template<PlanNodeType aggregateType>
+class AggregateExecutor : public AggregateExecutorBase
+{
+public:
+    AggregateExecutor() { }
+    ~AggregateExecutor() { purgeAggs(); }
+
+protected:
+    bool p_init();
+    bool p_execute();
+
+private:
+    void prepareFirstTuple();
+    bool nextTuple(TableTuple nextTuple, TableTuple prevTuple);
+    bool finalize(TableTuple prevTuple);
+    void purgeAggs();
+
+    AggregatorState<aggregateType> m_data;
 };
 
 /*
- * Type of the hash table used to store aggregates for each group.
+ * Member function specializations for an AggregateExecutor that uses a hash map to simultaneously aggregate
+ * randomly ordered tuples from the input table.
  */
-typedef boost::unordered_map<TableTuple,
-                             AggregateList*,
-                             TableTupleHasher,
-                             TableTupleEqualityChecker> HashAggregateMapType;
-
-/*
- * Specialization of an Aggregator that uses a hash map to aggregate
- * tuples from the input table.
- */
-template<>
-class Aggregator<PLAN_NODE_TYPE_HASHAGGREGATE>
-{
-public:
-    inline Aggregator(Pool *memoryPool,
-                      TupleSchema *groupByKeySchema,
-                      AggregatePlanNode* node,
-                      PassThroughColType* passThroughColumns,
-                      Table* input_table,
-                      Table* output_table,
-                      std::vector<ExpressionType> *agg_types,
-                      const std::vector<bool>& distinctAggs,
-                      const std::vector<AbstractExpression*>& groupByExpressions,
-                      std::vector<ValueType> *col_types)
-        : m_memoryPool(memoryPool),
-          m_groupByKeySchema(groupByKeySchema),
-          m_node(node),
-          m_passThroughColumns(passThroughColumns),
-          m_inputTable(input_table),
-          m_outputTable(output_table),
-          m_aggTypes(agg_types),
-          m_distinctAggs(distinctAggs),
-          m_groupByExpressions(groupByExpressions),
-          m_colTypes(col_types),
-          groupByKeyTuple(groupByKeySchema)
+    template<> inline void AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>::prepareFirstTuple()
     {
-        groupByKeyTuple.
-            moveNoHeader(static_cast<char*>
-                         (memoryPool->
-                          allocate(groupByKeySchema->tupleLength())));
+        m_groupByKeyTuple.allocateTupleNoHeader(m_groupByKeySchema, &m_memoryPool);
+        m_data.clear();
     }
 
-    ~Aggregator()
+    template<> inline void AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>::purgeAggs()
     {
-        purgeAggs();
+        for (HashAggregateMapType::const_iterator iter = m_data.begin();
+             iter != m_data.end();
+             iter++) {
+            tearDownAggs(iter->second->m_aggregates);
+        }
     }
 
-    inline bool nextTuple(TableTuple nextTuple, TableTuple)
+    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>::nextTuple(TableTuple nextTuple, TableTuple)
     {
         AggregateList *aggregateList;
-
         // configure a tuple and search for the required group.
-        for (int i = 0; i < m_groupByExpressions.size(); i++)
-        {
-            groupByKeyTuple.setNValue(i,
-                                      m_groupByExpressions[i]->eval(&nextTuple,
-                                                                    NULL));
+        for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
+            m_groupByKeyTuple.setNValue(ii, m_groupByExpressions[ii]->eval(&nextTuple));
         }
-        HashAggregateMapType::const_iterator keyIter =
-            m_aggregates.find(groupByKeyTuple);
+        HashAggregateMapType::const_iterator keyIter = m_data.find(m_groupByKeyTuple);
 
         // Group not found. Make a new entry in the hash for this new group.
-        if (keyIter == m_aggregates.end())
-        {
-            aggregateList =
-                static_cast<AggregateList*>
-                (m_memoryPool->allocate(sizeof(AggregateList) +
-                                        (sizeof(void*) * m_colTypes->size())));
-            aggregateList->m_groupTuple = nextTuple;
-            for (int i = 0; i < m_colTypes->size(); i++)
-            {
-                // Map aggregate index i to the corresponding output
-                // column.
-                aggregateList->m_aggregates[i] =
-                    getAggInstance(m_memoryPool, (*m_aggTypes)[i],
-                                   m_distinctAggs[i]);
-            }
-            m_aggregates.
-                insert(HashAggregateMapType::value_type(groupByKeyTuple,
-                                                        aggregateList));
-            groupByKeyTuple.
-                moveNoHeader(m_memoryPool->
-                             allocate(m_groupByKeySchema->tupleLength()));
-        }
-        // otherwise, the list is the second item of the pair...
-        else
-        {
+        if (keyIter == m_data.end()) {
+            aggregateList = new (m_memoryPool, m_aggTypes.size()) AggregateList(nextTuple);
+            m_data.insert(HashAggregateMapType::value_type(m_groupByKeyTuple, aggregateList));
+            // The map is referencing the current key tuple for use by the new group,
+            // so allocate a new tuple to hold the next candidate key
+            m_groupByKeyTuple.reallocateTupleNoHeader();
+        } else {
+            // otherwise, the list is the second item of the pair...
             aggregateList = keyIter->second;
         }
 
         // update the aggregation calculation.
-        for (int i = 0; i < m_colTypes->size(); i++)
-        {
-            aggregateList->m_aggregates[i]->
-                advance(m_node->getAggregateInputExpressions()[i]->
-                        eval(&nextTuple, NULL));
-        }
-
+        advanceAggs(aggregateList->m_aggregates, nextTuple);
         return true;
     }
 
-    inline bool finalize(TableTuple prevTuple)
+    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>::finalize(TableTuple prevTuple)
     {
-        for (HashAggregateMapType::const_iterator iter = m_aggregates.begin();
-             iter != m_aggregates.end();
-             iter++)
-        {
-            if (!helper(m_node, iter->second->m_aggregates, m_outputTable,
-                        m_inputTable, iter->second->m_groupTuple,
-                        m_passThroughColumns))
-            {
-                return false;
-            }
-        }
-
-        // if no record exists in input_table, we have to output one record
-        // only when it doesn't have GROUP BY. See difference of these cases:
-        //   SELECT SUM(A) FROM BBB ,   when BBB has no tuple
-        //   SELECT SUM(A) FROM BBB GROUP BY C,   when BBB has no tuple
-        if (m_groupByExpressions.size() == 0 &&
-            m_outputTable->activeTupleCount() == 0)
-        {
-            VOLT_TRACE("no record. outputting a NULL row..");
-            Agg** aggregates =
-                static_cast<Agg**>(m_memoryPool->allocate(sizeof(void*) *
-                                                           m_colTypes->size()));
-            for (int i = 0; i < m_colTypes->size(); i++)
-            {
-                // It is necessary to look up the mapping between the
-                // aggregate index i and the associated output column
-                aggregates[i] =
-                    getAggInstance(m_memoryPool,
-                                   (*m_aggTypes)[i],
-                                   m_distinctAggs[i]);
-            }
-            if (!helper(m_node, aggregates, m_outputTable, m_inputTable,
-                        prevTuple, m_passThroughColumns))
-            {
+        for (HashAggregateMapType::const_iterator iter = m_data.begin(); iter != m_data.end(); iter++) {
+            if (!insertOutputTuple(iter->second->m_aggregates, iter->second->m_groupTuple)) {
                 return false;
             }
         }
         return true;
     }
 
-    void purgeAggs()
-    {
-        for (HashAggregateMapType::const_iterator iter = m_aggregates.begin();
-             iter != m_aggregates.end();
-             iter++)
-        {
-            Agg** aggs = iter->second->m_aggregates;
-            int num_aggs = static_cast<int>(m_node->getAggregateOutputColumns().size());
-            for (int ii = 0; ii < num_aggs; ii++)
-            {
-                if (aggs[ii] != NULL)
-                {
-                    aggs[ii]->~Agg();
-                }
-            }
-        }
-    }
-
-private:
-    Pool* m_memoryPool;
-    TupleSchema *m_groupByKeySchema;
-    AggregatePlanNode* m_node;
-    PassThroughColType* m_passThroughColumns;
-    Table* m_inputTable;
-    Table* m_outputTable;
-    std::vector<ExpressionType>* m_aggTypes;
-    const std::vector<bool>& m_distinctAggs;
-    const std::vector<AbstractExpression*>& m_groupByExpressions;
-    std::vector<ValueType>* m_colTypes;
-    HashAggregateMapType m_aggregates;
-    TableTuple groupByKeyTuple;
-};
 
 /*
- * Specialization of an aggregator that expects the input table to be
+ * Member function specializations for an aggregator that expects the input table to be
  * sorted on the group by key.
  */
-template<>
-class Aggregator<PLAN_NODE_TYPE_AGGREGATE>
-{
-public:
-    inline Aggregator(Pool* memoryPool,
-                      TupleSchema* groupByKeySchema,
-                      AggregatePlanNode* node,
-                      PassThroughColType *passThroughColumns,
-                      Table* input_table,
-                      Table* output_table,
-                      std::vector<ExpressionType>* agg_types,
-                      const std::vector<bool>& distinctAggs,
-                      const std::vector<AbstractExpression*>& groupByExpressions,
-                      std::vector<ValueType>* col_types) :
-        m_memoryPool(memoryPool),
-        m_groupByKeySchema(groupByKeySchema),
-        m_node(node),
-        m_passThroughColumns(passThroughColumns),
-        m_inputTable(input_table),
-        m_outputTable(output_table),
-        m_aggTypes(agg_types),
-        m_distinctAggs(distinctAggs),
-        m_groupByExpressions(groupByExpressions),
-        m_colTypes(col_types),
-        m_aggs(static_cast<Agg**>(memoryPool->allocate(sizeof(void*) *
-                                                       agg_types->size())))
+    template<> inline void AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>::prepareFirstTuple()
     {
-        ::memset(m_aggs, 0, sizeof(void*) * agg_types->size());
+        m_data = static_cast<Agg**>(m_memoryPool.allocateZeroes(sizeof(void*) * m_aggTypes.size()));
     }
 
-    ~Aggregator()
+    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>::nextTuple(TableTuple nextTuple, TableTuple prevTuple)
     {
-        purgeAggs();
-    }
-
-    inline bool nextTuple(TableTuple nextTuple, TableTuple prevTuple)
-    {
-        bool m_startNewAgg = false;
-        if (prevTuple.address() == NULL)
-        {
-            m_startNewAgg = true;
-        }
-        else
-        {
-            for (int i = 0; i < m_groupByExpressions.size(); i++)
-            {
-                bool cmp =
-                    m_groupByExpressions[i]->eval(&nextTuple, NULL).
-                    op_notEquals(m_groupByExpressions[i]->eval(&prevTuple,
-                                                               NULL)).
-                    isTrue();
-                if (cmp)
-                {
-                    m_startNewAgg = true;
+        bool startNewAgg = false;
+        if (prevTuple.address() == NULL) {
+            startNewAgg = true;
+        } else {
+            for (int i = 0; i < m_groupByExpressions.size(); i++) {
+                startNewAgg =
+                    m_groupByExpressions[i]->eval(&nextTuple).
+                    op_notEquals(m_groupByExpressions[i]->eval(&prevTuple)).isTrue();
+                if (startNewAgg) {
                     break;
                 }
             }
         }
-        if (m_startNewAgg)
-        {
+        if (startNewAgg) {
             VOLT_TRACE("new group!");
-            if (!prevTuple.isNullTuple() &&
-                !helper(m_node, m_aggs, m_outputTable, m_inputTable,
-                        prevTuple, m_passThroughColumns))
-            {
+            if (!prevTuple.isNullTuple() && !insertOutputTuple(m_data, prevTuple)) {
                 return false;
             }
-            for (int i = 0; i < m_colTypes->size(); i++)
-            {
-                //is_ints and ret_types are all referring to all
-                //output columns some of which are not aggregates.  It
-                //is necessary to look up the mapping between the
-                //aggregate index i and the output column associated
-                //with it
-                if (m_aggs[i] != NULL)
-                {
-                    m_aggs[i]->~Agg();
-                }
-                m_aggs[i] =
-                    getAggInstance(m_memoryPool, (*m_aggTypes)[i],
-                                   m_distinctAggs[i]);
-            }
+            tearDownAggs(m_data);
+            initAggInstances(m_data);
         }
-        for (int i = 0; i < m_colTypes->size(); i++)
-        {
-            m_aggs[i]->
-                advance(m_node->getAggregateInputExpressions()[i]->
-                        eval(&nextTuple, NULL));
-        }
+        advanceAggs(m_data, nextTuple);
         return true;
     }
 
-    inline bool finalize(TableTuple prevTuple)
-    {
-        if (!prevTuple.isNullTuple() &&
-            !helper(m_node, m_aggs, m_outputTable, m_inputTable,
-                    prevTuple, m_passThroughColumns))
-        {
+    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>::finalize(TableTuple prevTuple) {
+        if (!prevTuple.isNullTuple() && !insertOutputTuple(m_data, prevTuple)) {
             return false;
         }
 
@@ -790,196 +653,58 @@ public:
         // only when it doesn't have GROUP BY. See difference of these cases:
         //   SELECT SUM(A) FROM BBB ,   when BBB has no tuple
         //   SELECT SUM(A) FROM BBB GROUP BY C,   when BBB has no tuple
-        if (m_groupByExpressions.size() == 0 &&
-            m_outputTable->activeTupleCount() == 0)
-        {
+        if (m_groupByExpressions.size() == 0 && m_outputTable->activeTupleCount() == 0) {
             VOLT_TRACE("no record. outputting a NULL row..");
-            for (int i = 0; i < m_colTypes->size(); i++)
-            {
-                //is_ints and ret_types are all referring to all
-                //output columns some of which are not aggregates.  It
-                //is necessary to look up the mapping between the
-                //aggregate index i and the output column associated
-                //with it
-                m_aggs[i] =
-                    getAggInstance(m_memoryPool, (*m_aggTypes)[i],
-                                   m_distinctAggs[i]);
-            }
-            if (!helper(m_node, m_aggs, m_outputTable, m_inputTable,
-                        prevTuple, m_passThroughColumns))
-            {
+            initAggInstances(m_data);
+            if (!insertOutputTuple(m_data, prevTuple)) {
                 return false;
             }
         }
         return true;
     }
 
-    void purgeAggs()
+    template<> inline void AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>::purgeAggs()
     {
-        for (int ii = 0; ii < m_aggTypes->size(); ii++)
-        {
-            if (m_aggs[ii] != NULL)
-            {
-                m_aggs[ii]->~Agg();
-            }
-        }
+        tearDownAggs(m_data);
     }
 
-private:
-    Pool* m_memoryPool;
-    TupleSchema* m_groupByKeySchema;
-    AggregatePlanNode* m_node;
-    PassThroughColType* m_passThroughColumns;
-    Table* m_inputTable;
-    Table* m_outputTable;
-    std::vector<ExpressionType>* m_aggTypes;
-    const std::vector<bool>& m_distinctAggs;
-    const std::vector<AbstractExpression*>& m_groupByExpressions;
-    std::vector<ValueType>* m_colTypes;
-    Agg** m_aggs;
-};
 
-template<PlanNodeType aggregateType>
-bool
-AggregateExecutor<aggregateType>::p_init()
+template<PlanNodeType aggregateType> bool AggregateExecutor<aggregateType>::p_init()
 {
-    AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
-    assert(node);
-
-    assert(getInputTables().size() == 1);
-
-    assert(node->getChildren()[0] != NULL);
-    for (int i = 0; i < node->getAggregateInputExpressions().size(); i++)
-    {
-        VOLT_DEBUG("\nAGG INPUT EXPRESSIONS: %s\n",
-                   node->getAggregateInputExpressions()[i]->debug().c_str());
+    if ( ! initBase()) {
+        return false;
     }
-
-    /*
-     * Find the difference between the set of aggregate output columns
-     * (output columns resulting from an aggregate) and output columns.
-     * Columns that are not the result of aggregates are being passed
-     * through from the input table. Do this extra work here rather then
-     * serialize yet more data.
-     */
-    std::vector<bool>
-        outputColumnsResultingFromAggregates(node->getOutputSchema().size(),
-                                             false);
-    std::vector<int> aggregateOutputColumns =
-        node->getAggregateOutputColumns();
-
-    for (int ii = 0; ii < aggregateOutputColumns.size(); ii++)
-    {
-        outputColumnsResultingFromAggregates[aggregateOutputColumns[ii]] =
-            true;
-    }
-
-    /*
-     * Now collect the indices in the output table of the pass
-     * through columns.
-     */
-    for (int ii = 0; ii < outputColumnsResultingFromAggregates.size();
-         ii++)
-    {
-        if (outputColumnsResultingFromAggregates[ii] == false)
-        {
-            m_passThroughColumns.push_back(ii);
-        }
-    }
-
-    std::vector<ValueType> groupByColumnTypes;
-    std::vector<int32_t> groupByColumnSizes;
-    std::vector<bool> groupByColumnAllowNull;
-    for (int ii = 0; ii < node->getGroupByExpressions().size(); ii++)
-    {
-        AbstractExpression* expr = node->getGroupByExpressions()[ii];
-        groupByColumnTypes.push_back(expr->getValueType());
-        groupByColumnSizes.push_back(expr->getValueSize());
-        groupByColumnAllowNull.push_back(true);
-    }
-    m_groupByKeySchema =
-        TupleSchema::createTupleSchema(groupByColumnTypes,
-                                       groupByColumnSizes,
-                                       groupByColumnAllowNull,
-                                       true);
-
     return true;
 }
 
-//
-// Assumes that the input table is sorted on the group-by keys.
-//
 template<PlanNodeType aggregateType>
-bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
+bool AggregateExecutor<aggregateType>::p_execute()
 {
     m_memoryPool.purge();
     VOLT_DEBUG("started AGGREGATE");
-    AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
-    assert(node);
-    assert(m_outputTable);
+    assert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
+    assert(dynamic_cast<TempTable*>(m_outputTable));
     VOLT_TRACE("input table\n%s", m_inputTable->debug().c_str());
 
-    // substitute params in output expressions
-    const std::vector<SchemaColumn*>& outputs = m_abstractNode->getOutputSchema();
-    for (int i = 0; i < outputs.size(); i++) {
-        outputs[i]->getExpression()->substitute(params);
-    }
-
-    std::vector<ExpressionType> agg_types = node->getAggregates();
-    std::vector<ValueType> col_types(node->getAggregateInputExpressions().size());
-    for (int i = 0; i < col_types.size(); i++)
-    {
-        // substitue params here too
-        AbstractExpression *expr = node->getAggregateInputExpressions()[i];
-        expr->substitute(params);
-        col_types[i] = expr->getValueType();
-    }
-
-    TableIterator it = m_inputTable->iterator();
-
-    const std::vector<bool> distinctAggs =
-        node->getDistinctAggregates();
-    std::vector<AbstractExpression*> groupByExpressions =
-        node->getGroupByExpressions();
-    // substitute params
-    for (int i = 0; i < groupByExpressions.size(); i++) {
-        groupByExpressions[i]->substitute(params);
-    }
-
+    prepareFirstTuple();
     TableTuple prev(m_inputTable->schema());
-
-    Aggregator<aggregateType> aggregator(&m_memoryPool, m_groupByKeySchema,
-                                         node, &m_passThroughColumns,
-                                         m_inputTable, m_outputTable,
-                                         &agg_types, distinctAggs,
-                                         groupByExpressions, &col_types);
-
+    TableIterator it = m_inputTable->iterator();
     VOLT_TRACE("looping..");
-    for (TableTuple cur(m_inputTable->schema()); it.next(cur);
-         prev.move(cur.address()))
-    {
-        if (!aggregator.nextTuple( cur, prev))
-        {
+    for (TableTuple cur(m_inputTable->schema()); it.next(cur); prev.move(cur.address())) {
+        if ( ! nextTuple(cur, prev)) {
             return false;
         }
     }
     VOLT_TRACE("finalizing..");
-    if (!aggregator.finalize(prev))
+    if ( ! finalize(prev)) {
         return false;
-
+    }
     VOLT_TRACE("finished");
     VOLT_TRACE("output table\n%s", m_outputTable->debug().c_str());
 
     return true;
 }
 
-template<PlanNodeType aggregateType>
-AggregateExecutor<aggregateType>::~AggregateExecutor()
-{
-    if (m_groupByKeySchema != NULL) {
-        TupleSchema::freeTupleSchema(m_groupByKeySchema);
-    }
-}
 }
 
 #endif

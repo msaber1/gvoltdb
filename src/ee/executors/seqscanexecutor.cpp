@@ -89,10 +89,11 @@ bool SeqScanExecutor::p_init()
     return true;
 }
 
-bool SeqScanExecutor::p_execute(const NValueArray &params) {
+bool SeqScanExecutor::p_execute() {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
     assert(m_outputTable);
+
     assert(m_targetTable);
     //cout << "SeqScanExecutor: node id" << node->getPlanNodeId() << endl;
     VOLT_TRACE("Sequential Scanning table :\n %s",
@@ -107,18 +108,8 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
     //
     // OPTIMIZATION: NESTED PROJECTION
     //
-    // Since we have the input params, we need to call substitute to
-    // change any nodes in our expression tree to be ready for the
-    // projection operations in execute
-    //
     int num_of_columns = (int)m_outputTable->columnCount();
     ProjectionPlanNode* projection_node = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-    if (projection_node != NULL) {
-        for (int ctr = 0; ctr < num_of_columns; ctr++) {
-            assert(projection_node->getOutputColumnExpressions()[ctr]);
-            projection_node->getOutputColumnExpressions()[ctr]->substitute(params);
-        }
-    }
 
     //
     // OPTIMIZATION: NESTED LIMIT
@@ -149,8 +140,6 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         if (predicate)
         {
-            predicate->substitute(params);
-            assert(predicate != NULL);
             VOLT_DEBUG("SCAN PREDICATE B:\n%s\n",
                        predicate->debug(true).c_str());
         }
@@ -158,8 +147,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int limit = -1;
         int offset = -1;
         if (limit_node) {
-            limit_node->getLimitAndOffsetByReference(params, limit, offset);
+            limit_node->getLimitAndOffsetByReference(limit, offset);
         }
+
+        TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
 
         int tuple_ctr = 0;
         int tuple_skipped = 0;
@@ -194,7 +185,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                           getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
-                    if (!m_outputTable->insertTuple(temp_tuple))
+                    if ( ! output_temp_table->insertTempTuple(temp_tuple))
                     {
                         VOLT_ERROR("Failed to insert tuple from table '%s' into"
                                    " output table '%s'",
@@ -208,7 +199,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     //
                     // Insert the tuple into our output table
                     //
-                    if (!m_outputTable->insertTuple(tuple)) {
+                    if ( ! output_temp_table->insertTempTuple(tuple)) {
                         VOLT_ERROR("Failed to insert tuple from table '%s' into"
                                    " output table '%s'",
                                    m_targetTable->name().c_str(),

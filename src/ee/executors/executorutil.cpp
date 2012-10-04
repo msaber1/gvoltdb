@@ -46,13 +46,11 @@
 #include "executorutil.h"
 
 #include "common/debuglog.h"
-#include "common/FatalException.hpp"
 #include "executors/executors.h"
-#include <cassert>
 
 namespace voltdb {
 
-AbstractExecutor* getNewExecutor(PlanNodeType type) {
+AbstractExecutor* ExecutorUtil::getNewExecutor(PlanNodeType type) {
     switch (type) {
     case PLAN_NODE_TYPE_AGGREGATE: return new AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>();
     case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>();

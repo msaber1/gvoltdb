@@ -47,14 +47,11 @@
 #define HSTOREPARAMETERVALUEEXPRESSION_H
 
 #include "expressions/tuplevalueexpression.h"
-#include "expressions/constantvalueexpression.h"
 
+#include "common/executorcontext.hpp"
 #include "common/valuevector.h"
 
-#include <vector>
-#include <string>
 #include <sstream>
-#include <cassert>
 
 namespace voltdb {
 
@@ -62,20 +59,14 @@ class ParameterValueExpression : public AbstractExpression {
 public:
 
     ParameterValueExpression(int value_idx)
-        : AbstractExpression(EXPRESSION_TYPE_VALUE_PARAMETER)
+        : AbstractExpression(EXPRESSION_TYPE_VALUE_PARAMETER),
+        m_valueIdx(value_idx),
+        m_paramValue(&(ExecutorContext::getParams()[value_idx]))
     {
         VOLT_TRACE("ParameterValueExpression %d", value_idx);
-        this->m_valueIdx = value_idx;
     };
 
-    voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
-        return this->m_paramValue;
-    }
-
-    void substitute(const NValueArray &params) {
-        assert (this->m_valueIdx < params.size());
-        m_paramValue = params[this->m_valueIdx];
-    }
+    voltdb::NValue eval(const TableTuple *, const TableTuple *) const { return *m_paramValue; }
 
     std::string debugInfo(const std::string &spacer) const {
         std::ostringstream buffer;
@@ -83,13 +74,11 @@ public:
         return (buffer.str());
     }
 
-    int getParameterId() const {
-        return this->m_valueIdx;
-    }
+    int getParameterId() const { return m_valueIdx; }
 
   private:
     int m_valueIdx;
-    voltdb::NValue m_paramValue;
+    const voltdb::NValue *m_paramValue;
 };
 
 }

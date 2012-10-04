@@ -71,21 +71,7 @@ class AbstractExpression {
     /** destroy this node and all children */
     virtual ~AbstractExpression();
 
-    virtual NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const = 0;
-
-    /** set parameter values for this node and its descendents */
-    void substitute(const NValueArray &params)
-    {
-        if (m_hasParameter) {
-            p_substitute(params);
-        }
-    }
-    
-    virtual void p_substitute(const NValueArray &params);
-
-    /** return true if self or descendent should be substitute()'d */
-    bool hasParameter() const { return m_hasParameter; }
-    void setHasParameter(bool hasParam) { m_hasParameter = hasParam; }
+    virtual NValue eval(const TableTuple *tuple1 = NULL, const TableTuple *tuple2 = NULL) const = 0;
 
     /* debugging methods - some various ways to create a sring
        describing the expression tree */
@@ -143,10 +129,6 @@ class AbstractExpression {
     AbstractExpression(ExpressionType type,
                        AbstractExpression *left,
                        AbstractExpression *right);
-
-  private:
-    static AbstractExpression* buildExpressionTree_recurse(json_spirit::Object &obj);
-    bool initParamShortCircuits();
 
   protected:
     AbstractExpression *m_left, *m_right;

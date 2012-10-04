@@ -65,30 +65,6 @@ AggregatePlanNode::~AggregatePlanNode()
     }
 }
 
-vector<ExpressionType>
-AggregatePlanNode::getAggregates()
-{
-    return m_aggregates;
-}
-
-const vector<ExpressionType>
-AggregatePlanNode::getAggregates() const
-{
-    return m_aggregates;
-}
-
-const vector<bool>&
-AggregatePlanNode::getDistinctAggregates() const
-{
-    return m_distinctAggregates;
-}
-
-const vector<AbstractExpression*>&
-AggregatePlanNode::getGroupByExpressions() const
-{
-    return m_groupByExpressions;
-}
-
 string AggregatePlanNode::debugInfo(const string &spacer) const {
     ostringstream buffer;
     buffer << spacer << "\nAggregates["
@@ -188,6 +164,17 @@ AggregatePlanNode::loadFromJSONObject(Object &obj)
             Value groupByExpressionValue = groupByExpressionsArray[ii];
             m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionValue.get_obj()));
         }
+    }
+}
+
+void
+AggregatePlanNode::collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const
+{
+    const std::vector<SchemaColumn*>& outputSchema = getOutputSchema();
+    for (int ii = 0; ii < outputSchema.size(); ii++)
+    {
+        SchemaColumn* outputColumn = outputSchema[ii];
+        outputColumnExpressions[ii] = outputColumn->getExpression();
     }
 }
 

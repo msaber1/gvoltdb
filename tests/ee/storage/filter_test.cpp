@@ -101,7 +101,7 @@ public:
             tuple.setNValue(2, ValueFactory::getBigIntValue(i % 3));
             tuple.setNValue(3, ValueFactory::getBigIntValue(i % 5));
             tuple.setNValue(4, ValueFactory::getBigIntValue(i % 7));
-            table->insertTuple(tuple);
+            table->insertTempTuple(tuple);
         }
         //::printf("made.\n");
         //::printf("%s", table->debug().c_str());
@@ -111,10 +111,10 @@ public:
         delete table_static;
     };
 
-    static Table* table_static;
-    Table* table;
+    static TempTable* table_static;
+    TempTable* table;
 };
-Table* FilterTest::table_static = NULL;
+TempTable* FilterTest::table_static = NULL;
 
 TEST_F(FilterTest, SimpleFilter) {
     // WHERE id = 20
@@ -369,8 +369,8 @@ TEST_F(FilterTest, SubstituteFilter) {
     for (int64_t implantedValue = 1; implantedValue < 5; ++implantedValue) {
         NValueArray params(1);
         params[0] = ValueFactory::getBigIntValue(implantedValue);
-        predicate->substitute(params);
-        // ::printf("\nSubstituted Filter:%s\n", predicate->debug().c_str());
+        //TODO: Need a testing hook to install params into ExecutorContext.
+        // ::printf("\nParameterized Filter:%s\n", predicate->debug().c_str());
         // ::printf("\tLEFT:  %s\n", predicate->getLeft()->debug().c_str());
         // ::printf("\tRIGHT: %s\n", predicate->getRight()->debug().c_str());
 
@@ -378,7 +378,7 @@ TEST_F(FilterTest, SubstituteFilter) {
         TableIterator iter = table->iterator();
         TableTuple match(table->schema());
         while (iter.next(match)) {
-            if (predicate->eval(&match, NULL).isTrue()) {
+            if (predicate->eval(&match).isTrue()) {
                 ++count;
             }
         }

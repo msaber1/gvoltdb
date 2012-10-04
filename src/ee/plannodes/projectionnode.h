@@ -62,12 +62,12 @@ class ProjectionPlanNode : public AbstractPlanNode
     const std::vector<AbstractExpression*>& getOutputColumnExpressions() const { return m_outputColumnExpressions; }
 
     /** If the projection contains only ParameterValueExpression, it
-     * returns their ParamIds, otherwise NULL.*/
-    boost::shared_array<int> convertOutputIfAllParameterValues();
-    
+     * returns their bound NValues, otherwise an empty vector. */
+    const std::vector<const NValue*>& getOutputIfAllParameterValues() const { return m_outputIfAllParameterValues; }
+
     /** If the projection contains only TupleValueExpression, it
-     * returns their column Ids, otherwise NULL.*/
-    boost::shared_array<int> convertOutputIfAllTupleValues();
+     * returns their column Ids, otherwise an empty vector. */
+    const std::vector<int>& getOutputIfAllTupleValues() const { return m_outputIfAllTupleValues; }
 
     std::string debugInfo(const std::string& spacer) const;
 
@@ -76,12 +76,14 @@ class ProjectionPlanNode : public AbstractPlanNode
 
     // indicate how to project (or replace) each column value. indices
     // are same as output table's.
-    // note that this might be a PlaceholderExpression (for substituted value)
+    // note that this might be a ParameterValueExpression (for substituted value)
     // It will become ConstantValueExpression for implanted value
     // or TupleValueExpression for pure projection,
     // or other kind of AbstractExpression for projection with arithmetic calculation, etc.
-    // in ProjectionPlanNode
     std::vector<AbstractExpression*> m_outputColumnExpressions;
+    std::vector<const NValue*> m_outputIfAllParameterValues;
+    std::vector<int> m_outputIfAllTupleValues;
+
 };
 
 }
