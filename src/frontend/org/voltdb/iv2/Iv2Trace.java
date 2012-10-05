@@ -35,6 +35,81 @@ public class Iv2Trace
     private static VoltLogger iv2log = new VoltLogger("IV2TRACE");
     private static VoltLogger iv2queuelog = new VoltLogger("IV2QUEUETRACE");
 
+    private enum ACTION {
+        CREATE("createTxn"),
+        FINISH("finishTxn"),
+        RECEIVE("rx"),
+        OFFER("txnQOffer");
+
+        private final String shortName;
+        private ACTION(String shortName)
+        {
+            this.shortName = shortName;
+        }
+    }
+
+    private enum MSG_TYPE {
+        Iv2InitiateTaskMessage("InitMsg"),
+        InitiateResponseMessage("InitRsp"),
+        FragmentTaskMessage("FragMsg"),
+        FragmentResponseMessage("FragRsp"),
+        MultiPartitionParticipantMessage("SntlMsg");
+
+        private final String shortName;
+        private MSG_TYPE(String shortName)
+        {
+            this.shortName = shortName;
+        }
+
+        public MSG_TYPE typeFromMsg(VoltMessage msg)
+        {
+            String simpleName = msg.getClass().getSimpleName();
+            return MSG_TYPE.valueOf(simpleName);
+        }
+    }
+
+    private class TaskMsg {
+        public final ACTION action;
+        public final MSG_TYPE type;
+
+        public final long localHSId;
+        public final long sourceHSId;
+        public final long ciHandle;
+        public final long coordHSId;
+        public final long txnId;
+        public final long spHandle;
+        public final long truncationHandle;
+        public final boolean isMP;
+        public final String procName;
+        public final byte status;
+
+        public TaskMsg(ACTION action,
+                       MSG_TYPE type,
+                       long localHSId,
+                       long sourceHSId,
+                       long ciHandle,
+                       long coordHSId,
+                       long txnId,
+                       long spHandle,
+                       long truncationHandle,
+                       boolean isMP,
+                       String procName,
+                       byte status) {
+            this.action = action;
+            this.type = type;
+            this.localHSId = localHSId;
+            this.sourceHSId = sourceHSId;
+            this.ciHandle = ciHandle;
+            this.coordHSId = coordHSId;
+            this.txnId = txnId;
+            this.spHandle = spHandle;
+            this.truncationHandle = truncationHandle;
+            this.isMP = isMP;
+            this.procName = procName;
+            this.status = status;
+        }
+    }
+
     public static void logTopology(long leaderHSId, List<Long> replicas, int partitionId)
     {
         if (iv2log.isTraceEnabled()) {
