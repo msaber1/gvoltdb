@@ -85,16 +85,7 @@ public class Iv2Trace
 
         public TaskMsg(ACTION action,
                        MSG_TYPE type,
-                       long localHSId,
-                       long sourceHSId,
-                       long ciHandle,
-                       long coordHSId,
-                       long txnId,
-                       long spHandle,
-                       long truncationHandle,
-                       boolean isMP,
-                       String procName,
-                       byte status) {
+                       VoltMessage msg) {
             this.action = action;
             this.type = type;
             this.localHSId = localHSId;
