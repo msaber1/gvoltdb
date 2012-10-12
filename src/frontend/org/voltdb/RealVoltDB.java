@@ -157,7 +157,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.8.2";
+    private static final String m_defaultVersionString = "2.8.3";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -787,16 +787,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         MiscUtils.loadProClass("org.voltdb.management.JMXStatsManager", "JMX", true);
                 if (statsManagerClass != null) {
                     ArrayList<Long> localHSIds;
+                    Long MPHSId;
                     if (isIV2Enabled()) {
                         localHSIds = new ArrayList<Long>();
                         for (Initiator iv2Initiator : m_iv2Initiators) {
                             localHSIds.add(iv2Initiator.getInitiatorHSId());
                         }
+                        MPHSId = m_MPI.getInitiatorHSId();
                     } else {
                         localHSIds = new ArrayList<Long>(m_localSites.keySet());
+                        MPHSId = null;
                     }
                     m_statsManager = (StatsManager)statsManagerClass.newInstance();
-                    m_statsManager.initialize(localHSIds);
+                    m_statsManager.initialize(localHSIds, MPHSId);
                 }
             } catch (Exception e) {
                 hostLog.error("Failed to instantiate the JMX stats manager: " + e.getMessage() +
@@ -2132,8 +2135,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     @Override
     public synchronized void recoveryComplete() {
+        /*
+         * IV2 always calls recovery complete on a truncation snapshot, only
+         * log once.
+         */
+        if (m_rejoining) {
+            consoleLog.info("Node rejoin completed");
+        }
         m_rejoining = false;
-        consoleLog.info("Node rejoin completed");
     }
 
     @Override
