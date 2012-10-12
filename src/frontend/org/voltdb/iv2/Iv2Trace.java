@@ -18,12 +18,18 @@
 package org.voltdb.iv2;
 
 import java.util.List;
-
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.ThreadFactory;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientInterfaceHandleManager;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -32,28 +38,78 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class Iv2Trace
 {
-    private static VoltLogger iv2log = new VoltLogger("IV2TRACE");
-    private static VoltLogger iv2queuelog = new VoltLogger("IV2QUEUETRACE");
+    private static final VoltLogger iv2log = new VoltLogger("IV2TRACE");
+    private static final VoltLogger iv2queuelog = new VoltLogger("IV2QUEUETRACE");
+
+    // Log messages are passed to a separate thread through this queue
+    private static final LinkedBlockingQueue<TaskMsg> msgQueue =
+            new LinkedBlockingQueue<Iv2Trace.TaskMsg>();
+    private static final ExecutorService es =
+            Executors.newFixedThreadPool(1, new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable arg0) {
+                    Thread thread = new Thread(arg0, "IV2TRACE");
+                    thread.setDaemon(true);
+                    return thread;
+                }
+            });
+    private static final Runnable log4jWorker = new Runnable() {
+        @Override
+        public void run()
+        {
+            while (true) {
+                TaskMsg msg;
+                try {
+                    msg = msgQueue.take();
+                    if (msg.action.equals(ACTION.TXN_OFFER) || msg.action.equals(ACTION.TASK_OFFER)) {
+                        iv2queuelog.trace(msg.toString());
+                    } else {
+                        iv2log.trace(msg.toString());
+                    }
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    iv2log.trace("Terminating IV2 trace log thread");
+                    break;
+                }
+            }
+        }
+    };
+
+    static
+    {
+        if (iv2log.isTraceEnabled() || iv2queuelog.isTraceEnabled()) {
+            // TODO: If the debugging Volt database is not set, use log4j
+            es.execute(log4jWorker);
+        }
+    }
 
     private enum ACTION {
-        CREATE("createTxn"),
-        FINISH("finishTxn"),
-        RECEIVE("rx"),
-        OFFER("txnQOffer");
+        CREATE     ("createTxn"),
+        FINISH     ("finishTxn"),
+        RECEIVE    ("recvMsg"),
+        TXN_OFFER  ("txnQOffer"),
+        TASK_OFFER ("tskQOffer");
 
         private final String shortName;
         private ACTION(String shortName)
         {
             this.shortName = shortName;
         }
+
+        @Override
+        public String toString()
+        {
+            return shortName;
+        }
     }
 
     private enum MSG_TYPE {
-        Iv2InitiateTaskMessage("InitMsg"),
-        InitiateResponseMessage("InitRsp"),
-        FragmentTaskMessage("FragMsg"),
-        FragmentResponseMessage("FragRsp"),
-        MultiPartitionParticipantMessage("SntlMsg");
+        Iv2InitiateTaskMessage           ("InitMsg"),
+        InitiateResponseMessage          ("InitRsp"),
+        FragmentTaskMessage              ("FragMsg"),
+        FragmentResponseMessage          ("FragRsp"),
+        MultiPartitionParticipantMessage ("SntlMsg"),
+        BorrowTaskMessage                ("BrrwMsg");
 
         private final String shortName;
         private MSG_TYPE(String shortName)
@@ -61,14 +117,19 @@ public class Iv2Trace
             this.shortName = shortName;
         }
 
-        public MSG_TYPE typeFromMsg(VoltMessage msg)
+        public static MSG_TYPE typeFromMsg(VoltMessage msg)
         {
             String simpleName = msg.getClass().getSimpleName();
             return MSG_TYPE.valueOf(simpleName);
         }
+
+        @Override
+        public String toString() {
+            return shortName;
+        }
     }
 
-    private class TaskMsg {
+    private static class TaskMsg {
         public final ACTION action;
         public final MSG_TYPE type;
 
@@ -79,13 +140,23 @@ public class Iv2Trace
         public final long txnId;
         public final long spHandle;
         public final long truncationHandle;
-        public final boolean isMP;
+        public final Boolean isMP;
         public final String procName;
         public final byte status;
 
         public TaskMsg(ACTION action,
                        MSG_TYPE type,
-                       VoltMessage msg) {
+                       long localHSId,
+                       long sourceHSId,
+                       long ciHandle,
+                       long coordHSId,
+                       long txnId,
+                       long spHandle,
+                       long truncationHandle,
+                       Boolean isMP,
+                       String procName,
+                       byte status)
+        {
             this.action = action;
             this.type = type;
             this.localHSId = localHSId;
@@ -98,6 +169,34 @@ public class Iv2Trace
             this.isMP = isMP;
             this.procName = procName;
             this.status = status;
+        }
+
+        @Override
+        public String toString()
+        {
+            String procType = "UNKNOWN";
+            if (isMP != null) {
+                if (isMP == true) {
+                    procType = "MP";
+                } else {
+                    procType = "SP";
+                }
+            }
+
+            return String.format("%s %s %s from %s ciHandle %s initHSId %s txnId %s " +
+                                 "spHandle %s trunc %s type %s proc %s status %s",
+                                 action.toString(),
+                                 type == null ? "" : type.toString(),
+                                 CoreUtils.hsIdToString(localHSId),
+                                 CoreUtils.hsIdToString(sourceHSId),
+                                 ClientInterfaceHandleManager.handleToString(ciHandle),
+                                 CoreUtils.hsIdToString(coordHSId),
+                                 txnIdToString(txnId),
+                                 txnIdToString(spHandle),
+                                 txnIdToString(truncationHandle),
+                                 procType,
+                                 procName,
+                                 statusToString(status));
         }
     }
 
@@ -113,23 +212,38 @@ public class Iv2Trace
     public static void logCreateTransaction(Iv2InitiateTaskMessage msg)
     {
         if (iv2log.isTraceEnabled()) {
-            String logmsg = new String("createTxn %s ciHandle %s initHSId %s proc %s");
-            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(msg.getInitiatorHSId()),
-                        ClientInterfaceHandleManager.handleToString(msg.getClientInterfaceHandle()),
-                        CoreUtils.hsIdToString(msg.getCoordinatorHSId()),
-                        msg.getStoredProcedureInvocation().getProcName()));
+            TaskMsg logmsg = new TaskMsg(ACTION.CREATE,
+                                         MSG_TYPE.typeFromMsg(msg),
+                                         msg.getInitiatorHSId(),
+                                         msg.m_sourceHSId,
+                                         msg.getClientInterfaceHandle(),
+                                         msg.getCoordinatorHSId(),
+                                         msg.getTxnId(),
+                                         msg.getSpHandle(),
+                                         msg.getTruncationHandle(),
+                                         msg.isSinglePartition() == false,
+                                         msg.getStoredProcedureInvocation().getProcName(),
+                                         (byte)0);
+            msgQueue.offer(logmsg);
         }
     }
 
     public static void logFinishTransaction(InitiateResponseMessage msg, long localHSId)
     {
         if (iv2log.isTraceEnabled()) {
-            String logmsg = new String("finishTxn %s ciHandle %s initHSId %s status %s");
-            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
-                        ClientInterfaceHandleManager.handleToString(msg.getClientInterfaceHandle()),
-                        CoreUtils.hsIdToString(msg.getCoordinatorHSId()),
-                        respStatusToString(msg.getClientResponseData().getStatus())));
-
+            TaskMsg logmsg = new TaskMsg(ACTION.FINISH,
+                                         MSG_TYPE.typeFromMsg(msg),
+                                         localHSId,
+                                         msg.m_sourceHSId,
+                                         msg.getClientInterfaceHandle(),
+                                         msg.getCoordinatorHSId(),
+                                         msg.getTxnId(),
+                                         msg.getSpHandle(),
+                                         0,
+                                         null,
+                                         "",
+                                         msg.getClientResponseData().getStatus());
+            msgQueue.offer(logmsg);
         }
     }
 
@@ -143,16 +257,19 @@ public class Iv2Trace
         }
     }
 
-    private static String respStatusToString(byte status)
+    private static String statusToString(byte status)
     {
         switch(status) {
             case ClientResponse.SUCCESS:
+            // or FragmentResponseMessage.SUCCESS
                 return "SUCCESS";
             case ClientResponse.USER_ABORT:
+            case FragmentResponseMessage.USER_ERROR:
                 return "USER_ABORT";
             case ClientResponse.GRACEFUL_FAILURE:
                 return "GRACEFUL_FAILURE";
             case ClientResponse.UNEXPECTED_FAILURE:
+            case FragmentResponseMessage.UNEXPECTED_ERROR:
                 return "UNEXPECTED_FAILURE";
             case ClientResponse.CONNECTION_LOST:
                 return "CONNECTION_LOST";
@@ -161,21 +278,7 @@ public class Iv2Trace
             case ClientResponse.CONNECTION_TIMEOUT:
                 return "CONNECTION_TIMEOUT";
         }
-        return "UNKNOWN_CLIENT_STATUS";
-    }
-
-    private static String fragStatusToString(byte status)
-    {
-        if (status == FragmentResponseMessage.SUCCESS) {
-            return "SUCCESS";
-        }
-        else if (status == FragmentResponseMessage.USER_ERROR) {
-            return "USER_ERROR";
-        }
-        else if (status == FragmentResponseMessage.UNEXPECTED_ERROR) {
-            return "UNEXPECTED_ERROR";
-        }
-        return "UNKNOWN_STATUS_CODE!";
+        return "UNKNOWN_STATUS";
     }
 
     public static void logInitiatorRxMsg(VoltMessage msg, long localHSId)
@@ -183,22 +286,35 @@ public class Iv2Trace
         if (iv2log.isTraceEnabled()) {
             if (msg instanceof InitiateResponseMessage) {
                 InitiateResponseMessage iresp = (InitiateResponseMessage)msg;
-                String logmsg = new String("rxInitRsp %s from %s ciHandle %s txnId %s spHandle %s status %s");
-                iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
-                            CoreUtils.hsIdToString(iresp.m_sourceHSId),
-                            ClientInterfaceHandleManager.handleToString(iresp.getClientInterfaceHandle()),
-                            txnIdToString(iresp.getTxnId()),
-                            txnIdToString(iresp.getSpHandle()),
-                            respStatusToString(iresp.getClientResponseData().getStatus())));
+                TaskMsg logmsg = new TaskMsg(ACTION.RECEIVE,
+                                             MSG_TYPE.typeFromMsg(msg),
+                                             localHSId,
+                                             iresp.m_sourceHSId,
+                                             iresp.getClientInterfaceHandle(),
+                                             iresp.getCoordinatorHSId(),
+                                             iresp.getTxnId(),
+                                             iresp.getSpHandle(),
+                                             Long.MIN_VALUE,
+                                             null,
+                                             "",
+                                             iresp.getClientResponseData().getStatus());
+                msgQueue.offer(logmsg);
             }
             else if (msg instanceof FragmentResponseMessage) {
                 FragmentResponseMessage fresp = (FragmentResponseMessage)msg;
-                String logmsg = new String("rxFragRsp %s from %s txnId %s spHandle %s status %s");
-                iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
-                            CoreUtils.hsIdToString(fresp.m_sourceHSId),
-                            txnIdToString(fresp.getTxnId()),
-                            txnIdToString(fresp.getSpHandle()),
-                            fragStatusToString(fresp.getStatusCode())));
+                TaskMsg logmsg = new TaskMsg(ACTION.RECEIVE,
+                                             MSG_TYPE.typeFromMsg(msg),
+                                             localHSId,
+                                             fresp.m_sourceHSId,
+                                             0,
+                                             -1,
+                                             fresp.getTxnId(),
+                                             fresp.getSpHandle(),
+                                             Long.MIN_VALUE,
+                                             null,
+                                             "",
+                                             fresp.getStatusCode());
+                msgQueue.offer(logmsg);
             }
         }
     }
@@ -207,7 +323,6 @@ public class Iv2Trace
             long spHandle)
     {
         if (iv2log.isTraceEnabled()) {
-            String logmsg = new String("rxInitMsg %s from %s ciHandle %s txnId %s spHandle %s trunc %s");
             if (itask.getTxnId() != Long.MIN_VALUE && itask.getTxnId() != txnid) {
                 iv2log.error("Iv2InitiateTaskMessage TXN ID conflict.  Message: " + itask.getTxnId() +
                         ", locally held: " + txnid);
@@ -216,12 +331,20 @@ public class Iv2Trace
                 iv2log.error("Iv2InitiateTaskMessage SP HANDLE conflict.  Message: " + itask.getSpHandle() +
                         ", locally held: " + spHandle);
             }
-            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
-                        CoreUtils.hsIdToString(itask.m_sourceHSId),
-                        ClientInterfaceHandleManager.handleToString(itask.getClientInterfaceHandle()),
-                        txnIdToString(txnid),
-                        txnIdToString(spHandle),
-                        txnIdToString(itask.getTruncationHandle())));
+
+            TaskMsg logmsg = new TaskMsg(ACTION.RECEIVE,
+                                         MSG_TYPE.typeFromMsg(itask),
+                                         localHSId,
+                                         itask.m_sourceHSId,
+                                         itask.getClientInterfaceHandle(),
+                                         itask.getCoordinatorHSId(),
+                                         itask.getTxnId(),
+                                         itask.getSpHandle(),
+                                         itask.getTruncationHandle(),
+                                         itask.isSinglePartition() == false,
+                                         itask.getStoredProcedureInvocation().getProcName(),
+                                         (byte)0);
+            msgQueue.offer(logmsg);
         }
     }
 
@@ -229,51 +352,105 @@ public class Iv2Trace
             long txnId)
     {
         if (iv2log.isTraceEnabled()) {
-            String logmsg = new String("rxSntlMsg %s from %s txnId %s");
-            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
-                        CoreUtils.hsIdToString(message.m_sourceHSId),
-                        txnIdToString(txnId)));
+            TaskMsg logmsg = new TaskMsg(ACTION.RECEIVE,
+                                         MSG_TYPE.typeFromMsg(message),
+                                         localHSId,
+                                         message.m_sourceHSId,
+                                         0,
+                                         message.getCoordinatorHSId(),
+                                         message.getTxnId(),
+                                         message.getSpHandle(),
+                                         message.getTruncationHandle(),
+                                         message.isSinglePartition() == false,
+                                         "",
+                                         (byte)0);
+            msgQueue.offer(logmsg);
         }
     }
 
-    public static void logFragmentTaskMessage(FragmentTaskMessage ftask, long localHSId, long spHandle,
-            boolean borrow)
+    public static void logFragmentTaskMessage(FragmentTaskMessage ftask, long localHSId)
     {
         if (iv2log.isTraceEnabled()) {
-            String label = "rxFragMsg";
-            if (borrow) {
-                label = "rxBrrwMsg";
-            }
+            TaskMsg logmsg = new TaskMsg(ACTION.RECEIVE,
+                                         MSG_TYPE.typeFromMsg(ftask),
+                                         localHSId,
+                                         ftask.m_sourceHSId,
+                                         0,
+                                         ftask.getCoordinatorHSId(),
+                                         ftask.getTxnId(),
+                                         ftask.getSpHandle(),
+                                         ftask.getTruncationHandle(),
+                                         ftask.isSinglePartition() == false,
+                                         "",
+                                         (byte)0);
+            msgQueue.offer(logmsg);
+        }
+    }
+
+    public static void logBorrowTaskMessage(BorrowTaskMessage msg, long localHSId, long spHandle)
+    {
+        if (iv2log.isTraceEnabled()) {
+            FragmentTaskMessage ftask = msg.getFragmentTaskMessage();
             if (ftask.getSpHandle() != Long.MIN_VALUE && ftask.getSpHandle() != spHandle) {
                 iv2log.error("FragmentTaskMessage SP HANDLE conflict.  Message: " + ftask.getSpHandle() +
-                        ", locally held: " + spHandle);
+                             ", locally held: " + spHandle);
             }
-            String logmsg = new String("%s %s from %s txnId %s spHandle %s trunc %s");
-            iv2log.trace(String.format(logmsg, label, CoreUtils.hsIdToString(localHSId),
-                        CoreUtils.hsIdToString(ftask.m_sourceHSId),
-                        txnIdToString(ftask.getTxnId()),
-                        txnIdToString(spHandle),
-                        txnIdToString(ftask.getTruncationHandle())));
+
+            TaskMsg logmsg = new TaskMsg(ACTION.RECEIVE,
+                                         MSG_TYPE.typeFromMsg(msg),
+                                         localHSId,
+                                         ftask.m_sourceHSId,
+                                         0,
+                                         ftask.getCoordinatorHSId(),
+                                         ftask.getTxnId(),
+                                         ftask.getSpHandle(),
+                                         ftask.getTruncationHandle(),
+                                         ftask.isSinglePartition() == false,
+                                         "",
+                                         (byte)0);
+            msgQueue.offer(logmsg);
         }
     }
 
     public static void logTransactionTaskQueueOffer(TransactionTask task)
     {
         if (iv2queuelog.isTraceEnabled()) {
-            String logmsg = new String ("txnQOffer txnId %s spHandle %s type %s");
-            iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
-                        txnIdToString(task.getSpHandle()),
-                    task.m_txn.isSinglePartition() ? "SP" : "MP"));
+            TransactionState txn = task.m_txn;
+            StoredProcedureInvocation invocation = txn.getInvocation();
+            TaskMsg logmsg = new TaskMsg(ACTION.TXN_OFFER,
+                                         null,
+                                         -1,
+                                         -1,
+                                         0,
+                                         txn.coordinatorSiteId,
+                                         task.getTxnId(),
+                                         task.getSpHandle(),
+                                         Long.MIN_VALUE,
+                                         txn.isSinglePartition() == false,
+                                         invocation == null ? "" : invocation.getProcName(),
+                                         (byte)0);
+            msgQueue.offer(logmsg);
         }
     }
 
     public static void logSiteTaskerQueueOffer(TransactionTask task)
     {
         if (iv2queuelog.isTraceEnabled()) {
-            String logmsg = new String ("tskQOffer txnId %s spHandle %s type %s");
-            iv2queuelog.trace(String.format(logmsg, txnIdToString(task.getTxnId()),
-                            txnIdToString(task.getSpHandle()),
-                    task.m_txn.isSinglePartition() ? "SP" : "MP"));
+            TransactionState txn = task.m_txn;
+            StoredProcedureInvocation invocation = txn.getInvocation();
+            TaskMsg logmsg = new TaskMsg(ACTION.TASK_OFFER,
+                                         null,
+                                         -1,
+                                         -1,
+                                         0,
+                                         txn.coordinatorSiteId,
+                                         task.getTxnId(),
+                                         task.getSpHandle(),
+                                         Long.MIN_VALUE,
+                                         txn.isSinglePartition() == false,
+                                         invocation == null ? "" : invocation.getProcName(),
+                                         (byte)0);
+            msgQueue.offer(logmsg);
         }
     }
 }

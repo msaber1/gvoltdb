@@ -502,8 +502,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // move backwards anyway once the next message is received
         // from the SP leader.
         long newSpHandle = getCurrentTxnId();
-        Iv2Trace.logFragmentTaskMessage(message.getFragmentTaskMessage(),
-                m_mailbox.getHSId(), newSpHandle, true);
+        Iv2Trace.logBorrowTaskMessage(message, m_mailbox.getHSId(), newSpHandle);
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
 
         if (txn == null) {
@@ -592,7 +591,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             setMaxSeenTxnId(newSpHandle);
         }
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
-        Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
+        Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId());
         // bit of a hack...we will probably not want to create and
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
