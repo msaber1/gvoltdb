@@ -57,49 +57,19 @@ string ProjectionPlanNode::debugInfo(const string& spacer) const
     ostringstream buffer;
     buffer << spacer << "Projection Output["
            << getOutputSchema().size() << "]:\n";
-    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++)
-    {
+    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++) {
         buffer << spacer << "  [" << ctr << "] ";
-        buffer << "name=" << getOutputSchema()[ctr]->getColumnName() << " : ";
-        if (m_outputColumnExpressions[ctr] != NULL)
+        SchemaColumn* outputColumn = getOutputSchema()[ctr];
+        buffer << "name=" << outputColumn->getColumnName() << " : ";
+        AbstractExpression* ae = outputColumn->getExpression();
+        if (ae != NULL)
         {
-            buffer << m_outputColumnExpressions[ctr]->debug(spacer + "   ");
-        }
-        else
-        {
+            buffer << ae->debug(spacer + "   ");
+        } else {
             buffer << spacer << "  " << "<NULL>" << "\n";
         }
     }
     return buffer.str();
 }
 
-void ProjectionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
-{
-    // XXX-IZZY move this to init at some point
-    bool paramsBusted = false;
-    bool columnsBusted = false;
-    for (int ii = 0; ii < getOutputSchema().size(); ii++)
-    {
-        SchemaColumn* outputColumn = getOutputSchema()[ii];
-        AbstractExpression* ae = outputColumn->getExpression();
-        m_outputColumnExpressions.push_back(ae);
-        if ( ! columnsBusted ) {
-            voltdb::TupleValueExpression* tve = dynamic_cast<TupleValueExpression*>(ae);
-            if (tve == NULL) {
-                columnsBusted = true;
-                m_outputIfAllTupleValues.resize(0);
-            } else {
-                m_outputIfAllTupleValues[ii] = tve->getColumnId();
-            }
-        }
-        if ( ! paramsBusted ) {
-            voltdb::ParameterValueExpression* pve = dynamic_cast<ParameterValueExpression*>(ae);
-            if (pve == NULL) {
-                paramsBusted = true;
-                m_outputIfAllParameterValues.resize(0);
-            } else {
-                m_outputIfAllParameterValues[ii] = &(ExecutorContext::getParams()[pve->getParameterId()]);
-            }
-        }
-    }
-}
+void ProjectionPlanNode::loadFromJSONObject(json_spirit::Object& obj) { }

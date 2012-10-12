@@ -205,49 +205,49 @@ void setNewCurrent(const char *testName,
         if (strcmp(indexName, kMultiIntsHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            false, false, schema);
+                                            false, false, "dummyId", schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiIntsTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            false, true, schema);
+                                            false, true, "dummyId", schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            false, false, schema);
+                                            false, false, "dummyId", schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kMultiGenericTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            false, true, schema);
+                                            false, true, "dummyId", schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            true, false, schema);
+                                            true, false, "dummyId", schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueIntsTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            true, true, schema);
+                                            true, true, "dummyId", schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericHash) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::HASH_TABLE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            true, false, schema);
+                                            true, false, "dummyId", schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else if (strcmp(indexName, kUniqueGenericTree) == 0) {
             voltdb::TableIndexScheme scheme(indexName, voltdb::BALANCED_TREE_INDEX,
                                             columnIndices, TableIndex::simplyIndexColumns(),
-                                            true, true, schema);
+                                            true, true, "dummyId", schema);
             index = voltdb::TableIndexFactory::getInstance(scheme);
         }
         else {

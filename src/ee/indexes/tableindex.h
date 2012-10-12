@@ -74,6 +74,7 @@ struct TableIndexScheme {
                      const std::vector<int32_t>& a_columnIndices,
                      const std::vector<AbstractExpression*>& a_indexedExpressions,
                      bool a_unique, bool a_countable,
+                     const std::string& a_indexId,
                      const TupleSchema *a_tupleSchema) :
       name(a_name),
       type(a_type),
@@ -81,6 +82,7 @@ struct TableIndexScheme {
       indexedExpressions(a_indexedExpressions),
       unique(a_unique),
       countable(a_countable),
+      indexId(a_indexId),
       tupleSchema(a_tupleSchema)
     {}
 
@@ -91,6 +93,7 @@ struct TableIndexScheme {
       indexedExpressions(other.indexedExpressions),
       unique(other.unique),
       countable(other.countable),
+      indexId(other.indexId),
       tupleSchema(other.tupleSchema)
     {}
 
@@ -102,6 +105,7 @@ struct TableIndexScheme {
         indexedExpressions = other.indexedExpressions;
         unique = other.unique;
         countable = other.countable;
+        indexId = other.indexId;
         tupleSchema = other.tupleSchema;
         return *this;
     }
@@ -117,6 +121,7 @@ struct TableIndexScheme {
     std::vector<AbstractExpression*> indexedExpressions;
     bool unique;
     bool countable;
+    std::string indexId;
     const TupleSchema *tupleSchema;
 };
 
@@ -379,6 +384,21 @@ public:
         return m_scheme.name;
     }
 
+    void rename(std::string name) {
+        if (m_scheme.name.compare(name) != 0) {
+            m_scheme.name = name;
+            IndexStats *stats = getIndexStats();
+            if (stats) {
+                stats->rename(name);
+            }
+        }
+    }
+
+    const std::string& getId() const
+    {
+        return m_scheme.indexId;
+    }
+
     const TupleSchema *getKeySchema() const
     {
         return m_keySchema;
@@ -405,7 +425,7 @@ protected:
 
     TableIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme);
 
-    const TableIndexScheme m_scheme;
+    TableIndexScheme m_scheme;
     const TupleSchema * const m_keySchema;
 
     // counters

@@ -53,7 +53,7 @@ namespace voltdb
 
 class SeqScanExecutor : public AbstractTableIOExecutor {
 public:
-    SeqScanExecutor() {}
+    SeqScanExecutor() { /* Do Nothing */ }
 private:
     // By default, executors get a node-schema-based temp output table.
     // Override so the temp table can be named after the base table,
@@ -62,6 +62,10 @@ private:
 
     bool p_init();
     bool p_execute();
+    TableTuple m_tuple;
+    std::vector<AbstractExpression*> m_columnExpressions;
+    std::vector<int> m_columnsOnly;
+
 };
 
 }

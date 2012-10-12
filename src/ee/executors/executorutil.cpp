@@ -56,9 +56,8 @@ AbstractExecutor* ExecutorUtil::getNewExecutor(PlanNodeType type) {
     case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>();
     case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor();
     case PLAN_NODE_TYPE_DISTINCT: return new DistinctExecutor();
-    case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor();
     case PLAN_NODE_TYPE_INDEXCOUNT: return new IndexCountExecutor();
-    case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor();
+    case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor();
     case PLAN_NODE_TYPE_INSERT: return new InsertExecutor();
     case PLAN_NODE_TYPE_LIMIT: return new LimitExecutor();
     case PLAN_NODE_TYPE_MATERIALIZE: return new MaterializeExecutor();
@@ -69,6 +68,7 @@ AbstractExecutor* ExecutorUtil::getNewExecutor(PlanNodeType type) {
     case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor();
     case PLAN_NODE_TYPE_SEND: return new SendExecutor();
     case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor();
+    case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor();
     case PLAN_NODE_TYPE_UNION: return new UnionExecutor();
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor();
     default:

@@ -81,11 +81,9 @@ public:
                                                        m_tableSchemaAllowNull,
                                                        allowInlineStrings);
 
-        TableIndexScheme indexScheme("primaryKeyIndex",
-                                     BALANCED_TREE_INDEX,
-                                     m_primaryKeyIndexColumns,
-                                     TableIndex::simplyIndexColumns(),
-                                     true, true, m_tableSchema);
+        TableIndexScheme indexScheme("primaryKeyIndex", BALANCED_TREE_INDEX,
+                                     m_primaryKeyIndexColumns, TableIndex::simplyIndexColumns(),
+                                     true, true, "dummyId", m_tableSchema);
 
         vector<TableIndexScheme> indexes;
 

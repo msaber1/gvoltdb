@@ -58,6 +58,7 @@ class Table;
  */
 class MaterializePlanNode : public ProjectionPlanNode {
     // The following comment describes an idea that was NOT implemented in VoltDB:
+    // --paul 10/10/2012
     // A MaterializePlanNode is sort of like a special case ProjectionPlanNode where
     // we can auto-generate any primary keys that we may need. For the initial system, this
     // doesn't mean anything because we are going to require that all tables have a pkey. In
@@ -67,17 +68,13 @@ class MaterializePlanNode : public ProjectionPlanNode {
     // something special to populate these columns
     // Andy - 06/25/2008
     //
-    public:
-        MaterializePlanNode() : batched(false) { }
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_MATERIALIZE); }
+public:
+    MaterializePlanNode() { /* Do Nothing */ }
+    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_MATERIALIZE); }
 
-        std::string debugInfo(const std::string &spacer) const;
-
-        bool isBatched() const { return batched; }
-        void setBatched(bool batched) { this->batched = batched; }
-    protected:
-        virtual void loadFromJSONObject(json_spirit::Object &obj);
-        bool batched;
+    std::string debugInfo(const std::string &spacer) const;
+private:
+    virtual void loadFromJSONObject(json_spirit::Object &obj);
 };
 
 }

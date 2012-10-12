@@ -57,6 +57,8 @@
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
 
+#include "projectionexecutor.h"
+
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
@@ -73,9 +75,6 @@ void IndexScanExecutor::p_setOutputTable(TempTableLimits* limits)
 bool IndexScanExecutor::p_init()
 {
     VOLT_TRACE("init IndexScan Executor");
-
-    m_projectionNode = NULL;
-
     IndexScanPlanNode* node = dynamic_cast<IndexScanPlanNode*>(m_abstractNode);
     assert(node);
     assert(m_targetTable);
@@ -85,7 +84,11 @@ bool IndexScanExecutor::p_init()
     //
     // INLINE PROJECTION
     //
-    m_projectionNode = static_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+    ProjectionPlanNode* projectionNode = static_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+    if (projectionNode) {
+        m_columnExpressions = ProjectionExecutor::outputExpressions(projectionNode);
+        m_columnsOnly = ProjectionExecutor::indexesIfAllTupleValues(m_columnExpressions);
+    }
 
     //
     // Make sure that the search keys are not null
@@ -145,7 +148,6 @@ bool IndexScanExecutor::p_execute()
 {
     IndexScanPlanNode* node = dynamic_cast<IndexScanPlanNode*>(m_abstractNode);
     assert(node);
-    assert(node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
 
     // output must be a temp table
     assert(m_outputTable);
@@ -172,10 +174,8 @@ bool IndexScanExecutor::p_execute()
     //
     // INLINE PROJECTION
     //
-    bool projectsColumnsOnly = false;
-    if (m_projectionNode != NULL) {
-        projectsColumnsOnly = ! m_projectionNode->getOutputIfAllTupleValues().empty();
-    }
+    bool hasInlineProjection = ! m_columnExpressions.empty();
+    bool projectsColumnsOnly = ! m_columnsOnly.empty();
 
     //
     // SEARCH KEY
@@ -184,7 +184,7 @@ bool IndexScanExecutor::p_execute()
     VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
     const std::vector<AbstractExpression*>& searchKeyExpressions = node->getSearchKeyExpressions();
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-        NValue candidateValue = searchKeyExpressions[ctr]->eval(&m_dummy, NULL);
+        NValue candidateValue = searchKeyExpressions[ctr]->eval();
         try {
             m_searchKey.setNValue(ctr, candidateValue);
         }
@@ -339,7 +339,7 @@ bool IndexScanExecutor::p_execute()
         // First check whether the end_expression is now false
         //
         if (end_expression != NULL &&
-            end_expression->eval(&m_tuple, NULL).isFalse())
+            end_expression->eval(&m_tuple).isFalse())
         {
             VOLT_TRACE("End Expression evaluated to false, stopping scan");
             break;
@@ -348,7 +348,7 @@ bool IndexScanExecutor::p_execute()
         // Then apply our post-predicate to do further filtering
         //
         if (post_expression == NULL ||
-            post_expression->eval(&m_tuple, NULL).isTrue())
+            post_expression->eval(&m_tuple).isTrue())
         {
             //
             // INLINE OFFSET
@@ -360,34 +360,21 @@ bool IndexScanExecutor::p_execute()
             }
             tuple_ctr++;
 
-            if (m_projectionNode != NULL)
-            {
+            if (hasInlineProjection) {
                 TableTuple &temp_tuple = m_outputTable->tempTuple();
                 if (projectsColumnsOnly) {
-                    const std::vector<int>& column = m_projectionNode->getOutputIfAllTupleValues();
                     VOLT_TRACE("sweet, all tuples");
-                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr)
-                    {
-                        temp_tuple.setNValue(ctr, m_tuple.getNValue(column[ctr]));
+                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+                        temp_tuple.setNValue(ctr, m_tuple.getNValue(m_columnsOnly[ctr]));
                     }
                 } else {
-                    const std::vector<AbstractExpression*>& expression =
-                        m_projectionNode->getOutputColumnExpressions();
-                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr)
-                    {
-                        temp_tuple.setNValue(ctr, expression[ctr]->eval(&m_tuple));
+                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
+                        temp_tuple.setNValue(ctr, m_columnExpressions[ctr]->eval(&m_tuple));
                     }
                 }
                 output_temp_table->insertTempTuple(temp_tuple);
-            }
-            else
-                //
-                // Straight Insert
-                //
-            {
-                //
+            } else {
                 // Try to put the tuple into our output table
-                //
                 output_temp_table->insertTempTuple(m_tuple);
             }
         }

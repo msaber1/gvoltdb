@@ -58,15 +58,14 @@ class AbstractExpression;
  *
  */
 class MaterializeExecutor : public AbstractExecutor {
-  public:
-    MaterializeExecutor() : m_engine(NULL) {}
+public:
+    MaterializeExecutor() { /* Do nothing */ }
     ~MaterializeExecutor();
-  protected:
-    bool initEngine(VoltDBEngine* engine) { m_engine = engine; return true; }
+private:
     bool p_init();
     bool p_execute();
-  private:
-    VoltDBEngine *m_engine;
+    std::vector<AbstractExpression*> m_columnExpressions;
+    std::vector<const NValue*> m_paramsOnly;
 };
 
 }

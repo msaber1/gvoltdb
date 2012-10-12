@@ -74,7 +74,7 @@ class TableAndIndexTest : public Test {
 
             districtIndex1Scheme = TableIndexScheme("District primary key index", HASH_TABLE_INDEX,
                                                     districtIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    true, false, districtTupleSchema);
+                                                    true, false, "districtIndexNonce", districtTupleSchema);
 
             vector<voltdb::ValueType> warehouseColumnTypes;
             vector<int32_t> warehouseColumnLengths;
@@ -97,7 +97,7 @@ class TableAndIndexTest : public Test {
 
             warehouseIndex1Scheme = TableIndexScheme("Warehouse primary key index", HASH_TABLE_INDEX,
                                                      warehouseIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                     true, false, warehouseTupleSchema);
+                                                     true, true, "warehouseIndexNonce", warehouseTupleSchema);
 
             vector<voltdb::ValueType> customerColumnTypes;
             vector<int32_t> customerColumnLengths;
@@ -136,7 +136,7 @@ class TableAndIndexTest : public Test {
 
             customerIndex1Scheme = TableIndexScheme("Customer primary key index", HASH_TABLE_INDEX,
                                                     customerIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    true, true, customerTupleSchema);
+                                                    true, true, "customerIndexNonce", customerTupleSchema);
 
             customerIndex2ColumnIndices.push_back(2);
             customerIndex2ColumnIndices.push_back(1);
@@ -145,7 +145,7 @@ class TableAndIndexTest : public Test {
 
             customerIndex2Scheme = TableIndexScheme("Customer index 1", HASH_TABLE_INDEX,
                                                     customerIndex2ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    true, true, customerTupleSchema);
+                                                    true, true, "customerIndexNtwice?", customerTupleSchema);
             customerIndexes.push_back(customerIndex2Scheme);
 
             customerIndex3ColumnIndices.push_back(2);
@@ -154,7 +154,7 @@ class TableAndIndexTest : public Test {
 
             customerIndex3Scheme = TableIndexScheme("Customer index 3", HASH_TABLE_INDEX,
                                                     customerIndex3ColumnIndices, TableIndex::simplyIndexColumns(),
-                                                    false, false, customerTupleSchema);
+                                                    false, false, "customerIndexNthrice?", customerTupleSchema);
             customerIndexes.push_back(customerIndex3Scheme);
 
 

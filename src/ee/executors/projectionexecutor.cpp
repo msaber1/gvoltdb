@@ -50,10 +50,14 @@
 #include "common/executorcontext.hpp"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
+#include "expressions/parametervalueexpression.h"
+#include "expressions/tuplevalueexpression.h"
 #include "plannodes/projectionnode.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
+
+#include <boost/foreach.hpp>
 
 namespace voltdb {
 
@@ -63,6 +67,12 @@ bool ProjectionExecutor::p_init()
     ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(m_abstractNode);
     assert(node);
 
+    m_columnExpressions = outputExpressions(node);
+    m_columnsOnly = indexesIfAllTupleValues(m_columnExpressions);
+    if (m_columnsOnly.size() == 0) {
+        m_paramsOnly = valuesIfAllParameterValues(m_columnExpressions);
+    }
+
     if (!node->isInline()) {
         m_tuple = TableTuple(m_inputTable->schema());
     }
@@ -70,25 +80,16 @@ bool ProjectionExecutor::p_init()
 }
 
 bool ProjectionExecutor::p_execute() {
-    ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(m_abstractNode);
-    assert (node);
-    assert (!node->isInline()); // inline projection's execute() should not be
-                                // called
-
+    assert (dynamic_cast<ProjectionPlanNode*>(m_abstractNode));
+    assert ( ! m_abstractNode->isInline()); // inline projection's execute() should not be called
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
-
-    const std::vector<int>& columnsOnly = node->getOutputIfAllTupleValues();
-    const std::vector<const NValue*>& paramsOnly = node->getOutputIfAllParameterValues();
-    const std::vector<AbstractExpression*>& columnExpressions = node->getOutputColumnExpressions();
-
-
-    int columnsOnlyCount = (int) columnsOnly.size();
+    int columnsOnlyCount = (int) m_columnsOnly.size();
     int paramsOnlyCount = 0;
     int exprsCount = 0;
     if (columnsOnlyCount == 0) {
-        paramsOnlyCount = (int) paramsOnly.size();
+        paramsOnlyCount = (int) m_paramsOnly.size();
         if (paramsOnlyCount == 0) {
-            exprsCount = (int) columnExpressions.size();
+            exprsCount = (int) m_columnExpressions.size();
         }
     }
 
@@ -110,7 +111,7 @@ bool ProjectionExecutor::p_execute() {
         VOLT_TRACE("sweet, all tuples");
         while (iterator.next(tuple)) {
             for (int ctr = columnsOnlyCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, tuple.getNValue(columnsOnly[ctr]));
+                temp_tuple.setNValue(ctr, tuple.getNValue(m_columnsOnly[ctr]));
             }
             output_temp_table->insertTempTuple(temp_tuple);
         }
@@ -118,14 +119,14 @@ bool ProjectionExecutor::p_execute() {
         VOLT_TRACE("sweet, all params");
         while (iterator.next(tuple)) {
             for (int ctr = paramsOnlyCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, *(paramsOnly[ctr]));
+                temp_tuple.setNValue(ctr, *(m_paramsOnly[ctr]));
             }
             output_temp_table->insertTempTuple(temp_tuple);
         }
     } else {
         while (iterator.next(tuple)) {
             for (int ctr = exprsCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, columnExpressions[ctr]->eval(&tuple));
+                temp_tuple.setNValue(ctr, m_columnExpressions[ctr]->eval(&tuple));
             }
             output_temp_table->insertTempTuple(temp_tuple);
         }
@@ -133,6 +134,45 @@ bool ProjectionExecutor::p_execute() {
     //VOLT_TRACE("PROJECTED TABLE: %s\n", m_outputTable->debug().c_str());
 
     return (true);
+}
+
+std::vector<AbstractExpression*> ProjectionExecutor::outputExpressions(ProjectionPlanNode* node)
+{
+    std::vector<AbstractExpression*> columnExpressions;
+    BOOST_FOREACH(SchemaColumn* outputColumn, node->getOutputSchema()) {
+        AbstractExpression* ae = outputColumn->getExpression();
+        columnExpressions.push_back(ae);
+    }
+    return columnExpressions;
+}
+
+std::vector<int> ProjectionExecutor::indexesIfAllTupleValues(std::vector<AbstractExpression*>& columnExpressions)
+{
+    std::vector<int> cols;
+    BOOST_FOREACH(AbstractExpression* ae, columnExpressions) {
+        TupleValueExpression* tve = dynamic_cast<TupleValueExpression*>(ae);
+        if (tve == NULL) {
+            cols.resize(0);
+            break;
+        }
+        cols.push_back(tve->getColumnId());
+    }
+    return cols;
+}
+
+std::vector<const NValue*> ProjectionExecutor::valuesIfAllParameterValues(std::vector<AbstractExpression*>& columnExpressions)
+{
+    std::vector<const NValue*> values;
+    const NValueArray& params = ExecutorContext::getParams();
+    BOOST_FOREACH(AbstractExpression* ae, columnExpressions) {
+        ParameterValueExpression* pve = dynamic_cast<ParameterValueExpression*>(ae);
+        if (pve == NULL) {
+            values.resize(0);
+            break;
+        }
+        values.push_back(&(params[pve->getParameterId()]));
+    }
+    return values;
 }
 
 ProjectionExecutor::~ProjectionExecutor() {

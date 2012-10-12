@@ -52,12 +52,7 @@
 
 namespace voltdb {
 class AbstractExpression;
-
-//
-// Inline PlanNodes
-//
 class ProjectionPlanNode;
-class LimitPlanNode;
 
 class IndexScanExecutor : public AbstractTableIOExecutor
 {
@@ -80,9 +75,6 @@ private:
     int m_numOfColumns;
     int m_numOfSearchkeys;
 
-    // Inline Projection
-    ProjectionPlanNode* m_projectionNode;
-
     // Search key
     StorageBackedTempTuple m_searchKey;
 
@@ -90,8 +82,9 @@ private:
     SortDirectionType m_sortDirection;
 
     TableIndex *m_index;
-    TableTuple m_dummy;
     TableTuple m_tuple;
+    std::vector<AbstractExpression*> m_columnExpressions;
+    std::vector<int> m_columnsOnly;
 };
 
 }

@@ -131,7 +131,7 @@ public:
                                              voltdb::BALANCED_TREE_INDEX,
                                              m_primaryKeyIndexColumns,
                                              TableIndex::simplyIndexColumns(),
-                                             true, true, m_tableSchema);
+                                             true, true, "pknonce", m_tableSchema);
         std::vector<voltdb::TableIndexScheme> indexes;
 
         m_table = dynamic_cast<voltdb::PersistentTable*>(

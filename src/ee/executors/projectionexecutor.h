@@ -53,20 +53,29 @@
 
 namespace voltdb {
 class AbstractExpression;
+class ProjectionPlanNode;
 
 /**
  *
  */
 class ProjectionExecutor : public AbstractExecutor {
-    public:
-        ProjectionExecutor() : AbstractExecutor() {}
-        ~ProjectionExecutor();
-    protected:
-        bool p_init();
-        bool p_execute();
+public:
+    ProjectionExecutor() { /* Do Nothing */ }
+    ~ProjectionExecutor();
 
-    private:
-        TableTuple m_tuple;
+    static std::vector<AbstractExpression*> outputExpressions(ProjectionPlanNode* node);
+    static std::vector<int> indexesIfAllTupleValues(std::vector<AbstractExpression*>& columnExpressions);
+    static std::vector<const NValue*> valuesIfAllParameterValues(std::vector<AbstractExpression*>& columnExpressions);
+
+protected:
+    bool p_init();
+    bool p_execute();
+
+private:
+    TableTuple m_tuple;
+    std::vector<AbstractExpression*> m_columnExpressions;
+    std::vector<const NValue*> m_paramsOnly;
+    std::vector<int> m_columnsOnly;
 };
 
 }

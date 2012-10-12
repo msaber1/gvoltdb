@@ -47,9 +47,8 @@
 
 #include "common/debuglog.h"
 #include "common/common.h"
-#include "common/executorcontext.hpp"
 #include "common/tabletuple.h"
-#include "execution/VoltDBEngine.h"
+#include "executors/projectionexecutor.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/materializenode.h"
 #include "storage/temptable.h"
@@ -59,57 +58,36 @@ namespace voltdb {
 bool MaterializeExecutor::p_init()
 {
     VOLT_TRACE("init Materialize Executor");
-    assert(dynamic_cast<MaterializePlanNode*>(m_abstractNode));
+    MaterializePlanNode* node = dynamic_cast<MaterializePlanNode*>(m_abstractNode);
+    assert(node);
+    m_columnExpressions = ProjectionExecutor::outputExpressions(node);
+    m_paramsOnly = ProjectionExecutor::valuesIfAllParameterValues(m_columnExpressions);
     return (true);
 }
 
-bool MaterializeExecutor::p_execute() {
-    MaterializePlanNode* node = dynamic_cast<MaterializePlanNode*>(m_abstractNode);
-    assert(node);
-    assert(!node->isInline()); // inline projection's execute() should not be called
+bool MaterializeExecutor::p_execute()
+{
+    assert(dynamic_cast<MaterializePlanNode*>(m_abstractNode));
+    int paramColumnCount = (int)m_paramsOnly.size();
 
-    // Construct the output table
-    const std::vector<const NValue*>& paramArray = node->getOutputIfAllParameterValues();
-    int paramColumnCount = (int)paramArray.size();
-
-    // output must be a temp table
     TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
-    assert(output_temp_table);
     TableTuple &temp_tuple = output_temp_table->tempTuple();
-
-    // Parameter-based materialization (the most common case) single or batched.
-    // The batched case assumes that paramaters are referenced serially in index order.
-    // The single-tuple case allows out-of-order indexing, but this is not usually needed.
     if (paramColumnCount > 0) {
-        // batched insertion
-        if (node->isBatched()) {
-            const NValueArray& params = ExecutorContext::getParams();
-            int paramcnt = m_engine->getUsedParamcnt();
-            VOLT_TRACE("batched insertion with %d params. %d for each tuple.", paramcnt, paramColumnCount);
-            for (int i = 0, tuples = paramcnt / paramColumnCount; i < tuples; ++i) {
-                for (int j = paramColumnCount - 1; j >= 0; --j) {
-                    temp_tuple.setNValue(j, params[i * paramColumnCount + j]);
-                }
-                output_temp_table->TempTable::insertTuple(temp_tuple);
-            }
-            VOLT_TRACE ("Materialized :\n %s", m_outputTable->debug().c_str());
-            return true;
-        }
-
         for (int ctr = paramColumnCount - 1; ctr >= 0; --ctr) {
-            temp_tuple.setNValue(ctr, *(paramArray[ctr]));
+            temp_tuple.setNValue(ctr, *(m_paramsOnly[ctr]));
         }
     } else {
-        int exprsCount = (int) node->getOutputColumnExpressions().size();
-        const std::vector<AbstractExpression*>& exprArray = node->getOutputColumnExpressions();
+        int exprsCount = (int) m_columnExpressions.size();
         // Add each calculated value to the temp tuple.
         // It must have the same value type as the output column.
         for (int ctr = exprsCount - 1; ctr >= 0; --ctr) {
-            temp_tuple.setNValue(ctr, exprArray[ctr]->eval());
+            temp_tuple.setNValue(ctr, m_columnExpressions[ctr]->eval());
         }
     }
+
     // Add tuple to the output
     output_temp_table->insertTempTuple(temp_tuple);
+    VOLT_TRACE ("Materialized :\n %s", m_outputTable->debug().c_str());
     return true;
 }
 

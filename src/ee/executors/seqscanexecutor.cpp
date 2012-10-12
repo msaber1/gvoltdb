@@ -48,6 +48,7 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
+#include "executors/projectionexecutor.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/projectionnode.h"
@@ -85,7 +86,23 @@ void SeqScanExecutor::p_setOutputTable(TempTableLimits* limits)
 
 bool SeqScanExecutor::p_init()
 {
+    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
+    assert(node);
     VOLT_TRACE("init SeqScan Executor");
+
+    if (m_outputTable == m_targetTable) {
+        return true;
+    }
+
+    // OPTIMIZATION: INLINE PROJECTION
+    ProjectionPlanNode* projectionNode =
+        static_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+    if (projectionNode) {
+        m_columnExpressions = ProjectionExecutor::outputExpressions(projectionNode);
+        m_columnsOnly = ProjectionExecutor::indexesIfAllTupleValues(m_columnExpressions);
+    }
+
+    m_tuple = TableTuple(m_targetTable->schema());
     return true;
 }
 
@@ -93,7 +110,6 @@ bool SeqScanExecutor::p_execute() {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
     assert(m_outputTable);
-
     assert(m_targetTable);
     //cout << "SeqScanExecutor: node id" << node->getPlanNodeId() << endl;
     VOLT_TRACE("Sequential Scanning table :\n %s",
@@ -105,113 +121,81 @@ bool SeqScanExecutor::p_execute() {
                (int)m_targetTable->allocatedTupleCount(),
                (int)m_targetTable->usedTupleCount());
 
-    //
-    // OPTIMIZATION: NESTED PROJECTION
-    //
-    int num_of_columns = (int)m_outputTable->columnCount();
-    ProjectionPlanNode* projection_node = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-
-    //
-    // OPTIMIZATION: NESTED LIMIT
-    // How nice! We can also cut off our scanning with a nested limit!
-    //
-    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
-
-    //
     // OPTIMIZATION:
-    //
-    // If there is no predicate and no Projection for this SeqScan,
+    // If there is no predicate, projection, or limit for this SeqScan,
     // then we have already set the node's OutputTable to just point
-    // at the TargetTable. Therefore, there is nothing we more we need
-    // to do here
-    //
-    if (node->getPredicate() != NULL || projection_node != NULL ||
-        limit_node != NULL)
-    {
+    // at the TargetTable. There is nothing more to do here.
+    if (m_outputTable == m_targetTable) {
+        VOLT_TRACE("\n%s\n", m_outputTable->debug().c_str());
+        VOLT_DEBUG("Finished Seq scanning");
+        return true;
+    }
+
+    // INLINE PROJECTION
+    bool hasInlineProjection = ! m_columnExpressions.empty();
+    bool projectsColumnsOnly = ! m_columnsOnly.empty();
+
+
+    // Just walk through the table using our iterator and apply
+    // the predicate to each tuple. For each tuple that satisfies
+    // our expression, we'll insert them into the output table.
+    TableTuple tuple(m_targetTable->schema());
+    TableIterator iterator = m_targetTable->iterator();
+    AbstractExpression *predicate = node->getPredicate();
+    VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
+
+    if (predicate) {
+        VOLT_DEBUG("SCAN PREDICATE B:\n%s\n", predicate->debug(true).c_str());
+    }
+
+    // OPTIMIZATION: INLINE LIMIT
+    // How nice! We can also cut off our scanning with a nested limit!
+    int limit = -1;
+    int offset = -1;
+    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    if (limit_node) {
+        limit_node->getLimitAndOffsetByReference(limit, offset);
+    }
+
+    TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
+
+    int tuple_ctr = 0;
+    int tuple_skipped = 0;
+    while ((limit == -1 || tuple_ctr < limit) && iterator.next(m_tuple)) {
+        VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
+                   tuple.debug(m_targetTable->name()).c_str(), tuple_ctr,
+                   (int)m_targetTable->activeTupleCount());
         //
-        // Just walk through the table using our iterator and apply
-        // the predicate to each tuple. For each tuple that satisfies
-        // our expression, we'll insert them into the output table.
+        // For each tuple we need to evaluate it against our predicate
         //
-        TableTuple tuple(m_targetTable->schema());
-        TableIterator iterator = m_targetTable->iterator();
-        AbstractExpression *predicate = node->getPredicate();
-        VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
+        if (predicate == NULL || predicate->eval(&m_tuple).isTrue()) {
+            // Check if we have to skip this tuple because of offset
+            if (tuple_skipped < offset) {
+                tuple_skipped++;
+                continue;
+            }
+            ++tuple_ctr;
 
-        if (predicate)
-        {
-            VOLT_DEBUG("SCAN PREDICATE B:\n%s\n",
-                       predicate->debug(true).c_str());
-        }
-
-        int limit = -1;
-        int offset = -1;
-        if (limit_node) {
-            limit_node->getLimitAndOffsetByReference(limit, offset);
-        }
-
-        TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
-
-        int tuple_ctr = 0;
-        int tuple_skipped = 0;
-        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
-        {
-            VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
-                       tuple.debug(m_targetTable->name()).c_str(), tuple_ctr,
-                       (int)m_targetTable->activeTupleCount());
-            //
-            // For each tuple we need to evaluate it against our predicate
-            //
-            if (predicate == NULL || predicate->eval(&tuple, NULL).isTrue())
-            {
-                // Check if we have to skip this tuple because of offset
-                if (tuple_skipped < offset) {
-                    tuple_skipped++;
-                    continue;
-                }
-                ++tuple_ctr;
-
-                //
-                // Nested Projection
-                // Project (or replace) values from input tuple
-                //
-                if (projection_node != NULL)
-                {
-                    TableTuple &temp_tuple = m_outputTable->tempTuple();
-                    for (int ctr = 0; ctr < num_of_columns; ctr++)
-                    {
-                        NValue value =
-                            projection_node->
-                          getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
-                        temp_tuple.setNValue(ctr, value);
+            // Project (or replace) values from input tuple
+            if (hasInlineProjection) {
+                TableTuple &temp_tuple = m_outputTable->tempTuple();
+                if (projectsColumnsOnly) {
+                    for (int ctr = (int)m_columnsOnly.size() - 1; ctr >= 0; --ctr) {
+                        temp_tuple.setNValue(ctr, m_tuple.getNValue(m_columnsOnly[ctr]));
                     }
-                    if ( ! output_temp_table->insertTempTuple(temp_tuple))
-                    {
-                        VOLT_ERROR("Failed to insert tuple from table '%s' into"
-                                   " output table '%s'",
-                                   m_targetTable->name().c_str(),
-                                   m_outputTable->name().c_str());
-                        return false;
+                } else {
+                    for (int ctr = (int)m_columnExpressions.size() - 1; ctr >= 0; --ctr) {
+                        temp_tuple.setNValue(ctr, m_columnExpressions[ctr]->eval(&m_tuple));
                     }
                 }
-                else
-                {
-                    //
-                    // Insert the tuple into our output table
-                    //
-                    if ( ! output_temp_table->insertTempTuple(tuple)) {
-                        VOLT_ERROR("Failed to insert tuple from table '%s' into"
-                                   " output table '%s'",
-                                   m_targetTable->name().c_str(),
-                                   m_outputTable->name().c_str());
-                        return false;
-                    }
-                }
+                output_temp_table->insertTempTuple(temp_tuple);
+            } else {
+                // Put the whole input tuple into our output table
+                output_temp_table->insertTempTuple(m_tuple);
             }
         }
     }
     VOLT_TRACE("\n%s\n", m_outputTable->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
-
     return true;
 }
