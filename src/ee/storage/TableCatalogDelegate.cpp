@@ -185,9 +185,9 @@ TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
 
     // concat the target table column indexes into a unique string
     // using the order they appear in the index
-    for (size_t i = 0; i < columnIndexes.size(); i++) {
+    BOOST_FOREACH(int colIndex, columnIndexes) {
         char buf[128];
-        snprintf(buf, 128, "-%d", columnIndexes[i]);
+        snprintf(buf, 128, "-%d", colIndex);
         retval += buf;
     }
 

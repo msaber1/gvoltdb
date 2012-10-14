@@ -107,20 +107,18 @@ namespace voltdb {
 
 const int64_t AD_HOC_FRAG_ID = -1;
 
-VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
-    : m_currentUndoQuantum(NULL),
+VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy) :
+      m_dummyUndoQuantum(),
+      m_currentUndoQuantum(&m_dummyUndoQuantum),
       m_staticParams(MAX_PARAM_COUNT),
       m_currentOutputDepId(-1),
       m_currentInputDepId(-1),
-      m_isELEnabled(false),
       m_stringPool(16777216, 2),
       m_numResultDependencies(0),
       m_logManager(logProxy),
       m_templateSingleLongTable(NULL),
       m_topend(topend)
 {
-    m_currentUndoQuantum = new DummyUndoQuantum();
-
     // init the number of planfragments executed
     m_pfCount = 0;
 
@@ -206,7 +204,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_currentUndoQuantum,
                                             getTopend(),
                                             &m_stringPool,
-                                            m_isELEnabled,
+                                            false,
                                             hostname,
                                             hostId);
     return true;
@@ -222,12 +220,6 @@ VoltDBEngine::~VoltDBEngine() {
 
     // clean up execution plans
     m_executorMap.clear();
-
-    // Get rid of any dummy undo quantum first so m_undoLog.clear()
-    // doesn't wipe this out before we do it.
-    if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
-        delete m_currentUndoQuantum;
-    }
 
     // Clear the undo log before deleting the persistent tables so
     // that the persistent table schema are still around so we can
@@ -254,7 +246,6 @@ VoltDBEngine::~VoltDBEngine() {
     }
     m_snapshottingTables.clear();
 
-    delete m_topend;
     delete m_executorContext;
 }
 
@@ -320,8 +311,10 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
      * not be known in advance.
      */
     if (first) {
-        m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int32_t)
-                                                            + sizeof(int8_t));
+        // configure the execution context.
+        ExecutorContext::setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId,
+                                                     m_usedParamcnt, getParameterContainer());
+        m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int32_t) + sizeof(int8_t));
         m_dirtyFragmentBatch = false;
     }
 
@@ -336,11 +329,6 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
      */
     m_numResultDependencies = 0;
     size_t numResultDependenciesCountOffset = m_resultOutput.reserveBytes(4);
-
-    // configure the execution context.
-    m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
-                                             txnId,
-                                             lastCommittedTxnId);
 
     // count the number of plan fragments executed
     ++m_pfCount;
@@ -376,6 +364,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                 // set these back to -1 for error handling
                 m_currentOutputDepId = -1;
                 m_currentInputDepId = -1;
+                if (last) {
+                    m_stringPool.purge();
+                }
                 return ENGINE_ERRORCODE_ERROR;
             }
         } catch (SerializableEEException &e) {
@@ -390,6 +381,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             // set these back to -1 for error handling
             m_currentOutputDepId = -1;
             m_currentInputDepId = -1;
+            if (last) {
+                m_stringPool.purge();
+            }
             return ENGINE_ERRORCODE_ERROR;
         }
     }
@@ -418,6 +412,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
         m_resultOutput.writeIntAt(m_startOfResultBuffer,
             static_cast<int32_t>((m_resultOutput.position() - m_startOfResultBuffer) - sizeof(int32_t)));
         m_resultOutput.writeBoolAt(m_startOfResultBuffer + sizeof(int32_t), m_dirtyFragmentBatch);
+        m_stringPool.purge();
     }
 
     // set these back to -1 for error handling
@@ -536,8 +531,7 @@ bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload
         m_database->connectors().get("0")->enabled())
     {
         VOLT_DEBUG("EL enabled.");
-        m_executorContext->m_exportEnabled = true;
-        m_isELEnabled = true;
+        m_executorContext->enableExportFeature();
     }
 
     // load up all the tables, adding all tables
@@ -818,14 +812,46 @@ VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload)
     return true;
 }
 
+/**
+ * Utility used for deserializing ParameterSet passed from Java.
+ */
+void
+VoltDBEngine::deserializeParameterSet(const char *parameter_buffer, int parameter_buffer_capacity)
+{
+    ReferenceSerializeInput serialize_in(parameter_buffer, parameter_buffer_capacity);
+    NValueArray &params = getParameterContainer();
+    int cnt = serialize_in.readShort();
+    if (cnt < 0) {
+        throwFatalException( "parameter count is negative: %d", cnt);
+    }
+    assert (cnt < MAX_PARAM_COUNT);
+
+    for (int i = 0; i < cnt; ++i) {
+        params[i] = NValue::deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
+    }
+    m_usedParamcnt = cnt;
+}
+
+void
+VoltDBEngine::deserializeParameterSet()
+{
+    deserializeParameterSet(m_parameterBuffer, m_parameterBufferCapacity);
+}
+
+
+void
+VoltDBEngine::setUndoQuantum(UndoQuantum *undoQuantum)
+{
+    m_currentUndoQuantum = undoQuantum;
+    m_executorContext->setupForPlanFragments(undoQuantum);
+}
+
 bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInput &serializeIn,
                         int64_t txnId, int64_t lastCommittedTxnId)
 {
-    m_executorContext->setupForPlanFragments(getCurrentUndoQuantum(),
-                                             txnId,
-                                             lastCommittedTxnId);
+    ExecutorContext::setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId);
 
     Table* ret = getTable(tableId);
     if (ret == NULL) {
@@ -907,6 +933,8 @@ bool VoltDBEngine::rebuildTableCollections() {
 
     return true;
 }
+
+static int64_t uniqueIdForFragment(catalog::PlanFragment *frag);
 
 /*
  * Delete and rebuild all plan fragments.
@@ -1274,23 +1302,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     }
 }
 
-/* Smart accessor to keep executor context in synch with the engine's currrent valid undoquanta */
-void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
-{
-    m_currentUndoQuantum = undoQuantum;
-    m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
-}
-
-
-/*
- * Exists to transition pre-existing unit test cases.
- */
-ExecutorContext * VoltDBEngine::getExecutorContext() {
-    m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
-    return m_executorContext;
-}
-
-int64_t VoltDBEngine::uniqueIdForFragment(catalog::PlanFragment *frag) {
+static int64_t uniqueIdForFragment(catalog::PlanFragment *frag) {
     int64_t retval = 0;
     catalog::CatalogType *parent = frag->parent();
     retval = static_cast<int64_t>(parent->parent()->relativeIndex()) << 32;

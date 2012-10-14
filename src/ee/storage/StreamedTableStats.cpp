@@ -24,8 +24,4 @@ namespace voltdb {
 StreamedTableStats::StreamedTableStats(voltdb::StreamedTable* table) : voltdb::TableStats(table) {
 }
 
-std::vector<std::string> StreamedTableStats::generateStatsColumnNames() {
-    std::vector<std::string> columnNames = TableStats::generateStatsColumnNames();
-    return columnNames;
-}
 }

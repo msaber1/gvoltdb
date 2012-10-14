@@ -17,7 +17,6 @@
 
 #include "common/SerializableEEException.h"
 #include "common/serializeio.h"
-#include "execution/VoltDBEngine.h"
 
 #include <stdint.h>
 

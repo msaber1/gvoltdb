@@ -137,8 +137,7 @@ class Table {
     // ------------------------------------------------------------------
     // ACCESS METHODS
     // ------------------------------------------------------------------
-    virtual TableIterator& iterator() = 0;
-    virtual TableIterator *makeIterator() = 0;
+    virtual const TableIterator& iterator() = 0;
 
     // ------------------------------------------------------------------
     // OPERATIONS
@@ -222,10 +221,6 @@ class Table {
     // ------------------------------------------------------------------
     virtual int indexCount() const {
         return static_cast<int>(m_indexes.size());
-    }
-
-    virtual int uniqueIndexCount() const {
-        return static_cast<int>(m_uniqueIndexes.size());
     }
 
     virtual std::vector<TableIndex*> allIndexes() const {

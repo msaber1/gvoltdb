@@ -16,6 +16,7 @@
  */
 
 #include "common/UndoAction.h"
+#include "common/UndoQuantum.h"
 #include "common/Pool.hpp"
 #include <stdint.h>
 
@@ -35,12 +36,12 @@ public:
     ~DummyUndoQuantum() {
         delete m_dataPool;
     }
-    void registerUndoAction(UndoAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+    void registerUndoAction(UndoAction *undoAction) {
         undoAction->release();
         undoAction->~UndoAction();
         m_dataPool->purge();
     }
-    inline bool isDummy() {return true;}
+    void registerInterest(UndoQuantumReleaseInterest *interest) { }
 };
 }
 

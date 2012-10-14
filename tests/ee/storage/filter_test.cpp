@@ -343,6 +343,13 @@ TEST_F(FilterTest, ComplexFilter) {
     delete predicate;
 }
 TEST_F(FilterTest, SubstituteFilter) {
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* noPool = NULL;
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext paramHolder(0, 0, wantNoQuantum, topless, noPool, false, "", 0);
+    NValueArray params(1);
+    ExecutorContext::setupTxnIdsForPlanFragments(0, 0, 1, params);
 
     // WHERE id <= 20 AND val4=$1
 
@@ -367,9 +374,7 @@ TEST_F(FilterTest, SubstituteFilter) {
     // ::printf("\nFilter:%s\n", predicate->debug().c_str());
 
     for (int64_t implantedValue = 1; implantedValue < 5; ++implantedValue) {
-        NValueArray params(1);
         params[0] = ValueFactory::getBigIntValue(implantedValue);
-        //TODO: Need a testing hook to install params into ExecutorContext.
         // ::printf("\nParameterized Filter:%s\n", predicate->debug().c_str());
         // ::printf("\tLEFT:  %s\n", predicate->getLeft()->debug().c_str());
         // ::printf("\tRIGHT: %s\n", predicate->getRight()->debug().c_str());

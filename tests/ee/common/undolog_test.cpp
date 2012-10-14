@@ -60,8 +60,9 @@ private:
 class UndoLogTest : public Test {
 public:
 
-    UndoLogTest() {
-        m_undoLog = new voltdb::UndoLog();
+    UndoLogTest() :
+        m_undoLog()
+    {
         staticReleaseIndex = 0;
         staticUndoneIndex = 0;
     }
@@ -71,13 +72,13 @@ public:
         for (int ii = 0; ii < numUndoQuantums; ii++) {
             const int64_t undoToken = (INT64_MIN + 1) + (ii * 3);
             undoTokens.push_back(undoToken);
-            voltdb::UndoQuantum *quantum = m_undoLog->generateUndoQuantum(undoToken);
+            voltdb::UndoQuantum *quantum = m_undoLog.generateUndoQuantum(undoToken);
             voltdb::Pool *pool = quantum->getDataPool();
             std::vector<MockUndoActionHistory*> histories;
             for (int qq = 0; qq < numUndoActions; qq++) {
                 MockUndoActionHistory *history = new MockUndoActionHistory();
                 histories.push_back(history);
-                MockUndoAction *undoAction = new (pool->allocate(sizeof(MockUndoAction))) MockUndoAction(history);
+                MockUndoAction *undoAction = new (*pool) MockUndoAction(history);
                 quantum->registerUndoAction(undoAction);
             }
             m_undoActionHistoryByQuantum.push_back(histories);
@@ -86,11 +87,10 @@ public:
     }
 
     ~UndoLogTest() {
-        delete m_undoLog;
         for(std::vector<std::vector<MockUndoActionHistory*> >::iterator i = m_undoActionHistoryByQuantum.begin();
             i != m_undoActionHistoryByQuantum.end(); i++) {
-            for(std::vector<MockUndoActionHistory*>::iterator q = (*i).begin();
-                q != (*i).end(); q++) {
+            for(std::vector<MockUndoActionHistory*>::iterator q = i->begin();
+                q != i->end(); q++) {
                 delete (*q);
             }
         }
@@ -126,7 +126,7 @@ public:
         }
     }
 
-    voltdb::UndoLog *m_undoLog;
+    voltdb::UndoLog m_undoLog;
     std::vector<std::vector<MockUndoActionHistory*> > m_undoActionHistoryByQuantum;
 };
 
@@ -167,7 +167,7 @@ TEST_F(UndoLogTest, TestOneQuantumOneActionRelease) {
     std::vector<int64_t> undoTokens = generateQuantumsAndActions( 1, 1);
     ASSERT_EQ( 1, undoTokens.size());
 
-    m_undoLog->release(undoTokens[0]);
+    m_undoLog.release(undoTokens[0]);
     const MockUndoActionHistory *undoActionHistory = m_undoActionHistoryByQuantum[0][0];
     ASSERT_TRUE(undoActionHistory->m_released);
     ASSERT_FALSE(undoActionHistory->m_undone);
@@ -179,7 +179,7 @@ TEST_F(UndoLogTest, TestOneQuantumOneActionUndo) {
     std::vector<int64_t> undoTokens = generateQuantumsAndActions( 1, 1);
     ASSERT_EQ( 1, undoTokens.size());
 
-    m_undoLog->undo(undoTokens[0]);
+    m_undoLog.undo(undoTokens[0]);
     const MockUndoActionHistory *undoActionHistory = m_undoActionHistoryByQuantum[0][0];
     ASSERT_FALSE(undoActionHistory->m_released);
     ASSERT_TRUE(undoActionHistory->m_undone);
@@ -194,7 +194,7 @@ TEST_F(UndoLogTest, TestOneQuantumThreeActionUndoOrdering) {
     std::vector<int64_t> undoTokens = generateQuantumsAndActions( 1, 3);
     ASSERT_EQ( 1, undoTokens.size());
 
-    m_undoLog->undo(undoTokens[0]);
+    m_undoLog.undo(undoTokens[0]);
     std::vector<MockUndoActionHistory*> histories = m_undoActionHistoryByQuantum[0];
     int startingIndex = 0;
     confirmUndoneActionHistoryOrder(histories, startingIndex);
@@ -204,7 +204,7 @@ TEST_F(UndoLogTest, TestOneQuantumThreeActionReleaseOrdering) {
     std::vector<int64_t> undoTokens = generateQuantumsAndActions( 1, 3);
     ASSERT_EQ( 1, undoTokens.size());
 
-    m_undoLog->release(undoTokens[0]);
+    m_undoLog.release(undoTokens[0]);
     std::vector<MockUndoActionHistory*> histories = m_undoActionHistoryByQuantum[0];
     int startingIndex = 0;
     confirmReleaseActionHistoryOrder(histories, startingIndex);
@@ -217,7 +217,7 @@ TEST_F(UndoLogTest, TestThreeQuantumThreeActionUndoOrdering) {
     std::vector<int64_t> undoTokens = generateQuantumsAndActions( 3, 3);
     ASSERT_EQ( 3, undoTokens.size());
 
-    m_undoLog->undo(undoTokens[0]);
+    m_undoLog.undo(undoTokens[0]);
     int startingIndex = 0;
     for (int ii = 2; ii >= 0; ii--) {
         confirmUndoneActionHistoryOrder(m_undoActionHistoryByQuantum[ii], startingIndex);
@@ -231,7 +231,7 @@ TEST_F(UndoLogTest, TestThreeQuantumThreeActionReleaseOrdering) {
     std::vector<int64_t> undoTokens = generateQuantumsAndActions( 3, 3);
     ASSERT_EQ( 3, undoTokens.size());
 
-    m_undoLog->release(undoTokens[2]);
+    m_undoLog.release(undoTokens[2]);
     int startingIndex = 0;
     for (int ii = 0; ii < 3; ii++) {
         confirmReleaseActionHistoryOrder(m_undoActionHistoryByQuantum[ii], startingIndex);
@@ -242,11 +242,11 @@ TEST_F(UndoLogTest, TestThreeQuantumThreeActionReleaseOneUndoOne) {
     std::vector<int64_t> undoTokens = generateQuantumsAndActions( 3, 3);
     ASSERT_EQ( 3, undoTokens.size());
 
-    m_undoLog->release(undoTokens[0]);
+    m_undoLog.release(undoTokens[0]);
     int startingIndex = 0;
     confirmReleaseActionHistoryOrder(m_undoActionHistoryByQuantum[0], startingIndex);
 
-    m_undoLog->undo(undoTokens[2]);
+    m_undoLog.undo(undoTokens[2]);
     startingIndex = 0;
     confirmUndoneActionHistoryOrder(m_undoActionHistoryByQuantum[2], startingIndex);
 }
@@ -255,11 +255,11 @@ TEST_F(UndoLogTest, TestThreeQuantumThreeActionUndoOneReleaseOne) {
     std::vector<int64_t> undoTokens = generateQuantumsAndActions( 3, 3);
     ASSERT_EQ( 3, undoTokens.size());
 
-    m_undoLog->undo(undoTokens[2]);
+    m_undoLog.undo(undoTokens[2]);
     int startingIndex = 0;
     confirmUndoneActionHistoryOrder(m_undoActionHistoryByQuantum[2], startingIndex);
 
-    m_undoLog->release(undoTokens[0]);
+    m_undoLog.release(undoTokens[0]);
     startingIndex = 0;
     confirmReleaseActionHistoryOrder(m_undoActionHistoryByQuantum[0], startingIndex);
 }
@@ -268,11 +268,11 @@ TEST_F(UndoLogTest, TestTwoQuantumTwoActionReleaseOneUndoOne) {
     std::vector<int64_t> undoTokens = generateQuantumsAndActions( 2, 2);
     ASSERT_EQ( 2, undoTokens.size());
 
-    m_undoLog->release(undoTokens[0]);
+    m_undoLog.release(undoTokens[0]);
     int startingIndex = 0;
     confirmReleaseActionHistoryOrder(m_undoActionHistoryByQuantum[0], startingIndex);
 
-    m_undoLog->undo(undoTokens[1]);
+    m_undoLog.undo(undoTokens[1]);
     startingIndex = 0;
     confirmUndoneActionHistoryOrder(m_undoActionHistoryByQuantum[1], startingIndex);
 }
@@ -281,11 +281,11 @@ TEST_F(UndoLogTest, TestTwoQuantumTwoActionUndoOneReleaseOne) {
     std::vector<int64_t> undoTokens = generateQuantumsAndActions( 2, 2);
     ASSERT_EQ( 2, undoTokens.size());
 
-    m_undoLog->undo(undoTokens[1]);
+    m_undoLog.undo(undoTokens[1]);
     int startingIndex = 0;
     confirmUndoneActionHistoryOrder(m_undoActionHistoryByQuantum[1], startingIndex);
 
-    m_undoLog->release(undoTokens[0]);
+    m_undoLog.release(undoTokens[0]);
     startingIndex = 0;
     confirmReleaseActionHistoryOrder(m_undoActionHistoryByQuantum[0], startingIndex);
 }

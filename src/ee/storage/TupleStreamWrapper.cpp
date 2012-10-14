@@ -38,10 +38,10 @@ using namespace voltdb;
 const int METADATA_COL_CNT = 6;
 const int MAX_BUFFER_AGE = 4000;
 
-TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
-                                       int64_t siteId)
-    : m_partitionId(partitionId), m_siteId(siteId),
-      m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
+static size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
+
+TupleStreamWrapper::TupleStreamWrapper()
+    : m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),
       m_openTransactionId(0), m_openTransactionUso(0),
       m_committedTransactionId(0), m_committedUso(0),
@@ -93,13 +93,7 @@ void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_
     //Don't send the end of stream notice.
     if (generation != m_generation && m_generation > 0) {
         //Notify that no more data is coming from this generation.
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                m_generation,
-                m_partitionId,
-                m_signature,
-                NULL,
-                false,
-                true);
+        ExecutorContext::endExportBuffer(m_generation, m_signature);
         /*
          * With the new generational code the USO is reset to 0 for each
          * generation. The sequence number stored on the table outside the wrapper
@@ -124,13 +118,14 @@ void TupleStreamWrapper::setSignatureAndGeneration(std::string signature, int64_
  * This is the only function that should modify m_openTransactionId,
  * m_openTransactionUso.
  */
-void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId, bool sync)
+void TupleStreamWrapper::commit(int64_t currentTxnId)
 {
     if (currentTxnId < m_openTransactionId)
     {
         throwFatalException("Active transactions moving backwards");
     }
 
+    int64_t lastCommittedTxnId = ExecutorContext::lastCommittedTxnId();
     // more data for an ongoing transaction with no new committed data
     if ((currentTxnId == m_openTransactionId) &&
         (lastCommittedTxnId == m_committedTransactionId))
@@ -138,15 +133,6 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
         //std::cout << "Current txnid(" << currentTxnId << ") == m_openTransactionId(" << m_openTransactionId <<
         //") && lastCommittedTxnId(" << lastCommittedTxnId << ") m_committedTransactionId(" <<
         //m_committedTransactionId << ")" << std::endl;
-        if (sync) {
-            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                    m_generation,
-                    m_partitionId,
-                    m_signature,
-                    NULL,
-                    true,
-                    false);
-        }
         return;
     }
 
@@ -185,13 +171,7 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
         {
             //The block is handed off to the topend which is responsible for releasing the
             //memory associated with the block data. The metadata is deleted here.
-            ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                    m_generation,
-                    m_partitionId,
-                    m_signature,
-                    block,
-                    false,
-                    false);
+            ExecutorContext::pushExportBuffer(m_generation, m_signature, block);
             delete block;
             m_pendingBlocks.pop_front();
         }
@@ -199,16 +179,6 @@ void TupleStreamWrapper::commit(int64_t lastCommittedTxnId, int64_t currentTxnId
         {
             break;
         }
-    }
-
-    if (sync) {
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                m_generation,
-                m_partitionId,
-                m_signature,
-                NULL,
-                true,
-                false);
     }
 }
 
@@ -276,8 +246,7 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
             {
                 //The block is handed off to the topend which is responsible for releasing the
                 //memory associated with the block data. The metadata is deleted here.
-                ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                        m_generation, m_partitionId, m_signature, m_currBlock, false, false);
+                ExecutorContext::pushExportBuffer(m_generation, m_signature, m_currBlock);
                 delete m_currBlock;
             } else {
                 m_pendingBlocks.push_back(m_currBlock);
@@ -306,9 +275,7 @@ void TupleStreamWrapper::extendBufferChain(size_t minLength)
  * pending list for commit to operate against.
  */
 void
-TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
-                                  int64_t lastCommittedTxnId,
-                                  int64_t currentTxnId)
+TupleStreamWrapper::periodicFlush(int64_t timeInMillis)
 {
     // negative timeInMillis instructs a mandatory flush
     if (timeInMillis < 0 || (timeInMillis - m_lastFlush > MAX_BUFFER_AGE)) {
@@ -328,14 +295,18 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
         // transaction IDs; we choose whichever of currentTxnId or
         // m_openTransactionId here will allow commit() to continue
         // operating correctly.
-        int64_t txnId = currentTxnId;
-        if (m_openTransactionId > currentTxnId)
+        int64_t txnId = ExecutorContext::currentTxnId();
+        if (m_openTransactionId > txnId)
         {
             txnId = m_openTransactionId;
         }
 
         extendBufferChain(0);
-        commit(lastCommittedTxnId, txnId, timeInMillis < 0 ? true : false);
+        commit(txnId);
+        if (timeInMillis < 0) {
+            ExecutorContext::syncExportBuffer(m_generation, m_signature);
+    }
+
     }
 }
 
@@ -346,15 +317,11 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis,
  * in the stream the caller can rollback to if this append
  * should be rolled back.
  */
-size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
-                                       int64_t txnId,
-                                       int64_t seqNo,
-                                       int64_t timestamp,
+size_t TupleStreamWrapper::appendTuple(int64_t seqNo,
                                        TableTuple &tuple,
                                        TupleStreamWrapper::Type type)
 {
-    size_t rowHeaderSz = 0;
-    size_t tupleMaxLength = 0;
+    int64_t txnId = ExecutorContext::currentTxnId();
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.
@@ -363,11 +330,13 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
         throwFatalException("Active transactions moving backwards");
     }
 
-    commit(lastCommittedTxnId, txnId);
+    commit(txnId);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.
-    tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
+    size_t rowHeaderSz = 0;
+    size_t tupleMaxLength = computeOffsets(tuple, &rowHeaderSz);
+
     if (!m_currBlock) {
         extendBufferChain(m_defaultCapacity);
     }
@@ -390,10 +359,11 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
 
     // write metadata columns
     io.writeLong(txnId);
+    int64_t timestamp = ExecutorContext::currentTxnTimestamp();
     io.writeLong(timestamp);
     io.writeLong(seqNo);
-    io.writeLong(m_partitionId);
-    io.writeLong(m_siteId);
+    io.writeLong(ExecutorContext::partitionId());
+    io.writeLong(ExecutorContext::siteId());
 
     // use 1 for INSERT EXPORT op, 0 for DELETE EXPORT op
     io.writeLong((type == INSERT) ? 1L : 0L);
@@ -416,9 +386,7 @@ size_t TupleStreamWrapper::appendTuple(int64_t lastCommittedTxnId,
     return startingUso;
 }
 
-size_t
-TupleStreamWrapper::computeOffsets(TableTuple &tuple,
-                                   size_t *rowHeaderSz)
+size_t computeOffsets(TableTuple &tuple, size_t *rowHeaderSz)
 {
     // round-up columncount to next multiple of 8 and divide by 8
     int columnCount = tuple.sizeInValues() + METADATA_COL_CNT;

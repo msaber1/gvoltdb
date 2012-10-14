@@ -43,9 +43,11 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <iostream>
 #include "indexes/tableindex.h"
+
+#include <iostream>
 #include "expressions/abstractexpression.h"
+#include "storage/TableCatalogDelegate.hpp"
 
 using namespace voltdb;
 

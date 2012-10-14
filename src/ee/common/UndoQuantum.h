@@ -36,32 +36,32 @@ public:
         : m_undoToken(undoToken), m_numInterests(0), m_interestsCapacity(0), m_interests(NULL), m_dataPool(dataPool) {}
     inline virtual ~UndoQuantum() {}
 
-    virtual inline void registerUndoAction(UndoAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+    virtual void registerUndoAction(UndoAction *undoAction) {
         assert(undoAction);
         m_undoActions.push_back(undoAction);
+    }
 
-        if (interest != NULL) {
-            if (m_interests == NULL) {
-                m_interests = reinterpret_cast<UndoQuantumReleaseInterest**>(m_dataPool->allocate(sizeof(void*) * 16));
-                m_interestsCapacity = 16;
-            }
-            bool isDup = false;
-            for (int ii = 0; ii < m_numInterests; ii++) {
-                if (m_interests[ii] == interest) {
-                    isDup = true;
-                }
-            }
-            if (!isDup) {
-                if (m_numInterests == m_interestsCapacity) {
-                    UndoQuantumReleaseInterest **newStorage =
-                            reinterpret_cast<UndoQuantumReleaseInterest**>(m_dataPool->allocate(sizeof(void*) * m_interestsCapacity * 2));
-                    ::memcpy(newStorage, m_interests, sizeof(void*) * m_interestsCapacity);
-                    m_interests = newStorage;
-                    m_interestsCapacity *= 2;
-                }
-                m_interests[m_numInterests++] = interest;
+    virtual void registerInterest(UndoQuantumReleaseInterest *interest) {
+        if (m_interests == NULL) {
+            m_interests = reinterpret_cast<UndoQuantumReleaseInterest**>(m_dataPool->allocate(sizeof(void*) * 16));
+            m_interestsCapacity = 16;
+            m_interests[0] = interest;
+            m_numInterests = 1;
+            return;
+        }
+        for (int ii = 0; ii < m_numInterests; ii++) {
+            if (m_interests[ii] == interest) {
+                return;
             }
         }
+        if (m_numInterests == m_interestsCapacity) {
+            UndoQuantumReleaseInterest **newStorage =
+                    reinterpret_cast<UndoQuantumReleaseInterest**>(m_dataPool->allocate(sizeof(void*) * m_interestsCapacity * 2));
+            ::memcpy(newStorage, m_interests, sizeof(void*) * m_interestsCapacity);
+            m_interests = newStorage;
+            m_interestsCapacity *= 2;
+        }
+        m_interests[m_numInterests++] = interest;
     }
 
     /*
@@ -106,12 +106,17 @@ public:
         return m_dataPool;
     }
 
-    virtual bool isDummy() {return false;}
-
     inline int64_t getAllocatedMemory() const
     {
         return m_dataPool->getAllocatedMemory();
     }
+
+    static void* operator new(std::size_t size, Pool &pool) throw()
+    {
+        return pool.allocate(size);
+    }
+    static void operator delete(void *pMemory, Pool &pool) throw() { /* does nothing on failed allocate */ }
+    static void operator delete(void *pMemory) throw() { /* does nothing */ }
 
 private:
     const int64_t m_undoToken;
@@ -120,8 +125,13 @@ private:
     uint32_t m_interestsCapacity;
     UndoQuantumReleaseInterest **m_interests;
 protected:
-    Pool *m_dataPool;
+    Pool *const m_dataPool;
 };
+
+inline static void* UndoAction::operator new(std::size_t size, Pool &pool) throw()
+{
+    return pool.allocate(size);
+}
 
 }
 

@@ -56,7 +56,7 @@ class MockTopend : public Topend {
     MockTopend() {
     }
 
-    void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, voltdb::StreamBlock* block, bool sync, bool endOfStream) {
+    void pushExportBuffer(int64_t generation, int32_t partitionId, const std::string &signature, voltdb::StreamBlock* block, bool sync, bool endOfStream) {
         if (sync) {
             return;
         }
@@ -67,7 +67,7 @@ class MockTopend : public Topend {
         receivedExportBuffer = true;
     }
 
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) {
+    int64_t getQueuedExportBytes(int32_t partitionId, const std::string &signature) {
         return 0;
     }
 
@@ -91,31 +91,17 @@ class MockTopend : public Topend {
 
 class StreamedTableTest : public Test {
 public:
-    StreamedTableTest() {
+    StreamedTableTest() :
+        m_topend(),
+        m_pool(),
+        m_quantum(new (m_pool) UndoQuantum(0, &m_pool)),
+        m_context(0, 0, m_quantum, &m_topend, &m_pool, true, "", 0),
+        // a simple helper around the StreamedTable constructor that sets the
+        // wrapper buffer size to the specified value
+        m_table(StreamedTable::createForTest(1024)),
+        m_schema(initSchema())
+    {
         srand(0);
-        m_topend = new MockTopend();
-        m_pool = new Pool();
-        m_quantum =
-          new (m_pool->allocate(sizeof(UndoQuantum)))
-          UndoQuantum(0, m_pool);
-
-        m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, true, "", 0);
-
-        // set up the schema used to fill the new buffer
-        std::vector<ValueType> columnTypes;
-        std::vector<int32_t> columnLengths;
-        std::vector<bool> columnAllowNull;
-        for (int i = 0; i < COLUMN_COUNT; i++) {
-            columnTypes.push_back(VALUE_TYPE_INTEGER);
-            columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-            columnAllowNull.push_back(false);
-        }
-        m_schema =
-          TupleSchema::createTupleSchema(columnTypes,
-                                         columnLengths,
-                                         columnAllowNull,
-                                         true);
-
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero
         ::memset(m_tupleMemory, 0, 8 * (COLUMN_COUNT + 1));
@@ -125,11 +111,23 @@ public:
         *(reinterpret_cast<bool*>(m_tupleMemory)) = true;
         m_tuple = new TableTuple(m_schema);
         m_tuple->move(m_tupleMemory);
+    }
 
-        // a simple helper around the constructor that sets the
-        // wrapper buffer size to the specified value
-        m_table = StreamedTable::createForTest(1024, m_context);
-
+    static TupleSchema* initSchema()
+    {
+        // set up the schema used to fill the new buffer
+        std::vector<ValueType> columnTypes;
+        std::vector<int32_t> columnLengths;
+        std::vector<bool> columnAllowNull;
+        for (int i = 0; i < COLUMN_COUNT; i++) {
+            columnTypes.push_back(VALUE_TYPE_INTEGER);
+            columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+            columnAllowNull.push_back(false);
+        }
+        return TupleSchema::createTupleSchema(columnTypes,
+                                              columnLengths,
+                                              columnAllowNull,
+                                              true);
     }
 
     virtual ~StreamedTableTest() {
@@ -137,19 +135,16 @@ public:
         if (m_schema)
             TupleSchema::freeTupleSchema(m_schema);
         delete m_table;
-        delete m_context;
         m_quantum->release();
-        delete m_pool;
-        delete m_topend;
     }
 
 protected:
-    MockTopend *m_topend;
-    Pool *m_pool;
+    MockTopend m_topend;
+    Pool m_pool;
     UndoQuantum *m_quantum;
-    ExecutorContext *m_context;
+    ExecutorContext m_context;
 
-    StreamedTable *m_table;
+    Table *m_table;
     TupleSchema* m_schema;
     char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
     TableTuple* m_tuple;
@@ -168,11 +163,10 @@ TEST_F(StreamedTableTest, BaseCase) {
 
         // pretend to be a plan fragment execution
         m_quantum->release();
-        m_quantum =
-          new (m_pool->allocate(sizeof(UndoQuantum)))
-          UndoQuantum(i + tokenOffset, m_pool);
+        m_quantum = new (m_pool) UndoQuantum(i + tokenOffset, &m_pool);
         // quant, currTxnId, committedTxnId
-        m_context->setupForPlanFragments(m_quantum, i, i - 1);
+        m_context.setupForPlanFragments(m_quantum);
+        m_context.setupTxnIdsForPlanFragments(i, i - 1);
 
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {
@@ -188,14 +182,14 @@ TEST_F(StreamedTableTest, BaseCase) {
     // poll from the table and make sure we get "stuff", releasing as
     // we go.  This just makes sure we don't fail catastrophically and
     // that things are basically as we expect.
-    vector<shared_ptr<StreamBlock> >::iterator begin = m_topend->blocks.begin();
+    vector<shared_ptr<StreamBlock> >::iterator begin = m_topend.blocks.begin();
     int64_t uso = (*begin)->uso();
     EXPECT_EQ(uso, 0);
     size_t offset = (*begin)->offset();
     EXPECT_TRUE(offset != 0);
-    while (begin != m_topend->blocks.end()) {
+    while (begin != m_topend.blocks.end()) {
         begin++;
-        if (begin == m_topend->blocks.end()) {
+        if (begin == m_topend.blocks.end()) {
             break;
         }
 

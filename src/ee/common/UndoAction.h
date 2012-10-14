@@ -19,7 +19,11 @@
 #ifndef UNDOACTION_H_
 #define UNDOACTION_H_
 
+#include <cstddef>
+
 namespace voltdb {
+
+class Pool;
 
 /*
  * Abstract base class for all classes generated to undo changes to the system. Can be registered with an
@@ -29,6 +33,11 @@ class UndoAction {
 public:
     inline UndoAction() {}
     virtual ~UndoAction() {}
+
+    // placement new/delete
+    inline void* operator new(std::size_t size, Pool &pool) throw(); // implemeted in UndoQuantum.h
+    static void operator delete(void *pMemory, Pool &pool) throw() { /* does nothing on failed allocate */ }
+    static void operator delete(void *pMemory) throw() { /* does nothing */ }
 
     /*
      * Undo whatever this undo action was created to undo

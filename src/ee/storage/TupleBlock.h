@@ -88,10 +88,6 @@ class TupleBlock {
 public:
     TupleBlock(Table *table, TBBucketPtr bucket);
 
-    double loadFactor() {
-        return m_activeTuples / m_tuplesPerBlock;
-    }
-
     inline bool hasFreeTuples() {
         return m_activeTuples < m_tuplesPerBlock;
     }

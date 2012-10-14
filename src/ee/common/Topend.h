@@ -38,11 +38,11 @@ class Topend {
 
     virtual void crashVoltDB(voltdb::FatalException e) = 0;
 
-    virtual int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) = 0;
+    virtual int64_t getQueuedExportBytes(int32_t partitionId, const std::string &signature) = 0;
     virtual void pushExportBuffer(
             int64_t exportGeneration,
             int32_t partitionId,
-            std::string signature,
+            const std::string &signature,
             StreamBlock *block,
             bool sync,
             bool endOfStream) = 0;

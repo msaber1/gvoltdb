@@ -280,7 +280,7 @@ struct AggregateList
     void operator delete(void*, Pool& memoryPool, size_t nAggs) { /* NOOP -- on alloc error unroll */ }
     void operator delete(void*) { /* NOOP -- deallocate wholesale with pool */ }
 
-    AggregateList(TableTuple& nextTuple) : m_groupTuple(nextTuple) {}
+    AggregateList(TableTuple& nxtTuple) : m_groupTuple(nxtTuple) {}
 
     // A tuple from the group of tuples being aggregated. Source of
     // pass through columns.
@@ -298,17 +298,27 @@ typedef boost::unordered_map<TableTuple,
                              TableTupleHasher,
                              TableTupleEqualityChecker> HashAggregateMapType;
 
-/* Working storage whose type and API are dependent on the aaggregate PlanNodeType */
+/**
+ * Working storage whose type and API are dependent on the aggregate's PlanNodeType.
+ * Wrapping the completely different member variables of the AggregateExecutor instantiations into
+ * corresponding instantiations of this empty state class avoids the duplicated boilerplate code
+ * that would result from explicitly instantiating the entire AggregateExecutor class.
+ * This way, only the minimal set of member functions that differ need explicit instantiations
+ * and each set of function instantiations can use whatever data members it needs by defining
+ * (or inheriting) them in their own AggregatorState */
 template<PlanNodeType aggregateType> class AggregatorState {};
 
+/** Hash aggregates need to maintain a hash of group key tuples to Aggs */
 template<> struct AggregatorState<PLAN_NODE_TYPE_HASHAGGREGATE> : public HashAggregateMapType {};
 
+/** Serial aggregates need to maintain only one row of Aggs and the "previous" input tuple that defines
+ * their associated group keys -- so group transitions can be detected.
+ * In the case of table aggregates that have no grouping keys, the previous tuple has no effect and is tracked
+ * for nothing -- a separate instantiation for that case could be made much simpler/faster. */
 template<> struct AggregatorState<PLAN_NODE_TYPE_AGGREGATE>
 {
-    void operator=(Agg** aggs) { m_aggs = aggs; }
-    operator Agg**() { return m_aggs; }
-    //void operator Agg**() { return m_aggs; }
     Agg** m_aggs;
+    TableTuple m_prevTuple;
 };
 
 /**
@@ -390,12 +400,12 @@ protected:
     /// Helper method responsible for inserting the results of the
     /// aggregation into a new tuple in the output table as well as passing
     /// through any additional columns from the input table.
-    inline bool insertOutputTuple(Agg** aggs, TableTuple prev);
+    inline bool insertOutputTuple(Agg** aggs, TableTuple groupedTuple);
 
-    void advanceAggs(Agg** aggs, const TableTuple& nextTuple)
+    void advanceAggs(Agg** aggs, const TableTuple& nxtTuple)
     {
         for (int i = 0; i < m_aggTypes.size(); i++) {
-            aggs[i]->advance(m_inputExpressions[i]->eval(&nextTuple));
+            aggs[i]->advance(m_inputExpressions[i]->eval(&nxtTuple));
         }
     }
 
@@ -468,7 +478,7 @@ protected:
  * through any additional columns from the input table.
  */
 inline bool
-AggregateExecutorBase::insertOutputTuple(Agg** aggs, TableTuple prev)
+AggregateExecutorBase::insertOutputTuple(Agg** aggs, TableTuple groupedTuple)
 {
     TableTuple& tmptup = m_outputTable->tempTuple();
 
@@ -510,7 +520,7 @@ AggregateExecutorBase::insertOutputTuple(Agg** aggs, TableTuple prev)
      */
     for (int i = 0; i < m_passThroughColumns.size(); i++) {
         int output_col_index = m_passThroughColumns[i];
-        tmptup.setNValue(output_col_index, m_outputColumnExpressions[output_col_index]->eval(&prev));
+        tmptup.setNValue(output_col_index, m_outputColumnExpressions[output_col_index]->eval(&groupedTuple));
     }
 
     if ( ! dynamic_cast<TempTable*>(m_outputTable)->insertTempTuple(tmptup)) {
@@ -545,8 +555,8 @@ protected:
 
 private:
     void prepareFirstTuple();
-    bool nextTuple(TableTuple nextTuple, TableTuple prevTuple);
-    bool finalize(TableTuple prevTuple);
+    bool nextTuple(TableTuple nxtTuple);
+    bool finalize();
     void purgeAggs();
 
     AggregatorState<aggregateType> m_data;
@@ -571,18 +581,18 @@ private:
         }
     }
 
-    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>::nextTuple(TableTuple nextTuple, TableTuple)
+    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>::nextTuple(TableTuple nxtTuple)
     {
         AggregateList *aggregateList;
         // configure a tuple and search for the required group.
         for (int ii = 0; ii < m_groupByExpressions.size(); ii++) {
-            m_groupByKeyTuple.setNValue(ii, m_groupByExpressions[ii]->eval(&nextTuple));
+            m_groupByKeyTuple.setNValue(ii, m_groupByExpressions[ii]->eval(&nxtTuple));
         }
         HashAggregateMapType::const_iterator keyIter = m_data.find(m_groupByKeyTuple);
 
         // Group not found. Make a new entry in the hash for this new group.
         if (keyIter == m_data.end()) {
-            aggregateList = new (m_memoryPool, m_aggTypes.size()) AggregateList(nextTuple);
+            aggregateList = new (m_memoryPool, m_aggTypes.size()) AggregateList(nxtTuple);
             m_data.insert(HashAggregateMapType::value_type(m_groupByKeyTuple, aggregateList));
             // The map is referencing the current key tuple for use by the new group,
             // so allocate a new tuple to hold the next candidate key
@@ -593,11 +603,11 @@ private:
         }
 
         // update the aggregation calculation.
-        advanceAggs(aggregateList->m_aggregates, nextTuple);
+        advanceAggs(aggregateList->m_aggregates, nxtTuple);
         return true;
     }
 
-    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>::finalize(TableTuple prevTuple)
+    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_HASHAGGREGATE>::finalize()
     {
         for (HashAggregateMapType::const_iterator iter = m_data.begin(); iter != m_data.end(); iter++) {
             if (!insertOutputTuple(iter->second->m_aggregates, iter->second->m_groupTuple)) {
@@ -614,19 +624,26 @@ private:
  */
     template<> inline void AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>::prepareFirstTuple()
     {
-        m_data = static_cast<Agg**>(m_memoryPool.allocateZeroes(sizeof(void*) * m_aggTypes.size()));
+        m_data.m_aggs = static_cast<Agg**>(m_memoryPool.allocateZeroes(sizeof(void*) * m_aggTypes.size()));
+        m_data.m_prevTuple = TableTuple(m_inputTable->schema());
     }
 
-    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>::nextTuple(TableTuple nextTuple, TableTuple prevTuple)
+    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>::nextTuple(TableTuple nxtTuple)
     {
         bool startNewAgg = false;
-        if (prevTuple.address() == NULL) {
+        if (m_data.m_prevTuple.isNullTuple()) {
             startNewAgg = true;
         } else {
             for (int i = 0; i < m_groupByExpressions.size(); i++) {
+                //TODO: In theory, at the start of each new agg, m_groupByExpressions[i]->eval(&nxtTuple)
+                // could be cached in a key tuple and used for future comparisons instead of repeatedly
+                // re-evaluating m_groupByExpressions[i]->eval(&m_data.m_prevTuple).
+                // This cached key tuple seems to be the only aspect of m_prevTuple that needs to be retained.
+                // There's a good chance that Micheal Alexeev has already solved this problem for the pullexec
+                // implementation in which shorter temp tuple lifetimes may have made keeping m_prevTuple a non-option.
                 startNewAgg =
-                    m_groupByExpressions[i]->eval(&nextTuple).
-                    op_notEquals(m_groupByExpressions[i]->eval(&prevTuple)).isTrue();
+                    m_groupByExpressions[i]->eval(&nxtTuple).
+                    op_notEquals(m_groupByExpressions[i]->eval(&m_data.m_prevTuple)).isTrue();
                 if (startNewAgg) {
                     break;
                 }
@@ -634,18 +651,19 @@ private:
         }
         if (startNewAgg) {
             VOLT_TRACE("new group!");
-            if (!prevTuple.isNullTuple() && !insertOutputTuple(m_data, prevTuple)) {
+            if (!m_data.m_prevTuple.isNullTuple() && !insertOutputTuple(m_data.m_aggs, m_data.m_prevTuple)) {
                 return false;
             }
-            tearDownAggs(m_data);
-            initAggInstances(m_data);
+            tearDownAggs(m_data.m_aggs);
+            initAggInstances(m_data.m_aggs);
         }
-        advanceAggs(m_data, nextTuple);
+        advanceAggs(m_data.m_aggs, nxtTuple);
+        m_data.m_prevTuple.move(nxtTuple.address());
         return true;
     }
 
-    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>::finalize(TableTuple prevTuple) {
-        if (!prevTuple.isNullTuple() && !insertOutputTuple(m_data, prevTuple)) {
+    template<> inline bool AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>::finalize() {
+        if (!m_data.m_prevTuple.isNullTuple() && !insertOutputTuple(m_data.m_aggs, m_data.m_prevTuple)) {
             return false;
         }
 
@@ -655,8 +673,8 @@ private:
         //   SELECT SUM(A) FROM BBB GROUP BY C,   when BBB has no tuple
         if (m_groupByExpressions.size() == 0 && m_outputTable->activeTupleCount() == 0) {
             VOLT_TRACE("no record. outputting a NULL row..");
-            initAggInstances(m_data);
-            if (!insertOutputTuple(m_data, prevTuple)) {
+            initAggInstances(m_data.m_aggs);
+            if (!insertOutputTuple(m_data.m_aggs, m_data.m_prevTuple)) {
                 return false;
             }
         }
@@ -665,7 +683,7 @@ private:
 
     template<> inline void AggregateExecutor<PLAN_NODE_TYPE_AGGREGATE>::purgeAggs()
     {
-        tearDownAggs(m_data);
+        tearDownAggs(m_data.m_aggs);
     }
 
 
@@ -687,16 +705,16 @@ bool AggregateExecutor<aggregateType>::p_execute()
     VOLT_TRACE("input table\n%s", m_inputTable->debug().c_str());
 
     prepareFirstTuple();
-    TableTuple prev(m_inputTable->schema());
     TableIterator it = m_inputTable->iterator();
     VOLT_TRACE("looping..");
-    for (TableTuple cur(m_inputTable->schema()); it.next(cur); prev.move(cur.address())) {
-        if ( ! nextTuple(cur, prev)) {
+    TableTuple cur(m_inputTable->schema());
+    while (it.next(cur)) {
+        if ( ! nextTuple(cur)) {
             return false;
         }
     }
     VOLT_TRACE("finalizing..");
-    if ( ! finalize(prev)) {
+    if ( ! finalize()) {
         return false;
     }
     VOLT_TRACE("finished");

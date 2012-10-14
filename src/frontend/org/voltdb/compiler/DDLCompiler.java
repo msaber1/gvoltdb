@@ -980,7 +980,9 @@ public class DDLCompiler {
                 // do non-system indexes first so they get priority when the compiler
                 // starts throwing out duplicate indexes
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
+                    if (indexNode.name.equals("index") == false) {
+                        continue;
+                    }
                     String indexName = indexNode.attributes.get("name");
                     if (indexName.startsWith("SYS_IDX_SYS_") == false) {
                         addIndexToCatalog(table, indexNode, indexReplacementMap);
@@ -989,9 +991,11 @@ public class DDLCompiler {
 
                 // now do system indexes
                 for (VoltXMLElement indexNode : subNode.children) {
-                    if (indexNode.name.equals("index") == false) continue;
+                    if (indexNode.name.equals("index") == false) {
+                        continue;
+                    }
                     String indexName = indexNode.attributes.get("name");
-                    if (indexName.startsWith("SYS_IDX_SYS_") == true) {
+                    if (indexName.startsWith("SYS_IDX_SYS_")) {
                         addIndexToCatalog(table, indexNode, indexReplacementMap);
                     }
                 }

@@ -45,11 +45,12 @@ using namespace std;
 
 class TableAndIndexTest : public Test {
     public:
-        TableAndIndexTest() {
-            dummyUndo = new DummyUndoQuantum();
-            engine = new ExecutorContext(0, 0, dummyUndo, NULL, NULL, false, "", 0);
-            mem = 0;
-
+        TableAndIndexTest() :
+            mem(0),
+            limits(),
+            dummyUndo(),
+            engine(0, 0, &dummyUndo, NULL, NULL, false, "", 0)
+         {
             vector<voltdb::ValueType> districtColumnTypes;
             vector<int32_t> districtColumnLengths;
             vector<bool> districtColumnAllowNull(11, true);
@@ -194,8 +195,7 @@ class TableAndIndexTest : public Test {
                                                  &limits));
 
             warehouseTable = voltdb::TableFactory::getPersistentTable(0, "WAREHOUSE",
-                                                                      warehouseTupleSchema, warehouseColumnNames,
-                                                                      0, false, false);
+                                                                      warehouseTupleSchema, warehouseColumnNames, 0);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(warehouseIndex1Scheme);
             assert(pkeyIndex);
@@ -214,8 +214,7 @@ class TableAndIndexTest : public Test {
                                                  &limits));
 
             customerTable = voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
-                                                                     customerTupleSchema, customerColumnNames,
-                                                                     0, false, false);
+                                                                     customerTupleSchema, customerColumnNames, 0);
 
             pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(customerIndex1Scheme);
             assert(pkeyIndex);
@@ -235,8 +234,6 @@ class TableAndIndexTest : public Test {
         }
 
         ~TableAndIndexTest() {
-            delete engine;
-            delete dummyUndo;
             delete districtTable;
             delete districtTempTable;
             delete warehouseTable;
@@ -248,8 +245,8 @@ class TableAndIndexTest : public Test {
     protected:
         int mem;
         TempTableLimits limits;
-        UndoQuantum *dummyUndo;
-        ExecutorContext *engine;
+        DummyUndoQuantum dummyUndo;
+        ExecutorContext engine;
 
         TupleSchema      *districtTupleSchema;
         vector<TableIndexScheme> districtIndexes;

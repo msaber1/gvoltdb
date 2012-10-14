@@ -27,9 +27,9 @@
 #include "common/Topend.h"
 #include <deque>
 #include <cassert>
+
 namespace voltdb {
 
-class Topend;
 //If you change this constant here change it in Java in the StreamBlockQueue where
 //it is used to calculate the number of bytes queued
 const int EL_BUFFER_SIZE = /* 1024; */ 2 * 1024 * 1024;
@@ -38,7 +38,7 @@ class TupleStreamWrapper {
 public:
     enum Type { INSERT, DELETE };
 
-    TupleStreamWrapper(CatalogId partitionId, int64_t siteId);
+    TupleStreamWrapper();
 
     ~TupleStreamWrapper() {
         cleanupManagedBuffers();
@@ -68,8 +68,7 @@ public:
     void setBytesUsed(size_t count) {
         assert(m_uso == 0);
         StreamBlock *sb = new StreamBlock(new char[1], 0, count);
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
-                                m_generation, m_partitionId, m_signature, sb, false, false);
+        ExecutorContext::pushExportBuffer(m_generation, m_signature, sb);
         delete [] sb->rawPtr();
         delete sb;
         m_uso = count;
@@ -77,35 +76,26 @@ public:
 
     int64_t allocatedByteCount() const {
         return (m_pendingBlocks.size() * m_defaultCapacity) +
-                ExecutorContext::getExecutorContext()->getTopend()->getQueuedExportBytes( m_partitionId, m_signature);
+                ExecutorContext::getQueuedExportBytes(m_signature);
     }
 
     /** truncate stream back to mark */
     void rollbackTo(size_t mark);
 
     /** age out committed data */
-    void periodicFlush(int64_t timeInMillis,
-                       int64_t lastComittedTxnId,
-                       int64_t currentTxnId);
+    void periodicFlush(int64_t timeInMillis);
 
     /** write a tuple to the stream */
-    size_t appendTuple(int64_t lastCommittedTxnId,
-                       int64_t txnId,
-                       int64_t seqNo,
-                       int64_t timestamp,
+    size_t appendTuple(int64_t seqNo,
                        TableTuple &tuple,
                        TupleStreamWrapper::Type type);
 
-    size_t computeOffsets(TableTuple &tuple,size_t *rowHeaderSz);
+private:
     void extendBufferChain(size_t minLength);
     void discardBlock(StreamBlock *sb);
 
     /** Send committed data to the top end */
-    void commit(int64_t lastCommittedTxnId, int64_t txnId, bool sync = false);
-
-    // cached catalog values
-    const CatalogId m_partitionId;
-    const int64_t m_siteId;
+    void commit(int64_t txnId);
 
     /** timestamp of most recent flush() */
     int64_t m_lastFlush;

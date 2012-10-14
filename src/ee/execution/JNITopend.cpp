@@ -254,7 +254,7 @@ JNITopend::~JNITopend() {
     m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
 }
 
-int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
+int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, const string &signature) {
     jstring signatureString = m_jniEnv->NewStringUTF(signature.c_str());
     int64_t retval = m_jniEnv->CallStaticLongMethod(
             m_exportManagerClass,
@@ -268,7 +268,7 @@ int64_t JNITopend::getQueuedExportBytes(int32_t partitionId, string signature) {
 void JNITopend::pushExportBuffer(
         int64_t exportGeneration,
         int32_t partitionId,
-        string signature,
+        const std::string &signature,
         StreamBlock *block,
         bool sync,
         bool endOfStream) {

@@ -62,9 +62,7 @@ namespace voltdb
                 m_undoDataPools.pop_back();
             }
             assert(pool);
-            UndoQuantum *undoQuantum =
-                new (pool->allocate(sizeof(UndoQuantum)))
-                UndoQuantum(nextUndoToken, pool);
+            UndoQuantum *undoQuantum = new (*pool) UndoQuantum(nextUndoToken, pool);
             m_undoQuantums.push_back(undoQuantum);
             return undoQuantum;
         }

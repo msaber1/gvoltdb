@@ -133,14 +133,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         }
     }
 
-    // Return a table iterator by reference
-    TableIterator& iterator() {
+    // Return a table iterator by const reference
+    const TableIterator& iterator() {
         m_iter.reset(m_data.begin());
         return m_iter;
-    }
-
-    TableIterator* makeIterator() {
-        return new TableIterator(this, m_data.begin());
     }
 
     // ------------------------------------------------------------------

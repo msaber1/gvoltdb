@@ -198,7 +198,7 @@ public:
         }
         }
         m_engine->setUndoToken(++m_undoToken);
-        m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0);
+        ExecutorContext::setupTxnIdsForPlanFragments(0, 0);
         m_tuplesDeletedInLastUndo = 0;
         m_tuplesInsertedInLastUndo = 0;
     }
@@ -309,7 +309,7 @@ TEST_F(CompactionTest, BasicCompaction) {
     m_table->doForcedCompaction();
 
     stx::btree_set<int32_t> pkeysFoundAfterDelete;
-    TableIterator& iter = m_table->iterator();
+    TableIterator iter = m_table->iterator();
     TableTuple tuple(m_table->schema());
     while (iter.next(tuple)) {
         int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
@@ -446,7 +446,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
         m_table->doForcedCompaction();
 
         stx::btree_set<int32_t> pkeysFoundAfterDelete;
-        TableIterator& iter = m_table->iterator();
+        TableIterator iter = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iter.next(tuple)) {
             int32_t pkey = ValuePeeker::peekAsInteger(tuple.getNValue(0));

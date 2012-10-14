@@ -264,8 +264,7 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
     PersistentTableUndoInsertAction *ptuia =
-      new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
-      PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
+      new (*pool) PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
     undoQuantum->registerUndoAction(ptuia);
 
     // handle any materialized views
@@ -338,8 +337,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
     PersistentTableUndoUpdateAction *ptuua =
-        new (pool->allocate(sizeof(PersistentTableUndoUpdateAction)))
-             PersistentTableUndoUpdateAction(targetTupleToUpdate, this, pool);
+        new (*pool) PersistentTableUndoUpdateAction(targetTupleToUpdate, this, pool);
 
     if (m_COWContext.get() != NULL) {
         m_COWContext->markTupleDirty(targetTupleToUpdate, false);
@@ -389,11 +387,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     ptuua->setNewTuple(targetTupleToUpdate, pool);
 
-    if (!undoQuantum->isDummy()) {
-        //DummyUndoQuantum calls destructor upon register.
-        undoQuantum->registerUndoAction(ptuua);
-    }
-
     /**
      * Insert the updated tuple back into the indexes.
      */
@@ -412,11 +405,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         m_views[i]->processTupleInsert(targetTupleToUpdate);
     }
 
-    if (undoQuantum->isDummy()) {
-        //DummyUndoQuantum calls destructor upon register so it can't be called
-        //earlier
-        undoQuantum->registerUndoAction(ptuua);
-    }
+    //DummyUndoQuantum calls destructor upon register so it can't be called
+    //earlier
+    undoQuantum->registerUndoAction(ptuua);
 
     return true;
 }
@@ -492,14 +483,15 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     Pool *pool = undoQuantum->getDataPool();
     assert(pool);
     PersistentTableUndoDeleteAction *ptuda =
-            new (pool->allocate(sizeof(PersistentTableUndoDeleteAction))) PersistentTableUndoDeleteAction( target.address(), this);
+        new (*pool) PersistentTableUndoDeleteAction(target.address(), this);
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleDelete(target);
     }
 
-    undoQuantum->registerUndoAction(ptuda, this);
+    undoQuantum->registerUndoAction(ptuda);
+    undoQuantum->registerInterest(this);
     return true;
 }
 

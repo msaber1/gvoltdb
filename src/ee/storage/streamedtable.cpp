@@ -19,24 +19,22 @@
 #include "StreamedTableUndoAction.hpp"
 #include "TupleStreamWrapper.h"
 #include "common/executorcontext.hpp"
+#include "common/UndoQuantum.h"
 #include "tableiterator.h"
 
 using namespace voltdb;
 
-StreamedTable::StreamedTable(bool exportEnabled)
-    : Table(1), stats_(this), m_executorContext(ExecutorContext::getExecutorContext()), m_wrapper(NULL),
-      m_sequenceNo(0)
+StreamedTable::StreamedTable()
+    : Table(1), stats_(this), m_wrapper(NULL), m_sequenceNo(0)
 {
-    // In StreamedTable, a non-null m_wrapper implies export enabled.
-    if (exportEnabled) {
-        m_wrapper = new TupleStreamWrapper(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId);
+    if (ExecutorContext::exportFeatureIsEnabled()) {
+        m_wrapper = new TupleStreamWrapper();
     }
 }
 
 StreamedTable *
-StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
-    StreamedTable * st = new StreamedTable(true);
+StreamedTable::createForTest(size_t wrapperBufSize) {
+    StreamedTable * st = new StreamedTable();
     st->m_wrapper->setDefaultCapacity(wrapperBufSize);
     return st;
 }
@@ -47,12 +45,7 @@ StreamedTable::~StreamedTable()
     delete m_wrapper;
 }
 
-TableIterator& StreamedTable::iterator() {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not iterate a streamed table.");
-}
-
-TableIterator* StreamedTable::makeIterator() {
+const TableIterator& StreamedTable::iterator() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                   "May not iterate a streamed table.");
 }
@@ -77,23 +70,8 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
 
 bool StreamedTable::insertTuple(TableTuple &source)
 {
-    size_t mark = 0;
     if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
-                                      m_executorContext->currentTxnId(),
-                                      m_sequenceNo++,
-                                      m_executorContext->currentTxnTimestamp(),
-                                      source,
-                                      TupleStreamWrapper::INSERT);
-        m_tupleCount++;
-        m_usedTupleCount++;
-
-        UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
-        Pool *pool = uq->getDataPool();
-        StreamedTableUndoAction *ua =
-          new (pool->allocate(sizeof(StreamedTableUndoAction)))
-          StreamedTableUndoAction(this, mark);
-        uq->registerUndoAction(ua);
+        appendTuple(source, false);
     }
     return true;
 }
@@ -107,25 +85,24 @@ bool StreamedTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpda
 
 bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
 {
-    size_t mark = 0;
     if (m_wrapper) {
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedTxnId,
-                                      m_executorContext->currentTxnId(),
-                                      m_sequenceNo++,
-                                      m_executorContext->currentTxnTimestamp(),
-                                      tuple,
-                                      TupleStreamWrapper::DELETE);
-        m_tupleCount++;
-        m_usedTupleCount++;
-
-        UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
-        Pool *pool = uq->getDataPool();
-        StreamedTableUndoAction *ua =
-          new (pool->allocate(sizeof(StreamedTableUndoAction)))
-          StreamedTableUndoAction(this, mark);
-        uq->registerUndoAction(ua);
+        appendTuple(tuple, true);
     }
     return true;
+}
+
+void StreamedTable::appendTuple(TableTuple &tuple, bool forDelete)
+{
+    TupleStreamWrapper::Type entryType = forDelete ?  TupleStreamWrapper::DELETE : TupleStreamWrapper::INSERT;
+    size_t mark = m_wrapper->appendTuple(m_sequenceNo++, tuple, entryType);
+    m_tupleCount++;
+    m_usedTupleCount++;
+
+    UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+    Pool *pool = uq->getDataPool();
+    StreamedTableUndoAction *ua =
+       new (*pool) StreamedTableUndoAction(this, mark);
+    uq->registerUndoAction(ua);
 }
 
 void StreamedTable::loadTuplesFrom(SerializeInput&, Pool*)
@@ -137,9 +114,7 @@ void StreamedTable::loadTuplesFrom(SerializeInput&, Pool*)
 void StreamedTable::flushOldTuples(int64_t timeInMillis)
 {
     if (m_wrapper) {
-        m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastCommittedTxnId,
-                                 m_executorContext->currentTxnId());
+        m_wrapper->periodicFlush(timeInMillis);
     }
 }
 

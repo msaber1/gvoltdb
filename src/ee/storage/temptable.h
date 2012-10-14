@@ -120,12 +120,6 @@ class TempTable : public Table {
     void insertTempTupleWithDeepCopy(TableTuple &source, Pool *pool);
 
     // ------------------------------------------------------------------
-    // INDEXES
-    // ------------------------------------------------------------------
-    int getNumOfIndexes() const             { return (0); }
-    int getNumOfUniqueIndexes() const       { return (0); }
-
-    // ------------------------------------------------------------------
     // UTILITIY
     // ------------------------------------------------------------------
     std::string tableType() const;

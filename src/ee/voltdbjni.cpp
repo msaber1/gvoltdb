@@ -232,7 +232,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDestr
     if (engine == NULL) {
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
+    JNITopend* topend = static_cast<JNITopend*>(engine->getTopend());
     delete engine;
+    delete topend;
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
 }
 
@@ -431,36 +433,6 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
 ////////////////////////////////////////////////////////////////////////////
 // PlanNode Execution
 ////////////////////////////////////////////////////////////////////////////
-/**
- * Utility used for deserializing ParameterSet passed from Java.
- */
-void deserializeParameterSetCommon(int cnt, ReferenceSerializeInput &serialize_in,
-                                   NValueArray &params, Pool *stringPool)
-{
-    for (int i = 0; i < cnt; ++i) {
-        params[i] = NValue::deserializeFromAllocateForStorage(serialize_in, stringPool);
-    }
-}
-
-/**
- * Utility used for deserializing ParameterSet passed from Java.
- */
-int deserializeParameterSet(const char* serialized_parameterset, jint serialized_length,
-    NValueArray &params, Pool *stringPool) {
-    // deserialize parameters as ValueArray.
-    // We don't use SerializeIO here because it makes a copy.
-    ReferenceSerializeInput serialize_in(serialized_parameterset, serialized_length);
-
-    // see org.voltdb.ParameterSet.
-    // TODO : make it a class. later, later, later...
-    int cnt = serialize_in.readShort();
-    if (cnt < 0) {
-        throwFatalException( "parameter count is negative: %d", cnt);
-    }
-    assert (cnt < MAX_PARAM_COUNT);
-    deserializeParameterSetCommon(cnt, serialize_in, params, stringPool);
-    return cnt;
-}
 
 /**
  * Sets (or re-sets) the buffer shared between java and the EE. This is for reducing
@@ -534,12 +506,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         engine->setUndoToken(undoToken);
         engine->resetReusedResultOutputBuffer();
-        NValueArray &params = engine->getParameterContainer();
-        Pool *stringPool = engine->getStringPool();
-        const int paramcnt = deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-        engine->setUsedParamcnt(paramcnt);
+        engine->deserializeParameterSet();
         const int retval = engine->executeQuery(plan_fragment_id, outputDependencyId, inputDependencyId, txnId, lastCommittedTxnId, true, true);
-        stringPool->purge();
         return retval;
     } catch (FatalException e) {
         topend->crashVoltDB(e);
@@ -636,7 +604,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         engine->resetReusedResultOutputBuffer();
         engine->setUndoToken(undoToken);
         static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-        Pool *stringPool = engine->getStringPool();
+        engine->deserializeParameterSet();
 
         // fragment info
         int batch_size = num_fragments;
@@ -644,23 +612,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         jlong* fragment_ids_buffer = engine->getBatchFragmentIdsContainer();
         env->GetLongArrayRegion(plan_fragment_ids, 0, batch_size, fragment_ids_buffer);
 
-        // all fragments' parameters are in this buffer
-        ReferenceSerializeInput serialize_in(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
-        NValueArray &params = engine->getParameterContainer();
-
         // count failures
         int failures = 0;
 
         for (int i = 0; i < batch_size; ++i) {
-            int cnt = serialize_in.readShort();
-            if (cnt < 0) {
-                throwFatalException("parameter count is negative: %d", cnt);
-            }
-            assert (cnt < MAX_PARAM_COUNT);
-            deserializeParameterSetCommon(cnt, serialize_in, params, stringPool);
-
-            engine->setUsedParamcnt(cnt);
-
             int64_t input_dep_id = -1;
             if (input_dep_ids) {
                 env->GetLongArrayRegion(input_dep_ids, i, 1, (jlong*) &input_dep_id);
@@ -668,15 +623,13 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
             // success is 0 and error is 1.
             if (engine->executeQuery(fragment_ids_buffer[i], 1, static_cast<int32_t>(input_dep_id),
-                                     txnId, lastCommittedTxnId, i == 0,
-                                     i == (batch_size - 1)))
+                                     txnId, lastCommittedTxnId, i == 0, i == (batch_size - 1)))
             {
                 ++failures;
             }
         }
 
         // cleanup
-        stringPool->purge();
         engine->resizePlanCache();
 
         if (failures > 0)
@@ -1170,11 +1123,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         NValueArray& params = engine->getParameterContainer();
-        Pool *stringPool = engine->getStringPool();
-        deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-        int retval =
-            voltdb::TheHashinator::hashinate(params[0], partitionCount);
-        stringPool->purge();
+        engine->deserializeParameterSet();
+        int retval = voltdb::TheHashinator::hashinate(params[0], partitionCount);
+        engine->purgeStringPool();
         return retval;
     } catch (FatalException e) {
         std::cout << "HASHINATE ERROR: " << e.m_reason << std::endl;

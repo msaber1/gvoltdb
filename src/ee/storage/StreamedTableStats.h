@@ -31,8 +31,6 @@ class StreamedTable;
 class StreamedTableStats : public voltdb::TableStats {
   public:
     StreamedTableStats(voltdb::StreamedTable* table);
-  protected:
-    virtual std::vector<std::string> generateStatsColumnNames();
 };
 
 }

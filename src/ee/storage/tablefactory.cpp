@@ -62,7 +62,7 @@ Table* TableFactory::getPersistentTable(
     Table *table = NULL;
 
     if (exportOnly) {
-        table = new StreamedTable(exportEnabled);
+        table = new StreamedTable();
     }
     else {
         table = new PersistentTable(partitionColumn);

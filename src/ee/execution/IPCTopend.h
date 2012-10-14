@@ -14,36 +14,3 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
-#ifndef IPCTOPEND_H_
-#define IPCTOPEND_H_
-#include "common/Topend.h"
-#include "common/Pool.hpp"
-#include "common/FatalException.hpp"
-
-class VoltDBIPC;
-
-namespace voltdb {
-
-class IPCTopend : public Topend {
-public:
-    IPCTopend( VoltDBIPC *vdbipc);
-    int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
-    void crashVoltDB(FatalException e);
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-    void pushExportBuffer(
-            int64_t exportGeneration,
-            int32_t partitionId,
-            std::string signature,
-            StreamBlock *block,
-            bool sync,
-            bool endOfStream);
-    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {
-
-    }
-private:
-    ::VoltDBIPC *m_vdbipc;
-};
-}
-
-#endif /* IPCTOPEND_H_ */

@@ -31,6 +31,7 @@ namespace voltdb {
 class Topend;
 class ExecutorContext;
 class TupleStreamWrapper;
+class StreamedTableUndoAction;
 
 /**
  * A streamed table does not store data. It may not be read. It may
@@ -38,21 +39,24 @@ class TupleStreamWrapper;
  * are passed through a TupleStreamWrapper to Export. The table exists
  * only to support Export.
  */
-
 class StreamedTable : public Table {
-    friend class TableFactory;
     friend class StreamedTableStats;
-
   public:
-    StreamedTable(bool exportEnabled);
-    static StreamedTable* createForTest(size_t, ExecutorContext*);
+    StreamedTable();
+    static StreamedTable* createForTest(size_t allocation);
 
     virtual ~StreamedTable();
 
+    // undo interface particular to streamed table.
+    void undo(size_t mark);
+
+  private:
+    /// Append an inserted or deleted tuple to the stream.
+    void appendTuple(TableTuple &tuple, bool forDelete);
+
     // virtual Table functions
-    // Return a table iterator BY VALUE
-    virtual TableIterator& iterator();
-    virtual TableIterator* makeIterator();
+    // Return a table iterator by const reference suitable for initializing an independent iterator.
+    virtual const TableIterator& iterator();
 
     virtual void deleteAllTuples(bool freeAllocatedStrings);
     virtual bool insertTuple(TableTuple &source);
@@ -67,9 +71,6 @@ class StreamedTable : public Table {
     virtual std::string tableType() const {
         return "StreamedTable";
     }
-
-    // undo interface particular to streamed table.
-    void undo(size_t mark);
 
     //Override and say how many bytes are in Java and C++
     int64_t allocatedTupleMemory() const;
@@ -109,7 +110,6 @@ class StreamedTable : public Table {
     void nextFreeTuple(TableTuple *tuple);
 
   private:
-    ExecutorContext *m_executorContext;
     TupleStreamWrapper *m_wrapper;
     int64_t m_sequenceNo;
 };

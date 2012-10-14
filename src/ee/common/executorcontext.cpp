@@ -27,24 +27,13 @@ namespace voltdb {
 static pthread_key_t static_key;
 static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
 
-static void createThreadLocalKey() {
-    (void)pthread_key_create( &static_key, NULL);
+static void createThreadLocalKey()
+{
+    (void) pthread_key_create(&static_key, NULL);
 }
 
-ExecutorContext::ExecutorContext(int64_t siteId,
-                CatalogId partitionId,
-                UndoQuantum *undoQuantum,
-                Topend* topend,
-                Pool* tempStringPool,
-                bool exportEnabled,
-                std::string hostname,
-                CatalogId hostId) :
-    m_topEnd(topend), m_tempStringPool(tempStringPool),
-    m_undoQuantum(undoQuantum), m_txnId(0),
-    m_lastCommittedTxnId(0),
-    m_siteId(siteId), m_partitionId(partitionId),
-    m_hostname(hostname), m_hostId(hostId),
-    m_exportEnabled(exportEnabled), m_epoch(0) // set later
+void
+ExecutorContext::installAsThreadLocalSingleton()
 {
     (void)pthread_once(&static_keyOnce, createThreadLocalKey);
     bindToThread();
@@ -53,25 +42,26 @@ ExecutorContext::ExecutorContext(int64_t siteId,
 void ExecutorContext::bindToThread()
 {
     // There can be only one (per thread).
-    assert(pthread_getspecific( static_key) == NULL);
-    pthread_setspecific( static_key, this);
+    assert(pthread_getspecific(static_key) == NULL);
+    pthread_setspecific(static_key, this);
     VOLT_DEBUG("Installing EC(%ld)", (long)this);
 }
 
-ExecutorContext::~ExecutorContext() {
+ExecutorContext::~ExecutorContext()
+{
     // currently does not own any of its pointers
 
     // There can be only one (per thread).
-    assert(pthread_getspecific( static_key) == this);
+    assert(pthread_getspecific(static_key) == this);
     // ... or none, now that the one is going away.
     VOLT_DEBUG("De-installing EC(%ld)", (long)this);
-
-    pthread_setspecific( static_key, NULL);
+    pthread_setspecific(static_key, NULL);
 }
 
-ExecutorContext* ExecutorContext::getExecutorContext() {
-    (void)pthread_once(&static_keyOnce, createThreadLocalKey);
-    return static_cast<ExecutorContext*>(pthread_getspecific( static_key));
+ExecutorContext* ExecutorContext::getExecutorContext()
+{
+    (void) pthread_once(&static_keyOnce, createThreadLocalKey);
+    return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
 }
 
