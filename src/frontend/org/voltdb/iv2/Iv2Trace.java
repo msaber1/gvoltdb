@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+import java.net.UnknownHostException;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -27,6 +29,8 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientInterfaceHandleManager;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
@@ -74,12 +78,87 @@ public class Iv2Trace
             }
         }
     };
+    private static final Runnable dbWorker = new Runnable() {
+        private final Client m_client = ClientFactory.createClient();
+
+        private void connectToServers()
+        {
+            String servers = System.getenv().get("IV2TRACE_DB");
+            String[] serverArray = servers.split(",");
+            for (int i = 0; i < serverArray.length; i++) {
+                try {
+                    m_client.createConnection(serverArray[i]);
+                } catch (UnknownHostException e) {
+                    iv2log.error("Failed to connect to IV2 trace database: " + e.getMessage());
+                } catch (IOException e) {
+                    iv2log.trace("Unable to connect to IV2 trace database yet: " + e.getMessage());
+                    try { Thread.sleep(1000); } catch (InterruptedException ignore) {}
+                    i--; // retry this server
+                }
+            }
+            iv2log.trace("Connected to IV2 trace database: " + servers);
+        }
+
+        @Override
+        public void run() {
+            connectToServers();
+
+            while (true) {
+                TaskMsg msg = null;
+                try {
+                    msg = msgQueue.take();
+
+                    // Long.MIN will be treated as NULL in the DB,
+                    // convert it to -1, maybe no valid txnId will be -1?
+                    long txnId = -1;
+                    if (msg.txnId != Long.MIN_VALUE) {
+                        txnId = msg.txnId;
+                    }
+                    byte isMP = -1;
+                    if (msg.isMP != null) {
+                        isMP = msg.isMP ? 1 : (byte) 0;
+                    }
+
+                    m_client.callProcedure("AddMsg",
+                                           txnId,
+                                           msg.action.ordinal(),
+                                           msg.type == null ? null : msg.type.ordinal(),
+                                           msg.localHSId,
+                                           msg.sourceHSId,
+                                           msg.ciHandle,
+                                           msg.coordHSId,
+                                           msg.spHandle,
+                                           msg.truncationHandle,
+                                           isMP,
+                                           msg.procName,
+                                           msg.status);
+                } catch (InterruptedException e) {
+                    e.printStackTrace();
+                    iv2log.trace("Terminating IV2 trace log thread");
+                    break;
+                } catch (IOException e) {
+                    iv2log.trace("Connection to IV2 trace database lost, logging to log4j", e);
+                    iv2log.trace(msg.toString());
+                    es.execute(log4jWorker);
+                    break;
+                } catch (Exception e) {
+                    iv2log.trace("Exception on IV2 trace database", e);
+                    iv2log.trace(msg.toString());
+                    es.execute(log4jWorker);
+                    break;
+                }
+            }
+        }
+    };
 
     static
     {
         if (iv2log.isTraceEnabled() || iv2queuelog.isTraceEnabled()) {
-            // TODO: If the debugging Volt database is not set, use log4j
-            es.execute(log4jWorker);
+            if (System.getenv().get("IV2TRACE_DB") == null) {
+                es.execute(log4jWorker);
+            } else {
+                es.execute(dbWorker);
+            }
         }
     }
 
