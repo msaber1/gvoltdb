@@ -52,7 +52,7 @@ public:
      * Log a statement at the level specified in the template parameter.
      * @param level Log level to attempt to log the statement at
      * @param statement Statement to log
-     */
+     *-/
     inline void log(const voltdb::LogLevel level, const std::string *statement) const {
         assert(level != voltdb::LOGLEVEL_OFF && level != voltdb::LOGLEVEL_ALL); //: "Should never log as ALL or OFF";
         if (level >= m_level && m_logProxy != NULL) {
@@ -60,7 +60,7 @@ public:
         }
     }
 
-    /**
+    /-**
      * Log a statement at the level specified in the template parameter.
      * @param level Log level to attempt to log the statement at
      * @param statement null terminated UTF-8 string containg the statement to log

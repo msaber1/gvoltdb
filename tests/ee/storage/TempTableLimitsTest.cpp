@@ -24,8 +24,10 @@
 #include "storage/TempTableLimits.h"
 
 #include "harness.h"
+#include "common/executorcontext.hpp"
 #include "common/SQLException.h"
 #include "logging/LogManager.h"
+#include "logging/LogProxy.h"
 
 #include <sstream>
 
@@ -60,49 +62,70 @@ public:
     }
 };
 
-class TempTableLimitsTest : public Test
+// Define a top end that is useless except to install custom log proxies.
+struct MockTopend : public voltdb::Topend
 {
-public:
-    TempTableLimitsTest() : m_logManager(new TestProxy())
-    {
-        m_logManager.setLogLevels(0);
-    }
+    MockTopend(voltdb::LogProxy* logProxy) : Topend(logProxy) { }
+    ~MockTopend() { }
+    int loadNextDependency(int32_t dependencyId, voltdb::Pool *pool, voltdb::Table* destination) { return 0; }
+    void crashVoltDB(const voltdb::FatalException& e) { }
+    int64_t getQueuedExportBytes(int32_t partitionId, const std::string &signature) { return 0; }
+    void pushExportBuffer(
+            int64_t exportGeneration,
+            int32_t partitionId,
+            const std::string &signature,
+            voltdb::StreamBlock *block,
+            bool sync,
+            bool endOfStream) { }
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) { /* Do nothing */ }
+};
 
-    LogManager m_logManager;
+struct TempTableLimitsTest : public Test
+{
+    // Initialize and implicitly install an executor context member
+    // that is useless except to yield the top end's loggers.
+    TempTableLimitsTest()
+    : m_logProxy()
+    , m_loggerHolder(&m_logProxy)
+    // Initialize and implicitly install an executor context member
+    // that is useless except to yield the top end's loggers.
+    , m_logAccess(1, 1, NULL, &m_loggerHolder, NULL, false, "", 0)
+    {
+        m_loggerHolder.getLogManager().setLogLevels(0);
+    }
+    TestProxy m_logProxy;
+    MockTopend m_loggerHolder;
+    voltdb::ExecutorContext m_logAccess;
 };
 
 TEST_F(TempTableLimitsTest, CheckLogLatch)
 {
-    TestProxy* proxy =
-        dynamic_cast<TestProxy*>(const_cast<LogProxy*>(m_logManager.getLogProxy()));
-    proxy->reset();
+    m_logProxy.reset();
 
     TempTableLimits dut;
     dut.setLogThreshold(1024 * 5);
     dut.setMemoryLimit(1024 * 10);
     // check that bump over threshold gets us logged
     dut.increaseAllocated(1024 * 6);
-    EXPECT_EQ(proxy->lastLoggerId, LOGGERID_SQL);
-    EXPECT_EQ(proxy->lastLogLevel, LOGLEVEL_INFO);
-    proxy->reset();
+    EXPECT_EQ(m_logProxy.lastLoggerId, LOGGERID_SQL);
+    EXPECT_EQ(m_logProxy.lastLogLevel, LOGLEVEL_INFO);
+    m_logProxy.reset();
     // next bump still over does not, however
     dut.increaseAllocated(1024);
-    EXPECT_EQ(proxy->lastLoggerId, LOGGERID_INVALID);
-    EXPECT_EQ(proxy->lastLogLevel, LOGLEVEL_OFF);
-    proxy->reset();
+    EXPECT_EQ(m_logProxy.lastLoggerId, LOGGERID_INVALID);
+    EXPECT_EQ(m_logProxy.lastLogLevel, LOGLEVEL_OFF);
+    m_logProxy.reset();
     // dip below and back up, get new log
     dut.reduceAllocated(1024 * 3);
     dut.increaseAllocated(1024 * 2);
-    EXPECT_EQ(proxy->lastLoggerId, LOGGERID_SQL);
-    EXPECT_EQ(proxy->lastLogLevel, LOGLEVEL_INFO);
-    proxy->reset();
+    EXPECT_EQ(m_logProxy.lastLoggerId, LOGGERID_SQL);
+    EXPECT_EQ(m_logProxy.lastLogLevel, LOGLEVEL_INFO);
+    m_logProxy.reset();
 }
 
 TEST_F(TempTableLimitsTest, CheckLimitException)
 {
-    TestProxy* proxy =
-        dynamic_cast<TestProxy*>(const_cast<LogProxy*>(m_logManager.getLogProxy()));
-    proxy->reset();
+    m_logProxy.reset();
 
     TempTableLimits dut;
     dut.setLogThreshold(-1);
@@ -119,9 +142,9 @@ TEST_F(TempTableLimitsTest, CheckLimitException)
     }
     EXPECT_TRUE(threw);
     // no logging with -1 threshold
-    EXPECT_EQ(proxy->lastLoggerId, LOGGERID_INVALID);
-    EXPECT_EQ(proxy->lastLogLevel, LOGLEVEL_OFF);
-    proxy->reset();
+    EXPECT_EQ(m_logProxy.lastLoggerId, LOGGERID_INVALID);
+    EXPECT_EQ(m_logProxy.lastLogLevel, LOGLEVEL_OFF);
+    m_logProxy.reset();
     // And check that we can dip below and rethrow
     dut.reduceAllocated(1024 * 6);
     threw = false;

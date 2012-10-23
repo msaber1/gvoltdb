@@ -37,7 +37,9 @@ public:
      * Constructor that initializes all the loggers with the specified proxy
      * @param proxy The LogProxy that all the loggers should use
      */
-    LogManager(LogProxy *proxy);
+    LogManager(LogProxy *proxy) :
+        m_proxy(proxy), m_sqlLogger(proxy, LOGGERID_SQL), m_hostLogger(proxy, LOGGERID_HOST)
+    { }
 
     /**
      * Retrieve a logger by ID
@@ -78,19 +80,7 @@ public:
         delete m_proxy;
     }
 
-
-    /**
-     * Retrieve a logger by ID from the LogManager associated with this thread.
-     * @parameter loggerId ID of the logger to retrieve
-     */
-    inline static const Logger* getThreadLogger(LoggerId id) {
-        return getThreadLogManager()->getLogger(id);
-    }
-
 private:
-
-    static LogManager* getThreadLogManager();
-
     /**
      * The log proxy in use by this LogManager and its Loggers
      */

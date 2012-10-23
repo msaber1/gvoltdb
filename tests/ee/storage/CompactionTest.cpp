@@ -33,6 +33,7 @@
 #include "storage/tableutil.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
+#include "logging/StdoutLogProxy.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "common/DefaultTupleSerializer.h"
@@ -51,6 +52,21 @@ using namespace voltdb;
  */
 static int32_t m_primaryKeyIndex = 0;
 
+class MockTopend : public Topend {
+  public:
+    MockTopend() : Topend(new StdoutLogProxy()) { }
+
+    void pushExportBuffer(int64_t generation, int32_t partitionId, const std::string &signature, voltdb::StreamBlock* block, bool sync, bool endOfStream) { }
+
+    int64_t getQueuedExportBytes(int32_t partitionId, const std::string &signature) { return 0; }
+
+    int loadNextDependency(int32_t dependencyId, Pool *pool, Table* destination) { return 0; }
+
+    void crashVoltDB(const voltdb::FatalException& e) { }
+
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) { }
+};
+
 /**
  * The strategy of this test is to create a table with 5 blocks of tuples with the first column (primary key)
  * sequentially numbered, serialize the whole thing to a block of memory, go COW and start serializing tuples
@@ -60,14 +76,16 @@ static int32_t m_primaryKeyIndex = 0;
  */
 class CompactionTest : public Test {
 public:
-    CompactionTest() {
+    CompactionTest()
+    : m_topend()
+    {
         m_primaryKeyIndex = 0;
         m_tuplesInserted = 0;
         m_tuplesUpdated = 0;
         m_tuplesDeleted = 0;
         m_tuplesInsertedInLastUndo = 0;
         m_tuplesDeletedInLastUndo = 0;
-        m_engine = new voltdb::VoltDBEngine();
+        m_engine = new voltdb::VoltDBEngine(&m_topend);
         m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
 
         m_columnNames.push_back("1");
@@ -251,6 +269,7 @@ public:
         }
     }
 
+    MockTopend m_topend;
     voltdb::VoltDBEngine *m_engine;
     voltdb::TupleSchema *m_tableSchema;
     voltdb::PersistentTable *m_table;

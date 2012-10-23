@@ -31,6 +31,7 @@
 #include "common/ValueFactory.hpp"
 #include "common/TupleSchema.h"
 #include "common/tabletuple.h"
+#include "logging/StdoutLogProxy.h"
 #include "storage/StreamBlock.h"
 #include "storage/TupleStreamWrapper.h"
 #include "common/Topend.h"
@@ -58,19 +59,14 @@ const int BUFFER_SIZE = 1024;
 
 class DummyTopend : public Topend {
 public:
-    DummyTopend() : receivedExportBuffer(false) {
+    DummyTopend() : Topend(new StdoutLogProxy()), receivedExportBuffer(false) { }
 
-    }
+    int loadNextDependency(int32_t dependencyId, voltdb::Pool *pool, Table* destination) { return 0; }
 
-    int loadNextDependency(
-        int32_t dependencyId, voltdb::Pool *pool, Table* destination) {
-        return 0;
-    }
+    void crashVoltDB(const voltdb::FatalException& e) { }
 
-    void crashVoltDB(voltdb::FatalException e) {
-    }
-
-    int64_t getQueuedExportBytes(int32_t partitionId, const std::string &signature) {
+    int64_t getQueuedExportBytes(int32_t partitionId, const std::string &signature)
+    {
         int64_t bytes = 0;
         for (int ii = 0; ii < blocks.size(); ii++) {
             bytes += blocks[ii]->rawLength();
@@ -78,7 +74,9 @@ public:
         return bytes;
     }
 
-    virtual void pushExportBuffer(int64_t generation, int32_t partitionId, const std::string &signature, StreamBlock *block, bool sync, bool endOfStream) {
+    virtual void pushExportBuffer(int64_t generation, int32_t partitionId, const std::string &signature,
+                                  StreamBlock *block, bool sync, bool endOfStream)
+    {
         if (sync) {
             return;
         }
@@ -89,7 +87,7 @@ public:
         receivedExportBuffer = true;
     }
 
-    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) { }
     queue<int32_t> partitionIds;
     queue<std::string> signatures;
     deque<shared_ptr<StreamBlock> > blocks;

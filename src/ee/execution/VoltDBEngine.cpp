@@ -107,7 +107,7 @@ namespace voltdb {
 
 const int64_t AD_HOC_FRAG_ID = -1;
 
-VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy) :
+VoltDBEngine::VoltDBEngine(Topend *topend) :
       m_dummyUndoQuantum(),
       m_currentUndoQuantum(&m_dummyUndoQuantum),
       m_staticParams(MAX_PARAM_COUNT),
@@ -115,7 +115,6 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy) :
       m_currentInputDepId(-1),
       m_stringPool(16777216, 2),
       m_numResultDependencies(0),
-      m_logManager(logProxy),
       m_templateSingleLongTable(NULL),
       m_topend(topend)
 {
@@ -276,17 +275,14 @@ Table* VoltDBEngine::getTable(string name) const {
     return NULL;
 }
 
-bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
+void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
     // Just look in our list of tables
-    map<int32_t, Table*>::const_iterator lookup =
-        m_tables.find(tableId);
-    if (lookup != m_tables.end()) {
-        Table* table = lookup->second;
-        table->serializeTo(*out);
-        return true;
-    } else {
+    map<int32_t, Table*>::const_iterator lookup = m_tables.find(tableId);
+    if (lookup == m_tables.end()) {
         throwFatalException( "Unable to find table for TableId '%d'", (int) tableId);
     }
+    Table* table = lookup->second;
+    table->serializeTo(*out);
 }
 
 // ------------------------------------------------------------------
@@ -1233,6 +1229,8 @@ StatsAgent& VoltDBEngine::getStatsManager() {
 int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                            bool interval, int64_t now)
 {
+    resetReusedResultOutputBuffer();
+
     Table *resultTable = NULL;
     vector<CatalogId> locatorIds;
 

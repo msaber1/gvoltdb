@@ -75,7 +75,7 @@ import org.voltdb.messaging.FastSerializer;
  * 1 byte result code
  * 8 byte results codes. Same number of results as numPlanFragments.
  *
- * The return message format for QueryPlanFragments is all big endian:
+ * The return message format for ExecutePlanFragments is all big endian:
  * 1 byte result code
  * 4 byte result length. Does not include the length of the result code or result length field.
  * X bytes of serialized VoltTables. Same number of tables as numPlanFragments
@@ -96,17 +96,21 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     /** Commands are serialized over the connection */
     private enum Commands {
         Initialize(0),
+        // (1),
         LoadCatalog(2),
         ToggleProfiler(3),
         Tick(4),
         GetStats(5),
-        QueryPlanFragments(6),
-        PlanFragment(7),
+        ExecutePlanFragments(6),
+        // (7),
+        // (8),
         LoadTable(9),
-        releaseUndoToken(10),
-        undoUndoToken(11),
-        CustomPlanFragment(12),
+        ReleaseUndoToken(10),
+        UndoUndoToken(11),
+        // (12),
         SetLogLevels(13),
+        // (14),
+        // (15),
         Quiesce(16),
         ActivateTableStream(17),
         TableStreamSerializeMore(18),
@@ -784,7 +788,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final long txnId,
             final long lastCommittedTxnId,
             final long undoToken) throws EEException {
-        sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
+        sendPlanFragmentsInvocation(Commands.ExecutePlanFragments,
                 numFragmentIds, planFragmentIds, inputDepIds, parameterSets,
                 txnId, lastCommittedTxnId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
@@ -938,7 +942,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public boolean releaseUndoToken(final long undoToken) {
         m_data.clear();
-        m_data.putInt(Commands.releaseUndoToken.m_id);
+        m_data.putInt(Commands.ReleaseUndoToken.m_id);
         m_data.putLong(undoToken);
 
         try {
@@ -966,7 +970,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public boolean undoUndoToken(final long undoToken) {
         m_data.clear();
-        m_data.putInt(Commands.undoUndoToken.m_id);
+        m_data.putInt(Commands.UndoUndoToken.m_id);
         m_data.putLong(undoToken);
 
         try {

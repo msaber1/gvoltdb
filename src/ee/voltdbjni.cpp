@@ -120,20 +120,29 @@
 using namespace std;
 using namespace voltdb;
 
-#define castToEngine(x) reinterpret_cast<VoltDBEngine*>((x));\
-    currentEngine = reinterpret_cast<VoltDBEngine*>((x))
-#define updateJNILogProxy(x) const_cast<JNILogProxy*>(dynamic_cast<const JNILogProxy*>(x->getLogManager()->getLogProxy()))->setJNIEnv(env)
-
 /*
  * Yes, I know. This is ugly. But in order to get some useful information and
  * properly call crashVoltDB when a signal is caught, I cannot think of a
  * different way.
  */
-static VoltDBEngine *currentEngine = NULL;
+static VoltDBEngine *currentEngineForCrash = NULL;
 static JavaVM *currentVM = NULL;
 
+inline VoltDBEngine* fixupEngine(jlong engine_ptr, JNIEnv *env)
+{
+    VoltDBEngine* engine = reinterpret_cast<VoltDBEngine*>(engine_ptr);
+    currentEngineForCrash = engine;
+    assert(engine);
+    if (engine) {
+        static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    } else {
+        VOLT_ERROR("engine_ptr was NULL or invalid pointer");
+    }
+    return engine;
+}
+
 void signalHandler(int signum, siginfo_t *info, void *context) {
-    if (currentVM == NULL || currentEngine == NULL)
+    if (currentVM == NULL || currentEngineForCrash == NULL)
         return;
 
     char err_msg[128];
@@ -141,12 +150,13 @@ void signalHandler(int signum, siginfo_t *info, void *context) {
              " signal code %d\n\n", info->si_signo, info->si_errno,
              info->si_code);
     std::string message = err_msg;
-    message.append(currentEngine->debug());
+    message.append(currentEngineForCrash->debug());
 
     JNIEnv *env;
-    if (currentVM->AttachCurrentThread((void **)(void *)&env, NULL) != 0)
+    if (currentVM->AttachCurrentThread((void **)&env, NULL) != 0)
         exit(-1);
-    Topend *topend = static_cast<JNITopend*>(currentEngine->getTopend())->updateJNIEnv(env);
+    JNITopend *topend = static_cast<JNITopend*>(currentEngineForCrash->getTopend());
+    topend->updateJNIEnv(env);
     topend->crashVoltDB(SegvException(message.c_str(), context, __FILE__, __LINE__));
     currentVM->DetachCurrentThread();
 }
@@ -183,7 +193,9 @@ void setupSigHandler(void) {
  * This does strictly nothing so that this method never throws an exception.
  * @return the created VoltDBEngine pointer casted to jlong.
 */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCreate(JNIEnv *env, jobject obj, jboolean isSunJVM) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCreate(
+    JNIEnv *env, jobject obj, jboolean isSunJVM)
+{
     // obj is the instance pointer of the ExecutionEngineJNI instance
     // that is creating this native EE. Turn this into a global reference
     // and only use that global reference for calling back to Java.
@@ -201,16 +213,14 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
         throw std::exception();
         return 0;
     }
-    JavaVM *vm;
-    env->GetJavaVM(&vm);
-    currentVM = vm;
+    env->GetJavaVM(&currentVM);
     if (isSunJVM == JNI_TRUE)
         setupSigHandler();
     JNITopend *topend = NULL;
     VoltDBEngine *engine = NULL;
     try {
-        topend = new JNITopend(env, java_ee);
-        engine = new VoltDBEngine( topend, JNILogProxy::getJNILogProxy(env, vm));
+        topend = new JNITopend(env, java_ee, currentVM);
+        engine = new VoltDBEngine(topend);
     } catch (FatalException e) {
         if (topend != NULL) {
             topend->crashVoltDB(e);
@@ -224,15 +234,13 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
  * @return error code
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDestroy(
-    JNIEnv *env, jobject obj,
-    jlong engine_ptr) {
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
+    JNIEnv *env, jobject obj, jlong engine_ptr)
+{
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
     if (engine == NULL) {
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
-    JNITopend* topend = static_cast<JNITopend*>(engine->getTopend());
+    Topend* topend = engine->getTopend();
     delete engine;
     delete topend;
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
@@ -249,8 +257,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeDestr
  * @return error code
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeInitialize(
-    JNIEnv *env, jobject obj,
-    jlong enginePtr,
+    JNIEnv *env, jobject obj, jlong enginePtr,
     jint clusterIndex,
     jlong siteId,
     jint partitionId,
@@ -260,15 +267,12 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint totalPartitions)
 {
     VOLT_DEBUG("nativeInitialize() start");
-    VoltDBEngine *engine = castToEngine(enginePtr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VoltDBEngine *engine = fixupEngine(enginePtr, env);
     if (engine == NULL) {
-        VOLT_ERROR("engine_ptr was NULL or invalid pointer");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
-    try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
 
+    try {
         jbyte *hostChars = env->GetByteArrayElements( hostname, NULL);
         std::string hostString(reinterpret_cast<char*>(hostChars), env->GetArrayLength(hostname));
         env->ReleaseByteArrayElements( hostname, hostChars, JNI_ABORT);
@@ -289,10 +293,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
         } else {
             throwFatalException("initialize failed");
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
         }
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 }
@@ -304,18 +307,15 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
  * @return error code
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadCatalog(
-    JNIEnv *env, jobject obj,
-    jlong engine_ptr, jlong txnId, jbyteArray serialized_catalog) {
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jlong txnId,
+    jbyteArray serialized_catalog)
+{
     VOLT_DEBUG("nativeLoadCatalog() start");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
     if (engine == NULL) {
-        VOLT_ERROR("engine_ptr was NULL or invalid pointer");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
-
-    //JNIEnv pointer can change between calls, must be updated
-    updateJNILogProxy(engine);
 
     //copy to std::string. utf_chars may or may not by a copy of the string
     jbyte * utf_chars = env->GetByteArrayElements(serialized_catalog, NULL);
@@ -348,18 +348,14 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
 */
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
-    JNIEnv *env, jobject obj,
-    jlong engine_ptr, jlong txnId, jbyteArray catalog_diffs) {
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jlong txnId, jbyteArray catalog_diffs)
+{
     VOLT_DEBUG("nativeUpdateCatalog() start");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
     if (engine == NULL) {
-        VOLT_ERROR("engine_ptr was NULL or invalid pointer");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
-
-    //JNIEnv pointer can change between calls, must be updated
-    updateJNILogProxy(engine);
 
     //copy to std::string. utf_chars may or may not by a copy of the string
     jbyte* utf_chars = env->GetByteArrayElements(catalog_diffs, NULL);
@@ -389,20 +385,15 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
  * @param table_id catalog ID of the table
  * @param serialized_table the table data to be loaded
 */
-SHAREDLIB_JNIEXPORT jint JNICALL
-Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
-    JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
-    jbyteArray serialized_table, jlong txnId, jlong lastCommittedTxnId)
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jint table_id, jbyteArray serialized_table, jlong txnId, jlong lastCommittedTxnId)
 {
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VOLT_DEBUG("loading table %d in C++...", table_id);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
     if (engine == NULL) {
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
-
-    //JNIEnv pointer can change between calls, must be updated
-    updateJNILogProxy(engine);
-    VOLT_DEBUG("loading table %d in C++...", table_id);
 
     // deserialize dependency.
     jsize length = env->GetArrayLength(serialized_table);
@@ -423,7 +414,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
             e.serialize(engine->getExceptionOutputSerializer());
         }
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
 
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
@@ -446,37 +437,33 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
  * @param exception_buffer_size size of the buffer
  * @return error code
 */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBuffers
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jobject parameter_buffer, jint parameter_buffer_size,
-   jobject result_buffer, jint result_buffer_size,
-   jobject exception_buffer, jint exception_buffer_size)
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBuffers(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jobject parameter_buffer, jint parameter_buffer_size,
+    jobject result_buffer, jint result_buffer_size,
+    jobject exception_buffer, jint exception_buffer_size)
 {
     VOLT_DEBUG("nativeSetBuffers() start");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
     if (engine == NULL) {
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
+
+    char *parameterBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(parameter_buffer));
+    int parameterBufferCapacity = parameter_buffer_size;
+
+    char *reusedResultBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(result_buffer));
+    int reusedResultBufferCapacity = result_buffer_size;
+
+    char *exceptionBuffer = reinterpret_cast<char*>(env->GetDirectBufferAddress(exception_buffer));
+    int exceptionBufferCapacity = exception_buffer_size;
+
     try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-
-        char *parameterBuffer = reinterpret_cast<char*>(
-                env->GetDirectBufferAddress(parameter_buffer));
-        int parameterBufferCapacity = parameter_buffer_size;
-
-        char *reusedResultBuffer = reinterpret_cast<char*>(
-                env->GetDirectBufferAddress(result_buffer));
-        int reusedResultBufferCapacity = result_buffer_size;
-
-        char *exceptionBuffer = reinterpret_cast<char*>(
-                 env->GetDirectBufferAddress(exception_buffer));
-        int exceptionBufferCapacity = exception_buffer_size;
-
         engine->setBuffers(parameterBuffer, parameterBufferCapacity,
             reusedResultBuffer, reusedResultBufferCapacity,
             exceptionBuffer, exceptionBufferCapacity);
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
 
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
@@ -488,29 +475,29 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBu
  * @param plan_fragment_id ID of the plan fragment to be executed.
  * @return error code
 */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecutePlanFragment (
-        JNIEnv *env,
-        jobject obj,
-        jlong engine_ptr,
-        jlong plan_fragment_id,
-        jint outputDependencyId,
-        jint inputDependencyId,
-        jlong txnId,
-        jlong lastCommittedTxnId,
-        jlong undoToken) {
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecutePlanFragment(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jlong plan_fragment_id,
+    jint outputDependencyId,
+    jint inputDependencyId,
+    jlong txnId,
+    jlong lastCommittedTxnId,
+    jlong undoToken)
+{
     VOLT_DEBUG("nativeExecutePlanFragment() start");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    assert(engine);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
+
     try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         engine->setUndoToken(undoToken);
         engine->resetReusedResultOutputBuffer();
         engine->deserializeParameterSet();
         const int retval = engine->executeQuery(plan_fragment_id, outputDependencyId, inputDependencyId, txnId, lastCommittedTxnId, true, true);
         return retval;
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 }
@@ -520,22 +507,15 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
  * Method:    nativeLoadPlanFragment
  * Signature: (JJ[B)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL
-Java_org_voltdb_jni_ExecutionEngine_nativeLoadPlanFragment (
-    JNIEnv *env,
-    jobject obj,
-    jlong engine_ptr,
-    jbyteArray plan) {
-
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadPlanFragment(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jbyteArray plan)
+{
     VOLT_DEBUG("nativeUnloadPlanFragment() start");
-
-    // setup
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    assert(engine);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-
-    //JNIEnv pointer can change between calls, must be updated
-    updateJNILogProxy(engine);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
 
     // convert java plan string to stdc++ string plan
     jbyte *str = env->GetByteArrayElements(plan, NULL);
@@ -557,7 +537,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadPlanFragment (
                                       env->GetArrayLength(plan),
                                       fragId, wasHit, cacheSize);
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     assert((result == 1) || (fragId != 0));
 
@@ -583,27 +563,24 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadPlanFragment (
  * @param outputCapacity maximum number of bytes to write to buffer.
  * @return error code
 */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecutePlanFragments
-(JNIEnv *env,
-        jobject obj,
-        jlong engine_ptr,
-        jint num_fragments,
-        jlongArray plan_fragment_ids,
-        jlongArray input_dep_ids,
-        jlong txnId,
-        jlong lastCommittedTxnId,
-        jlong undoToken) {
-    //VOLT_DEBUG("nativeExecutePlanFragments() start");
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecutePlanFragments(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jint num_fragments,
+    jlongArray plan_fragment_ids,
+    jlongArray input_dep_ids,
+    jlong txnId,
+    jlong lastCommittedTxnId,
+    jlong undoToken)
+{
+    // VOLT_DEBUG("nativeExecutePlanFragments() start");
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
 
-    // setup
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    assert(engine);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         engine->resetReusedResultOutputBuffer();
         engine->setUndoToken(undoToken);
-        static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
         engine->deserializeParameterSet();
 
         // fragment info
@@ -637,7 +614,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
         else
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 }
@@ -649,30 +626,22 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
  * @return serialized temporary table
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSerializeTable(
-        JNIEnv *env,
-        jobject obj,
-        jlong engine_ptr,
-        jint table_id,
-        jobject output_buffer,
-        jint output_capacity) {
-    //VOLT_DEBUG("nativeSerializeTable() start");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jint table_id, jobject output_buffer, jint output_capacity)
+{
+    // VOLT_DEBUG("nativeSerializeTable() start");
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
     if (engine == NULL) {
-        VOLT_ERROR("The VoltDBEngine pointer is null!");
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+
     try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         void* data = env->GetDirectBufferAddress(output_buffer);
         ReferenceSerializeOutput out(data, output_capacity);
-
-        bool success = engine->serializeTable(table_id, &out);
-
-        if (!success) return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-        else return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+        engine->serializeTable(table_id, &out);
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 }
@@ -688,8 +657,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSeria
  * @param buffer DirectByteBuffer
  * @return Native address of the DirectByteBuffer as a long
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getBufferAddress
-  (JNIEnv *env, jclass clazz, jobject buffer)
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getBufferAddress(
+    JNIEnv *env, jclass clazz, jobject buffer)
 {
     void *address = env->GetDirectBufferAddress(buffer);
     if (env->ExceptionCheck()) {
@@ -705,8 +674,9 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getBufferAddre
  * Method:    getBufferCRC32
  * Signature: (Ljava/nio/ByteBuffer;II)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getBufferCRC32
-  (JNIEnv *env, jclass clazz, jobject buffer, jint offset, jint length) {
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getBufferCRC32(
+    JNIEnv *env, jclass clazz, jobject buffer, jint offset, jint length)
+{
     char *address = reinterpret_cast<char*>(env->GetDirectBufferAddress(buffer));
     if (env->ExceptionCheck()) {
         env->ExceptionDescribe();
@@ -723,8 +693,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getBufferCRC32
  * Method:    getBufferCRC32
  * Signature: (Ljava/nio/ByteBuffer;II)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32
-  (JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length) {
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32(
+    JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length)
+{
     char *address = reinterpret_cast<char*>(ptr);
     assert(address);
     boost::crc_32_type crc;
@@ -746,15 +717,19 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32
  * @param timeInMillis The current java timestamp (System.currentTimeMillis());
  * @param lastCommittedTxnId The id of the last committed transaction.
  */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTick
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong timeInMillis, jlong lastCommittedTxnId) {
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTick(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jlong timeInMillis, jlong lastCommittedTxnId)
+{
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return;
+    }
+
     try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         engine->tick(timeInMillis, lastCommittedTxnId);
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
 }
 
@@ -765,17 +740,19 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTick
  *
  * Called to instruct the EE to reach an idle steady state.
  */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeQuiesce
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong lastCommittedTxnId)
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeQuiesce(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jlong lastCommittedTxnId)
 {
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return;
+    }
+
     try {
-        // JNIEnv pointer can change between calls, must be updated
-        updateJNILogProxy(engine);
         engine->quiesce(lastCommittedTxnId);
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
 }
 
@@ -793,23 +770,20 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeQuies
  * @param locatorsArray Java array of CatalogIds indicating what set of sources should the statistics be retrieved from.
  * @return Number of result tables, 0 on no results, -1 on failure.
  */
-SHAREDLIB_JNIEXPORT jint JNICALL
-Java_org_voltdb_jni_ExecutionEngine_nativeGetStats(JNIEnv *env, jobject obj,
-                                                   jlong pointer, jint selector,
-                                                   jintArray locatorsArray,
-                                                   jboolean jinterval,
-                                                   jlong now) {
-    VoltDBEngine *engine = castToEngine(pointer);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetStats(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jint selector, jintArray locatorsArray, jboolean jinterval, jlong now)
+{
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
+
     /*
      * Can't use the standard JNI EE error code here because this method
      * actually uses that integer to indicate the number of result tables.
      */
     int result = -1;
-
-    //JNIEnv pointer can change between calls, must be updated
-    updateJNILogProxy(engine);
-    engine->resetReusedResultOutputBuffer();
 
     /*
      * Retrieve locators if any
@@ -835,7 +809,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeGetStats(JNIEnv *env, jobject obj,
         result = engine->getStats(static_cast<int>(selector), locators,
                                   numLocators, interval, now);
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
 
     env->ReleaseIntArrayElements(locatorsArray, locators, JNI_ABORT);
@@ -847,46 +821,50 @@ Java_org_voltdb_jni_ExecutionEngine_nativeGetStats(JNIEnv *env, jobject obj,
  * Turns on or off profiler.
  * @returns 0 on success.
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeToggleProfiler
-(JNIEnv *env, jobject obj, jlong engine_ptr, jint toggle)
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeToggleProfiler(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jint toggle)
 {
     VOLT_DEBUG("nativeToggleProfiler in C++ called");
 // set on build command line via build.py
 #ifdef PROFILE_ENABLED
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-    if (engine) {
-        if (toggle) {
-            ProfilerStart("/tmp/gprof.prof");
-        }
-        else {
-            ProfilerStop();
-            ProfilerFlush();
-        }
-        return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
     }
-#endif
+
+    if (toggle) {
+        ProfilerStart("/tmp/gprof.prof");
+    }
+    else {
+        ProfilerStop();
+        ProfilerFlush();
+    }
+    return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
+#else
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+#endif
 }
 
 /**
  * Release the undo token
  * @returns JNI_TRUE on success. JNI_FALSE otherwise.
  */
-SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeReleaseUndoToken
-(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken)
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeReleaseUndoToken(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+   jlong undoToken)
 {
     VOLT_DEBUG("nativeReleaseUndoToken in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return JNI_FALSE;
+    }
+
     try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-        if (engine) {
-            engine->releaseUndoToken(undoToken);
-            return JNI_TRUE;
-        }
+        engine->releaseUndoToken(undoToken);
+        return JNI_TRUE;
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     return JNI_FALSE;
 }
@@ -895,23 +873,23 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeR
  * Undo the undo token
  * @returns JNI_TRUE on success. JNI_FALSE otherwise.
  */
-SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUndoUndoToken
-(JNIEnv *env, jobject obj, jlong engine_ptr, jlong undoToken)
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUndoUndoToken(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jlong undoToken)
 {
     VOLT_DEBUG("nativeUndoUndoToken in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-        if (engine) {
-            engine->undoUndoToken(undoToken);
-            return JNI_TRUE;
-        }
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
         return JNI_FALSE;
-    } catch (FatalException e) {
-        topend->crashVoltDB(e);
     }
-    return false;
+
+    try {
+        engine->undoUndoToken(undoToken);
+        return JNI_TRUE;
+    } catch (FatalException e) {
+        engine->getTopend()->crashVoltDB(e);
+    }
+    return JNI_FALSE;
 }
 
 /*
@@ -919,21 +897,23 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeU
  * Method:    nativeSetLogLevels
  * Signature: (JJ)Z
  */
-SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetLogLevels
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong logLevels) {
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetLogLevels(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jlong logLevels)
+{
     VOLT_DEBUG("nativeSetLogLevels in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
-        if (engine) {
-            engine->getLogManager()->setLogLevels(logLevels);
-        }
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
         return JNI_FALSE;
-    } catch (FatalException e) {
-        topend->crashVoltDB(e);
     }
-    return false;
+
+    try {
+        engine->getTopend()->getLogManager().setLogLevels(logLevels);
+        return JNI_TRUE;
+    } catch (FatalException e) {
+        engine->getTopend()->crashVoltDB(e);
+    }
+    return JNI_FALSE;
 }
 
 /*
@@ -941,17 +921,22 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeS
  * Method:    nativeActivateTableStream
  * Signature: (JII)Z
  */
-SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId, jint streamType) {
+SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeActivateTableStream(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jint tableId, jint streamType)
+{
     VOLT_DEBUG("nativeActivateTableStream in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return JNI_FALSE;
+    }
+
     try {
         return engine->activateTableStream(tableId, static_cast<voltdb::TableStreamType>(streamType));
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
-    return false;
+    return JNI_FALSE;
 }
 
 /*
@@ -959,19 +944,17 @@ SHAREDLIB_JNIEXPORT jboolean JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeA
  * Method:    nativeTableStreamSerializeMore
  * Signature: (JJIIII)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableStreamSerializeMore
-  (JNIEnv *env,
-   jobject obj,
-   jlong engine_ptr,
-   jlong bufferPtr,
-   jint offset,
-   jint length,
-   jint tableId,
-   jint streamType) {
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableStreamSerializeMore(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jlong bufferPtr, jint offset, jint length, jint tableId, jint streamType)
+{
     VOLT_DEBUG("nativeTableStreamSerializeMore in C++ called");
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return 0;
+    }
+
     ReferenceSerializeOutput out(reinterpret_cast<char*>(bufferPtr) + offset, length - offset);
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
     try {
         try {
             return engine->tableStreamSerializeMore(
@@ -982,7 +965,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTable
             throwFatalException("%s", e.message().c_str());
         }
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     return 0;
 }
@@ -992,11 +975,16 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTable
  * Method:    nativeTableHashCode
  * Signature: (JI)J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableHashCode
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jint tableId) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTableHashCode(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jint tableId)
+{
     VOLT_DEBUG("nativeTableHashCode in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return 0;
+    }
+
     try {
         try {
             return engine->tableHashCode(tableId);
@@ -1004,7 +992,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
             throwFatalException("%s", e.message().c_str());
         }
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     return 0;
 }
@@ -1024,17 +1012,16 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTabl
  * any error this will be less than 0.  For any call with no
  * pollAction, any value >= 0 may be ignored.
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExportAction
-  (JNIEnv *env,
-   jobject obj,
-   jlong engine_ptr,
-   jboolean syncAction,
-   jlong ackOffset,
-   jlong seqNo,
-   jbyteArray tableSignature) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExportAction(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jboolean syncAction, jlong ackOffset, jlong seqNo, jbyteArray tableSignature)
+{
     VOLT_DEBUG("nativeExportAction in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return 0;
+    }
+
     jbyte *signatureChars = env->GetByteArrayElements(tableSignature, NULL);
     std::string signature(reinterpret_cast<char *>(signatureChars), env->GetArrayLength(tableSignature));
     env->ReleaseByteArrayElements(tableSignature, signatureChars, JNI_ABORT);
@@ -1049,7 +1036,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
             throwFatalException("%s", e.message().c_str());
         }
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     return 0;
 }
@@ -1059,12 +1046,16 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
  * Method:    nativeGetUSOForExportTable
  * Signature: (JLjava/lang/String;)[J
  */
-SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetUSOForExportTable
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jbyteArray tableSignature) {
-
+SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetUSOForExportTable(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jbyteArray tableSignature)
+{
     VOLT_DEBUG("nativeGetUSOForExportTable in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return NULL;
+    }
+
     jbyte *signatureChars = env->GetByteArrayElements(tableSignature, NULL);
     std::string signature(reinterpret_cast<char *>(signatureChars), env->GetArrayLength(tableSignature));
     env->ReleaseByteArrayElements(tableSignature, signatureChars, JNI_ABORT);
@@ -1080,7 +1071,7 @@ SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativ
         return retval;
     }
     catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     return NULL;
 }
@@ -1090,22 +1081,27 @@ SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativ
  * Method:    nativeProcessRecoveryMessage
  * Signature: (JJII)V
  */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProcessRecoveryMessage
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jlong buffer_ptr, jint offset, jint remaining) {
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProcessRecoveryMessage(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jlong buffer_ptr, jint offset, jint remaining)
+{
     //ProfilerEnable();
     VOLT_DEBUG("nativeProcessRecoveryMessage in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    char *data = reinterpret_cast<char*>(buffer_ptr) + offset;
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return;
+    }
+
     try {
+        char *data = reinterpret_cast<char*>(buffer_ptr);
         if (data == NULL) {
             throwFatalException("Failed to get byte array elements of recovery message");
         }
-        ReferenceSerializeInput input(data, remaining);
+        ReferenceSerializeInput input(data+offset, remaining);
         RecoveryProtoMsg message(&input);
         return engine->processRecoveryMessage(&message);
     } catch (FatalException e) {
-        topend->crashVoltDB(e);
+        engine->getTopend()->crashVoltDB(e);
     }
     //ProfilerDisable();
 }
@@ -1115,13 +1111,17 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeProce
  * Method:    nativeHashinate
  * Signature: (JI)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashinate(JNIEnv *env, jobject obj, jlong engine_ptr, jint partitionCount)
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashinate(
+    JNIEnv *env, jobject obj, jlong engine_ptr,
+    jint partitionCount)
 {
     VOLT_DEBUG("nativeHashinate in C++ called");
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    assert(engine);
+    VoltDBEngine *engine = fixupEngine(engine_ptr, env);
+    if (engine == NULL) {
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    }
+
     try {
-        updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
         NValueArray& params = engine->getParameterContainer();
         engine->deserializeParameterSet();
         int retval = voltdb::TheHashinator::hashinate(params[0], partitionCount);
@@ -1139,8 +1139,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
  * Method:    nativeGetThreadLocalPoolAllocations
  * Signature: ()J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetThreadLocalPoolAllocations
-  (JNIEnv *, jclass) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetThreadLocalPoolAllocations(JNIEnv *, jclass)
+{
     return ThreadLocalPool::getPoolAllocationSize();
 }
 
@@ -1149,9 +1149,8 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetT
  * Method:    nativeGetRSS
  * Signature: ()J
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetRSS
-  (JNIEnv *, jclass) {
-
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetRSS(JNIEnv*, jclass)
+{
     // This code only does anything useful on MACOSX.
     // It returns the RSS size in bytes.
     // On linux, procfs is read to get RSS
@@ -1177,8 +1176,8 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetR
  * Method:    deleteCharArrayMemory
  * Signature: (J)V
  */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltcore_utils_DBBPool_deleteCharArrayMemory
-  (JNIEnv *env, jclass clazz, jlong ptr) {
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltcore_utils_DBBPool_deleteCharArrayMemory(JNIEnv*, jclass, jlong ptr)
+{
     delete[] reinterpret_cast<char*>(ptr);
 }
 

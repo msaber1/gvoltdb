@@ -22,6 +22,7 @@
  */
 
 #include "harness.h"
+#include "common/executorcontext.hpp"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
 #include <stdint.h>
@@ -64,15 +65,45 @@ public:
 
 };
 
-class LoggingTest : public Test {
-    public:
-        LoggingTest() : m_logManager(new TestProxy()) {}
-        voltdb::LogManager m_logManager;
+// Define a top end that is useless except to install custom log proxies.
+struct MockTopend : public voltdb::Topend
+{
+    MockTopend(voltdb::LogProxy* logProxy) : Topend(logProxy) { }
+    ~MockTopend() { }
+    int loadNextDependency(int32_t dependencyId, voltdb::Pool *pool, voltdb::Table* destination) { return 0; }
+    void crashVoltDB(const voltdb::FatalException& e) { }
+    int64_t getQueuedExportBytes(int32_t partitionId, const std::string &signature) { return 0; }
+    void pushExportBuffer(
+            int64_t exportGeneration,
+            int32_t partitionId,
+            const std::string &signature,
+            voltdb::StreamBlock *block,
+            bool sync,
+            bool endOfStream) { }
+    void fallbackToEEAllocatedBuffer(char *buffer, size_t length) { /* Do nothing */ }
+};
+
+struct LoggingTest : public Test
+{
+    LoggingTest()
+    : m_logProxy()
+    , m_loggerHolder(&m_logProxy)
+    // Initialize and implicitly install an executor context member
+    // that is useless except to yield the top end's loggers.
+    , m_logAccess(1, 1, NULL, &m_loggerHolder, NULL, false, "", 0) { }
+
+    voltdb::LogManager& logManager() { return m_loggerHolder.getLogManager(); }
+
+
+    TestProxy m_logProxy;
+    MockTopend m_loggerHolder;
+    voltdb::ExecutorContext m_logAccess;
 };
 
 TEST_F(LoggingTest, TestManagerSetLevels) {
     /**
-     * Try and set the level for every logger to every possible level and make sure they are loggable/not loggable as they should be.
+     * Try and set the level for every logger to every possible level
+     * and make sure they are loggable/not loggable as they should be.
      */
     for (int loggerIndex = 0; loggerIndex < numLoggers; loggerIndex++) {
         for (int levelIndex = 0; levelIndex < numLogLevels; levelIndex++) {
@@ -80,17 +111,17 @@ TEST_F(LoggingTest, TestManagerSetLevels) {
             int64_t mask = 7;
             int64_t logLevel = logLevels[levelIndex];
             logLevelsToSet &= ((~logLevel & mask) << (loggerIndex * 3) ^ INT64_MAX) ;
-            m_logManager.setLogLevels(logLevelsToSet);
+            logManager().setLogLevels(logLevelsToSet);
             for (int ii = 1; ii < numLogLevels - 1; ii++) { //Should never log to ALL or OFF
                 for (int zz = 0; zz < numLoggers; zz++) {
                     if (zz == loggerIndex) {
                         if (ii >= levelIndex) {
-                            ASSERT_TRUE(voltdb::LogManager::getThreadLogger(loggerIds[zz])->isLoggable(logLevels[ii]));
+                            ASSERT_TRUE(voltdb::ExecutorContext::logger(loggerIds[zz])->isLoggable(logLevels[ii]));
                         } else {
-                            ASSERT_FALSE(voltdb::LogManager::getThreadLogger(loggerIds[zz])->isLoggable(logLevels[ii]));
+                            ASSERT_FALSE(voltdb::ExecutorContext::logger(loggerIds[zz])->isLoggable(logLevels[ii]));
                         }
                     } else {
-                        ASSERT_FALSE(voltdb::LogManager::getThreadLogger(loggerIds[zz])->isLoggable(logLevels[ii]));
+                        ASSERT_FALSE(voltdb::ExecutorContext::logger(loggerIds[zz])->isLoggable(logLevels[ii]));
                     }
                 }
             }
@@ -108,22 +139,21 @@ TEST_F(LoggingTest, TestLoggerUsesProxyLevels) {
             int64_t mask = 7;
             int64_t logLevel = logLevels[levelIndex];
             logLevelsToSet &= ((~logLevel & mask) << (loggerIndex * 3) ^ INT64_MAX) ;
-            m_logManager.setLogLevels(logLevelsToSet);
+            logManager().setLogLevels(logLevelsToSet);
             for (int ii = 1; ii < numLogLevels - 1; ii++) { //Should never log to ALL or OFF
                 for (int zz = 0; zz < numLoggers; zz++) {
-                    TestProxy *proxy = dynamic_cast<TestProxy*>(const_cast<voltdb::LogProxy*>(m_logManager.getLogProxy()));
-                    proxy->lastLoggerId = voltdb::LOGGERID_INVALID;
+                    m_logProxy.lastLoggerId = voltdb::LOGGERID_INVALID;
                     if (zz == loggerIndex) {
                         if (ii >= levelIndex) {
-                            voltdb::LogManager::getThreadLogger(loggerIds[zz])->log( logLevels[ii], "foo");
-                            ASSERT_NE(static_cast<int>(proxy->lastLoggerId), voltdb::LOGGERID_INVALID);
+                            voltdb::ExecutorContext::logger(loggerIds[zz])->log(logLevels[ii], "foo");
+                            ASSERT_NE(static_cast<int>(m_logProxy.lastLoggerId), voltdb::LOGGERID_INVALID);
                         } else {
-                            voltdb::LogManager::getThreadLogger(loggerIds[zz])->log(logLevels[ii], "foo");
-                            ASSERT_EQ(static_cast<int>(proxy->lastLoggerId), voltdb::LOGGERID_INVALID);
+                            voltdb::ExecutorContext::logger(loggerIds[zz])->log(logLevels[ii], "foo");
+                            ASSERT_EQ(static_cast<int>(m_logProxy.lastLoggerId), voltdb::LOGGERID_INVALID);
                         }
                     } else {
-                        voltdb::LogManager::getThreadLogger(loggerIds[zz])->log(logLevels[ii], "foo");
-                        ASSERT_EQ(static_cast<int>(proxy->lastLoggerId), voltdb::LOGGERID_INVALID);
+                        voltdb::ExecutorContext::logger(loggerIds[zz])->log(logLevels[ii], "foo");
+                        ASSERT_EQ(static_cast<int>(m_logProxy.lastLoggerId), voltdb::LOGGERID_INVALID);
                     }
                 }
             }

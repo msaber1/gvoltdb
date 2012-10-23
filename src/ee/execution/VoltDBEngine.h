@@ -65,9 +65,6 @@
 #include "common/SerializableEEException.h"
 #include "common/DefaultTupleSerializer.h"
 #include "execution/FragmentManager.h"
-#include "logging/LogManager.h"
-#include "logging/LogProxy.h"
-#include "logging/StdoutLogProxy.h"
 #include "plannodes/plannodefragment.h"
 #include "stats/StatsAgent.h"
 #include "storage/TempTableLimits.h"
@@ -122,11 +119,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
           m_staticParams(MAX_PARAM_COUNT),
           m_currentOutputDepId(-1),
           m_currentInputDepId(-1),
-          m_numResultDependencies(0),
-          m_logManager(new StdoutLogProxy()), m_templateSingleLongTable(NULL), m_topend(NULL)
+          m_numResultDependencies(0)
         {}
 
-        VoltDBEngine(Topend *topend, LogProxy *logProxy);
+        VoltDBEngine(Topend *topend);
         bool initialize(int32_t clusterIndex,
                         int64_t siteId,
                         int32_t partitionId,
@@ -146,8 +142,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         Table* getTable(int32_t tableId) const;
         Table* getTable(std::string name) const;
-        // Serializes table_id to out. Returns true if successful.
-        bool serializeTable(int32_t tableId, SerializeOutput* out) const;
+        // Serializes table_id to out. Throws if unsuccessful.
+        void serializeTable(int32_t tableId, SerializeOutput* out) const;
 
         // -------------------------------------------------
         // Execution Functions
@@ -195,7 +191,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                        ReferenceSerializeInput &serializeIn,
                        int64_t txnId, int64_t lastCommittedTxnId);
 
-        void resetReusedResultOutputBuffer(const size_t headerSize = 0);
+        void resetReusedResultOutputBuffer(const size_t headerSize = 0) {
+            m_resultOutput.initializeWithPosition(m_reusedResultBuffer, m_reusedResultCapacity, headerSize);
+            m_exceptionOutput.initializeWithPosition(m_exceptionBuffer, m_exceptionBufferCapacity, headerSize);
+            *reinterpret_cast<int32_t*>(m_exceptionBuffer) = voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
+        }
+
+
         inline ReferenceSerializeOutput* getResultOutputSerializer() { return &m_resultOutput; }
         inline ReferenceSerializeOutput* getExceptionOutputSerializer() { return &m_exceptionOutput; }
         void setBuffers(char *parameter_buffer, int m_parameterBuffercapacity,
@@ -289,10 +291,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                 int64_t now);
 
         inline void purgeStringPool() { m_stringPool.purge(); }
-
-        inline LogManager* getLogManager() {
-            return &m_logManager;
-        }
 
         inline void setUndoToken(int64_t nextUndoToken) {
             if (nextUndoToken == INT64_MAX) {
@@ -501,8 +499,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int32_t m_numResultDependencies;
 
-        LogManager m_logManager;
-
         char *m_templateSingleLongTable;
 
         const static int m_templateSingleLongTableSize
@@ -530,12 +526,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
     private:
         ThreadLocalPool m_tlPool;
 };
-
-inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize) {
-    m_resultOutput.initializeWithPosition(m_reusedResultBuffer, m_reusedResultCapacity, headerSize);
-    m_exceptionOutput.initializeWithPosition(m_exceptionBuffer, m_exceptionBufferCapacity, headerSize);
-    *reinterpret_cast<int32_t*>(m_exceptionBuffer) = voltdb::VOLT_EE_EXCEPTION_TYPE_NONE;
-}
 
 } // namespace voltdb
 

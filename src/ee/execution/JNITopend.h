@@ -18,29 +18,33 @@
 #ifndef JNITOPEND_H_
 #define JNITOPEND_H_
 #include "common/Topend.h"
-#include "common/FatalException.hpp"
-#include "common/Pool.hpp"
+#include "logging/JNILogProxy.h"
 #include <jni.h>
 
 namespace voltdb {
 
 class JNITopend : public Topend {
 public:
-    JNITopend(JNIEnv *env, jobject caller);
+    JNITopend(JNIEnv *env, jobject caller, JavaVM *vm);
     ~JNITopend();
 
-    inline JNITopend* updateJNIEnv(JNIEnv *env) { m_jniEnv = env; return this; }
-    int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
-    void crashVoltDB(FatalException e);
+    void updateJNIEnv(JNIEnv *env)
+    {
+        m_jniEnv = env;
+        m_logProxy->setJNIEnv(env);
+    }
+    int loadNextDependency(int32_t dependencyId, Pool *stringPool, voltdb::Table* destination);
+    void crashVoltDB(const voltdb::FatalException& e);
     int64_t getQueuedExportBytes(int32_t partitionId, const std::string &signature);
     void pushExportBuffer(
             int64_t exportGeneration,
             int32_t partitionId,
             const std::string &signature,
-            StreamBlock *block,
+            voltdb::StreamBlock *block,
             bool sync,
             bool endOfStream);
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
+
 private:
     JNIEnv *m_jniEnv;
 
@@ -55,6 +59,7 @@ private:
     jmethodID m_pushExportBufferMID;
     jmethodID m_getQueuedExportBytesMID;
     jclass m_exportManagerClass;
+    JNILogProxy* m_logProxy;
 };
 
 }

@@ -19,6 +19,7 @@
 #include <iostream>
 
 #include "common/debuglog.h"
+#include "storage/StreamBlock.h"
 #include "storage/table.h"
 
 using namespace std;
@@ -68,7 +69,11 @@ class JNILocalFrameBarrier {
     }
 };
 
-JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecutionEngine(caller) {
+JNITopend::JNITopend(JNIEnv *env, jobject caller, JavaVM *vm)
+  : Topend(JNILogProxy::getJNILogProxy(env, vm))
+  , m_jniEnv(env)
+  , m_javaExecutionEngine(caller)
+{
     // Cache the method id for better performance. It is valid until the JVM unloads the class:
     // http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/design.html#wp17074
     jclass jniClass = m_jniEnv->GetObjectClass(m_javaExecutionEngine);
@@ -207,7 +212,7 @@ int JNITopend::loadNextDependency(int32_t dependencyId, voltdb::Pool *stringPool
     }
 }
 
-void JNITopend::crashVoltDB(FatalException e) {
+void JNITopend::crashVoltDB(const FatalException& e) {
     //Enough references for the reason string, traces array, and traces strings
     JNILocalFrameBarrier jni_frame =
             JNILocalFrameBarrier(

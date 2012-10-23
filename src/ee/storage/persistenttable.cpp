@@ -60,7 +60,7 @@
 #include "common/RecoveryProtoMessage.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
-#include "logging/LogManager.h"
+#include "logging/Logger.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/TupleStreamWrapper.h"
@@ -970,10 +970,10 @@ void PersistentTable::doIdleCompaction() {
 }
 
 void PersistentTable::doForcedCompaction() {
+    const Logger* sqlLogger = ExecutorContext::sqlLogger();
     if (m_recoveryContext != NULL)
     {
-        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,
-            "Deferring compaction until recovery is complete.");
+        sqlLogger->log(LOGLEVEL_INFO, "Deferring compaction until recovery is complete.");
         return;
     }
     bool hadWork1 = true;
@@ -982,7 +982,7 @@ void PersistentTable::doForcedCompaction() {
     char msg[512];
     snprintf(msg, sizeof(msg), "Doing forced compaction with allocated tuple count %zd",
              ((intmax_t)allocatedTupleCount()));
-    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
+    sqlLogger->log(LOGLEVEL_INFO, msg);
 
     int failedCompactionCountBefore = m_failedCompactionCount;
     while (compactionPredicate()) {
@@ -1008,7 +1008,7 @@ void PersistentTable::doForcedCompaction() {
                          "blocks to compact but no blocks were found "
                          "to be eligible for compaction. This has "
                          "occured %d times.", m_failedCompactionCount);
-                LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, msg);
+                sqlLogger->log(LOGLEVEL_ERROR, msg);
             }
             if (m_failedCompactionCount == 0) {
                 printBucketInfo();
@@ -1031,14 +1031,14 @@ void PersistentTable::doForcedCompaction() {
         snprintf(msg, sizeof(msg), "Recovered from a failed compaction scenario "
                 "and compacted to the point that the compaction predicate was "
                 "satisfied after %d failed attempts", failedCompactionCountBefore);
-        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, msg);
+        sqlLogger->log(LOGLEVEL_ERROR, msg);
         m_failedCompactionCount = 0;
     }
 
     assert(!compactionPredicate());
     snprintf(msg, sizeof(msg), "Finished forced compaction with allocated tuple count %zd",
              ((intmax_t)allocatedTupleCount()));
-    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
+    sqlLogger->log(LOGLEVEL_INFO, msg);
 }
 
 void PersistentTable::printBucketInfo() {

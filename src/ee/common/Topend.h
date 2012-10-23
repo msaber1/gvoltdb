@@ -19,12 +19,13 @@
 #define TOPEND_H_
 #include "common/ids.h"
 #include <string>
-#include "common/FatalException.hpp"
-#include "storage/StreamBlock.h"
+#include "logging/LogManager.h"
 
 namespace voltdb {
 class Table;
 class Pool;
+class StreamBlock;
+class FatalException;
 
 /*
  * Topend abstracts the EE's calling interface to Java to
@@ -32,25 +33,26 @@ class Pool;
  * the IPC communication paths.
  */
 class Topend {
-  public:
-    virtual int loadNextDependency(
-        int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
+public:
+    Topend(LogProxy* proxy) : m_logManager(proxy) { };
+    virtual int loadNextDependency(int32_t dependencyId, voltdb::Pool *pool, voltdb::Table* destination) = 0;
 
-    virtual void crashVoltDB(voltdb::FatalException e) = 0;
+    virtual void crashVoltDB(const voltdb::FatalException& e) = 0;
 
     virtual int64_t getQueuedExportBytes(int32_t partitionId, const std::string &signature) = 0;
     virtual void pushExportBuffer(
             int64_t exportGeneration,
             int32_t partitionId,
             const std::string &signature,
-            StreamBlock *block,
+            voltdb::StreamBlock *block,
             bool sync,
             bool endOfStream) = 0;
 
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
-    virtual ~Topend()
-    {
-    }
+    virtual ~Topend() { }
+    LogManager& getLogManager() { return m_logManager; }
+private:
+    LogManager m_logManager;
 };
 
 }

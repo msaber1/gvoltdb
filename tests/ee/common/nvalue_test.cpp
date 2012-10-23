@@ -2088,10 +2088,10 @@ TEST_F(NValueTest, TestLike)
 TEST_F(NValueTest, TestSubstring)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
-    Pool* testPool = new Pool();
+    Pool testPool;
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    ExecutorContext poolHolder(0, 0, wantNoQuantum, topless, &testPool, false, "", 0);
     std::vector<std::string> testData;
     testData.push_back("abcdefg");
     testData.push_back("âbcdéfg");
@@ -2179,17 +2179,15 @@ TEST_F(NValueTest, TestSubstring)
         }
         testString.free();
     }
-    delete poolHolder;
-    delete testPool;
 }
 
 TEST_F(NValueTest, TestExtract)
 {
     assert(ExecutorContext::getExecutorContext() == NULL);
-    Pool* testPool = new Pool();
+    Pool testPool;
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    ExecutorContext poolHolder(0, 0, wantNoQuantum, topless, &testPool, false, "", 0);
 
     NValue result;
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
@@ -2233,9 +2231,6 @@ TEST_F(NValueTest, TestExtract)
     const std::string EXPECTED_SECONDS = "40";
     result = midSeptember.callUnary<FUNC_EXTRACT_SECOND>();
     EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
-
-    delete poolHolder;
-    delete testPool;
 }
 
 int main() {

@@ -139,6 +139,18 @@ class ExecutorContext {
         return singleton->m_topEnd->fallbackToEEAllocatedBuffer(buffer, length);
     }
 
+    /**
+     * Retrieve a logger by ID from the LogManager associated with this thread.
+     * @parameter loggerId ID of the logger to retrieve
+     */
+    inline static const Logger* logger(LoggerId loggerId) {
+        ExecutorContext* singleton = getExecutorContext();
+        return singleton->m_topEnd->getLogManager().getLogger(loggerId);
+    }
+    // SQL is historically the "go to" logger for the EE -- don't know why --paul
+    inline static const Logger* sqlLogger() { return logger(LOGGERID_SQL); }
+
+
     ExecutorContext(int64_t siteId,
                     CatalogId partitionId,
                     UndoQuantum *undoQuantum,

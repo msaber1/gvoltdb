@@ -17,8 +17,9 @@
 
 #include "TempTableLimits.h"
 
+#include "common/executorcontext.hpp"
 #include "common/SQLException.h"
-#include "logging/LogManager.h"
+#include "logging/Logger.h"
 
 #include <cstdio>
 
@@ -66,7 +67,8 @@ TempTableLimits::increaseAllocated(int bytes)
         snprintf(msg, 1024,
                  "More than %d MB of temp table memory used while executing SQL.  This may indicate an operation that should be broken into smaller chunks.",
                  thresh_mb);
-        LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
+        const Logger* sqlLogger = ExecutorContext::sqlLogger();
+        sqlLogger->log(LOGLEVEL_INFO, msg);
     }
 }
 
