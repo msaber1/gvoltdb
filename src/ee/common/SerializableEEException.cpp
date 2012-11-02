@@ -25,18 +25,18 @@ namespace voltdb {
 SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionType, std::string message) :
     m_exceptionType(exceptionType), m_message(message) {}
 
-void SerializableEEException::serialize(ReferenceSerializeOutput *output) {
-    const std::size_t lengthPosition = output->reserveBytes(sizeof(int32_t));
-    output->writeByte(static_cast<int8_t>(m_exceptionType));
+void SerializableEEException::serialize(SerializeOutput &output) {
+    const std::size_t lengthPosition = output.reserveBytes(sizeof(int32_t));
+    output.writeByte(static_cast<int8_t>(m_exceptionType));
     const char *messageBytes = m_message.c_str();
     const std::size_t messageLength = m_message.length();
-    output->writeInt(static_cast<int32_t>(messageLength));
-    output->writeBytes(messageBytes, messageLength);
+    output.writeInt(static_cast<int32_t>(messageLength));
+    output.writeBytes(messageBytes, messageLength);
     p_serialize(output);
     if (m_exceptionType == VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION)
-        output->writeInt(ENGINE_ERRORCODE_ERROR);
-    const int32_t length = static_cast<int32_t>(output->position() - (lengthPosition + sizeof(int32_t)));
-    output->writeIntAt( lengthPosition, length);
+        output.writeInt(ENGINE_ERRORCODE_ERROR);
+    const int32_t length = static_cast<int32_t>(output.position() - (lengthPosition + sizeof(int32_t)));
+    output.writeIntAt(lengthPosition, length);
 }
 
 SerializableEEException::~SerializableEEException() {

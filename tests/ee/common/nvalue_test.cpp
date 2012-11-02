@@ -2091,7 +2091,7 @@ TEST_F(NValueTest, TestSubstring)
     Pool testPool;
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext poolHolder(0, 0, wantNoQuantum, topless, &testPool, false, "", 0);
+    ExecutorContext poolHolder(0, 0, wantNoQuantum, topless, &testPool, NULL, false, "", 0);
     std::vector<std::string> testData;
     testData.push_back("abcdefg");
     testData.push_back("âbcdéfg");
@@ -2187,7 +2187,7 @@ TEST_F(NValueTest, TestExtract)
     Pool testPool;
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext poolHolder(0, 0, wantNoQuantum, topless, &testPool, false, "", 0);
+    ExecutorContext poolHolder(0, 0, wantNoQuantum, topless, &testPool, NULL, false, "", 0);
 
     NValue result;
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);

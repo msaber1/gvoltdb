@@ -73,6 +73,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller, JavaVM *vm)
   : Topend(JNILogProxy::getJNILogProxy(env, vm))
   , m_jniEnv(env)
   , m_javaExecutionEngine(caller)
+  , m_logProxy(dynamic_cast<JNILogProxy*>(const_cast<LogProxy*>(getLogManager().getLogProxy())))
 {
     // Cache the method id for better performance. It is valid until the JVM unloads the class:
     // http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/design.html#wp17074

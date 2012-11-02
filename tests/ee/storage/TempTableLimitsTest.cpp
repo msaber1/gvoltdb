@@ -26,6 +26,7 @@
 #include "harness.h"
 #include "common/executorcontext.hpp"
 #include "common/SQLException.h"
+#include "common/Topend.h"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
 
@@ -89,7 +90,7 @@ struct TempTableLimitsTest : public Test
     , m_loggerHolder(&m_logProxy)
     // Initialize and implicitly install an executor context member
     // that is useless except to yield the top end's loggers.
-    , m_logAccess(1, 1, NULL, &m_loggerHolder, NULL, false, "", 0)
+    , m_logAccess(1, 1, NULL, &m_loggerHolder, NULL, NULL, false, "", 0)
     {
         m_loggerHolder.getLogManager().setLogLevels(0);
     }

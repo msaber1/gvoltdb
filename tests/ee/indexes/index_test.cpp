@@ -96,7 +96,6 @@ public:
     {
         int num_of_columns = 100;
         CatalogId database_id = 1000;
-        vector<boost::shared_ptr<const TableColumn> > columns;
         vector<string> columnNames(num_of_columns);
 
         vector<ValueType> columnTypes(num_of_columns, VALUE_TYPE_BIGINT);
@@ -173,7 +172,7 @@ public:
 
         m_engine = new VoltDBEngine();
         m_exceptionBuffer = new char[4096];
-        m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
+        m_engine->setBuffers(NULL, 0, m_exceptionBuffer, 4096);
         m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
         table = dynamic_cast<PersistentTable*>(
             TableFactory::getPersistentTable(database_id, "test_wide_table",
@@ -272,8 +271,6 @@ public:
                                unique, countable, "dummyId", initiallyNullTupleSchema);
 
         CatalogId database_id = 1000;
-        vector<boost::shared_ptr<const TableColumn> > columns;
-
         vector<string> columnNames(NUM_OF_COLUMNS);
 
         char buffer[32];
@@ -307,7 +304,7 @@ public:
         indexes.push_back(index);
         m_engine = new VoltDBEngine();
         m_exceptionBuffer = new char[4096];
-        m_engine->setBuffers( NULL, 0, NULL, 0, m_exceptionBuffer, 4096);
+        m_engine->setBuffers(NULL, 0, m_exceptionBuffer, 4096);
         m_engine->initialize(0, 0, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 1);
         table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames));
 

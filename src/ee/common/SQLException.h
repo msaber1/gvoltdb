@@ -22,7 +22,6 @@
 
 #define throwDynamicSQLException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::SQLException( SQLException::dynamic_sql_error, reallysuperbig_nonce_message); }
 namespace voltdb {
-class ReferenceSerializeOutput;
 
 class SQLException : public SerializableEEException {
 public:
@@ -60,7 +59,7 @@ public:
     int getInternalFlags() const { return m_internalFlags; }
 
 protected:
-    void p_serialize(ReferenceSerializeOutput *output);
+    void p_serialize(SerializeOutput &output);
 private:
     std::string m_sqlState;
 

@@ -62,7 +62,6 @@
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
-#include "storage/persistenttable.h"
 
 using namespace voltdb;
 

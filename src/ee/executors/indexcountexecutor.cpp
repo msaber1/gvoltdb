@@ -26,7 +26,6 @@
 #include "indexes/tableindex.h"
 #include "plannodes/indexcountnode.h"
 #include "storage/temptable.h"
-#include "storage/persistenttable.h"
 
 using namespace voltdb;
 
@@ -71,10 +70,7 @@ bool IndexCountExecutor::p_init()
     assert(m_outputTable);
     assert(m_outputTable == node->getOutputTable());
     assert(m_outputTable == dynamic_cast<TempTable*>(m_outputTable));
-
-    //target table should be persistenttable
     assert(m_targetTable);
-    assert(m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable));
     m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
 
     assert(m_numOfColumns == 1);

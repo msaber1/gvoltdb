@@ -18,9 +18,6 @@
 #ifndef HSTOREFUNCTIONEXPRESSION_H
 #define HSTOREFUNCTIONEXPRESSION_H
 
-//#include "common/common.h"
-//#include "common/serializeio.h"
-
 #include "expressions/abstractexpression.h"
 
 // IMPORTANT: These FUNC_... values must be kept synchronized with those listed in the following hsql parser source files:

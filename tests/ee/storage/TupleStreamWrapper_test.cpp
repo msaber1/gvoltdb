@@ -99,7 +99,7 @@ public:
 class TupleStreamWrapperTest : public Test {
 public:
     TupleStreamWrapperTest() : m_schema(initSchema()), m_tuple(m_schema),
-        m_context( 1, 1, NULL, &m_topend, NULL, true, "localhost", 2), m_wrapper() {
+        m_context( 1, 1, NULL, &m_topend, NULL, NULL, true, "localhost", 2), m_wrapper() {
         srand(0);
         // excercise a smaller buffer capacity
         m_wrapper.setDefaultCapacity(BUFFER_SIZE);
@@ -129,7 +129,7 @@ public:
 
     void appendTuple(int64_t lastCommittedTxnId, int64_t currentTxnId)
     {
-        ExecutorContext::setupTxnIdsForPlanFragments(currentTxnId, lastCommittedTxnId);
+        m_context.setupTxnIdsForPlanFragments(currentTxnId, lastCommittedTxnId);
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {
             int value = rand();
@@ -142,7 +142,7 @@ public:
 
     void periodicFlush(int64_t lastCommittedTxnId,
                        int64_t currentTxnId) {
-        ExecutorContext::setupTxnIdsForPlanFragments(currentTxnId, lastCommittedTxnId);
+        m_context.setupTxnIdsForPlanFragments(currentTxnId, lastCommittedTxnId);
         m_wrapper.periodicFlush(-1);
     }
 

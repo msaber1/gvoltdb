@@ -43,13 +43,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "table.h"
+
 #include <sstream>
 #include <cassert>
 #include <cstdio>
 #include <boost/foreach.hpp>
 #include <boost/scoped_array.hpp>
 
-#include "table.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/TupleSchema.h"

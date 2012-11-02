@@ -459,9 +459,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSetBu
     int exceptionBufferCapacity = exception_buffer_size;
 
     try {
-        engine->setBuffers(parameterBuffer, parameterBufferCapacity,
-            reusedResultBuffer, reusedResultBufferCapacity,
-            exceptionBuffer, exceptionBufferCapacity);
+        JNITopend* topend = static_cast<JNITopend*>(engine->getTopend());
+        topend->setParameterBuffer(parameterBuffer, parameterBufferCapacity);
+        engine->setBuffers(reusedResultBuffer, reusedResultBufferCapacity,
+                           exceptionBuffer, exceptionBufferCapacity);
     } catch (FatalException e) {
         engine->getTopend()->crashVoltDB(e);
     }
@@ -491,9 +492,12 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
     }
 
     try {
+        JNITopend* topend = static_cast<JNITopend*>(engine->getTopend());
+        int parameterBufferCapacity = 0;
+        const char* parameterBuffer = topend->getParameterBuffer(&parameterBufferCapacity);
+        engine->deserializeParameterSet(parameterBuffer, parameterBufferCapacity);
         engine->setUndoToken(undoToken);
         engine->resetReusedResultOutputBuffer();
-        engine->deserializeParameterSet();
         const int retval = engine->executeQuery(plan_fragment_id, outputDependencyId, inputDependencyId, txnId, lastCommittedTxnId, true, true);
         return retval;
     } catch (FatalException e) {
@@ -521,10 +525,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadP
     jbyte *str = env->GetByteArrayElements(plan, NULL);
     assert(str);
 
-    // get the buffer to write results to
-    engine->resetReusedResultOutputBuffer();
-    ReferenceSerializeOutput* out = engine->getResultOutputSerializer();
-
     // output from the engine's loadFragment method
     int64_t fragId = 0;
     bool wasHit = 0;
@@ -545,9 +545,12 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadP
     env->ReleaseByteArrayElements(plan, str, JNI_ABORT);
 
     // write results back to java
-    out->writeLong(fragId);
-    out->writeBool(wasHit);
-    out->writeLong(cacheSize);
+    // get the buffer to write results to
+    engine->resetReusedResultOutputBuffer();
+    ReferenceSerializeOutput& out = engine->getResultOutputSerializer();
+    out.writeLong(fragId);
+    out.writeBool(wasHit);
+    out.writeLong(cacheSize);
 
     if (result == 1)
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
@@ -579,9 +582,13 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
     }
 
     try {
+        JNITopend* topend = static_cast<JNITopend*>(engine->getTopend());
+        int parameterBufferCapacity = 0;
+        const char* parameterBuffer = topend->getParameterBuffer(&parameterBufferCapacity);
+        engine->deserializeParameterSet(parameterBuffer, parameterBufferCapacity);
+
         engine->resetReusedResultOutputBuffer();
         engine->setUndoToken(undoToken);
-        engine->deserializeParameterSet();
 
         // fragment info
         int batch_size = num_fragments;
@@ -1122,11 +1129,11 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
     }
 
     try {
-        NValueArray& params = engine->getParameterContainer();
-        engine->deserializeParameterSet();
-        int retval = voltdb::TheHashinator::hashinate(params[0], partitionCount);
-        engine->purgeStringPool();
-        return retval;
+        JNITopend* topend = static_cast<JNITopend*>(engine->getTopend());
+        int parameterBufferCapacity = 0;
+        const char* parameterBuffer = topend->getParameterBuffer(&parameterBufferCapacity);
+        engine->deserializeParameterSet(parameterBuffer, parameterBufferCapacity);
+        return engine->hashinate(partitionCount);
     } catch (FatalException e) {
         std::cout << "HASHINATE ERROR: " << e.m_reason << std::endl;
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;

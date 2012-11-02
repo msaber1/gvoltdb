@@ -203,6 +203,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_currentUndoQuantum,
                                             getTopend(),
                                             &m_stringPool,
+                                            &m_staticParams,
                                             false,
                                             hostname,
                                             hostId);
@@ -308,8 +309,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
      */
     if (first) {
         // configure the execution context.
-        ExecutorContext::setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId,
-                                                     m_usedParamcnt, getParameterContainer());
+        m_executorContext->setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId);
         m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int32_t) + sizeof(int8_t));
         m_dirtyFragmentBatch = false;
     }
@@ -372,7 +372,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             if (cleanUpTable != NULL)
                 cleanUpTable->deleteAllTuples(false);
             resetReusedResultOutputBuffer();
-            e.serialize(getExceptionOutputSerializer());
+            e.serialize(m_exceptionOutput);
 
             // set these back to -1 for error handling
             m_currentOutputDepId = -1;
@@ -508,6 +508,7 @@ bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload
 
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
+
     m_catalog->execute(catalogPayload);
 
 
@@ -815,7 +816,6 @@ void
 VoltDBEngine::deserializeParameterSet(const char *parameter_buffer, int parameter_buffer_capacity)
 {
     ReferenceSerializeInput serialize_in(parameter_buffer, parameter_buffer_capacity);
-    NValueArray &params = getParameterContainer();
     int cnt = serialize_in.readShort();
     if (cnt < 0) {
         throwFatalException( "parameter count is negative: %d", cnt);
@@ -823,17 +823,10 @@ VoltDBEngine::deserializeParameterSet(const char *parameter_buffer, int paramete
     assert (cnt < MAX_PARAM_COUNT);
 
     for (int i = 0; i < cnt; ++i) {
-        params[i] = NValue::deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
+        m_staticParams[i] = NValue::deserializeFromAllocateForStorage(serialize_in, &m_stringPool);
     }
     m_usedParamcnt = cnt;
 }
-
-void
-VoltDBEngine::deserializeParameterSet()
-{
-    deserializeParameterSet(m_parameterBuffer, m_parameterBufferCapacity);
-}
-
 
 void
 VoltDBEngine::setUndoQuantum(UndoQuantum *undoQuantum)
@@ -847,7 +840,7 @@ VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInput &serializeIn,
                         int64_t txnId, int64_t lastCommittedTxnId)
 {
-    ExecutorContext::setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId);
+    m_executorContext->setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId);
 
     Table* ret = getTable(tableId);
     if (ret == NULL) {
@@ -1139,19 +1132,6 @@ int VoltDBEngine::getResultsSize() const {
     return static_cast<int>(m_resultOutput.size());
 }
 
-void VoltDBEngine::setBuffers(char *parameterBuffer, int parameterBuffercapacity,
-        char *resultBuffer, int resultBufferCapacity,
-        char *exceptionBuffer, int exceptionBufferCapacity) {
-    m_parameterBuffer = parameterBuffer;
-    m_parameterBufferCapacity = parameterBuffercapacity;
-
-    m_reusedResultBuffer = resultBuffer;
-    m_reusedResultCapacity = resultBufferCapacity;
-
-    m_exceptionBuffer = exceptionBuffer;
-    m_exceptionBufferCapacity = exceptionBufferCapacity;
-}
-
 // -------------------------------------------------
 // MISC FUNCTIONS
 // -------------------------------------------------
@@ -1284,8 +1264,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                                           message);
         }
     } catch (SerializableEEException &e) {
-        resetReusedResultOutputBuffer();
-        e.serialize(getExceptionOutputSerializer());
+        e.serialize(m_exceptionOutput);
         return -1;
     }
 
@@ -1483,4 +1462,12 @@ size_t VoltDBEngine::tableHashCode(int32_t tableId) {
     }
     return table->hashCode();
 }
+
+int VoltDBEngine::hashinate(int32_t partitionCount)
+{
+    int retval = voltdb::TheHashinator::hashinate(m_staticParams[0], partitionCount);
+    purgeStringPool();
+    return retval;
+}
+
 }

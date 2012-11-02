@@ -87,7 +87,7 @@ public:
         m_topend(),
         m_pool(),
         m_quantum(new (m_pool) UndoQuantum(0, &m_pool)),
-        m_context(0, 0, m_quantum, &m_topend, &m_pool, true, "", 0),
+        m_context(0, 0, m_quantum, &m_topend, &m_pool, NULL, true, "", 0),
         // a simple helper around the StreamedTable constructor that sets the
         // wrapper buffer size to the specified value
         m_table(StreamedTable::createForTest(1024)),

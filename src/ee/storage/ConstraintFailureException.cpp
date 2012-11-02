@@ -40,18 +40,18 @@ ConstraintFailureException::ConstraintFailureException(
         assert(!tuple.isNullTuple());
 }
 
-void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) {
+void ConstraintFailureException::p_serialize(SerializeOutput &output) {
     SQLException::p_serialize(output);
-    output->writeInt(m_type);
-    output->writeTextString(m_table->name());
-    std::size_t tableSizePosition = output->reserveBytes(4);
+    output.writeInt(m_type);
+    output.writeTextString(m_table->name());
+    std::size_t tableSizePosition = output.reserveBytes(4);
     TableTuple tuples[] = { m_tuple, m_otherTuple };
     if (m_otherTuple.isNullTuple()) {
-        m_table->serializeTupleTo(*output, tuples, 1);
+        m_table->serializeTupleTo(output, tuples, 1);
     } else {
-        m_table->serializeTupleTo(*output, tuples, 2);
+        m_table->serializeTupleTo(output, tuples, 2);
     }
-    output->writeIntAt(tableSizePosition, static_cast<int32_t>(output->position() - tableSizePosition - 4));
+    output.writeIntAt(tableSizePosition, static_cast<int32_t>(output.position() - tableSizePosition - 4));
 }
 ConstraintFailureException::~ConstraintFailureException() {
     // TODO Auto-generated destructor stub

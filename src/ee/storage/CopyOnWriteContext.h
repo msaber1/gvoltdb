@@ -17,18 +17,22 @@
 #ifndef COPYONWRITECONTEXT_H_
 #define COPYONWRITECONTEXT_H_
 
-#include <vector>
-#include <utility>
-#include "common/TupleSerializer.h"
-#include "storage/persistenttable.h"
-#include "common/Pool.hpp"
 #include "common/tabletuple.h"
+#include "common/types.h"
+#include "storage/TupleBlock.h"
+
 #include "boost/scoped_ptr.hpp"
+#include <utility>
+#include <vector>
 
 namespace voltdb {
-class TupleIterator;
+class PersistentTable;
+class Pool;
+class ReferenceSerializeOutput;
+class TableTuple;
 class TempTable;
-class ReferenceSerializeOut;
+class TupleIterator;
+class TupleSerializer;
 
 class CopyOnWriteContext {
 public:

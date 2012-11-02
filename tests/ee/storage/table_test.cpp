@@ -103,7 +103,6 @@ public:
 protected:
     void init(bool xact) {
         CatalogId database_id = 1000;
-        vector<boost::shared_ptr<const TableColumn> > columns;
         char buffer[32];
 
         vector<string> columnNames(NUM_OF_COLUMNS);

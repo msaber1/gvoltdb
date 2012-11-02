@@ -179,7 +179,7 @@ public:
         }
         }
         m_engine->setUndoToken(++m_undoToken);
-        ExecutorContext::setupTxnIdsForPlanFragments(0, 0);
+        ExecutorContext::setupTxnIdsForPlanFragmentsForTesting(0, 0);
         m_tuplesDeletedInLastUndo = 0;
         m_tuplesInsertedInLastUndo = 0;
     }
@@ -403,7 +403,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 //#endif
     addRandomUniqueTuples(tupleCount);
     m_engine->setUndoToken(0);
-    ExecutorContext::setupTxnIdsForPlanFragments(0, 0);
+    ExecutorContext::setupTxnIdsForPlanFragmentsForTesting(0, 0);
     DefaultTupleSerializer serializer;
     TableTuple tuple(m_table->schema());
     for (int qq = 0; qq < 10; qq++) {
@@ -501,7 +501,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
 #endif
     addRandomUniqueTuples(tupleCount);
     m_engine->setUndoToken(0);
-    ExecutorContext::setupTxnIdsForPlanFragments(0, 0);
+    ExecutorContext::setupTxnIdsForPlanFragmentsForTesting(0, 0);
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
         stx::btree_set<int64_t> originalTuples;
@@ -549,7 +549,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             }
             m_engine->undoUndoToken(m_undoToken);
             m_engine->setUndoToken(++m_undoToken);
-            ExecutorContext::setupTxnIdsForPlanFragments(0, 0);
+            ExecutorContext::setupTxnIdsForPlanFragmentsForTesting(0, 0);
         }
 
         std::vector<int64_t> diff;

@@ -347,9 +347,9 @@ TEST_F(FilterTest, SubstituteFilter) {
     Pool* noPool = NULL;
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext paramHolder(0, 0, wantNoQuantum, topless, noPool, false, "", 0);
     NValueArray params(1);
-    ExecutorContext::setupTxnIdsForPlanFragments(0, 0, 1, params);
+    ExecutorContext paramHolder(0, 0, wantNoQuantum, topless, noPool, &params, false, "", 0);
+    paramHolder.setupTxnIdsForPlanFragments(0, 0);
 
     // WHERE id <= 20 AND val4=$1
 

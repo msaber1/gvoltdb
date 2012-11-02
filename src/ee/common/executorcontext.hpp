@@ -19,10 +19,11 @@
 #define _EXECUTORCONTEXT_HPP_
 
 #include "common/common.h"
-#include "common/Topend.h"
 #include "common/valuevector.h"
+#include "logging/LogDefs.h"
 
 namespace voltdb {
+class Logger;
 class StreamBlock;
 class Topend;
 class UndoQuantum;
@@ -57,14 +58,19 @@ class ExecutorContext {
     void setupForQuiesce(int64_t lastCommittedTxnId) { m_lastCommittedTxnId = lastCommittedTxnId; }
 
     // helper to configure the context for a new jni call
-    static void setupTxnIdsForPlanFragments(int64_t txnId, int64_t lastCommittedTxnId)
+    void setupForPlanFragments(UndoQuantum *undoQuantum) { m_undoQuantum = undoQuantum; }
+
+    void setupTxnIdsForPlanFragments(int64_t txnId, int64_t lastCommittedTxnId)
     {
-        ExecutorContext* singleton = getExecutorContext();
-        singleton->m_txnId = txnId;
-        singleton->m_lastCommittedTxnId = lastCommittedTxnId;
+        m_txnId = txnId;
+        m_lastCommittedTxnId = lastCommittedTxnId;
     }
 
-    void setupForPlanFragments(UndoQuantum *undoQuantum) { m_undoQuantum = undoQuantum; }
+    static void setupTxnIdsForPlanFragmentsForTesting(int64_t txnId, int64_t lastCommittedTxnId)
+    {
+        ExecutorContext* singleton = getExecutorContext();
+        singleton->setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId);
+    }
 
     static UndoQuantum *currentUndoQuantum() { return getExecutorContext()->m_undoQuantum; }
 
@@ -91,64 +97,25 @@ class ExecutorContext {
         return singleton->m_tempStringPool;
     }
 
-    static void setupTxnIdsForPlanFragments(int64_t txnId, int64_t lastCommittedTxnId,
-                                            int paramcnt, const NValueArray &params)
-    {
-        ExecutorContext* singleton = getExecutorContext();
-        singleton->m_txnId = txnId;
-        singleton->m_lastCommittedTxnId = lastCommittedTxnId;
-        singleton->m_params = &params;
-        singleton->m_paramCnt = paramcnt;
-    }
-
     static const NValueArray& getParams() { return *(getExecutorContext()->m_params); }
-
-    static int getUsedParamcnt() { return getExecutorContext()->m_paramCnt; }
 
     void enableExportFeature() { m_exportFeatureEnabled = true; }
 
     static bool exportFeatureIsEnabled() { return getExecutorContext()->m_exportFeatureEnabled; }
 
-    static void pushExportBuffer(int64_t exportGeneration, const std::string &signature, StreamBlock *block)
-    {
-        ExecutorContext* singleton = getExecutorContext();
-        singleton->m_topEnd->pushExportBuffer(exportGeneration, singleton->m_partitionId, signature, block, false, false);
-    }
-
-    static void syncExportBuffer(int64_t exportGeneration, const std::string &signature)
-    {
-        ExecutorContext* singleton = getExecutorContext();
-        singleton->m_topEnd->pushExportBuffer(exportGeneration, singleton->m_partitionId, signature, NULL, true, false);
-    }
-
-    static void endExportBuffer(int64_t exportGeneration, const std::string &signature)
-    {
-        ExecutorContext* singleton = getExecutorContext();
-        singleton->m_topEnd->pushExportBuffer(exportGeneration, singleton->m_partitionId, signature, NULL, false, true);
-    }
-
-    static int64_t getQueuedExportBytes(const std::string &signature)
-    {
-        ExecutorContext* singleton = getExecutorContext();
-        return singleton->m_topEnd->getQueuedExportBytes( singleton->m_partitionId, signature);
-    }
-
-    static void fallbackToEEAllocatedBuffer(char *buffer, size_t length)
-    {
-        ExecutorContext* singleton = getExecutorContext();
-        return singleton->m_topEnd->fallbackToEEAllocatedBuffer(buffer, length);
-    }
+    static void pushExportBuffer(int64_t exportGeneration, const std::string &signature, StreamBlock *block);
+    static void syncExportBuffer(int64_t exportGeneration, const std::string &signature);
+    static void endExportBuffer(int64_t exportGeneration, const std::string &signature);
+    static int64_t getQueuedExportBytes(const std::string &signature);
+    static void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
     /**
      * Retrieve a logger by ID from the LogManager associated with this thread.
      * @parameter loggerId ID of the logger to retrieve
      */
-    inline static const Logger* logger(LoggerId loggerId) {
-        ExecutorContext* singleton = getExecutorContext();
-        return singleton->m_topEnd->getLogManager().getLogger(loggerId);
-    }
+    static const Logger* logger(LoggerId loggerId);
     // SQL is historically the "go to" logger for the EE -- don't know why --paul
-    inline static const Logger* sqlLogger() { return logger(LOGGERID_SQL); }
+    static const Logger* sqlLogger() { return logger(LOGGERID_SQL); }
 
 
     ExecutorContext(int64_t siteId,
@@ -156,13 +123,13 @@ class ExecutorContext {
                     UndoQuantum *undoQuantum,
                     Topend* topend,
                     Pool* tempStringPool,
+                    const NValueArray* params,
                     bool exportEnabled,
                     std::string hostname,
                     CatalogId hostId) :
         m_topEnd(topend), m_tempStringPool(tempStringPool),
         m_undoQuantum(undoQuantum), m_txnId(0), m_lastCommittedTxnId(0),
-        m_params(NULL),
-        m_paramCnt(0),
+        m_params(params),
         m_siteId(siteId), m_partitionId(partitionId),
         m_hostname(hostname), m_hostId(hostId),
         m_epoch(0), m_exportFeatureEnabled(exportEnabled) // reset later
@@ -181,7 +148,6 @@ class ExecutorContext {
     int64_t m_txnId;
     int64_t m_lastCommittedTxnId;
     const NValueArray* m_params;
-    int m_paramCnt;
 
   public:
     int64_t const m_siteId;

@@ -18,20 +18,15 @@
 #ifndef STREAMEDTABLE_H
 #define STREAMEDTABLE_H
 
-#include <vector>
-
 #include "common/ids.h"
 #include "table.h"
 #include "storage/StreamedTableStats.h"
 #include "storage/TableStats.h"
+#include "storage/TupleBlock.h"
 
 namespace voltdb {
 
-// forward decl.
-class Topend;
-class ExecutorContext;
 class TupleStreamWrapper;
-class StreamedTableUndoAction;
 
 /**
  * A streamed table does not store data. It may not be read. It may

@@ -33,6 +33,19 @@ public:
         m_jniEnv = env;
         m_logProxy->setJNIEnv(env);
     }
+
+    void setParameterBuffer(const char* parameterBuffer, int parameterBufferCapacity)
+    {
+        m_parameterBuffer = parameterBuffer;
+        m_parameterBufferCapacity = parameterBufferCapacity;
+    }
+
+    const char* getParameterBuffer(int *parameterBufferCapacity)
+    {
+        *parameterBufferCapacity = m_parameterBufferCapacity;
+        return m_parameterBuffer;
+    }
+
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, voltdb::Table* destination);
     void crashVoltDB(const voltdb::FatalException& e);
     int64_t getQueuedExportBytes(int32_t partitionId, const std::string &signature);
@@ -60,6 +73,12 @@ private:
     jmethodID m_getQueuedExportBytesMID;
     jclass m_exportManagerClass;
     JNILogProxy* m_logProxy;
+    /** buffer object to pass parameters to EE. */
+    const char* m_parameterBuffer;
+    /** size of parameter_buffer. */
+    int m_parameterBufferCapacity;
+
+
 };
 
 }

@@ -43,8 +43,7 @@ class AddDropTableTest : public Test {
         : m_clusterId(0), m_databaseId(0), m_siteId(0), m_partitionId(0),
           m_hostId(101), m_hostName("host101")
     {
-        m_engine.setBuffers(NULL, 0,
-                            m_resultBuffer, sizeof(m_resultBuffer), m_exceptionBuffer, sizeof(m_exceptionBuffer));
+        m_engine.setBuffers(m_resultBuffer, sizeof(m_resultBuffer), m_exceptionBuffer, sizeof(m_exceptionBuffer));
         m_engine.resetReusedResultOutputBuffer();
         m_engine.initialize(m_clusterId, m_siteId, m_partitionId,
                             m_hostId, m_hostName, DEFAULT_TEMP_TABLE_MEMORY, 3);

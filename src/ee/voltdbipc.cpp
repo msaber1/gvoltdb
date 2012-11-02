@@ -95,7 +95,7 @@ static Topend *s_currentTopEnd = NULL;
 
 static VoltDBEngine *s_engine = NULL;
 static int s_fd = -1;
-static char s_reusedResultBuffer[MAX_MSG_SZ];
+static char s_reusedResultBuffer[MAX_MSG_SZ+1];//+1 for ipc's error code prefix.
 static char s_exceptionBuffer[MAX_MSG_SZ];
 static bool s_terminate = false;
 
@@ -158,7 +158,7 @@ static void sendSerializedResult(size_t position)
 
 static void sendException()
 {
-    const int32_t* exceptionData = reinterpret_cast<const int32_t*>(s_engine->getExceptionOutputSerializer()->data());
+    const int32_t* exceptionData = reinterpret_cast<const int32_t*>(s_exceptionBuffer);
     // The exception is serialized preceded by its normalized 4-byte length.
     // Denormalize the length and use it to size up the write of the length-prefixed exception.
     int32_t exceptionLength = ntoh(*exceptionData);
@@ -269,7 +269,8 @@ static int8_t initialize(ipc_command *cmd)
     // That's why VoltDBIPCTopEnd implements the Topend interface.
     s_engine = new VoltDBEngine(s_currentTopEnd);
     s_currentTopEnd->getLogManager().setLogLevels(logLevels);
-    s_engine->setBuffers( NULL, 0, s_reusedResultBuffer, MAX_MSG_SZ, s_exceptionBuffer, MAX_MSG_SZ);
+    // offset by +1 reserves 1 byte for ipc to add its prefix code without disturbing the engine.
+    s_engine->setBuffers(s_reusedResultBuffer+1, MAX_MSG_SZ, s_exceptionBuffer, MAX_MSG_SZ);
     if (s_engine->initialize(clusterId,
                              siteId,
                              partitionId,
@@ -372,7 +373,6 @@ static int8_t executePlanFragments(ipc_command *cmd)
     const char* parameterset = reinterpret_cast<const char*>(inputDepId + numFrags);
     long int usedsize = parameterset - reinterpret_cast<const char*>(cmd);
     int sz = static_cast<int>(ntoh(cmd->msgsize) - usedsize);
-    s_engine->deserializeParameterSet(parameterset, sz);
 
     if (0)
         cout << "executepfs:" << " txnId=" << ntoh(cs->txnId)
@@ -382,7 +382,8 @@ static int8_t executePlanFragments(ipc_command *cmd)
                   << " numFragIds=" << numFrags << endl;
 
     // and reset to space for the results output
-    s_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
+    s_engine->deserializeParameterSet(parameterset, sz);
+    s_engine->resetReusedResultOutputBuffer();
     s_engine->setUndoToken(ntoh(cs->undoToken));
     for (int i = 0; i < numFrags; ++i) {
         if (s_engine->executeQuery(ntoh(fragmentId[i]),
@@ -518,12 +519,11 @@ static int8_t getStats(struct ipc_command *cmd)
         sendException();
         return kErrorCode_None;
     }
-    const int8_t successResult = kErrorCode_Success;
-    writeOrDie(&successResult, sizeof(int8_t));
+    s_reusedResultBuffer[0] = static_cast<char>(kErrorCode_Success);
     // write the results array back across the wire
     // the result set includes the total serialization size
     const int32_t size = s_engine->getResultsSize();
-    writeOrDie(s_reusedResultBuffer, size);
+    writeOrDie(s_reusedResultBuffer, size+1);
     return kErrorCode_None;
 }
 
@@ -673,16 +673,12 @@ static int8_t hashinate(ipc_command* cmd)
     }__attribute__((packed));
     cmd_structure* cs = reinterpret_cast<cmd_structure*>(cmd+1);
 
-    NValueArray& params = s_engine->getParameterContainer();
-
-    int32_t partCount = ntoh(cs->partitionCount);
+    int32_t partitionCount = ntoh(cs->partitionCount);
     char* paramData = cs->data;
     int sz = static_cast<int> (ntoh(cmd->msgsize) - sizeof(cmd_structure));
 
-    int retval = -1;
     s_engine->deserializeParameterSet(paramData, sz);
-    retval = TheHashinator::hashinate(params[0], partCount);
-    s_engine->purgeStringPool();
+    int retval = s_engine->hashinate(partitionCount);
 
     char response[5];
     response[0] = kErrorCode_Success;

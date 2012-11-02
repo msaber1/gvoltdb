@@ -15,17 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "stats/StatsAgent.h"
-#include "stats/StatsSource.h"
-#include "common/ids.h"
-#include "common/tabletuple.h"
-#include "common/TupleSchema.h"
 #include "indexes/IndexStats.h"
 #include "storage/PersistentTableStats.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
 #include <cassert>
 #include <string>
-#include <vector>
 
 using namespace voltdb;
 using namespace std;

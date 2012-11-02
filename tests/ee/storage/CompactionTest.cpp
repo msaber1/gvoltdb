@@ -22,9 +22,10 @@
  */
 
 #include "harness.h"
+#include "common/NValue.hpp"
+#include "common/Topend.h"
 #include "common/TupleSchema.h"
 #include "common/types.h"
-#include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "execution/VoltDBEngine.h"
@@ -216,7 +217,7 @@ public:
         }
         }
         m_engine->setUndoToken(++m_undoToken);
-        ExecutorContext::setupTxnIdsForPlanFragments(0, 0);
+        ExecutorContext::setupTxnIdsForPlanFragmentsForTesting(0, 0);
         m_tuplesDeletedInLastUndo = 0;
         m_tuplesInsertedInLastUndo = 0;
     }

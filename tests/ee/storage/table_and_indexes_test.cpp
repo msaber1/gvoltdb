@@ -49,7 +49,7 @@ class TableAndIndexTest : public Test {
             mem(0),
             limits(),
             dummyUndo(),
-            engine(0, 0, &dummyUndo, NULL, NULL, false, "", 0)
+            engine(0, 0, &dummyUndo, NULL, NULL, NULL, false, "", 0)
          {
             vector<voltdb::ValueType> districtColumnTypes;
             vector<int32_t> districtColumnLengths;

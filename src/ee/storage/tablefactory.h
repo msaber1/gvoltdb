@@ -63,8 +63,7 @@ public:
     /**
     * Creates an empty persistent table with given name, columns, PK index, other indexes, partition column, etc.
     * Every PersistentTable must be instantiated via this method.
-    * Also, columns can't be added/changed/removed after a PersistentTable
-    * instance is made. TableColumn is immutable.
+    * Also, columns can't be added/changed/removed after a PersistentTable instance is made.
     */
     static Table* getPersistentTable(
         voltdb::CatalogId databaseId,

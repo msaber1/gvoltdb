@@ -48,16 +48,12 @@
 
 #include "common/common.h"
 #include "common/TupleSchema.h"
-#include "common/Pool.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/FatalException.hpp"
-#include "common/ExportSerializeIo.h"
 
 #include <cassert>
 #include <ostream>
 #include <iostream>
-
-class CopyOnWriteTest_TestTableTupleFlags;
 
 namespace voltdb {
 
@@ -68,19 +64,14 @@ namespace voltdb {
 #define PENDING_DELETE_MASK 4
 #define PENDING_DELETE_ON_UNDO_RELEASE_MASK 8
 
-class TableColumn;
-
 class TableTuple {
-    friend class TableFactory;
     friend class Table;
     friend class TempTable;
     friend class PersistentTable;
     friend class PersistentTableUndoDeleteAction;
     friend class PersistentTableUndoUpdateAction;
-    friend class CopyOnWriteIterator;
     friend class CopyOnWriteContext;
-    friend class ::CopyOnWriteTest_TestTableTupleFlags;
-    template<std::size_t keySize> friend class IntsKey;
+    friend class CopyOnWriteIterator;
     template<std::size_t keySize> friend class GenericKey;
 
 public:

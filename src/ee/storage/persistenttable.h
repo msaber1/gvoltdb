@@ -46,36 +46,29 @@
 #ifndef HSTOREPERSISTENTTABLE_H
 #define HSTOREPERSISTENTTABLE_H
 
-#include <string>
-#include <vector>
+#include "storage/table.h"
+#include "common/UndoQuantumReleaseInterest.h"
+
 #include <cassert>
 #include "boost/shared_ptr.hpp"
 #include "boost/scoped_ptr.hpp"
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
-#include "storage/table.h"
 #include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
 #include "storage/CopyOnWriteContext.h"
 #include "storage/RecoveryContext.h"
-#include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
+
+class CompactionTest_BasicCompaction;
+class CompactionTest_CompactionWithCopyOnWrite;
 
 namespace voltdb {
 
-class TableColumn;
-class TableIndex;
-class TableIterator;
-class TableFactory;
-class TupleSerializer;
-class SerializeInput;
-class Topend;
-class ReferenceSerializeOutput;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
-class PersistentTableUndoDeleteAction;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -91,7 +84,7 @@ class PersistentTableUndoDeleteAction;
  * tuples, assuming every PersistentTable has a Primary Key index.
  *
  * Currently, constraints are not-null constraint and unique
- * constraint.  Not-null constraint is just a flag of TableColumn and
+ * constraint.  Not-null constraint is
  * checked against insertion and update. Unique constraint is also
  * just a flag of TableIndex and checked against insertion and
  * update. There's no rule constraint or foreign key constraint so far
@@ -107,12 +100,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class CopyOnWriteContext;
     friend class CopyOnWriteIterator;
     friend class TableFactory;
-    friend class TableTuple;
-    friend class TableIndex;
-    friend class TableIterator;
-    friend class PersistentTableStats;
     friend class PersistentTableUndoDeleteAction;
-    friend class ::CopyOnWriteTest_CopyOnWriteIterator;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
   private:

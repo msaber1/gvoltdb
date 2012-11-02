@@ -17,6 +17,7 @@
 #include "common/executorcontext.hpp"
 
 #include "common/debuglog.h"
+#include "common/Topend.h"
 
 #include <pthread.h>
 
@@ -63,5 +64,47 @@ ExecutorContext* ExecutorContext::getExecutorContext()
     (void) pthread_once(&static_keyOnce, createThreadLocalKey);
     return static_cast<ExecutorContext*>(pthread_getspecific(static_key));
 }
+
+void ExecutorContext::pushExportBuffer(int64_t exportGeneration, const std::string &signature, StreamBlock *block)
+{
+    ExecutorContext* singleton = getExecutorContext();
+    singleton->m_topEnd->pushExportBuffer(exportGeneration, singleton->m_partitionId, signature, block, false, false);
+}
+
+void ExecutorContext::syncExportBuffer(int64_t exportGeneration, const std::string &signature)
+{
+    ExecutorContext* singleton = getExecutorContext();
+    singleton->m_topEnd->pushExportBuffer(exportGeneration, singleton->m_partitionId, signature, NULL, true, false);
+}
+
+void ExecutorContext::endExportBuffer(int64_t exportGeneration, const std::string &signature)
+{
+    ExecutorContext* singleton = getExecutorContext();
+    singleton->m_topEnd->pushExportBuffer(exportGeneration, singleton->m_partitionId, signature, NULL, false, true);
+}
+
+int64_t ExecutorContext::getQueuedExportBytes(const std::string &signature)
+{
+    ExecutorContext* singleton = getExecutorContext();
+    return singleton->m_topEnd->getQueuedExportBytes( singleton->m_partitionId, signature);
+}
+
+void ExecutorContext::fallbackToEEAllocatedBuffer(char *buffer, size_t length)
+{
+    ExecutorContext* singleton = getExecutorContext();
+    return singleton->m_topEnd->fallbackToEEAllocatedBuffer(buffer, length);
+}
+
+/**
+ * Retrieve a logger by ID from the LogManager associated with this thread.
+ * @parameter loggerId ID of the logger to retrieve
+ */
+const Logger* ExecutorContext::logger(LoggerId loggerId)
+{
+    ExecutorContext* singleton = getExecutorContext();
+    return singleton->m_topEnd->getLogManager().getLogger(loggerId);
+}
+
+
 }
 

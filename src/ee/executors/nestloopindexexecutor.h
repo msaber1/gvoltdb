@@ -82,7 +82,7 @@ protected:
 
     IndexScanPlanNode* inline_node;
     IndexLookupType m_lookupType;
-    PersistentTable* inner_table;
+    Table* inner_table;
     TableIndex *index;
     StorageBackedTempTuple index_values;
     Table* outer_table;

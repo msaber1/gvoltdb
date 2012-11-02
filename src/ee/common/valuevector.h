@@ -68,7 +68,7 @@ namespace voltdb {
  */
 template <typename V> class GenericValueArray {
 public:
-    inline GenericValueArray() : size_(0),
+    inline GenericValueArray(void*** SPOILT) : size_(0),
         data_(reinterpret_cast<V*>(new char[sizeof(V) * size_])) {
         ::memset(data_, 0, sizeof(V) * size_);
     }

@@ -55,7 +55,6 @@
 
 namespace voltdb {
 
-class TableColumn;
 class TableFactory;
 class TableStats;
 

@@ -53,7 +53,6 @@
 #include "plannodes/nestloopindexnode.h"
 #include "plannodes/indexscannode.h"
 #include "storage/table.h"
-#include "storage/persistenttable.h"
 #include "storage/temptable.h"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
@@ -211,7 +210,7 @@ bool NestLoopIndexExecutor::p_init()
         }
     }
 
-    inner_table = dynamic_cast<PersistentTable*>(inline_node->getTargetTable());
+    inner_table = inline_node->getTargetTable();
     assert(inner_table);
 
     assert(hasExactlyOneInputTable());
@@ -266,7 +265,7 @@ bool NestLoopIndexExecutor::p_execute()
     assert(inline_node);
 
     //inner_table is the table that has the index to be used in this executor
-    assert (inner_table == dynamic_cast<PersistentTable*>(inline_node->getTargetTable()));
+    assert (inner_table == inline_node->getTargetTable());
     assert(inner_table);
 
     //outer_table is the input table that have tuples to be iterated

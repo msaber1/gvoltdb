@@ -16,12 +16,13 @@
  */
 #ifndef TUPLEITERATOR_H_
 #define TUPLEITERATOR_H_
-#include "common/tabletuple.h"
 
 /**
  * Interface for iterators that return tuples.
  */
 namespace voltdb {
+class TableTuple;
+
 class TupleIterator {
 public:
     virtual bool next(TableTuple &out) = 0;

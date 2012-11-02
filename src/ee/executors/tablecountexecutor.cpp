@@ -22,7 +22,6 @@
 #include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
 #include "plannodes/tablecountnode.h"
-#include "storage/persistenttable.h"
 
 using namespace voltdb;
 
@@ -32,7 +31,6 @@ bool TableCountExecutor::p_init()
 
     assert(dynamic_cast<TableCountPlanNode*>(m_abstractNode));
     assert(m_targetTable);
-    assert(m_targetTable == dynamic_cast<PersistentTable*>(m_targetTable));
 
     assert(m_abstractNode->getOutputSchema().size() == 1);
 

@@ -50,41 +50,23 @@
 #endif
 #include <string>
 #include <vector>
-#include <set>
-#include <list>
-#include <cassert>
 
 #include "common/ids.h"
 #include "common/types.h"
-#include "common/TupleSchema.h"
-#include "common/Pool.hpp"
 #include "common/tabletuple.h"
-#include "storage/TupleBlock.h"
-#include "stx/btree_set.h"
 #include "common/ThreadLocalPool.h"
-
-class CopyOnWriteTest_CopyOnWriteIterator;
-class CompactionTest_BasicCompaction;
-class CompactionTest_CompactionWithCopyOnWrite;
 
 namespace voltdb {
 
 class TableIndex;
-class TableColumn;
 class TableTuple;
 class TableFactory;
 class TableIterator;
 class CopyOnWriteIterator;
-class CopyOnWriteContext;
-class UndoLog;
-class ReadWriteSet;
 class SerializeInput;
 class SerializeOutput;
 class TableStats;
-class StatsSource;
-class StreamBlock;
-class Topend;
-class TupleBlock;
+class TupleSchema;
 class PersistentTableUndoDeleteAction;
 
 const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name length
@@ -100,10 +82,7 @@ const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name leng
 class Table {
     friend class TableFactory;
     friend class TableIterator;
-    friend class CopyOnWriteContext;
-    friend class ExecutionEngine;
-    friend class TableStats;
-    friend class StatsSource;
+    friend class CopyOnWriteIterator;
     friend class TupleBlock;
     friend class PersistentTableUndoDeleteAction;
 

@@ -46,11 +46,13 @@
 #ifndef HSTORETABLEITERATOR_H
 #define HSTORETABLEITERATOR_H
 
-#include <cassert>
-#include "boost/shared_ptr.hpp"
-#include "common/tabletuple.h"
-#include "table.h"
 #include "storage/TupleIterator.h"
+
+#include "common/tabletuple.h"
+#include "storage/table.h"
+#include "storage/TupleBlock.h"
+
+#include <cassert>
 
 namespace voltdb {
 

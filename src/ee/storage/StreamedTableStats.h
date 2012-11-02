@@ -19,8 +19,6 @@
 #define STREAMEDTABLESTATS_H_
 
 #include "storage/TableStats.h"
-#include <vector>
-#include <string>
 
 namespace voltdb {
 class StreamedTable;

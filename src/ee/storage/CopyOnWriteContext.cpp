@@ -15,11 +15,12 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "storage/CopyOnWriteContext.h"
+
+#include "common/FatalException.hpp"
+#include "storage/persistenttable.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "storage/CopyOnWriteIterator.h"
-#include "storage/tableiterator.h"
-#include "common/FatalException.hpp"
 #include <algorithm>
 #include <cassert>
 #include <boost/crc.hpp>
