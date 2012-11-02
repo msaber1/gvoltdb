@@ -34,6 +34,9 @@ public class AddMsg extends VoltProcedure {
     private static final SQLStmt insert =
             new SQLStmt("INSERT INTO MSGS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
+    private static final SQLStmt getMsgsForTxn =
+        new SQLStmt("SELECT * FROM msgs WHERE txnid = ? ORDER BY localhsid, ts;");
+
     public VoltTable[] run(long txnId,
                            byte action,
                            byte type,

@@ -27,5 +27,5 @@ PARTITION TABLE msgs ON COLUMN txnid;
 CREATE PROCEDURE FROM CLASS iv2trace.procedures.AddMsg;
 PARTITION PROCEDURE AddMsg ON TABLE msgs COLUMN txnid;
 CREATE PROCEDURE iv2trace.procedures.getMsgsForTxn AS
-       SELECT * FROM msgs WHERE txnid = ? ORDER BY ts, action;
+       SELECT * FROM msgs WHERE txnid = ? ORDER BY localhsid, ts;
 PARTITION PROCEDURE getMsgsForTxn ON TABLE msgs COLUMN txnid;
