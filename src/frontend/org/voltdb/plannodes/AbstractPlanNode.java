@@ -68,7 +68,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     protected int m_id = -1;
     protected List<AbstractPlanNode> m_children = new ArrayList<AbstractPlanNode>();
     protected List<AbstractPlanNode> m_parents = new ArrayList<AbstractPlanNode>();
-    protected Set<AbstractPlanNode> m_dominators = new HashSet<AbstractPlanNode>();
 
     // TODO: planner accesses this data directly. Should be protected.
     protected List<ScalarValueHints> m_outputColumnHints = new ArrayList<ScalarValueHints>();
@@ -408,54 +407,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return m_isInline;
     }
 
-
-    /**
-     * @return the dominator list for a node
-     */
-    public Set<AbstractPlanNode> getDominators() {
-        return m_dominators;
-    }
-
-    /**
-    *   Initialize a hashset for each node containing that node's dominators
-    *   (the set of predecessors that *always* precede this node in a traversal
-    *   of the plan-graph in reverse-execution order (from root to leaves)).
-    */
-    public void calculateDominators() {
-        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        calculateDominators_recurse(visited);
-    }
-
-    private void calculateDominators_recurse(HashSet<AbstractPlanNode> visited) {
-        if (visited.contains(this)) {
-            assert(false): "do not expect loops in plangraph.";
-            return;
-        }
-
-        visited.add(this);
-        m_dominators.clear();
-        m_dominators.add(this);
-
-        // find nodes that are in every parent's dominator set.
-
-        HashMap<AbstractPlanNode, Integer> union = new HashMap<AbstractPlanNode, Integer>();
-        for (AbstractPlanNode n : m_parents) {
-            for (AbstractPlanNode d : n.getDominators()) {
-                if (union.containsKey(d))
-                    union.put(d, union.get(d) + 1);
-                else
-                    union.put(d, 1);
-            }
-        }
-
-        for (AbstractPlanNode pd : union.keySet() ) {
-            if (union.get(pd) == m_parents.size())
-                m_dominators.add(pd);
-        }
-
-        for (AbstractPlanNode n : m_children)
-            n.calculateDominators_recurse(visited);
-    }
 
     /**
      * @param type plan node type to search for

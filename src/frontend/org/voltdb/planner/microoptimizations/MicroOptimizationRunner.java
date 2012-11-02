@@ -29,7 +29,6 @@ public class MicroOptimizationRunner {
     static {
         optimizations.add(new PushdownLimitsIntoScans());
         optimizations.add(new ReplaceWithIndexCounter());
-        // optimizations.add(new PushdownReceiveDominators());
     }
 
     public static List<CompiledPlan> applyAll(CompiledPlan plan) {
