@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -49,14 +48,7 @@ public class Iv2Trace
     private static final LinkedBlockingQueue<TaskMsg> msgQueue =
             new LinkedBlockingQueue<Iv2Trace.TaskMsg>();
     private static final ExecutorService es =
-            Executors.newFixedThreadPool(1, new ThreadFactory() {
-                @Override
-                public Thread newThread(Runnable arg0) {
-                    Thread thread = new Thread(arg0, "IV2TRACE");
-                    thread.setDaemon(true);
-                    return thread;
-                }
-            });
+            Executors.newFixedThreadPool(1, CoreUtils.getThreadFactory("IV2TRACE"));
     private static final Runnable log4jWorker = new Runnable() {
         @Override
         public void run()
