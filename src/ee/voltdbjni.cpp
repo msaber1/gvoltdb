@@ -308,8 +308,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadCatalog(
     JNIEnv *env, jobject obj, jlong engine_ptr,
-    jlong txnId,
-    jbyteArray serialized_catalog)
+    jlong timestamp, jbyteArray serialized_catalog)
 {
     VOLT_DEBUG("nativeLoadCatalog() start");
     VoltDBEngine *engine = fixupEngine(engine_ptr, env);
@@ -324,7 +323,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->loadCatalog(txnId, str);
+        bool success = engine->loadCatalog(timestamp, str);
 
         if (success) {
             VOLT_DEBUG("loadCatalog succeeded");
@@ -349,7 +348,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     JNIEnv *env, jobject obj, jlong engine_ptr,
-    jlong txnId, jbyteArray catalog_diffs)
+    jlong timestamp, jbyteArray catalog_diffs)
 {
     VOLT_DEBUG("nativeUpdateCatalog() start");
     VoltDBEngine *engine = fixupEngine(engine_ptr, env);
@@ -364,7 +363,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->updateCatalog( txnId, str);
+        bool success = engine->updateCatalog( timestamp, str);
 
         if (success) {
             VOLT_DEBUG("updateCatalog succeeded");

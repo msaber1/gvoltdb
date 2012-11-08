@@ -497,11 +497,13 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
     return true;
 }
 
-bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload) {
+bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPayload) {
     assert(m_executorContext != NULL);
     ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
-    if (executorContext == NULL) {
-        VOLT_DEBUG("Rebinding EC (%ld) to new thread", (long)m_executorContext);
+    if (executorContext != m_executorContext)
+    {
+        // Error, because Ryan says that this should never happen under normal circumstances.
+        VOLT_ERROR("Rebinding EC (%ld) to new thread", (long)m_executorContext);
         // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
         m_executorContext->bindToThread();
     }
@@ -532,7 +534,7 @@ bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload
     }
 
     // load up all the tables, adding all tables
-    if (processCatalogAdditions(true, txnId) == false) {
+    if (processCatalogAdditions(true, timestamp) == false) {
         return false;
     }
 
@@ -564,7 +566,7 @@ bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload
  * processCatalogAdditions(..) for dumb reasons.
  */
 bool
-VoltDBEngine::processCatalogDeletes(int64_t txnId)
+VoltDBEngine::processCatalogDeletes(int64_t timestamp )
 {
     vector<string> deletions;
     m_catalog->getDeletedPaths(deletions);
@@ -581,7 +583,7 @@ VoltDBEngine::processCatalogDeletes(int64_t txnId)
              */
             if (tcd && tcd->exportEnabled()) {
                 m_exportingTables.erase(tcd->signature());
-                tcd->getTable()->setSignatureAndGeneration( tcd->signature(), txnId);
+                tcd->getTable()->setSignatureAndGeneration( tcd->signature(), timestamp);
             }
             pos->second->deleteCommand();
             delete pos->second;
@@ -600,7 +602,7 @@ VoltDBEngine::processCatalogDeletes(int64_t txnId)
  * data.
  */
 bool
-VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
+VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 {
     // iterate over all of the tables in the new catalog
     map<string, catalog::Table*>::const_iterator catTableIter;
@@ -631,7 +633,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
 
             // set export info on the new table
             if (tcd->exportEnabled()) {
-                tcd->getTable()->setSignatureAndGeneration(catalogTable->signature(), txnId);
+                tcd->getTable()->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 m_exportingTables[catalogTable->signature()] = tcd->getTable();
             }
         }
@@ -664,7 +666,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
              * that no more data is coming for the previous generation
              */
             if (tcd->exportEnabled()) {
-                table->setSignatureAndGeneration(catalogTable->signature(), txnId);
+                table->setSignatureAndGeneration(catalogTable->signature(), timestamp);
             }
 
             vector<TableIndex*> currentIndexes = table->allIndexes();
@@ -763,7 +765,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
  * delete or modify the corresponding exectution engine objects.
  */
 bool
-VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload)
+VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayload)
 {
     assert(m_catalog != NULL); // the engine must be initialized
 
@@ -778,12 +780,12 @@ VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload)
         return false;
     }
 
-    if (processCatalogDeletes(txnId) == false) {
+    if (processCatalogDeletes(timestamp) == false) {
         VOLT_ERROR("Error processing catalog deletions.");
         return false;
     }
 
-    if (processCatalogAdditions(false, txnId) == false) {
+    if (processCatalogAdditions(false, timestamp) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }

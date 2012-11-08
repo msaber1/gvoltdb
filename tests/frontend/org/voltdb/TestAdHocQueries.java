@@ -780,6 +780,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                                          BackendTarget.NATIVE_EE_JNI,
                                          LocalCluster.FailureState.ALL_RUNNING,
                                          m_debug, false, enableIv2);
+            m_cluster.setHasLocalServer(false);
             boolean success = m_cluster.compile(m_builder);
             assert(success);
 
@@ -789,8 +790,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             catch (Exception e) {
                 fail(String.format("Failed to copy \"%s\" to \"%s\"", m_builder.getPathToDeployment(), pathToDeployment));
             }
-
-            m_cluster.setHasLocalServer(true);
         }
 
         void setUp() {

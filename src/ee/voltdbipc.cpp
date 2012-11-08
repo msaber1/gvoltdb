@@ -200,14 +200,14 @@ static int8_t loadCatalog(ipc_command *cmd)
 {
     struct cmd_structure
     {
-        int64_t txnId;
+        int64_t timestamp;
         char data[0];
     }__attribute__((packed));
     cmd_structure* cs = reinterpret_cast<cmd_structure*>(cmd+1);
 
     //printf("loadCatalog\n");
     try {
-        if (s_engine->loadCatalog(ntoh(cs->txnId), string(cs->data))) {
+        if (s_engine->loadCatalog(ntoh(cs->timestamp), string(cs->data))) {
             return kErrorCode_Success;
         }
     } catch (SerializableEEException &e) {
@@ -220,12 +220,12 @@ static int8_t updateCatalog(ipc_command *cmd)
 {
     struct cmd_structure
     {
-        int64_t txnId;
+        int64_t timestamp;
         char data[];
     }__attribute__((packed));
     cmd_structure* cs = reinterpret_cast<cmd_structure*>(cmd+1);
 
-    if (s_engine->updateCatalog(ntoh(cs->txnId), string(cs->data))) {
+    if (s_engine->updateCatalog(ntoh(cs->timestamp), string(cs->data))) {
         return kErrorCode_Success;
     }
     return kErrorCode_Error;
