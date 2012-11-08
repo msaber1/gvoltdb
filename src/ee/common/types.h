@@ -361,22 +361,22 @@ bool isNumeric(ValueType type);
 NValue getRandomValue(ValueType type);
 
 std::string valueToString(ValueType type);
-ValueType stringToValue(std::string str );
+ValueType stringToValue(const std::string& str);
 
 std::string joinToString(JoinType type);
-JoinType stringToJoin(std::string str );
+JoinType stringToJoin(const std::string& str);
 
 std::string sortDirectionToString(SortDirectionType type);
-SortDirectionType stringToSortDirection(std::string str );
+SortDirectionType stringToSortDirection(const std::string& str);
 
 std::string planNodeToString(PlanNodeType type);
-PlanNodeType stringToPlanNode(std::string str );
+PlanNodeType stringToPlanNode(const std::string& str);
 
 std::string expressionToString(ExpressionType type);
-ExpressionType stringToExpression(std::string str );
+ExpressionType stringToExpression(const std::string& str);
 
 std::string indexLookupToString(IndexLookupType type);
-IndexLookupType stringToIndexLookup(std::string str );
+IndexLookupType stringToIndexLookup(const std::string& str);
 
 int64_t getMaxTypeValue (ValueType type);
 

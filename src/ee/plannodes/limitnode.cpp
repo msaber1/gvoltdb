@@ -48,6 +48,7 @@
 #include "common/executorcontext.hpp"
 #include "common/SQLException.h"
 #include "common/ValuePeeker.hpp"
+#include "expressions/abstractexpression.h"
 
 namespace voltdb {
 
@@ -87,7 +88,7 @@ LimitPlanNode::getLimitAndOffsetByReference(int &limitOut, int &offsetOut)
     }
 
     // If the limit expression is not null, we need to evaluate it and assign
-    // the result to limit, offset must be 0
+    // the result to limit, offset must be 0 (because this is the pushdown case)
     if (limitExpression != NULL) {
         // The expression should be an operator expression with either constant
         // value expression or parameter value expression as children
@@ -98,43 +99,27 @@ LimitPlanNode::getLimitAndOffsetByReference(int &limitOut, int &offsetOut)
 
 std::string LimitPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
-    buffer << spacer << "Limit[" << this->limit << "]\n";
-    buffer << spacer << "Offset[" << this->offset << "]\n";
+    if (limit != -1) {
+        buffer << spacer << "Limit[" << limit << "]\n";
+    }
+    if (offset != 0) {
+        buffer << spacer << "Offset[" << offset << "]\n";
+    }
+    if (limitParamIdx != -1) {
+        buffer << spacer << "Limit Param[" << limitParamIdx << "]\n";
+    }
+    if (offsetParamIdx != -1) {
+        buffer << spacer << "Offset Param[" << offsetParamIdx << "]\n";
+    }
     return (buffer.str());
 }
 
 void LimitPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
-    json_spirit::Value limitValue = json_spirit::find_value( obj, "LIMIT");
-    if (limitValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "LimitPlanNode::loadFromJSONObject:"
-                                      " can't find LIMIT value");
-    }
-    limit = limitValue.get_int();
-
-    json_spirit::Value offsetValue = json_spirit::find_value( obj, "OFFSET");
-    if (offsetValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "LimitPlanNode::loadFromJSONObject:"
-                                      " can't find OFFSET value");
-    }
-    offset = offsetValue.get_int();
-
-    json_spirit::Value paramIdx = json_spirit::find_value(obj, "LIMIT_PARAM_IDX");
-    if (!(paramIdx == json_spirit::Value::null)) {
-        limitParamIdx = paramIdx.get_int();
-    }
-    paramIdx = json_spirit::find_value(obj, "OFFSET_PARAM_IDX");
-    if (!(paramIdx == json_spirit::Value::null)) {
-        offsetParamIdx = paramIdx.get_int();
-    }
-
-    json_spirit::Value expr = json_spirit::find_value(obj, "LIMIT_EXPRESSION");
-    if (expr == json_spirit::Value::null) {
-        limitExpression = NULL;
-    } else {
-        limitExpression = AbstractExpression::buildExpressionTree(expr.get_obj());
-    }
+    limit = loadIntegerFromJSON(obj, "LIMIT", -1);
+    offset = loadIntegerFromJSON(obj, "OFFSET", 0);
+    limitParamIdx = loadIntegerFromJSON(obj, "LIMIT_PARAM_IDX", -1);
+    offsetParamIdx = loadIntegerFromJSON(obj, "OFFSET_PARAM_IDX", -1);
+    limitExpression = loadExpressionFromJSON(obj, "LIMIT_EXPRESSION");
 }
 
 }

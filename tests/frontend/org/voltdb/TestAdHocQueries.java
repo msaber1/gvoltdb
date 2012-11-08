@@ -299,12 +299,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
             throws IOException, NoConnectionsException, ProcCallException {
         VoltTable result;
         result = m_client.callProcedure("@AdHoc", query).getResults()[0];
-        System.out.println(result.toString());
+        //Enable for debugging only:*/ System.out.println(result.toString());
         assertEquals(expected, result.getRowCount());
 
         result = m_client.callProcedure("@AdHoc", query, hashable).getResults()[0];
         int spResult = result.getRowCount();
-        System.out.println(result.toString());
+        //Enable for debugging only:*/ System.out.println(result.toString());
         if (validatingSPresult != 0) {
             assertEquals(expected, spPartialSoFar + spResult);
         }
@@ -318,7 +318,13 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testSimple() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1, m_useIv2);
+
+        int siteCount = 2;
+        int hostCount = 2;
+        // Experimenting with hostCount == 1 will disable replication.
+        int kFactor = hostCount > 1 ? 1 : 0;
+        int partitionCount = siteCount * hostCount / (kFactor+1);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, siteCount, hostCount, kFactor, m_useIv2);
         try {
             env.setUp();
 
@@ -328,21 +334,26 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             VoltTable result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
             assertEquals(1, result.getRowCount());
-            System.out.println(result.toString());
+            //Enable for debugging only:*/ System.out.println(result.toString());
 
             // test single-partition stuff
+            // Partition 0 is the last place to expect the tuple, but it COULD be there.
+            int expectedUsuallyZero = (hostCount*siteCount == 1) ? 1 : 0;
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 0).getResults()[0];
-            assertEquals(0, result.getRowCount());
-            System.out.println(result.toString());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 1).getResults()[0];
-            assertEquals(1, result.getRowCount());
-            System.out.println(result.toString());
+            assertEquals(expectedUsuallyZero, result.getRowCount());
+            //Enable for debugging only:*/ System.out.println(result.toString());
 
-            try {
-                env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", 1);
-                fail("Badly partitioned insert failed to throw expected exception");
+            if (partitionCount > 1) {
+                result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 1).getResults()[0];
+                assertEquals(1, result.getRowCount());
+                //Enable for debugging only:*/ System.out.println(result.toString());
+
+                try {
+                    env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", 1);
+                    fail("Badly partitioned insert failed to throw expected exception");
+                }
+                catch (Exception e) {}
             }
-            catch (Exception e) {}
 
             try {
                 env.m_client.callProcedure("@AdHoc", "SLEECT * FROOM NEEEW_OOORDERERER;");
@@ -357,15 +368,15 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assertEquals(1, modCount.asScalarLong());
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 974599638818488300;").getResults()[0];
             assertEquals(1, result.getRowCount());
-            System.out.println(result.toString());
+            //Enable for debugging only:*/ System.out.println(result.toString());
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL = '2011-06-24 10:30:26.123012';").getResults()[0];
             assertEquals(1, result.getRowCount());
-            System.out.println(result.toString());
+            //Enable for debugging only:*/ System.out.println(result.toString());
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL > '2011-06-24 10:30:25';").getResults()[0];
             assertEquals(2, result.getRowCount());
-            System.out.println(result.toString());
+            //Enable for debugging only:*/ System.out.println(result.toString());
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE TVAL < '2011-06-24 10:30:27';").getResults()[0];
-            System.out.println(result.toString());
+            //Enable for debugging only:*/ System.out.println(result.toString());
             // We inserted a 1,1,1 row way earlier
             assertEquals(2, result.getRowCount());
 
@@ -383,7 +394,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assertEquals(1, modCount.asScalarLong());
             result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 2;").getResults()[0];
             assertEquals(1, result.getRowCount());
-            System.out.println(result.toString());
+            //Enable for debugging only:*/ System.out.println(result.toString());
         }
         finally {
             env.tearDown();

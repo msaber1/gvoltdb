@@ -25,7 +25,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -36,6 +35,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.types.PlanNodeType;
@@ -689,6 +689,30 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
+    protected static AbstractExpression loadExpressionFromJSONObject(JSONObject jparent, Database db, String label)
+        throws JSONException
+    {
+        if (jparent.isNull(label)) {
+            return null;
+        }
+        JSONObject tempjobj = jparent.getJSONObject(label);
+        return AbstractExpression.fromJSONObject(tempjobj, db);
+    }
+
+    protected static void loadExpressionsFromJSONArray(JSONObject jparent, Database db,
+                                                       List<AbstractExpression> memberList, String label)
+        throws JSONException
+    {
+        if ( ! jparent.isNull(label)) {
+            JSONArray jarray = jparent.getJSONArray(label);
+            int size = jarray.length();
+            for (int ii = 0; ii < size; ii++) {
+                JSONObject tempjobj = jarray.getJSONObject(ii);
+                memberList.add(AbstractExpression.fromJSONObject(tempjobj, db));
+            }
+        }
+    }
+
     public boolean reattachFragment( SendPlanNode child ) {
         for( AbstractPlanNode pn : m_inlineNodes.values() ) {
             if( pn.reattachFragment( child) )
@@ -698,6 +722,21 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             if( pn.reattachFragment( child) )
                 return true;
         }
+        return false;
+    }
+
+    /**
+     * Check through a plan graph and return true if it ever touches a persistent table.
+     */
+    public boolean referencesPersistentTable() {
+        // Nodes that can read/modify persistent tables provide their own "return true;" implementation.
+        // recursively check out children.
+        for (AbstractPlanNode child : m_children) {
+            if (child.referencesPersistentTable()) {
+                return true;
+            }
+        }
+        // if nothing found, return false
         return false;
     }
 

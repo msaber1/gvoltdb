@@ -43,7 +43,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "abstracttableioexecutor.h"
+#include "abstractoperationexecutor.h"
 
 #include "common/ValueFactory.hpp"
 #include "execution/VoltDBEngine.h"
@@ -55,20 +55,37 @@
 using namespace std;
 using namespace voltdb;
 
-bool AbstractTableIOExecutor::initEngine(VoltDBEngine* engine)
-{
-    m_engine = engine;
-    m_targetTable = dynamic_cast<AbstractTableIOPlanNode*>(m_abstractNode)->resolveTargetTable(engine);
-    return m_targetTable != NULL;
+/**
+ * Set up a single-column temp output table for DML executors that require one to return their counts.
+ */
+void AbstractOperationExecutor::p_setOutputTable(TempTableLimits* limits) {
+    TupleSchema* schema = m_abstractNode->generateTupleSchema(false);
+    // The column count (1) and column name for the DML counter column is hard-coded in the planner
+    // and passed via the output schema -- kind of pointless since they could just as easily be hard-coded here,
+    // possibly saving the trouble of serializing an outputSchema at all for DML nodes.
+    assert(m_abstractNode->getOutputSchema().size() == 1);
+    CatalogId databaseId = m_abstractNode->databaseId();
+    const string name("temp");
+    vector<string> columnNames(1, m_abstractNode->getOutputSchema()[0]->getColumnName());
+    m_outputTable = TableFactory::getTempTable(databaseId,
+                                               name,
+                                               schema,
+                                               columnNames,
+                                               limits);
 }
 
-bool AbstractTableIOExecutor::valueHashesToTheLocalPartition(const NValue& value) const
-{
-    return m_engine->isLocalSite(value);
-}
+bool AbstractOperationExecutor::storeModifiedTupleCount(int64_t modifiedTuples) {
+    TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
+    TableTuple& count_tuple = output_temp_table->tempTuple();
+    count_tuple.setNValue(0, ValueFactory::getBigIntValue(modifiedTuples));
+    // try to put the count tuple into the output table
+    if (!output_temp_table->insertTempTuple(count_tuple)) {
+        VOLT_ERROR("Failed to insert tuple count (%ld) into result table", modifiedTuples);
+        return false;
+    }
 
-bool AbstractTableIOExecutor::onPartitionZero() const
-{
-    NValue zero = ValueFactory::getBigIntValue(0);
-    return valueHashesToTheLocalPartition(zero);
+    // add to the planfragments count of modified tuples
+    getEngine()->m_tuplesModified += modifiedTuples;
+    VOLT_INFO("Finished modifying table");
+    return true;
 }

@@ -264,6 +264,8 @@ public:
         return NValue::deserializeFromTupleStorage( dataPtr, columnType, isInlined);
     }
 
+    inline void* getSelfAddressColumn() const { return getNValue(0).castAsAddress(); }
+
     inline const voltdb::TupleSchema* getSchema() const {
         return m_schema;
     }

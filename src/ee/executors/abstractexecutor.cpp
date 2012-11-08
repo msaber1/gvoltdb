@@ -49,6 +49,8 @@
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 
+#include "boost/foreach.hpp"
+
 using namespace std;
 using namespace voltdb;
 
@@ -59,39 +61,29 @@ bool AbstractExecutor::init(TempTableLimits* limits)
     // Grab the input tables directly from this node's children
     //
     vector<Table*> input_tables;
-    for (int ctr = 0,
-             cnt = static_cast<int>(m_abstractNode->getChildren().size());
-         ctr < cnt;
-         ctr++)
-    {
-        Table* table = m_abstractNode->getChildren()[ctr]->getOutputTable();
+    std::vector<AbstractPlanNode*>& children = m_abstractNode->getChildren();
+    BOOST_FOREACH(AbstractPlanNode* child, children) {
+        Table* table = child->getOutputTable();
         if (table == NULL) {
             VOLT_ERROR("Output table from PlanNode '%s' is NULL",
-                       m_abstractNode->getChildren()[ctr]->debug().c_str());
+                       child->debug().c_str());
             return false;
         }
         m_inputTables.push_back(table);
-        if (cnt == 0) {
+        // Optimize access to the first -- often the only -- input table.
+        if (m_inputTable == NULL) {
             m_inputTable = table;
         }
     }
 
-    try {
-        // Initialize the output table just as needed by the derived class.
-        // This step is separate from p_init since it has only a handful of possible
-        // implementations that can often be inherited.
-        p_setOutputTable(limits);
+    // Initialize the output table just as needed by the derived class.
+    // This step is separate from p_init since it has only a handful of possible
+    // implementations that can often be inherited.
+    p_setOutputTable(limits);
 
-        // Call the highly specialized p_init() method of the derived class.
-        if ( ! p_init()) {
-            return false;
-        }
-    } catch (exception& err) {
-        char message[128];
-        snprintf(message, 128, "The Executor failed to initialize PlanNode '%s'",
-                m_abstractNode->debug().c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      message);
+    // Call the highly specialized p_init() method of the derived class.
+    if ( ! p_init()) {
+        return false;
     }
     return true;
 }

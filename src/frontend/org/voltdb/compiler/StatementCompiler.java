@@ -33,12 +33,8 @@ import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.DeletePlanNode;
-import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.SchemaColumn;
-import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.Encoder;
@@ -198,7 +194,7 @@ public abstract class StatementCompiler {
         PlanFragment planFragment = catalogStmt.getFragments().add("0");
         planFragment.setHasdependencies(plan.subPlanGraph != null);
         // mark a fragment as non-transactional if it never touches a persistent table
-        planFragment.setNontransactional(!fragmentReferencesPersistentTable(plan.rootPlanGraph));
+        planFragment.setNontransactional(! plan.rootPlanGraph.referencesPersistentTable());
         planFragment.setMultipartition(plan.subPlanGraph != null);
         writePlanBytes(compiler, planFragment, plan.rootPlanGraph);
 
@@ -233,31 +229,4 @@ public abstract class StatementCompiler {
         }
     }
 
-    /**
-     * Check through a plan graph and return true if it ever touches a persistent table.
-     */
-    static boolean fragmentReferencesPersistentTable(AbstractPlanNode node) {
-        if (node == null)
-            return false;
-
-        // these nodes can read/modify persistent tables
-        if (node instanceof AbstractScanPlanNode)
-            return true;
-        if (node instanceof InsertPlanNode)
-            return true;
-        if (node instanceof DeletePlanNode)
-            return true;
-        if (node instanceof UpdatePlanNode)
-            return true;
-
-        // recursively check out children
-        for (int i = 0; i < node.getChildCount(); i++) {
-            AbstractPlanNode child = node.getChild(i);
-            if (fragmentReferencesPersistentTable(child))
-                return true;
-        }
-
-        // if nothing found, return false
-        return false;
-    }
 }

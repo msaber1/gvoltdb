@@ -332,12 +332,19 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
+        m_predicate = loadExpressionFromJSONObject(jobj, db, Members.PREDICATE.name());
+        m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
+    }
 
-        if(!jobj.isNull(Members.PREDICATE.name())) {
-            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
+    protected static void listExpressionsToJSONArray(JSONStringer stringer,
+                                                     List<AbstractExpression> exprs, String label)
+    throws JSONException
+    {
+        stringer.key(label).array();
+        for (AbstractExpression ae : exprs) {
+            stringer.value(ae);
         }
-        this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
-
+        stringer.endArray();
     }
 
     @Override
@@ -350,4 +357,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         visited.add(this);
         collected.add(this);
     }
+
+    @Override
+    public boolean referencesPersistentTable() { return true; }
+
 }

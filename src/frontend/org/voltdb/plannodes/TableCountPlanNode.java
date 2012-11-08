@@ -34,7 +34,6 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
         super();
         m_outputSchema = apn.getOutputSchema().clone();
         m_estimatedOutputTupleCount = 1;
-        m_targetTableAlias = ssp.getTargetTableAlias();
         m_targetTableName = ssp.getTargetTableName();
         m_tableSchema = ssp.getTableSchema();
     }

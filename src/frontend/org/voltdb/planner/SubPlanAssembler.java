@@ -558,11 +558,9 @@ public abstract class SubPlanAssembler {
         }
         // create the IndexScanNode with all its metadata
         scanNode.setCatalogIndex(index);
-        scanNode.setKeyIterate(path.keyIterate);
         scanNode.setLookupType(path.lookupType);
         scanNode.setSortDirection(path.sortDirection);
         scanNode.setTargetTableName(table.getTypeName());
-        scanNode.setTargetTableAlias(table.getTypeName());
         scanNode.setTargetIndexName(index.getTypeName());
         if (path.sortDirection != SortDirectionType.DESC) {
             List<AbstractExpression> predicate = new ArrayList<AbstractExpression>();

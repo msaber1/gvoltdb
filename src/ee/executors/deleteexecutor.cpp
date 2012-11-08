@@ -50,7 +50,7 @@
 #include "common/tabletuple.h"
 #include "indexes/tableindex.h"
 #include "plannodes/deletenode.h"
-#include "storage/table.h"
+#include "storage/persistenttable.h"
 #include "storage/tableiterator.h"
 
 using namespace std;
@@ -103,9 +103,9 @@ bool DeleteExecutor::p_execute() {
             // -- AND, BTW, this code assumes just that --
             // then the first column in the input table will be the address of a
             // tuple on the target table that we will want to blow away. This saves
-            // us the trouble of having to do an index lookup
+            // us the trouble of having to require a primary key to do an index lookup
             //
-            void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
+            void *targetAddress = m_inputTuple.getSelfAddressColumn();
             m_targetTuple.move(targetAddress);
 
             // Delete from target table

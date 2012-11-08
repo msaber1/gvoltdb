@@ -57,6 +57,7 @@
 #include <string>
 #include <ctime>
 #include <cstdio>
+#include <iostream>
 
 // Log levels.
 #define VOLT_LEVEL_OFF    1000

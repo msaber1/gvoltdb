@@ -190,7 +190,7 @@ string valueToString(ValueType type)
     }
 }
 
-ValueType stringToValue(string str )
+ValueType stringToValue(const std::string& str)
 {
     if (str == "INVALID") {
         return VALUE_TYPE_INVALID;
@@ -243,7 +243,7 @@ string joinToString(JoinType type)
     return "INVALID";
 }
 
-JoinType stringToJoin(string str )
+JoinType stringToJoin(const std::string& str)
 {
     if (str == "INVALID") {
         return JOIN_TYPE_INVALID;
@@ -275,7 +275,7 @@ string sortDirectionToString(SortDirectionType type)
     return "INVALID";
 }
 
-SortDirectionType stringToSortDirection(string str )
+SortDirectionType stringToSortDirection(const std::string& str)
 {
     if (str == "INVALID") {
         return SORT_DIRECTION_TYPE_INVALID;
@@ -357,7 +357,7 @@ string planNodeToString(PlanNodeType type)
     return "INVALID";
 }
 
-PlanNodeType stringToPlanNode(string str )
+PlanNodeType stringToPlanNode(const std::string& str)
 {
     if (str == "INVALID") {
         return PLAN_NODE_TYPE_INVALID;
@@ -505,7 +505,7 @@ string expressionToString(ExpressionType type)
     return "INVALID";
 }
 
-ExpressionType stringToExpression(string str )
+ExpressionType stringToExpression(const std::string& str)
 {
     if (str == "INVALID") {
         return EXPRESSION_TYPE_INVALID;
@@ -611,7 +611,7 @@ string indexLookupToString(IndexLookupType type)
     return "INVALID";
 }
 
-IndexLookupType stringToIndexLookup(string str )
+IndexLookupType stringToIndexLookup(const std::string& str)
 {
     if (str == "INVALID") {
         return INDEX_LOOKUP_TYPE_INVALID;

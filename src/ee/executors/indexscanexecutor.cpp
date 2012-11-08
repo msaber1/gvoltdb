@@ -59,7 +59,7 @@
 
 #include "projectionexecutor.h"
 
-#include "storage/table.h"
+#include "storage/persistenttable.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
 

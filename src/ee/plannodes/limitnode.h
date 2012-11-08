@@ -61,7 +61,7 @@ class Table;
 class LimitPlanNode : public AbstractPlanNode {
     public:
         LimitPlanNode() : AbstractPlanNode(),
-        limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1)
+        limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1), limitExpression(NULL)
         {}
         ~LimitPlanNode();
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_LIMIT); }

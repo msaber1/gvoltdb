@@ -46,7 +46,7 @@
 #ifndef HSTOREDELETEEXECUTOR_H
 #define HSTOREDELETEEXECUTOR_H
 
-#include "executors/abstracttableioexecutor.h"
+#include "executors/abstractoperationexecutor.h"
 
 #include "common/tabletuple.h"
 

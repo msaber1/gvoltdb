@@ -51,9 +51,9 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/SerializableEEException.h"
+#include "expressions/abstractexpression.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 

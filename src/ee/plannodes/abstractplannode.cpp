@@ -47,6 +47,7 @@
 
 #include "common/TupleSchema.h"
 #include "executors/abstractexecutor.h"
+#include "expressions/abstractexpression.h"
 #include "plannodeutil.h"
 
 #include <sstream>
@@ -318,6 +319,62 @@ AbstractPlanNode::fromJSONObject(Object &obj) {
         throw;
     }
     return node;
+}
+
+vector<string> AbstractPlanNode::loadStringsFromJSONArray(json_spirit::Object& jparent, const char* label)
+{
+    vector<string> strings;
+    json_spirit::Value jValue = json_spirit::find_value(jparent, label);
+    if (jValue == json_spirit::Value::null) {
+        return strings;
+    }
+    json_spirit::Array jArray = jValue.get_array();
+    for (int ii = 0; ii < jArray.size(); ii++) {
+        strings.push_back(jArray[ii].get_str());
+    }
+    return strings;
+}
+
+string AbstractPlanNode::loadStringFromJSON(json_spirit::Object& jparent, const char* label)
+{
+    json_spirit::Value stringValue = json_spirit::find_value(jparent, label);
+    if (stringValue == json_spirit::Value::null) {
+        return string();
+    }
+    return stringValue.get_str();
+}
+
+vector<AbstractExpression*> AbstractPlanNode::loadExpressionsFromJSONArray(json_spirit::Object& jparent,
+                                                                           const char* label)
+{
+    vector<AbstractExpression*> exprs;
+    json_spirit::Value jValue = json_spirit::find_value(jparent, label);
+    if (jValue == json_spirit::Value::null) {
+        return exprs;
+    }
+    json_spirit::Array jArray = jValue.get_array();
+    for (int ii = 0; ii < jArray.size(); ii++) {
+        exprs.push_back(AbstractExpression::buildExpressionTree(jArray[ii].get_obj()));
+    }
+    return exprs;
+}
+
+AbstractExpression* AbstractPlanNode::loadExpressionFromJSON(json_spirit::Object& jparent, const char* label)
+{
+    json_spirit::Value jValue = json_spirit::find_value(jparent, label);
+    if (jValue == json_spirit::Value::null) {
+        return NULL;
+    }
+    return AbstractExpression::buildExpressionTree(jValue.get_obj());
+}
+
+int AbstractPlanNode::loadIntegerFromJSON(json_spirit::Object& jparent, const char* label, int defaultValue)
+{
+    json_spirit::Value jValue = json_spirit::find_value(jparent, label);
+    if (jValue == json_spirit::Value::null) {
+        return defaultValue;
+    }
+    return jValue.get_int();
 }
 
 // ------------------------------------------------------------------

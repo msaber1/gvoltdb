@@ -124,7 +124,7 @@ bool InsertExecutor::p_execute() {
             NValue value = m_tuple.getNValue(m_partitionColumn);
 
             // if it doesn't map to this site
-            if ( ! valueHashesToTheLocalPartiton(value)) {
+            if ( ! valueHashesToTheLocalPartition(value)) {
                 if (!m_multiPartition) {
                     VOLT_ERROR("Mispartitioned Tuple in single-partition plan.");
                     return false;

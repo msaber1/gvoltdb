@@ -214,25 +214,13 @@ public class SchemaColumn
         // bit hacky, but it's the easiest way for the EE to generate
         // a result set that has all the aliases that may have been specified
         // by the user (thanks to chains of setOutputTable(getInputTable))
-        if (getColumnAlias() != null && !getColumnAlias().equals(""))
-        {
-            stringer.key(Members.COLUMN_NAME.name()).value(getColumnAlias());
+        String columnName = "";
+        if (m_columnAlias != null && ! m_columnAlias.equals("")) {
+            columnName = m_columnAlias;
+        } else if (m_columnAlias != null) {
+            columnName = m_columnName;
         }
-        else if (getColumnName() != null) {
-            stringer.key(Members.COLUMN_NAME.name()).value(getColumnName());
-        }
-        else
-        {
-            stringer.key(Members.COLUMN_NAME.name()).value("");
-        }
-
-        if (getColumnAlias() != null) {
-            stringer.key(Members.COLUMN_ALIAS.name()).value(getColumnAlias());
-        }
-        else
-        {
-            stringer.key(Members.COLUMN_ALIAS.name()).value("");
-        }
+        stringer.key(Members.COLUMN_NAME.name()).value(columnName);
 
         if (m_expression != null) {
             stringer.key(Members.EXPRESSION.name());
@@ -253,7 +241,6 @@ public class SchemaColumn
     public static SchemaColumn fromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         String tableName = "";
         String columnName = "";
-        String columnAlias = "";
         AbstractExpression expression = null;
         if( !jobj.isNull( Members.TABLE_NAME.name() ) ) {
             tableName = jobj.getString( Members.TABLE_NAME.name() );
@@ -261,13 +248,10 @@ public class SchemaColumn
         if( !jobj.isNull( Members.COLUMN_NAME.name() ) ){
             columnName = jobj.getString( Members.COLUMN_NAME.name() );
         }
-        if( !jobj.isNull( Members.COLUMN_ALIAS.name() ) ){
-            columnAlias = jobj.getString( Members.COLUMN_ALIAS.name() );
-        }
         if( !jobj.isNull( Members.EXPRESSION.name() ) ) {
             expression = AbstractExpression.fromJSONObject( jobj.getJSONObject( Members.EXPRESSION.name() ), db);
         }
-        return new SchemaColumn( tableName, columnName, columnAlias, expression );
+        return new SchemaColumn( tableName, columnName, null, expression );
     }
 
     private String m_tableName;

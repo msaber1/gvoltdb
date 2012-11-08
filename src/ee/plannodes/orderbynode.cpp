@@ -47,6 +47,8 @@
 
 #include "expressions/abstractexpression.h"
 
+#include <boost/foreach.hpp>
+
 #include <sstream>
 
 using namespace std;
@@ -102,40 +104,21 @@ OrderByPlanNode::debugInfo(const string& spacer) const
 void
 OrderByPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
-    json_spirit::Value sortColumnsValue =
-        json_spirit::find_value(obj, "SORT_COLUMNS");
-    if (sortColumnsValue == json_spirit::Value::null)
-    {
+    vector<string> sortDirectionStrings = loadStringsFromJSONArray(obj, "SORT_DIRECTIONS");
+    if (sortDirectionStrings.empty()) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "OrderByPlanNode::loadFromJSONObject:"
-                                      " Can't find SORT_COLUMNS value");
+                                      " Can't find SORT_DIRECTIONS value");
     }
-    json_spirit::Array sortColumnsArray = sortColumnsValue.get_array();
 
-    for (int ii = 0; ii < sortColumnsArray.size(); ii++)
-    {
-        json_spirit::Object sortColumn = sortColumnsArray[ii].get_obj();
-        bool hasDirection = false, hasExpression = false;
-        for (int zz = 0; zz < sortColumn.size(); zz++)
-        {
-            if (sortColumn[zz].name_ == "SORT_DIRECTION")
-            {
-                hasDirection = true;
-                string sortDirectionTypeString = sortColumn[zz].value_.get_str();
-                m_sortDirections.
-                    push_back(stringToSortDirection(sortDirectionTypeString));
-            }
-            else if (sortColumn[zz].name_ == "SORT_EXPRESSION")
-            {
-                hasExpression = true;
-                m_sortExpressions.
-                    push_back(AbstractExpression::buildExpressionTree(sortColumn[zz].value_.get_obj()));
-            }
-        }
-        if (!(hasExpression && hasDirection)) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "OrderByPlanNode::loadFromJSONObject:"
-                                          " Does not have expression and direction.");
-        }
+    BOOST_FOREACH(const std::string& sortDirectionTypeString, sortDirectionStrings) {
+        m_sortDirections.push_back(stringToSortDirection(sortDirectionTypeString));
+    }
+
+    m_sortExpressions = loadExpressionsFromJSONArray(obj, "SORT_EXPRESSIONS");
+    if (m_sortExpressions.empty()) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "OrderByPlanNode::loadFromJSONObject:"
+                                      " Can't find SORT_EXPRESSIONS value");
     }
 }

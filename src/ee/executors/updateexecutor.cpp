@@ -66,60 +66,38 @@ bool UpdateExecutor::p_init()
 {
     VOLT_TRACE("init Update Executor");
 
-    m_node = dynamic_cast<UpdatePlanNode*>(m_abstractNode);
-    assert(m_node);
+    UpdatePlanNode* node = dynamic_cast<UpdatePlanNode*>(m_abstractNode);
+    assert(node);
     assert(hasExactlyOneInputTable());
     assert(m_inputTable);
     assert(m_targetTable);
 
-    AbstractPlanNode *child = m_node->getChildren()[0];
-    if (NULL == child) {
-        VOLT_ERROR("Attempted to initialize update executor with NULL child");
-        return false;
-    }
-
-    ProjectionPlanNode *proj_node = NULL;
-    PlanNodeType pnt = child->getPlanNodeType();
-    if (pnt == PLAN_NODE_TYPE_PROJECTION) {
-        proj_node = dynamic_cast<ProjectionPlanNode*>(child);
-        assert(NULL != proj_node);
-    } else if (pnt == PLAN_NODE_TYPE_SEQSCAN || pnt == PLAN_NODE_TYPE_INDEXSCAN) {
-        proj_node = dynamic_cast<ProjectionPlanNode*>(child->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-        assert(NULL != proj_node);
-    }
-
-    const vector<string> &targettable_column_names = m_targetTable->getColumnNames();
-
-    /*
-     * The first output column is the tuple address expression and it isn't part of our output so we skip
-     * it when generating the map from input columns to the target table columns.
-     */
-    for (int ii = 1; ii < proj_node->getOutputSchema().size(); ii++) {
-        string column_name = proj_node->getOutputSchema()[ii]->getColumnName();
-        for (int jj=0; jj < targettable_column_names.size(); ++jj) {
-            if (targettable_column_names[jj].compare(column_name) == 0) {
-                m_inputTargetMap.push_back(pair<int,int>(ii, jj));
-                break;
-            }
-        }
-    }
-
-    assert(m_inputTargetMap.size() == (proj_node->getOutputSchema().size() - 1));
-    m_inputTargetMapSize = (int)m_inputTargetMap.size();
+    m_inputTargetSize = m_inputTable->columnCount();
+    assert(m_inputTargetSize >= 2); // An address and at least 1 value.
     m_inputTuple = TableTuple(m_inputTable->schema());
     m_targetTuple = TableTuple(m_targetTable->schema());
 
-    m_partitionColumn = m_targetTable->partitionColumn();
+    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_targetTable);
+    assert(persistentTarget);
+    if (persistentTarget) {
+        m_partitionColumn = persistentTarget->partitionColumn();
+    } else {
+        // Probably trying to update a streamed table
+        // -- not allowed unless/until logged stream updates are implemented.
+        //TODO: really should throw something descriptive
+        return false;
+    }
+
+    m_updatedColumns = node->getUpdatedColumns();
 
     // determine which indices are updated by this executor
     // iterate through all target table indices and see if they contain
-    //  tables mutated by this executor
+    // columns mutated by this executor
     BOOST_FOREACH(TableIndex *index, m_targetTable->allIndexes()) {
         bool indexKeyUpdated = false;
         BOOST_FOREACH(int colIndex, index->getColumnIndices()) {
-            std::pair<int, int> updateColInfo; // needs to be here because of macro failure
-            BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
-                if (updateColInfo.second == colIndex) {
+            BOOST_FOREACH(int updatedCol, m_updatedColumns) {
+                if (updatedCol == colIndex) {
                     indexKeyUpdated = true;
                     break;
                 }
@@ -130,13 +108,13 @@ bool UpdateExecutor::p_init()
             m_indexesToUpdate.push_back(index);
         }
     }
-
     return true;
 }
 
 bool UpdateExecutor::p_execute() {
     assert(m_inputTable);
     assert(m_targetTable);
+    assert(m_inputTargetSize > 0);
 
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", m_targetTable->debug().c_str());
@@ -147,25 +125,28 @@ bool UpdateExecutor::p_execute() {
     while (input_iterator.next(m_inputTuple)) {
         //
         // OPTIMIZATION: Single-Sited Query Plans
-        // If our beloved UpdatePlanNode is apart of a single-site query plan,
+        // If our beloved UpdatePlanNode is part of a single-site query plan,
         // then the first column in the input table will be the address of a
         // tuple on the target table that we will want to update. This saves us
-        // the trouble of having to do an index lookup
-        //
-        void *target_address = m_inputTuple.getNValue(0).castAsAddress();
+        // the trouble of having to require a primary key to do an index lookup.
+        // There are also multi-site plans where this would continue to work,
+        // at least in theory. The worst case scenario is where a change to the
+        // partition key would require a delete on one partition and an insert on another.
+        // At the EE/plan fragment level, that hardly looks like an update at all, so
+        // the current approach may have a long future.
+        void *target_address = m_inputTuple.getSelfAddressColumn();
         m_targetTuple.move(target_address);
 
-        // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
-        // the values that we need to. The key thing to note here is that we
-        // grab a temp tuple that is a copy of the target tuple (i.e., the tuple
-        // we want to update). This insures that if the input tuple is somehow
-        // bringing garbage with it, we're only going to copy what we really
-        // need to into the target tuple.
-        //
-        TableTuple &tempTuple = m_targetTable->getTempTupleInlined(m_targetTuple);
-        for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
-            tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
-                                m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
+        // Loop through input columns and update the values that we need to.
+        // The key thing to note here is that we grab a temp tuple
+        // that is a copy of the target tuple (i.e., the tuple we want to update).
+        TableTuple &tempTuple = static_cast<PersistentTable*>(m_targetTable)->getTempTupleInlined(m_targetTuple);
+
+        // The first input column is the tuple address expression and it isn't represented
+        // by an updated column, so skip it in the input.
+        for (int ctr = 1; ctr < m_inputTargetSize; ctr++) {
+            tempTuple.setNValue(m_updatedColumns[ctr-1], // don't skip an updated column
+                                m_inputTuple.getNValue(ctr));
         }
 
         // if there is a partition column for the target table
@@ -174,7 +155,7 @@ bool UpdateExecutor::p_execute() {
             // get the value for the partition column
             NValue value = tempTuple.getNValue(m_partitionColumn);
             // if it doesn't map to this site
-            if ( ! valueHashesToTheLocalPartiton(value)) {
+            if ( ! valueHashesToTheLocalPartition(value)) {
                 VOLT_ERROR("Mispartitioned tuple in single-partition plan for"
                            " table '%s'", m_targetTable->name().c_str());
                 return false;

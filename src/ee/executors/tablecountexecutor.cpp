@@ -22,6 +22,7 @@
 #include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
 #include "plannodes/tablecountnode.h"
+#include "storage/persistenttable.h"
 
 using namespace voltdb;
 

@@ -43,32 +43,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#ifndef VOLTDBOPERATIONEXECUTOR_H
+#define VOLTDBOPERATIONEXECUTOR_H
+
 #include "abstracttableioexecutor.h"
 
-#include "common/ValueFactory.hpp"
-#include "execution/VoltDBEngine.h"
-#include "plannodes/abstracttableionode.h"
-#include "storage/table.h"
-#include "storage/tablefactory.h"
+namespace voltdb {
 
+class AbstractOperationExecutor : public AbstractTableIOExecutor {
+protected:
+    bool storeModifiedTupleCount(int64_t modifiedTuples);
+    void p_setOutputTable(TempTableLimits* limits);
+};
 
-using namespace std;
-using namespace voltdb;
-
-bool AbstractTableIOExecutor::initEngine(VoltDBEngine* engine)
-{
-    m_engine = engine;
-    m_targetTable = dynamic_cast<AbstractTableIOPlanNode*>(m_abstractNode)->resolveTargetTable(engine);
-    return m_targetTable != NULL;
 }
-
-bool AbstractTableIOExecutor::valueHashesToTheLocalPartition(const NValue& value) const
-{
-    return m_engine->isLocalSite(value);
-}
-
-bool AbstractTableIOExecutor::onPartitionZero() const
-{
-    NValue zero = ValueFactory::getBigIntValue(0);
-    return valueHashesToTheLocalPartition(zero);
-}
+#endif

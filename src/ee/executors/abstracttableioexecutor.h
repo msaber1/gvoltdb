@@ -49,11 +49,12 @@
 #include "abstractexecutor.h"
 
 namespace voltdb {
+class Table;
 
 class AbstractTableIOExecutor : public AbstractExecutor {
 protected:
     bool initEngine(VoltDBEngine* engine);
-    bool valueHashesToTheLocalPartiton(const NValue& value) const;
+    bool valueHashesToTheLocalPartition(const NValue& value) const;
     bool onPartitionZero() const;
 
     Table* m_targetTable;
@@ -64,12 +65,6 @@ private:
     /** reference to the engine/context to store the number of modified tuples,
      *  check whether updated/inserted tuples are on the right partition, etc. */
     VoltDBEngine* m_engine;
-};
-
-class AbstractOperationExecutor : public AbstractTableIOExecutor {
-protected:
-    bool storeModifiedTupleCount(int64_t modifiedTuples);
-    void p_setOutputTable(TempTableLimits* limits);
 };
 
 }

@@ -46,12 +46,11 @@
 #ifndef HSTOREINSERTEXECUTOR_H
 #define HSTOREINSERTEXECUTOR_H
 
-#include "executors/abstracttableioexecutor.h"
+#include "executors/abstractoperationexecutor.h"
 
 #include "common/tabletuple.h"
 
 namespace voltdb {
-class InsertPlanNode;
 /**
  *
  */

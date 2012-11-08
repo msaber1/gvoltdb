@@ -18,20 +18,17 @@
 #define VOLTDBSCHEMACOLUMN_H
 
 #include "common/types.h"
-#include "expressions/abstractexpression.h"
-
-#include "boost/shared_ptr.hpp"
 #include "json_spirit/json_spirit.h"
 
 #include <string>
 
 namespace voltdb
 {
+class AbstractExpression;
 
 /**
  * Convenience class to deserialize a SchemaColumn object from the JSON
- * and provide common accessors to the contents.  Currently relies on
- * colObject to remain valid; SchemaColumns should not be passed around,
+ * and provide common accessors to the contents.  SchemaColumns should not be passed around,
  * stored, or expected to be valid outside the scope of the initial
  * JSON deserialization.
  */
@@ -43,7 +40,6 @@ public:
 
     std::string getTableName() const;
     std::string getColumnName() const;
-    std::string getColumnAlias() const;
     ValueType getType() const;
     int32_t getSize() const;
 
@@ -52,11 +48,8 @@ public:
     AbstractExpression* getExpression();
 
 private:
-    const json_spirit::Object& m_colObject;
-
     std::string m_tableName;
     std::string m_columnName;
-    std::string m_columnAlias;
     AbstractExpression* m_expression;
     ValueType m_type;
     int32_t m_size;

@@ -149,4 +149,9 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         helpLoadFromJSONObject(jobj, db);
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
     }
+
+    @Override
+    public boolean referencesPersistentTable() { return true; }
+
+
 }

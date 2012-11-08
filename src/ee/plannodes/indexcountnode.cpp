@@ -24,28 +24,28 @@
 namespace voltdb {
 
 IndexCountPlanNode::~IndexCountPlanNode() {
-    for (int ii = 0; ii < searchkey_expressions.size(); ii++) {
-        delete searchkey_expressions[ii];
+    for (int ii = 0; ii < m_startKeys.size(); ii++) {
+        delete m_startKeys[ii];
     }
-    for (int ii = 0; ii < endkey_expressions.size(); ii++) {
-        delete endkey_expressions[ii];
+    for (int ii = 0; ii < m_endKeys.size(); ii++) {
+        delete m_endKeys[ii];
     }
 }
 
 std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
-    buffer << this->AbstractScanPlanNode::debugInfo(spacer);
-    buffer << spacer << "TargetIndexName[" << this->target_index_name << "]\n";
-    buffer << spacer << "IndexLookupType[" << this->lookup_type << "]\n";
+    buffer << AbstractScanPlanNode::debugInfo(spacer);
+    buffer << spacer << "TargetIndexName[" << m_targetIndexName << "]\n";
+    buffer << spacer << "IndexLookupType[" << m_startType << "]\n";
 
     buffer << spacer << "SearchKey Expressions:\n";
-    for (int ctr = 0, cnt = (int)this->searchkey_expressions.size(); ctr < cnt; ctr++) {
-        buffer << this->searchkey_expressions[ctr]->debug(spacer);
+    for (size_t ctr = 0, cnt = m_startKeys.size(); ctr < cnt; ctr++) {
+        buffer << m_startKeys[ctr]->debug(spacer);
     }
 
     buffer << spacer << "EndKey Expressions:\n";
-    for (int ctr = 0, cnt = (int)this->endkey_expressions.size(); ctr < cnt; ctr++) {
-        buffer << this->endkey_expressions[ctr]->debug(spacer);
+    for (size_t ctr = 0, cnt = m_endKeys.size(); ctr < cnt; ctr++) {
+        buffer << m_endKeys[ctr]->debug(spacer);
     }
 
     buffer << spacer << "Post-Scan Expression: ";
@@ -59,58 +59,32 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
 
 void IndexCountPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
-    json_spirit::Value endTypeValue = json_spirit::find_value( obj, "END_TYPE");
-    if (endTypeValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                "IndexCountPlanNode::loadFromJSONObject:"
-                " Can't find END_TYPE");
-    }
-    std::string endTypeString = endTypeValue.get_str();
-    end_type = stringToIndexLookup(endTypeString);
 
-    json_spirit::Value lookupTypeValue = json_spirit::find_value( obj, "LOOKUP_TYPE");
-    if (lookupTypeValue == json_spirit::Value::null) {
+    std::string startTypeString = loadStringFromJSON(obj, "START_TYPE");
+    if (startTypeString.empty()) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "IndexCountPlanNode::loadFromJSONObject:"
-                                      " Can't find LOOKUP_TYPE");
+                                      " Can't find START_TYPE");
     }
-    std::string lookupTypeString = lookupTypeValue.get_str();
-    lookup_type = stringToIndexLookup(lookupTypeString);
+    m_startType = stringToIndexLookup(startTypeString);
 
-    json_spirit::Value targetIndexNameValue = json_spirit::find_value( obj, "TARGET_INDEX_NAME");
-    if (targetIndexNameValue == json_spirit::Value::null) {
+    std::string endTypeString = loadStringFromJSON(obj, "END_TYPE");
+    if (endTypeString.empty()) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "IndexCountPlanNode::loadFromJSONObject:"
+                                      " Can't find END_TYPE");
+    }
+    m_endType = stringToIndexLookup(endTypeString);
+
+    m_targetIndexName = loadStringFromJSON(obj, "TARGET_INDEX_NAME");
+    if (m_targetIndexName.empty()) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "IndexCountPlanNode::loadFromJSONObject:"
                                       " Can't find TARGET_INDEX_NAME");
     }
-    target_index_name = targetIndexNameValue.get_str();
 
-    json_spirit::Value endKeyExpressionsValue = json_spirit::find_value( obj, "ENDKEY_EXPRESSIONS");
-    if (endKeyExpressionsValue == json_spirit::Value::null) {
-        endkey_expressions.clear();
-    } else {
-        json_spirit::Array endKeyExpressionsArray = endKeyExpressionsValue.get_array();
-        for (int ii = 0; ii < endKeyExpressionsArray.size(); ii++) {
-            json_spirit::Object endKeyExpressionObject = endKeyExpressionsArray[ii].get_obj();
-            AbstractExpression *expr = AbstractExpression::buildExpressionTree(endKeyExpressionObject);
-            endkey_expressions.push_back(expr);
-        }
-    }
-
-
-    json_spirit::Value searchKeyExpressionsValue = json_spirit::find_value( obj, "SEARCHKEY_EXPRESSIONS");
-    if (searchKeyExpressionsValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "IndexCountPlanNode::loadFromJSONObject:"
-                                      " Can't find SEARCHKEY_EXPRESSIONS");
-    }
-    json_spirit::Array searchKeyExpressionsArray = searchKeyExpressionsValue.get_array();
-
-    for (int ii = 0; ii < searchKeyExpressionsArray.size(); ii++) {
-        json_spirit::Object searchKeyExpressionObject = searchKeyExpressionsArray[ii].get_obj();
-        AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExpressionObject);
-        searchkey_expressions.push_back(expr);
-    }
+    m_startKeys = loadExpressionsFromJSONArray(obj, "STARTKEYS");
+    m_endKeys = loadExpressionsFromJSONArray(obj, "ENDKEYS");
 }
 
 }

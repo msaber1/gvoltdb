@@ -92,52 +92,37 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
 void IndexScanPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
-    json_spirit::Value lookupTypeValue = json_spirit::find_value( obj, "LOOKUP_TYPE");
-    if (lookupTypeValue == json_spirit::Value::null) {
+    std::string lookupTypeString = loadStringFromJSON(obj, "LOOKUP_TYPE");
+    if (lookupTypeString.empty()) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "IndexScanPlanNode::loadFromJSONObject:"
                                       " Can't find LOOKUP_TYPE");
     }
-    std::string lookupTypeString = lookupTypeValue.get_str();
     lookup_type = stringToIndexLookup(lookupTypeString);
 
-    json_spirit::Value sortDirectionValue = json_spirit::find_value( obj, "SORT_DIRECTION");
-    if (sortDirectionValue == json_spirit::Value::null) {
+    std::string sortDirectionString = loadStringFromJSON(obj, "SORT_DIRECTION");
+    if (sortDirectionString.empty()) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "IndexScanPlanNode::loadFromJSONObject:"
                                       " Can't find SORT_DIRECTION");
     }
-    std::string sortDirectionString = sortDirectionValue.get_str();
     sort_direction = stringToSortDirection(sortDirectionString);
 
-    json_spirit::Value targetIndexNameValue = json_spirit::find_value( obj, "TARGET_INDEX_NAME");
-    if (targetIndexNameValue == json_spirit::Value::null) {
+    target_index_name = loadStringFromJSON(obj, "TARGET_INDEX_NAME");
+    if (target_index_name.empty()) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "IndexScanPlanNode::loadFromJSONObject:"
                                       " Can't find TARGET_INDEX_NAME");
     }
-    target_index_name = targetIndexNameValue.get_str();
 
-    json_spirit::Value endExpressionValue = json_spirit::find_value( obj, "END_EXPRESSION");
-    if (endExpressionValue == json_spirit::Value::null) {
-        end_expression = NULL;
-    } else {
-        end_expression = AbstractExpression::buildExpressionTree(endExpressionValue.get_obj());
-    }
-
-    json_spirit::Value searchKeyExpressionsValue = json_spirit::find_value( obj, "SEARCHKEY_EXPRESSIONS");
-    if (searchKeyExpressionsValue == json_spirit::Value::null) {
+    searchkey_expressions = loadExpressionsFromJSONArray(obj, "SEARCH_KEYS");
+    if (searchkey_expressions.empty()) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "IndexScanPlanNode::loadFromJSONObject:"
-                                      " Can't find SEARCHKEY_EXPRESSIONS");
+                                      " Can't find SEARCH_KEYS");
     }
-    json_spirit::Array searchKeyExpressionsArray = searchKeyExpressionsValue.get_array();
 
-    for (int ii = 0; ii < searchKeyExpressionsArray.size(); ii++) {
-        json_spirit::Object searchKeyExpressionObject = searchKeyExpressionsArray[ii].get_obj();
-        AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExpressionObject);
-        searchkey_expressions.push_back(expr);
-    }
+    end_expression = loadExpressionFromJSON(obj, "END_EXPRESSION");
 }
 
 }

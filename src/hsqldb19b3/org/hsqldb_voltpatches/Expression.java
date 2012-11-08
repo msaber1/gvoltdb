@@ -1479,6 +1479,7 @@ public class Expression {
         // catch unexpected types
         else {
             switch( getType()) {
+            case OpTypes.ROW:
             case OpTypes.ROW_SUBQUERY:
             case OpTypes.SCALAR_SUBQUERY:
             case OpTypes.TABLE_SUBQUERY:
@@ -1487,7 +1488,6 @@ public class Expression {
             System.err.println("UNSUPPORTED EXPR TYPE: " + String.valueOf(getType()));
             VoltXMLElement unknown = new VoltXMLElement("unknown");
             exp.children.add(unknown);
-            assert(unknown != null);
         }
 
         return exp;

@@ -131,6 +131,13 @@ public:
     // UTILITY METHODS
     // ------------------------------------------------------------------
     static AbstractPlanNode* fromJSONObject(json_spirit::Object& obj);
+    
+    static std::vector<std::string> loadStringsFromJSONArray(json_spirit::Object& jparent, const char* label);
+    static std::string loadStringFromJSON(json_spirit::Object& jparent, const char* label);
+    static std::vector<AbstractExpression*> loadExpressionsFromJSONArray(json_spirit::Object& jparent,
+                                                                         const char* label);
+    static AbstractExpression* loadExpressionFromJSON(json_spirit::Object& jparent, const char* label);
+    static int loadIntegerFromJSON(json_spirit::Object& jparent, const char* label, int defaultValue);
 
     // Debugging convenience methods
     std::string debug() const;

@@ -127,21 +127,15 @@ public class TestTwoSitePlans extends TestCase {
         // cache some plan fragments
         selectStmt = selectProc.getStatements().get("selectAll");
         assert(selectStmt != null);
-        int i = 0;
-        // this kinda assumes the right order
         for (PlanFragment f : selectStmt.getFragments()) {
-            if (i == 0) selectTopFrag = f;
-            else selectBottomFrag = f;
-            i++;
+            if (f.getHasdependencies()) {
+                selectTopFrag = f;
+            } else {
+                selectBottomFrag = f;
+            }
         }
         assert(selectTopFrag != null);
         assert(selectBottomFrag != null);
-
-        if (selectTopFrag.getHasdependencies() == false) {
-            PlanFragment temp = selectTopFrag;
-            selectTopFrag = selectBottomFrag;
-            selectBottomFrag = temp;
-        }
 
         // insert some data
         Statement insertStmt = insertProc.getStatements().get("insert");

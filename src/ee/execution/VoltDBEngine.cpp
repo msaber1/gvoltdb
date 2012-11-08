@@ -1011,27 +1011,20 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
         frag_temptable_limit = -1;
     }
 
-    boost::shared_ptr<ExecutorVector> ev =
-        boost::shared_ptr<ExecutorVector>
-        (new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit, pnf));
+    boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit, pnf));
 
-    // Initialize each node!
-    for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
-         ctr < cnt; ctr++) {
-        if (!initPlanNode(fragId, pnf->getExecuteList()[ctr], &(ev->limits)))
-        {
+    // Initialize each node! children before parents
+    // Also the vector of executors for this planfragment, used at runtime.
+    int position = -1;
+    BOOST_FOREACH(AbstractPlanNode* node, pnf->getExecuteList()) {
+        ++position;
+        if (!initPlanNode(fragId, node, &(ev->limits))) {
             VOLT_ERROR("Failed to initialize PlanNode '%s' at position '%d'"
                        " for PlanFragment '%jd'",
-                       pnf->getExecuteList()[ctr]->debug().c_str(), ctr,
-                       (intmax_t)fragId);
+                       node->debug().c_str(), position, (intmax_t)fragId);
             return false;
         }
-    }
-
-    // Initialize the vector of executors for this planfragment, used at runtime.
-    for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
-         ctr < cnt; ctr++) {
-        ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutor());
+        ev->list.push_back(node->getExecutor());
     }
     m_executorMap[fragId] = ev;
 
@@ -1050,9 +1043,9 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId,
     AbstractExecutor* executor = ExecutorUtil::getNewExecutor(node->getPlanNodeType());
     if (executor == NULL)
         return false;
-    executor->initEngine(this);
     node->initExecutor(executor);
     executor->initPlanNode(node);
+    executor->initEngine(this);
 
     // If this PlanNode has an internal PlanNode (e.g., AbstractScanPlanNode can
     // have internal Projections), then we need to make sure that we set that
@@ -1073,12 +1066,20 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId,
     }
 
     // Now initialize the executor for execution later on
-    if (!executor->init(limits))
-    {
-        VOLT_ERROR("The Executor failed to initialize PlanNode '%s' for"
-                   " PlanFragment '%jd'", node->debug().c_str(),
-                   (intmax_t)fragId);
-        return false;
+    try {
+        if (!executor->init(limits)) {
+            VOLT_ERROR("The Executor failed to initialize PlanNode '%s'"
+                       " for PlanFragment '%jd'", node->debug().c_str(),
+                       (intmax_t)fragId);
+            return false;
+        }
+    } catch (exception& err) {
+        char message[128];
+        snprintf(message, sizeof(message), "The Executor failed to initialize PlanNode '%s'"
+                 " for PlanFragment '%jd', threw exception", node->debug().c_str(),
+                 (intmax_t)fragId);
+        /*TODO: , extend message to add exception detail*/
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 
     return true;

@@ -45,6 +45,7 @@
 
 #include "abstractscannode.h"
 
+#include "expressions/abstractexpression.h"
 #include "storage/table.h"
 
 using namespace json_spirit;
@@ -69,10 +70,5 @@ AbstractScanPlanNode::loadFromJSONObject(json_spirit::Object& obj)
 {
     AbstractTableIOPlanNode::loadFromJSONObject(obj);
 
-    json_spirit::Value predicateValue = json_spirit::find_value(obj, "PREDICATE");
-    if (!(predicateValue == json_spirit::Value::null))
-    {
-        json_spirit::Object predicateObject = predicateValue.get_obj();
-        m_predicate = AbstractExpression::buildExpressionTree(predicateObject);
-    }
+    m_predicate = loadExpressionFromJSON(obj, "PREDICATE");
 }

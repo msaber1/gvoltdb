@@ -48,6 +48,8 @@
 
 #include "abstracttableionode.h"
 
+#include <vector>
+
 namespace voltdb {
 
 /**
@@ -63,10 +65,13 @@ class UpdatePlanNode : public AbstractTableIOPlanNode {
 
         bool doesUpdateIndexes() { return m_updatesIndexes; }
 
+        std::vector<int> const &getUpdatedColumns() const { return m_updatedColumns; }
+
     protected:
         virtual void loadFromJSONObject(json_spirit::Object &obj);
 
         bool m_updatesIndexes;
+        std::vector<int> m_updatedColumns;
 };
 
 }

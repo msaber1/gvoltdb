@@ -48,6 +48,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
+#include "expressions/abstractexpression.h"
 #include "plannodes/distinctnode.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"

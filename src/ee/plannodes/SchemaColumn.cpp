@@ -16,53 +16,47 @@
  */
 
 #include "SchemaColumn.h"
+#include "expressions/abstractexpression.h"
 
 using namespace json_spirit;
 using namespace std;
 using namespace voltdb;
 
-SchemaColumn::SchemaColumn(Object& colObject) : m_colObject(colObject)
+SchemaColumn::SchemaColumn(Object& colObject)
 {
     bool contains_table_name = false;
     bool contains_column_name = false;
-    bool contains_column_alias = false;
     bool contains_type = false;
     bool contains_size = false;
-    for (int attr = 0; attr < m_colObject.size(); attr++)
+    for (int attr = 0; attr < colObject.size(); attr++)
     {
-        if (m_colObject[attr].name_ == "TABLE_NAME")
+        if (colObject[attr].name_ == "TABLE_NAME")
         {
             contains_table_name = true;
-            m_tableName = m_colObject[attr].value_.get_str();
+            m_tableName = colObject[attr].value_.get_str();
         }
-        else if (m_colObject[attr].name_ == "COLUMN_NAME")
+        else if (colObject[attr].name_ == "COLUMN_NAME")
         {
             contains_column_name = true;
-            m_columnName = m_colObject[attr].value_.get_str();
+            m_columnName = colObject[attr].value_.get_str();
         }
-        else if (m_colObject[attr].name_ == "COLUMN_ALIAS")
-        {
-            contains_column_alias = true;
-            m_columnAlias = m_colObject[attr].value_.get_str();
-        }
-        else if (m_colObject[attr].name_ == "TYPE")
+        else if (colObject[attr].name_ == "TYPE")
         {
             contains_type = true;
-            string m_colObjectTypeString =
-                m_colObject[attr].value_.get_str();
-            m_type = stringToValue(m_colObjectTypeString);
+            string colObjectTypeString = colObject[attr].value_.get_str();
+            m_type = stringToValue(colObjectTypeString);
         }
-        else if (m_colObject[attr].name_ == "SIZE")
+        else if (colObject[attr].name_ == "SIZE")
         {
             contains_size = true;
-            m_size = m_colObject[attr].value_.get_int();
+            m_size = colObject[attr].value_.get_int();
         }
     }
 
     m_expression = NULL;
     // lazy vector search
 
-    Value columnExpressionValue = find_value(m_colObject, "EXPRESSION");
+    Value columnExpressionValue = find_value(colObject, "EXPRESSION");
     if (columnExpressionValue == Value::null)
     {
         throw runtime_error("SchemaColumn::constructor: "
@@ -72,8 +66,7 @@ SchemaColumn::SchemaColumn(Object& colObject) : m_colObject(colObject)
     Object columnExpressionObject = columnExpressionValue.get_obj();
     m_expression = AbstractExpression::buildExpressionTree(columnExpressionObject);
 
-    if(!(contains_table_name && contains_column_name &&
-         contains_column_alias && contains_type && contains_size)) {
+    if(!(contains_table_name && contains_column_name && contains_type && contains_size)) {
         throw runtime_error("SchemaColumn::constructor missing configuration data.");
     }
 }
@@ -93,12 +86,6 @@ string
 SchemaColumn::getColumnName() const
 {
     return m_columnName;
-}
-
-string
-SchemaColumn::getColumnAlias() const
-{
-    return m_columnAlias;
 }
 
 ValueType

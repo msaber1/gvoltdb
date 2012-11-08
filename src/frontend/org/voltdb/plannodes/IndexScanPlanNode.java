@@ -47,8 +47,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     public enum Members {
         TARGET_INDEX_NAME,
         END_EXPRESSION,
-        SEARCHKEY_EXPRESSIONS,
-        KEY_ITERATE,
+        SEARCH_KEYS,
         LOOKUP_TYPE,
         SORT_DIRECTION;
     }
@@ -70,10 +69,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
-    protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
-
-    // ???
-    protected Boolean m_keyIterate = false;
+    protected List<AbstractExpression> m_searchKeys = new ArrayList<AbstractExpression>();
 
     // The overall index lookup operation type
     protected IndexLookupType m_lookupType = IndexLookupType.EQ;
@@ -99,7 +95,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super.validate();
 
         // There needs to be at least one search key expression
-        if (m_searchkeyExpressions.isEmpty()) {
+        if (m_searchKeys.isEmpty()) {
             throw new Exception("ERROR: There were no search key expressions defined for " + this);
         }
 
@@ -107,7 +103,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (m_endExpression != null) {
             m_endExpression.validate();
         }
-        for (AbstractExpression exp : m_searchkeyExpressions) {
+        for (AbstractExpression exp : m_searchKeys) {
             exp.validate();
         }
     }
@@ -144,22 +140,6 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     public Index getCatalogIndex()
     {
         return m_catalogIndex;
-    }
-
-    /**
-     *
-     * @param keyIterate
-     */
-    public void setKeyIterate(Boolean keyIterate) {
-        m_keyIterate = keyIterate;
-    }
-
-    /**
-     *
-     * @return Does this scan iterate over values in the index.
-     */
-    public Boolean getKeyIterate() {
-        return m_keyIterate;
     }
 
     /**
@@ -246,7 +226,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // don't get bashed by other nodes or subsequent planner runs
             try
             {
-                m_searchkeyExpressions.add((AbstractExpression) expr.clone());
+                m_searchKeys.add((AbstractExpression) expr.clone());
             }
             catch (CloneNotSupportedException e)
             {
@@ -258,29 +238,29 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     /**
-     * @return the searchkey_expressions
+     * @return the search keys
      */
     // Please don't use me to add search key expressions.  Use
     // addSearchKeyExpression() so that the expression gets cloned
     public List<AbstractExpression> getSearchKeyExpressions() {
-        return Collections.unmodifiableList(m_searchkeyExpressions);
+        return Collections.unmodifiableList(m_searchKeys);
     }
 
     @Override
     public void resolveColumnIndexes()
     {
         // IndexScanPlanNode has TVEs that need index resolution in:
-        // m_searchkeyExpressions
+        // m_searchKeys
         // m_endExpression
 
         // Collect all the TVEs in the end expression and search key expressions
         List<TupleValueExpression> index_tves =
             new ArrayList<TupleValueExpression>();
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
-        for (AbstractExpression search_exp : m_searchkeyExpressions)
+        for (AbstractExpression search_exp : m_searchKeys)
         {
             index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
         }
+        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
         // and update their indexes against the table schema
         for (TupleValueExpression tve : index_tves)
         {
@@ -309,7 +289,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // get the width of the index and number of columns used
         int colCount = m_catalogIndex.getColumns().size();
-        int keyWidth = m_searchkeyExpressions.size();
+        int keyWidth = m_searchKeys.size();
         assert(keyWidth <= colCount);
 
         // need a double for math
@@ -352,15 +332,14 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
         stringer.key(Members.END_EXPRESSION.name());
         stringer.value(m_endExpression);
 
-        stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
-        for (AbstractExpression ae : m_searchkeyExpressions) {
+        stringer.key(Members.SEARCH_KEYS.name()).array();
+        for (AbstractExpression ae : m_searchKeys) {
             assert (ae instanceof JSONString);
             stringer.value(ae);
         }
@@ -371,26 +350,14 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
         m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        JSONObject tempjobj = null;
+        // load search keys
+        loadExpressionsFromJSONArray(jobj, db, m_searchKeys, Members.SEARCH_KEYS.name());
         //load end_expression
-        if( !jobj.isNull( Members.END_EXPRESSION.name() ) ) {
-            tempjobj = jobj.getJSONObject( Members.END_EXPRESSION.name() );
-            m_endExpression = AbstractExpression.fromJSONObject( tempjobj, db);
-        }
-        //load searchkey_expressions
-        if( !jobj.isNull( Members.SEARCHKEY_EXPRESSIONS.name() ) ) {
-            JSONArray jarray = jobj.getJSONArray( Members.SEARCHKEY_EXPRESSIONS.name() );
-            int size = jarray.length();
-            for( int i = 0 ; i < size; i++ ) {
-                tempjobj = jarray.getJSONObject( i );
-                m_searchkeyExpressions.add( AbstractExpression.fromJSONObject(tempjobj, db));
-            }
-        }
+        m_endExpression = loadExpressionFromJSONObject(jobj, db, Members.END_EXPRESSION.name());
     }
 
     @Override
@@ -398,7 +365,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         assert(m_catalogIndex != null);
 
         int indexSize = m_catalogIndex.getColumns().size();
-        int keySize = m_searchkeyExpressions.size();
+        int keySize = m_searchKeys.size();
 
         String scanType = "unique-scan";
         if (m_lookupType != IndexLookupType.EQ)

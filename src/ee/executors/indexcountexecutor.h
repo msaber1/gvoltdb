@@ -24,8 +24,6 @@
 #include "common/tabletuple.h"
 
 namespace voltdb {
-class AbstractExpression;
-class IndexCountPlanNode;
 
 class IndexCountExecutor : public AbstractTableIOExecutor
 {
@@ -41,14 +39,14 @@ protected:
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
     int m_numOfColumns;
-    int m_numOfSearchkeys;
-    int m_numOfEndkeys;
+    int m_numOfStartKeys;
+    int m_numOfEndKeys;
 
     // Search key
-    StorageBackedTempTuple m_searchKey;
+    StorageBackedTempTuple m_startKey;
     StorageBackedTempTuple m_endKey;
 
-    IndexLookupType m_lookupType;
+    IndexLookupType m_startType;
     IndexLookupType m_endType;
 
     TableIndex *m_index;

@@ -46,7 +46,7 @@
 #ifndef HSTOREUPDATEEXECUTOR_H
 #define HSTOREUPDATEEXECUTOR_H
 
-#include "executors/abstracttableioexecutor.h"
+#include "executors/abstractoperationexecutor.h"
 
 #include "common/tabletuple.h"
 
@@ -58,7 +58,7 @@ class UpdateExecutor : public AbstractOperationExecutor
 {
 public:
     UpdateExecutor() :
-        m_inputTargetMapSize(-1),
+        m_inputTargetSize(-1),
         m_partitionColumn(-1)
     {}
 
@@ -66,13 +66,8 @@ protected:
     bool p_init();
     bool p_execute();
 
-    UpdatePlanNode* m_node;
-
-    std::vector<std::pair<int, int> > m_inputTargetMap;
-    int m_inputTargetMapSize;
-
-    PersistentTable* m_targetTable;
-
+    int m_inputTargetSize;
+    std::vector<int> m_updatedColumns;
     TableTuple m_inputTuple;
     TableTuple m_targetTuple;
     int m_partitionColumn;

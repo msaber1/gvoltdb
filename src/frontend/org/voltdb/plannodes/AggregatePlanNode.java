@@ -295,20 +295,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
             m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
 
-            if( !tempObj.isNull( Members.AGGREGATE_EXPRESSION.name() ) ) {
-                m_aggregateExpressions.add(
-                        AbstractExpression.fromJSONObject(
-                                tempObj.getJSONObject( Members.AGGREGATE_EXPRESSION.name() ),
-                                db) );
-            }
+            AbstractExpression agg = loadExpressionFromJSONObject(jobj, db, Members.AGGREGATE_EXPRESSION.name());
+            assert(agg != null);
+            m_aggregateExpressions.add(agg);
         }
-        if( !jobj.isNull(Members.GROUPBY_EXPRESSIONS.name() ) ) {
-            jarray = jobj.getJSONArray( Members.GROUPBY_EXPRESSIONS.name() );
-            size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_groupByExpressions.add(
-                        AbstractExpression.fromJSONObject( jarray.getJSONObject(i), db));
-            }
-        }
+        loadExpressionsFromJSONArray(jobj, db, m_groupByExpressions, Members.GROUPBY_EXPRESSIONS.name());
     }
 }

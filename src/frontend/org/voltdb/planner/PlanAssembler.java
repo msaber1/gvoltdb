@@ -17,12 +17,11 @@
 
 package org.voltdb.planner;
 
+import java.util.BitSet;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
-import java.util.Set;
 
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
@@ -491,8 +490,6 @@ public class PlanAssembler {
         UpdatePlanNode updateNode = new UpdatePlanNode();
         Table targetTable = m_parsedUpdate.tableList.get(0);
         updateNode.setTargetTableName(targetTable.getTypeName());
-        // set this to false until proven otherwise
-        updateNode.setUpdateIndexes(false);
 
         ProjectionPlanNode projectionNode = new ProjectionPlanNode();
         TupleAddressExpression tae = new TupleAddressExpression();
@@ -503,41 +500,39 @@ public class PlanAssembler {
                                                "tuple_address",
                                                tae));
 
-        // get the set of columns affected by indexes
-        Set<String> affectedColumns = getIndexedColumnSetForTable(targetTable);
+        // track the set of updated columns since they might affect indexes
+        BitSet updatedColumns = new BitSet();
 
         // add the output columns we need to the projection
         //
-        // Right now, the EE is going to use the original column names
-        // and compare these to the persistent table column names in the
-        // update executor in order to figure out which table columns get
-        // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
-        // to avoid any false schema/column matches with the actual table.
+        // The EE uses an array of table column indexes to determine the target column of
+        // each projected expression added here. The alternative approach, now abandoned,
+        // was to carefully label the columns of the projection (actually its output schema)
+        // with the target column name -- but that required excessive general case pampering
+        // of temp table output schema in the EE "just in case".
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
-
+            Column targetColumn = col.getKey();
             // make the literal type we're going to insert match the column type
             AbstractExpression castedExpr = null;
             try {
                 castedExpr = (AbstractExpression) col.getValue().clone();
                 ExpressionUtil.setOutputTypeForInsertExpression(
-                        castedExpr, VoltType.get((byte) col.getKey().getType()), col.getKey().getSize(), m_paramTypeOverrideMap);
+                        castedExpr, VoltType.get((byte) targetColumn.getType()), targetColumn.getSize(), m_paramTypeOverrideMap);
             } catch (Exception e) {
                 throw new PlanningErrorException(e.getMessage());
             }
 
-            proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
-                                                   col.getKey().getTypeName(),
-                                                   col.getKey().getTypeName(),
-                                                   castedExpr));
-
-            // check if this column is an indexed column
-            if (affectedColumns.contains(col.getKey().getTypeName()))
-            {
-                updateNode.setUpdateIndexes(true);
-            }
+            int colIndex = targetColumn.getIndex();
+            updateNode.addUpdatedColumn(colIndex);
+            updatedColumns.set(colIndex);
+            proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE", null, null, castedExpr));
         }
         projectionNode.setOutputSchema(proj_schema);
 
+        // check if any updated column is an indexed column
+        if (overlapsIndexedColumnsForTable(targetTable, updatedColumns)) {
+            updateNode.setUpdateIndexes(true);
+        }
 
         // add the projection inline (TODO: this will break if more than one
         // layer is below this)
@@ -555,7 +550,6 @@ public class PlanAssembler {
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
             updateNode.generateOutputSchema(m_catalogDb);
-
             return updateNode;
         }
 
@@ -965,11 +959,10 @@ public class PlanAssembler {
             for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.displayColumns)
             {
                 AbstractExpression rootExpr = col.expression;
-                AbstractExpression agg_input_expr = null;
                 SchemaColumn schema_col = null;
                 SchemaColumn topSchemaCol = null;
-                ExpressionType agg_expression_type = rootExpr.getExpressionType();
                 if (rootExpr.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    ExpressionType agg_expression_type = rootExpr.getExpressionType();
                     // If the rootExpr is not itself an AggregateExpression but simply contains one (or more)
                     // like "MAX(counter)+1" or "MAX(col)/MIN(col)",
                     // it gets classified as a non-push-down-able aggregate.
@@ -977,7 +970,7 @@ public class PlanAssembler {
                     // TODO: support expressions of aggregates by greater differentiation of display columns between the top-level
                     // aggregate (potentially containing aggregate functions and expressions of aggregate functions) and the pushed-down
                     // aggregate (potentially containing aggregate functions and aggregate functions of expressions).
-                    agg_input_expr = rootExpr.getLeft();
+                    AbstractExpression agg_input_expr = rootExpr.getLeft();
                     hasAggregates = true;
 
                     // count(*) hack.  we're not getting AGGREGATE_COUNT_STAR
@@ -1384,23 +1377,23 @@ public class PlanAssembler {
     }
 
     /**
-     * Get the unique set of names of all columns that are part of an index on
-     * the given table.
+     * Determine whether there are any index-affecting columns in a set of columns identified
+     * by column index (offset) within a table.
      *
      * @param table
      *            The table to build the list of index-affected columns with.
-     * @return The set of column names affected by indexes with duplicates
-     *         removed.
+     * @param columns
+     *            The set of candidate columns identified by integer index.
+     * @return true iff there is an index that references any of the columns.
      */
-    public Set<String> getIndexedColumnSetForTable(Table table) {
-        HashSet<String> columns = new HashSet<String>();
-
+    public boolean overlapsIndexedColumnsForTable(Table table, BitSet columns) {
         for (Index index : table.getIndexes()) {
             for (ColumnRef colRef : index.getColumns()) {
-                columns.add(colRef.getColumn().getTypeName());
+                if (columns.get(colRef.getColumn().getIndex())) {
+                    return true;
+                }
             }
         }
-
-        return columns;
+        return false;
     }
 }

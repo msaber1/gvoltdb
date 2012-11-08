@@ -53,7 +53,7 @@
 #include "plannodes/seqscannode.h"
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
+#include "storage/persistenttable.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 

@@ -44,7 +44,7 @@
  */
 
 #include "aggregatenode.h"
-
+#include "common/debuglog.h"
 #include "expressions/abstractexpression.h"
 
 #include <sstream>
@@ -155,24 +155,16 @@ AggregatePlanNode::loadFromJSONObject(Object &obj)
         }
     }
 
-    Value groupByExpressionsValue = find_value(obj, "GROUPBY_EXPRESSIONS");
-    if (!(groupByExpressionsValue == Value::null))
-    {
-        Array groupByExpressionsArray = groupByExpressionsValue.get_array();
-        for (int ii = 0; ii < groupByExpressionsArray.size(); ii++)
-        {
-            Value groupByExpressionValue = groupByExpressionsArray[ii];
-            m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionValue.get_obj()));
-        }
-    }
+    m_groupByExpressions = loadExpressionsFromJSONArray(obj, "GROUPBY_EXPRESSIONS");
 }
 
-void
-AggregatePlanNode::collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const
+
+void AggregatePlanNode::collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const
 {
     const std::vector<SchemaColumn*>& outputSchema = getOutputSchema();
-    for (int ii = 0; ii < outputSchema.size(); ii++)
-    {
+    size_t size = outputSchema.size();
+    outputColumnExpressions.resize(size);
+    for (int ii = 0; ii < size; ii++) {
         SchemaColumn* outputColumn = outputSchema[ii];
         outputColumnExpressions[ii] = outputColumn->getExpression();
     }
