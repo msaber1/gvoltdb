@@ -430,11 +430,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         if (getPlanNodeType() == type)
             collected.add(this);
 
-        for (AbstractPlanNode n : m_children)
-            n.findAllNodesOfType_recurse(type, collected, visited);
+        for (AbstractPlanNode child : m_children)
+            child.findAllNodesOfType_recurse(type, collected, visited);
 
-        // NOTE: ignores inline nodes.
-
+        for (AbstractPlanNode inlined : m_inlineNodes.values())
+            inlined.findAllNodesOfType_recurse(type, collected, visited);
     }
 
     /**
@@ -541,8 +541,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public void toJSONString(JSONStringer stringer) throws JSONException {
         stringer.key(Members.ID.name()).value(m_id);
         stringer.key(Members.PLAN_NODE_TYPE.name()).value(getPlanNodeType().toString());
-        stringer.key(Members.INLINE_NODES.name()).array();
-
 
         PlanNodeType types[] = new PlanNodeType[m_inlineNodes.size()];
         int i = 0;
@@ -550,10 +548,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             types[i++] = type;
         }
         Arrays.sort(types);
+
+        stringer.key(Members.INLINE_NODES.name()).array();
         for (PlanNodeType type : types) {
             AbstractPlanNode node = m_inlineNodes.get(type);
             assert(node != null);
-            assert(node instanceof JSONString);
             stringer.value(node);
         }
         stringer.endArray();
@@ -577,6 +576,37 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         stringer.endArray();
     }
+
+    protected void listExpressionsToJSONArray(JSONStringer stringer, String label,
+                                              List<AbstractExpression> exprs)
+        throws JSONException
+    {
+        stringer.key(label).array();
+        for (AbstractExpression ae : exprs) {
+            stringer.value(ae);
+        }
+        stringer.endArray();
+    }
+
+    protected void listIntegersToJSONArray(JSONStringer stringer, String label, List<Integer> ints)
+        throws JSONException
+    {
+        stringer.key(label).array();
+        for (int ii : ints) {
+            stringer.value(ii);
+        }
+        stringer.endArray();
+    }
+
+    protected void listStringsToJSONArray(JSONStringer stringer, String label, List<String> strings)
+            throws JSONException
+        {
+            stringer.key(label).array();
+            for (String string : strings) {
+                stringer.value(string);
+            }
+            stringer.endArray();
+        }
 
     public String toExplainPlanString() {
         StringBuilder sb = new StringBuilder();
@@ -709,6 +739,32 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             for (int ii = 0; ii < size; ii++) {
                 JSONObject tempjobj = jarray.getJSONObject(ii);
                 memberList.add(AbstractExpression.fromJSONObject(tempjobj, db));
+            }
+        }
+    }
+
+    protected static void loadIntegersFromJSONArray(JSONObject jparent,
+                                                    List<Integer> ints, String label)
+        throws JSONException
+    {
+        if ( ! jparent.isNull(label)) {
+            JSONArray jarray = jparent.getJSONArray(label);
+            int size = jarray.length();
+            for (int ii = 0; ii < size; ii++) {
+                ints.add(jarray.getInt(ii));
+            }
+        }
+    }
+
+    protected static void loadStringsFromJSONArray(JSONObject jparent,
+                                                   List<String> strings, String label)
+        throws JSONException
+    {
+        if ( ! jparent.isNull(label)) {
+            JSONArray jarray = jparent.getJSONArray(label);
+            int size = jarray.length();
+            for (int ii = 0; ii < size; ii++) {
+                strings.add(jarray.getString(ii));
             }
         }
     }

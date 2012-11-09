@@ -20,7 +20,6 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -58,23 +57,15 @@ public class UpdatePlanNode extends AbstractOperationPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.UPDATES_INDEXES.name()).value(m_updatesIndexes);
-        stringer.key(Members.UPDATED_COLUMNS.name()).array();
-        for (int ii : m_updatedColumns) {
-            stringer.value(ii);
-        }
-        stringer.endArray();
+        listIntegersToJSONArray(stringer, Members.UPDATED_COLUMNS.name(), m_updatedColumns);
 
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        m_updatesIndexes = jobj.getBoolean( Members.UPDATES_INDEXES .name() );
-        JSONArray jarray = jobj.getJSONArray( Members.UPDATED_COLUMNS.name() );
-        int size = jarray.length();
-        for( int i = 0; i < size; i++ ) {
-            m_updatedColumns.add( jarray.getInt( i ) );
-        }
+        m_updatesIndexes = jobj.getBoolean(Members.UPDATES_INDEXES.name());
+        loadIntegersFromJSONArray(jobj,  m_updatedColumns, Members.UPDATED_COLUMNS.name());
     }
 
     @Override

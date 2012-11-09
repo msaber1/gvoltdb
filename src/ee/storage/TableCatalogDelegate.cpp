@@ -106,8 +106,9 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table &catalogTable,
     }
 
     vector<AbstractExpression*> indexedExpressions = TableIndex::simplyIndexColumns();
-    if (catalogIndex.expressionsjson().length() != 0) {
-        ExpressionUtil::loadIndexedExprsFromJson(indexedExpressions, catalogIndex.expressionsjson());
+    const std::string expressionsAsText = catalogIndex.expressionsjson();
+    if (expressionsAsText.length() != 0) {
+        ExpressionUtil::loadIndexedExprsFromJson(indexedExpressions, expressionsAsText);
     }
 
     // Since the columns are not going to come back in the proper order from
@@ -158,6 +159,7 @@ TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
     }
 
     bool countable = true; //catalogIndex.countable(), // always counting for now
+
     // add the uniqueness of the index
     std::string retval = catalogIndex.unique() ? "U" : "M";
 

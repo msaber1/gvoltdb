@@ -72,23 +72,13 @@ string AbstractJoinPlanNode::debugInfo(const string& spacer) const
 void
 AbstractJoinPlanNode::loadFromJSONObject(Object& obj)
 {
-    Value joinTypeValue = find_value(obj, "JOIN_TYPE");
-    if (joinTypeValue == Value::null)
-    {
+    string joinTypeString = loadStringFromJSON(obj, "JOIN_TYPE");
+    if (joinTypeString.empty()) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "AbstractJoinPlanNode::loadFromJSONObject:"
                                       " Couldn't find JOIN_TYPE value");
     }
-    m_joinType = stringToJoin(joinTypeValue.get_str());
+    m_joinType = stringToJoin(joinTypeString);
 
-    Value predicateValue = find_value(obj, "PREDICATE");
-    if (predicateValue == Value::null)
-    {
-        m_predicate = NULL;
-    }
-    else
-    {
-        Object predicateObject = predicateValue.get_obj();
-        m_predicate = AbstractExpression::buildExpressionTree(predicateObject);
-    }
+    m_predicate = loadExpressionFromJSON(obj, "PREDICATE");
 }

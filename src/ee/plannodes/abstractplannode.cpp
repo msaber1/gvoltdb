@@ -321,10 +321,10 @@ AbstractPlanNode::fromJSONObject(Object &obj) {
     return node;
 }
 
-vector<string> AbstractPlanNode::loadStringsFromJSONArray(json_spirit::Object& jparent, const char* label)
+vector<string> AbstractPlanNode::loadStringsFromJSONArray(json_spirit::Object& jparent, const char* key)
 {
     vector<string> strings;
-    json_spirit::Value jValue = json_spirit::find_value(jparent, label);
+    json_spirit::Value jValue = json_spirit::find_value(jparent, key);
     if (jValue == json_spirit::Value::null) {
         return strings;
     }
@@ -335,20 +335,19 @@ vector<string> AbstractPlanNode::loadStringsFromJSONArray(json_spirit::Object& j
     return strings;
 }
 
-string AbstractPlanNode::loadStringFromJSON(json_spirit::Object& jparent, const char* label)
+string AbstractPlanNode::loadStringFromJSON(json_spirit::Object& jparent, const char* key)
 {
-    json_spirit::Value stringValue = json_spirit::find_value(jparent, label);
+    json_spirit::Value stringValue = json_spirit::find_value(jparent, key);
     if (stringValue == json_spirit::Value::null) {
         return string();
     }
     return stringValue.get_str();
 }
 
-vector<AbstractExpression*> AbstractPlanNode::loadExpressionsFromJSONArray(json_spirit::Object& jparent,
-                                                                           const char* label)
+vector<AbstractExpression*> AbstractPlanNode::loadExpressionsFromJSONArray(json_spirit::Object& jparent, const char* key)
 {
     vector<AbstractExpression*> exprs;
-    json_spirit::Value jValue = json_spirit::find_value(jparent, label);
+    json_spirit::Value jValue = json_spirit::find_value(jparent, key);
     if (jValue == json_spirit::Value::null) {
         return exprs;
     }
@@ -359,18 +358,32 @@ vector<AbstractExpression*> AbstractPlanNode::loadExpressionsFromJSONArray(json_
     return exprs;
 }
 
-AbstractExpression* AbstractPlanNode::loadExpressionFromJSON(json_spirit::Object& jparent, const char* label)
+AbstractExpression* AbstractPlanNode::loadExpressionFromJSON(json_spirit::Object& jparent, const char* key)
 {
-    json_spirit::Value jValue = json_spirit::find_value(jparent, label);
+    json_spirit::Value jValue = json_spirit::find_value(jparent, key);
     if (jValue == json_spirit::Value::null) {
         return NULL;
     }
     return AbstractExpression::buildExpressionTree(jValue.get_obj());
 }
 
-int AbstractPlanNode::loadIntegerFromJSON(json_spirit::Object& jparent, const char* label, int defaultValue)
+vector<int> AbstractPlanNode::loadIntegersFromJSONArray(json_spirit::Object& jparent, const char* key)
 {
-    json_spirit::Value jValue = json_spirit::find_value(jparent, label);
+    vector<int> ints;
+    json_spirit::Value jValue = json_spirit::find_value(jparent, key);
+    if (jValue == json_spirit::Value::null) {
+        return ints;
+    }
+    json_spirit::Array jArray = jValue.get_array();
+    for (int ii = 0; ii < jArray.size(); ii++) {
+        ints.push_back(jArray[ii].get_int());
+    }
+    return ints;
+}
+
+int AbstractPlanNode::loadIntegerFromJSON(json_spirit::Object& jparent, const char* key, int defaultValue)
+{
+    json_spirit::Value jValue = json_spirit::find_value(jparent, key);
     if (jValue == json_spirit::Value::null) {
         return defaultValue;
     }

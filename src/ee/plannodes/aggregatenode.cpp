@@ -47,6 +47,7 @@
 #include "common/debuglog.h"
 #include "expressions/abstractexpression.h"
 
+#include <boost/foreach.hpp>
 #include <sstream>
 
 using namespace json_spirit;
@@ -100,60 +101,23 @@ void
 AggregatePlanNode::loadFromJSONObject(Object &obj)
 {
     Value aggregateColumnsValue = find_value(obj, "AGGREGATE_COLUMNS");
-    if (aggregateColumnsValue == Value::null)
-    {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AggregatePlanNode::loadFromJSONObject:"
-                                      " Can't find AGGREGATE_COLUMNS value");
+    vector<string> types = loadStringsFromJSONArray(obj, "AGGREGATE_TYPE");
+    BOOST_FOREACH(const string& aggtype, types) {
+        m_aggregates.push_back(stringToExpression(aggtype));
     }
-    Array aggregateColumnsArray = aggregateColumnsValue.get_array();
-    for (int ii = 0; ii < aggregateColumnsArray.size(); ii++)
-    {
-        Value aggregateColumnValue = aggregateColumnsArray[ii];
-        Object aggregateColumn = aggregateColumnValue.get_obj();
-        bool containsType = false;
-        bool containsDistinct = false;
-        bool containsOutputColumn = false;
-        bool containsExpression = false;
-        for (int zz = 0; zz < aggregateColumn.size(); zz++)
-        {
-            if (aggregateColumn[zz].name_ == "AGGREGATE_TYPE")
-            {
-                containsType = true;
-                string aggregateColumnTypeString =
-                    aggregateColumn[zz].value_.get_str();
-                m_aggregates.
-                    push_back(stringToExpression(aggregateColumnTypeString));
-            }
-            else if (aggregateColumn[zz].name_ == "AGGREGATE_DISTINCT")
-            {
-                containsDistinct = true;
-                bool distinct = false;
-                if (aggregateColumn[zz].value_.get_int() == 1)
-                {
-                    distinct = true;
-                }
-                m_distinctAggregates.push_back(distinct);
-            }
-            else if (aggregateColumn[zz].name_ == "AGGREGATE_OUTPUT_COLUMN")
-            {
-                containsOutputColumn = true;
-                m_aggregateOutputColumns.
-                    push_back(aggregateColumn[zz].value_.get_int());
-            }
-            else if (aggregateColumn[zz].name_ == "AGGREGATE_EXPRESSION")
-            {
-                containsExpression = true;
-                m_aggregateInputExpressions.
-                    push_back(AbstractExpression::buildExpressionTree(aggregateColumn[zz].value_.get_obj()));
-            }
-        }
-        if(!(containsType && containsDistinct && containsOutputColumn && containsExpression)) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AggregatePlanNode::loadFromJSONObject:"
-                                      " Missing type,distinct, outputcolumn or expression.");
-        }
+    assert(types.size() == m_aggregates.size());
+
+    vector<int> distincts = loadIntegersFromJSONArray(obj, "AGGREGATE_DISTINCT");
+    BOOST_FOREACH(int distinct, distincts) {
+        m_distinctAggregates.push_back(distinct);
     }
+    assert(types.size() == m_distinctAggregates.size());
+
+    m_aggregateOutputColumns = loadIntegersFromJSONArray(obj, "AGGREGATE_OUTPUT_COLUMN");
+    assert(types.size() == m_aggregateOutputColumns.size());
+
+    m_aggregateInputExpressions = loadExpressionsFromJSONArray(obj, "AGGREGATE_EXPRESSION");
+    assert(types.size() == m_aggregateInputExpressions.size());
 
     m_groupByExpressions = loadExpressionsFromJSONArray(obj, "GROUPBY_EXPRESSIONS");
 }

@@ -224,6 +224,7 @@ CTX.INPUT['execution'] = """
 CTX.INPUT['executors'] = """
  executorutil.cpp
  abstractexecutor.cpp
+ abstractoperationexecutor.cpp
  abstracttableioexecutor.cpp
  deleteexecutor.cpp
  distinctexecutor.cpp

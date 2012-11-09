@@ -44,10 +44,9 @@
  */
 
 #include "indexes/tableindex.h"
+#include "expressions/abstractexpression.h"
 
 #include <iostream>
-#include "expressions/abstractexpression.h"
-#include "storage/TableCatalogDelegate.hpp"
 
 using namespace voltdb;
 

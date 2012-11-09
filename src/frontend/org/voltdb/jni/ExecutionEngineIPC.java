@@ -277,7 +277,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                             throw new EOFException();
                         }
                     }
-
+                    messageBuffer.flip();
                     final int reasonLength = messageBuffer.getInt();
                     final byte reasonBytes[] = new byte[reasonLength];
                     messageBuffer.get(reasonBytes);
@@ -297,6 +297,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                     for (int ii = 0; ii < numTraces; ii++) {
                         final int traceLength = messageBuffer.getInt();
                         final byte traceBytes[] = new byte[traceLength];
+                        messageBuffer.get(traceBytes);
                         traces[ii] = new String(traceBytes, "UTF-8");
                     }
 

@@ -155,7 +155,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.8.3.1";
+    private static final String m_defaultVersionString = "2.8.4";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -2093,6 +2093,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
          */
         for (Initiator initiator : m_iv2Initiators) {
             initiator.enableWritingIv2FaultLog();
+        }
+
+        /*
+         * IV2: From this point on, not all node failures should crash global VoltDB.
+         */
+        if (m_leaderAppointer != null) {
+            m_leaderAppointer.onReplayCompletion();
         }
 
         /*

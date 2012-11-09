@@ -336,17 +336,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
     }
 
-    protected static void listExpressionsToJSONArray(JSONStringer stringer,
-                                                     List<AbstractExpression> exprs, String label)
-    throws JSONException
-    {
-        stringer.key(label).array();
-        for (AbstractExpression ae : exprs) {
-            stringer.value(ae);
-        }
-        stringer.endArray();
-    }
-
     @Override
     public void getScanNodeList_recurse(ArrayList<AbstractScanPlanNode> collected,
             HashSet<AbstractPlanNode> visited) {

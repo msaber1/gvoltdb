@@ -210,9 +210,10 @@ static int8_t loadCatalog(ipc_command *cmd)
         if (s_engine->loadCatalog(ntoh(cs->timestamp), string(cs->data))) {
             return kErrorCode_Success;
         }
-    } catch (SerializableEEException &e) {
-        //TODO: Probably not advisable to just squelch a serializable exception from loadCatalog?
-    }
+    //TODO: FatalException and SerializableException should be universally caught and handled in "main",
+    // rather than in hard-to-maintain "execute method" boilerplate code like this.
+    } catch (SerializableEEException &e) {} //TODO: We don't really want to quietly SQUASH non-fatal exceptions.
+
     return kErrorCode_Error;
 }
 

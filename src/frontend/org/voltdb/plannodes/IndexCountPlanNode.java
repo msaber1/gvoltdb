@@ -18,17 +18,13 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
@@ -74,6 +70,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // at runtime in the upper bound lookup on the index
     final protected List<AbstractExpression> m_endKeys = new ArrayList<AbstractExpression>();
 
+    private ArrayList<AbstractExpression> m_bindings;
+
     public IndexCountPlanNode() {
         super();
     }
@@ -88,6 +86,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         m_estimatedOutputTupleCount = 1;
         m_predicate = null;
+        m_bindings = isp.getBindings();
 
         m_outputSchema = apn.getOutputSchema().clone();
         setEndKeyExpression(isp.getEndExpression());
@@ -187,10 +186,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
 
         if ( ! m_startKeys.isEmpty()) {
-            listExpressionsToJSONArray(stringer, m_startKeys, Members.START_KEYS.name());
+            listExpressionsToJSONArray(stringer, Members.START_KEYS.name(),  m_startKeys);
         }
         if ( ! m_endKeys.isEmpty()) {
-            listExpressionsToJSONArray(stringer, m_endKeys, Members.END_KEYS.name());
+            listExpressionsToJSONArray(stringer, Members.END_KEYS.name(), m_endKeys);
         }
     }
 
@@ -215,5 +214,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         retval += " using \"" + m_targetIndexName + "\"";
         retval += " " + usageInfo;
         return retval;
+    }
+
+    public ArrayList<AbstractExpression> getBindings() {
+        return m_bindings;
     }
 }

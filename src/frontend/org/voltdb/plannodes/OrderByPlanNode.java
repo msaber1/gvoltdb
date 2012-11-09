@@ -20,7 +20,6 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -191,32 +190,23 @@ public class OrderByPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         assert (m_sortExpressions.size() == m_sortDirections.size());
-        stringer.key(Members.SORT_COLUMNS.name()).array();
-        for (int ii = 0; ii < m_sortExpressions.size(); ii++) {
-            stringer.object();
-            stringer.key(Members.SORT_EXPRESSION.name());
-            stringer.object();
-            m_sortExpressions.get(ii).toJSONString(stringer);
-            stringer.endObject();
-            stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirections.get(ii).toString());
-            stringer.endObject();
+        List<String> tempStrings = new ArrayList<String>();
+        for (SortDirectionType sdt : m_sortDirections) {
+            tempStrings.add(sdt.toString());
         }
-        stringer.endArray();
+        listStringsToJSONArray(stringer, Members.SORT_DIRECTION.name(), tempStrings);
+        listExpressionsToJSONArray(stringer, Members.SORT_EXPRESSION.name(), m_sortExpressions);
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        JSONArray jarray = null;
-        if( !jobj.isNull(Members.SORT_COLUMNS.name()) ){
-            jarray = jobj.getJSONArray( Members.SORT_COLUMNS.name() );
+        List<String> tempStrings = new ArrayList<String>();
+        loadStringsFromJSONArray(jobj, tempStrings, Members.SORT_DIRECTION.name());
+        for (String string : tempStrings) {
+            m_sortDirections.add(SortDirectionType.get(string));
         }
-        int size = jarray.length();
-        for( int i = 0; i < size; i++ ) {
-            JSONObject tempObj = jarray.getJSONObject(i);
-            m_sortDirections.add( SortDirectionType.get(tempObj.getString( Members.SORT_DIRECTION.name())) );
-            m_sortExpressions.add( AbstractExpression.fromJSONObject( tempObj.getJSONObject( Members.SORT_EXPRESSION.name()), db) );
-        }
+        loadExpressionsFromJSONArray(jobj, db, m_sortExpressions, Members.SORT_EXPRESSION.name());
     }
 
     @Override

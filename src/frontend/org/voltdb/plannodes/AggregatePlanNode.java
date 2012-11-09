@@ -20,7 +20,6 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -34,7 +33,6 @@ import org.voltdb.types.PlanNodeType;
 public class AggregatePlanNode extends AbstractPlanNode {
 
     public enum Members {
-        AGGREGATE_COLUMNS,
         AGGREGATE_TYPE,
         AGGREGATE_DISTINCT,
         AGGREGATE_OUTPUT_COLUMN,
@@ -237,30 +235,24 @@ public class AggregatePlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
 
-        stringer.key("AGGREGATE_COLUMNS");
-        stringer.array();
-        for (int ii = 0; ii < m_aggregateTypes.size(); ii++) {
-            stringer.object();
-            stringer.key(Members.AGGREGATE_TYPE.name()).value(m_aggregateTypes.get(ii).name());
-            stringer.key(Members.AGGREGATE_DISTINCT.name()).value(m_aggregateDistinct.get(ii));
-            stringer.key(Members.AGGREGATE_OUTPUT_COLUMN.name()).value(m_aggregateOutputColumns.get(ii));
-            stringer.key(Members.AGGREGATE_EXPRESSION.name());
-            stringer.object();
-            m_aggregateExpressions.get(ii).toJSONString(stringer);
-            stringer.endObject();
-            stringer.endObject();
+        int arraySize = m_aggregateTypes.size();
+        List<String> typeStrings = new ArrayList<String>();
+        for (ExpressionType aggtype : m_aggregateTypes) {
+            typeStrings.add(aggtype.name());
         }
-        stringer.endArray();
+        listStringsToJSONArray(stringer, Members.AGGREGATE_TYPE.name(), typeStrings);
 
-        if (!m_groupByExpressions.isEmpty())
-        {
-            stringer.key(Members.GROUPBY_EXPRESSIONS.name()).array();
-            for (int i = 0; i < m_groupByExpressions.size(); i++) {
-                stringer.object();
-                m_groupByExpressions.get(i).toJSONString(stringer);
-                stringer.endObject();
-            }
-            stringer.endArray();
+        assert(arraySize == m_aggregateDistinct.size());
+        listIntegersToJSONArray(stringer, Members.AGGREGATE_DISTINCT.name(), m_aggregateDistinct);
+
+        assert(arraySize == m_aggregateOutputColumns.size());
+        listIntegersToJSONArray(stringer, Members.AGGREGATE_OUTPUT_COLUMN.name(), m_aggregateOutputColumns);
+
+        assert(arraySize == m_aggregateExpressions.size());
+        listExpressionsToJSONArray(stringer, Members.AGGREGATE_EXPRESSION.name(), m_aggregateExpressions);
+
+        if ( ! m_groupByExpressions.isEmpty()) {
+            listExpressionsToJSONArray(stringer, Members.GROUPBY_EXPRESSIONS.name(), m_groupByExpressions);
         }
     }
 
@@ -287,18 +279,15 @@ public class AggregatePlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        JSONArray jarray = jobj.getJSONArray( Members.AGGREGATE_COLUMNS.name() );
-        int size = jarray.length();
-        for( int i = 0; i < size; i++ ) {
-            JSONObject tempObj = jarray.getJSONObject( i );
-            m_aggregateTypes.add( ExpressionType.get( tempObj.getString( Members.AGGREGATE_TYPE.name() )));
-            m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
-            m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
-
-            AbstractExpression agg = loadExpressionFromJSONObject(jobj, db, Members.AGGREGATE_EXPRESSION.name());
-            assert(agg != null);
-            m_aggregateExpressions.add(agg);
+        List<String> tempStrings = new ArrayList<String>();
+        loadStringsFromJSONArray(jobj, tempStrings, Members.AGGREGATE_TYPE.name());
+        for (String string : tempStrings) {
+            m_aggregateTypes.add(ExpressionType.get(string));
         }
+        loadIntegersFromJSONArray(jobj, m_aggregateDistinct, Members.AGGREGATE_DISTINCT.name());
+        loadIntegersFromJSONArray(jobj, m_aggregateOutputColumns, Members.AGGREGATE_OUTPUT_COLUMN.name());
+        loadExpressionsFromJSONArray(jobj, db, m_aggregateExpressions, Members.AGGREGATE_EXPRESSION.name());
         loadExpressionsFromJSONArray(jobj, db, m_groupByExpressions, Members.GROUPBY_EXPRESSIONS.name());
     }
+
 }

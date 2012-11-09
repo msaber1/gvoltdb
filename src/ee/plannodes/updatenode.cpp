@@ -59,18 +59,11 @@ void UpdatePlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     }
     m_updatesIndexes = updatesIndexesValue.get_bool();
 
-    json_spirit::Value updatedColumnsValue = find_value(obj, "UPDATED_COLUMNS");
-    if (updatedColumnsValue == json_spirit::Value::null) {
+    m_updatedColumns = loadIntegersFromJSONArray(obj, "UPDATED_COLUMNS");
+    if (m_updatedColumns.empty()) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       "UpdatePlanNode::loadFromJSONObject:"
                                       " Can't find UPDATED_COLUMNS value");
-    }
-    json_spirit::Array updatedColumnsArray = updatedColumnsValue.get_array();
-    m_updatedColumns.resize(updatedColumnsArray.size());
-    for (int ii = 0; ii < updatedColumnsArray.size(); ii++) {
-        json_spirit::Value columnIdxValue = updatedColumnsArray[ii];
-        int columnIndex = columnIdxValue.get_int();
-        m_updatedColumns[ii] = columnIndex;
     }
 }
 

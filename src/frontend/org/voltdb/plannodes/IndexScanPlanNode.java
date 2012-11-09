@@ -21,10 +21,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
@@ -80,6 +78,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
     protected Index m_catalogIndex = null;
+
+    private ArrayList<AbstractExpression> m_bindings = null;
 
     public IndexScanPlanNode() {
         super();
@@ -335,15 +335,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
-        stringer.key(Members.END_EXPRESSION.name());
-        stringer.value(m_endExpression);
+        stringer.key(Members.END_EXPRESSION.name()).value(m_endExpression);
 
-        stringer.key(Members.SEARCH_KEYS.name()).array();
-        for (AbstractExpression ae : m_searchKeys) {
-            assert (ae instanceof JSONString);
-            stringer.value(ae);
-        }
-        stringer.endArray();
+        listExpressionsToJSONArray(stringer, Members.SEARCH_KEYS.name(), m_searchKeys);
     }
 
     //all members loaded
@@ -383,5 +377,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         retval += " using \"" + m_targetIndexName + "\"";
         retval += " " + usageInfo;
         return retval;
+    }
+
+    public void setBindings(ArrayList<AbstractExpression> bindings) {
+        m_bindings  = bindings;
+    }
+
+    public ArrayList<AbstractExpression> getBindings() {
+        return m_bindings;
     }
 }
