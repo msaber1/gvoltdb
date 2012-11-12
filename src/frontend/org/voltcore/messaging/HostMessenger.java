@@ -31,7 +31,6 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -76,7 +75,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static class Config {
         public InetSocketAddress coordinatorIp;
         public String zkInterface = "127.0.0.1:2181";
-        public ScheduledExecutorService ses = null;
         public String internalInterface = "";
         public int internalPort = 3021;
         public int deadHostTimeout = 10000;
@@ -149,6 +147,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final int AGREEMENT_SITE_ID = -1;
     public static final int STATS_SITE_ID = -2;
     public static final int ASYNC_COMPILER_SITE_ID = -3;
+    public static final int CLIENT_INTERFACE_SITE_ID = -4;
+
+    // we should never hand out this site ID.  Use it as an empty message destination
+    public static final int VALHALLA = Integer.MIN_VALUE;
 
     int m_localHostId;
 
@@ -197,7 +199,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             Config config)
     {
         m_config = config;
-        m_network = new VoltNetworkPool( m_config.networkThreads, m_config.ses);
+        m_network = new VoltNetworkPool( m_config.networkThreads);
         m_joiner = new SocketJoiner(
                 m_config.coordinatorIp,
                 m_config.internalInterface,
@@ -411,36 +413,43 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         prepSocketChannel(socket);
         ForeignHost fhost = null;
         try {
-            /*
-             * Write the response that advertises the cluster topology
-             */
-            writeRequestJoinResponse( hostId, socket);
+            try {
+                /*
+                 * Write the response that advertises the cluster topology
+                 */
+                writeRequestJoinResponse( hostId, socket);
 
-            /*
-             * Wait for the a response from the joining node saying that it connected
-             * to all the nodes we just advertised. Use a timeout so that the cluster can't be stuck
-             * on failed joins.
-             */
-            ByteBuffer finishedJoining = ByteBuffer.allocate(1);
-            socket.configureBlocking(false);
-            long start = System.currentTimeMillis();
-            while (finishedJoining.hasRemaining() && System.currentTimeMillis() - start < 120000) {
-                int read = socket.read(finishedJoining);
-                if (read == -1) {
-                    hostLog.info("New connection was unable to establish mesh");
-                    return;
-                } else if (read < 1) {
-                    Thread.sleep(5);
+                /*
+                 * Wait for the a response from the joining node saying that it connected
+                 * to all the nodes we just advertised. Use a timeout so that the cluster can't be stuck
+                 * on failed joins.
+                 */
+                ByteBuffer finishedJoining = ByteBuffer.allocate(1);
+                socket.configureBlocking(false);
+                long start = System.currentTimeMillis();
+                while (finishedJoining.hasRemaining() && System.currentTimeMillis() - start < 120000) {
+                    int read = socket.read(finishedJoining);
+                    if (read == -1) {
+                        hostLog.info("New connection was unable to establish mesh");
+                        return;
+                    } else if (read < 1) {
+                        Thread.sleep(5);
+                    }
                 }
-            }
 
-            /*
-             * Now add the host to the mailbox system
-             */
-            fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
-            fhost.register(this);
-            putForeignHost(hostId, fhost);
-            fhost.enableRead();
+                /*
+                 * Now add the host to the mailbox system
+                 */
+                fhost = new ForeignHost(this, hostId, socket, m_config.deadHostTimeout, listeningAddress);
+                fhost.register(this);
+                putForeignHost(hostId, fhost);
+                fhost.enableRead();
+            } catch (Exception e) {
+                logger.error("Error joining new node", e);
+                m_knownFailedHosts.add(hostId);
+                removeForeignHost(hostId);
+                return;
+            }
 
             /*
              * And the last step is to wait for the new node to join ZooKeeper.
@@ -612,8 +621,27 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         try {
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-                if (m_zk.getChildren(CoreZK.hosts, fw).size() == expectedHosts) {
+                final int numChildren = m_zk.getChildren(CoreZK.hosts, fw).size();
+
+                /*
+                 * If the target number of hosts has been reached
+                 * break out
+                 */
+                if ( numChildren == expectedHosts) {
                     break;
+                }
+
+
+                /*
+                 * If there are extra hosts that means too many Volt procs were started.
+                 * Kill this node based on the assumption that we are the extra one. In most
+                 * cases this is correct and fine and in the worst case the cluster will hang coming up
+                 * because two or more hosts killed themselves
+                 */
+                if ( numChildren > expectedHosts) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Expected to find " + expectedHosts +
+                            " hosts in cluster at startup but found " + numChildren +
+                            ".  Terminating this host.", false, null);
                 }
                 fw.get();
             }
@@ -662,7 +690,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * @param message
      * @return null if message was delivered locally or a ForeignHost
      * reference if a message is read to be delivered remotely.
-     * @throws MessagingException
      */
     ForeignHost presend(long hsId, VoltMessage message)
     {
@@ -673,6 +700,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             Mailbox mbox = m_siteMailboxes.get(hsId);
             if (mbox != null) {
                 mbox.deliver(message);
+                return null;
+            } else {
+                hostLog.warn("Mailbox is not registered for site id " + CoreUtils.getSiteIdFromHSId(hsId));
                 return null;
             }
         }
@@ -724,7 +754,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             public void send(long[] hsIds, VoltMessage message) {}
             @Override
             public void deliver(VoltMessage message) {
-                hostLog.warn("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
+                hostLog.info("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
             }
             @Override
             public void deliverFront(VoltMessage message) {}

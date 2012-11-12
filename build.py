@@ -165,6 +165,7 @@ CTX.INPUT['catalog'] = """
  columnref.cpp
  connector.cpp
  connectortableinfo.cpp
+ connectorproperty.cpp
  constraint.cpp
  constraintref.cpp
  database.cpp
@@ -213,6 +214,7 @@ CTX.INPUT['common'] = """
 """
 
 CTX.INPUT['execution'] = """
+ FragmentManager.cpp
  JNITopend.cpp
  VoltDBEngine.cpp
 """
@@ -223,6 +225,8 @@ CTX.INPUT['executors'] = """
  distinctexecutor.cpp
  executorutil.cpp
  indexscanexecutor.cpp
+ indexcountexecutor.cpp
+ tablecountexecutor.cpp
  insertexecutor.cpp
  limitexecutor.cpp
  materializeexecutor.cpp
@@ -253,6 +257,8 @@ CTX.INPUT['plannodes'] = """
  deletenode.cpp
  distinctnode.cpp
  indexscannode.cpp
+ indexcountnode.cpp
+ tablecountnode.cpp
  insertnode.cpp
  limitnode.cpp
  materializenode.cpp
@@ -318,6 +324,10 @@ CTX.THIRD_PARTY_INPUT['json_spirit'] = """
  json_spirit_value.cpp
 """
 
+CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
+ jsoncpp.cpp
+"""
+
 ###############################################################################
 # SPECIFY THE TESTS
 ###############################################################################
@@ -356,6 +366,7 @@ if whichtests in ("${eetestsuite}", "execution"):
     CTX.TESTS['execution'] = """
      add_drop_table
      engine_test
+     FragmentManagerTest
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):
@@ -391,6 +402,7 @@ if whichtests in ("${eetestsuite}", "storage"):
 if whichtests in ("${eetestsuite}", "structures"):
     CTX.TESTS['structures'] = """
      CompactingMapTest
+     CompactingMapIndexCountTest
      CompactingHashTest
      CompactingPoolTest
     """

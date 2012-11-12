@@ -117,6 +117,13 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
 
+    // substitute params in distinct expressions
+    const std::vector<AbstractExpression*>& expressions = node->getDistinctExpressions();
+    for (std::vector<AbstractExpression*>::const_iterator it = expressions.begin();
+        it != expressions.end(); ++it) {
+        (*it)->substitute(params);
+    }
+
     std::set<std::vector<NValue>, detail::ltTuples> found_values;
     while (iterator.next(tuple)) {
         //

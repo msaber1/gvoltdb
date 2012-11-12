@@ -65,9 +65,11 @@
 #include "common/SerializableEEException.h"
 #include "common/Topend.h"
 #include "common/DefaultTupleSerializer.h"
+#include "execution/FragmentManager.h"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
 #include "logging/StdoutLogProxy.h"
+#include "plannodes/plannodefragment.h"
 #include "stats/StatsAgent.h"
 #include "storage/TempTableLimits.h"
 #include "common/ThreadLocalPool.h"
@@ -158,8 +160,12 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         int executeQuery(int64_t planfragmentId, int32_t outputDependencyId, int32_t inputDependencyId,
                          const NValueArray &params, int64_t txnId, int64_t lastCommittedTxnId, bool first, bool last);
-        int executePlanFragment(std::string fragmentString, int32_t outputDependencyId, int32_t inputDependencyId,
-                                const NValueArray &params, int64_t txnId, int64_t lastCommittedTxnId);
+
+        // ensure a plan fragment is loaded, given a graph
+        // return the fragid and cache statistics
+        int loadFragment(const char *plan, int32_t length, int64_t &fragId, bool &wasHit, int64_t &cacheSize);
+        // purge cached plans over the specified cache size
+        void resizePlanCache();
 
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
         inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}
@@ -178,10 +184,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Catalog Functions
         // -------------------------------------------------
-        bool loadCatalog(const int64_t txnId, const std::string &catalogPayload);
-        bool updateCatalog(const int64_t txnId, const std::string &catalogPayload);
-        bool processCatalogAdditions(bool addAll, int64_t txnId);
-        bool processCatalogDeletes(int64_t txnId);
+        bool loadCatalog(const int64_t timestamp, const std::string &catalogPayload);
+        bool updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
+        bool processCatalogAdditions(bool addAll, int64_t timestamp);
+        bool processCatalogDeletes(int64_t timestamp);
         bool rebuildPlanFragmentCollections();
         bool rebuildTableCollections();
 
@@ -312,7 +318,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                     return;
                 }
             }
-            m_currentUndoQuantum = m_undoLog.generateUndoQuantum(nextUndoToken);
+            setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
 
         inline void releaseUndoToken(int64_t undoToken) {
@@ -382,11 +388,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         size_t tableHashCode(int32_t tableId);
 
-    protected:
-        /*
-         * Get the list of persistent table Ids by inspecting the catalog.
-         */
-        std::vector<int32_t> getPersistentTableIds();
+    private:
+
+        void setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum);
+
         std::string getClusterNameFromTable(voltdb::Table *table);
         std::string getDatabaseNameFromTable(voltdb::Table *table);
 
@@ -409,11 +414,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         struct ExecutorVector {
             ExecutorVector(int64_t logThreshold,
-                           int64_t memoryLimit)
+                           int64_t memoryLimit,
+                           PlanNodeFragment *fragment) : planFragment(fragment)
             {
                 limits.setLogThreshold(logThreshold);
                 limits.setMemoryLimit(memoryLimit);
             }
+            boost::shared_ptr<PlanNodeFragment> planFragment;
             std::vector<AbstractExecutor*> list;
             TempTableLimits limits;
         };
@@ -518,11 +525,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int32_t m_numResultDependencies;
 
-        /*
-         * Cache plan node fragments in order to allow for deletion.
-         */
-        std::vector<PlanNodeFragment*> m_planFragments;
-
         LogManager m_logManager;
 
         char *m_templateSingleLongTable;
@@ -546,6 +548,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExecutorContext *m_executorContext;
 
         DefaultTupleSerializer m_tupleSerializer;
+
+        FragmentManager m_fragmentManager;
+
     private:
         ThreadLocalPool m_tlPool;
 };

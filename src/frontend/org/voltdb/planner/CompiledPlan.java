@@ -18,11 +18,19 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
+import java.util.BitSet;
 import java.util.List;
 
+import org.voltdb.ParameterSet;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexCountPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NodeSchema;
+import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.PlanNodeType;
 
 /**
@@ -34,29 +42,11 @@ import org.voltdb.types.PlanNodeType;
  */
 public class CompiledPlan {
 
-    public static class Fragment implements Comparable<Fragment> {
-        /** A complete plan graph */
-        public AbstractPlanNode planGraph;
+    /** A complete plan graph for SP plans and the top part of MP plans */
+    public AbstractPlanNode rootPlanGraph;
 
-        /** IDs of dependencies that must be met to begin */
-        public boolean hasDependencies = false;
-
-        /** Does this fragment get sent to all partitions */
-        public boolean multiPartition = false;
-
-        @Override
-        public int compareTo(Fragment o) {
-            Integer me = multiPartition == false ? 0 : 1;
-            Integer them = o.multiPartition == false ? 0 : 1;
-            return me.compareTo(them);
-        }
-    }
-
-    /**
-     * The set of plan fragments that make up this plan
-     * The first in the list must be the root.
-     */
-    public List<Fragment> fragments = new ArrayList<Fragment>();
+    /** A "collector" fragment for two-part MP plans */
+    public AbstractPlanNode subPlanGraph;
 
     /**
      * The SQL text of the statement
@@ -64,7 +54,7 @@ public class CompiledPlan {
     public String sql = null;
 
     /**
-     * Cost of the plan as extimated (not necessarily well)
+     * Cost of the plan as estimated (not necessarily well)
      * by the planner
      */
     public double cost = 0.0;
@@ -75,8 +65,11 @@ public class CompiledPlan {
      */
     public String explainedPlan = null;
 
-    /** A list of parameter names, indexes and types */
-    public List<ParameterInfo> parameters = new ArrayList<ParameterInfo>();
+    /** Parameter types in parameter index order */
+    public VoltType[] parameters = null;
+
+    /** Parameter values, if the planner pulled constants out of the plan */
+    public ParameterSet extractedParamValues = new ParameterSet();
 
     /** A list of output column ids, indexes and types */
     public NodeSchema columns = new NodeSchema();
@@ -87,6 +80,9 @@ public class CompiledPlan {
      * be the sum of tuples changed on all replicas.
      */
     public boolean replicatedTableDML = false;
+
+    /** Does the statment write? */
+    public boolean readOnly = false;
 
     /**
      * The tree representing the full where clause of the SQL
@@ -118,12 +114,16 @@ public class CompiledPlan {
      */
     private boolean m_statementIsOrderDeterministic = false;
 
+    /** Which extracted param is the partitioning object (assuming parameterized plans) */
+    public int partitioningKeyIndex = -1;
+
     private Object m_partitioningKey;
 
     void resetPlanNodeIds() {
-        int nextId = 1;
-        for (Fragment f : fragments)
-            nextId = resetPlanNodeIds(f.planGraph, nextId);
+        int nextId = resetPlanNodeIds(rootPlanGraph, 1);
+        if (subPlanGraph != null) {
+            resetPlanNodeIds(subPlanGraph, nextId);
+        }
     }
 
     private int resetPlanNodeIds(AbstractPlanNode node, int nextId) {
@@ -168,8 +168,7 @@ public class CompiledPlan {
         if (m_statementIsOrderDeterministic) {
             return true;
         }
-        AbstractPlanNode apn = fragments.get(0).planGraph;
-        return apn.isOrderDeterministic();
+        return rootPlanGraph.isOrderDeterministic();
     }
 
     /**
@@ -181,8 +180,7 @@ public class CompiledPlan {
         if (m_statementIsContentDeterministic) {
             return true;
         }
-        AbstractPlanNode apn = fragments.get(0).planGraph;
-        return apn.isContentDeterministic();
+        return rootPlanGraph.isContentDeterministic();
     }
 
     /**
@@ -190,14 +188,13 @@ public class CompiledPlan {
      * @return the corresponding value from the first fragment
      */
     public String nondeterminismDetail() {
-        return fragments.get(0).planGraph.nondeterminismDetail();
+        return rootPlanGraph.nondeterminismDetail();
     }
 
     public int countSeqScans() {
-        int total = 0;
-        for (Fragment fragment : fragments) {
-            AbstractPlanNode apn = fragment.planGraph;
-            total += apn.findAllNodesOfType(PlanNodeType.SEQSCAN).size();
+        int total = rootPlanGraph.findAllNodesOfType(PlanNodeType.SEQSCAN).size();
+        if (subPlanGraph != null) {
+            total += subPlanGraph.findAllNodesOfType(PlanNodeType.SEQSCAN).size();
         }
         return total;
     }
@@ -208,6 +205,73 @@ public class CompiledPlan {
 
     public Object getPartitioningKey() {
         return m_partitioningKey;
+    }
+
+    public static byte[] bytesForPlan(AbstractPlanNode planGraph) {
+        if (planGraph == null) {
+            return null;
+        }
+
+        PlanNodeList planList = new PlanNodeList(planGraph);
+        return planList.toJSONString().getBytes(VoltDB.UTF8ENCODING);
+    }
+
+    // A reusable step extracted from boundParamIndexes so it can be applied to two different
+    // sources of bindings, IndexScans and IndexCounts.
+    private static void setParamIndexes(BitSet ints, List<AbstractExpression> params) {
+        for(AbstractExpression ae : params) {
+            assert(ae instanceof ParameterValueExpression);
+            ParameterValueExpression pve = (ParameterValueExpression) ae;
+            int param = pve.getParameterIndex();
+            ints.set(param);
+        }
+    }
+
+    // An obvious but apparently missing BitSet utility function
+    // to convert the set bits to their integer indexes.
+    private static int[] bitSetToIntVector(BitSet ints) {
+        int intCount = ints.cardinality();
+        if (intCount == 0) {
+            return null;
+        }
+        int[] result = new int[intCount];
+        int nextBit = ints.nextSetBit(0);
+        for (int ii = 0; ii < intCount; ii++) {
+            assert(nextBit != -1);
+            result[ii] = nextBit;
+            nextBit = ints.nextSetBit(nextBit+1);
+        }
+        assert(nextBit == -1);
+        return result;
+    }
+
+    /// Extract a sorted de-duped vector of all the bound parameter indexes in a plan. Or null if none.
+    public int[] boundParamIndexes() {
+        if (parameters.length == 0) {
+            return null;
+        }
+
+        BitSet ints = new BitSet();
+        ArrayList<AbstractPlanNode> ixscans = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN);
+        if (subPlanGraph != null) {
+            ixscans.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXSCAN));
+        }
+        for (AbstractPlanNode apn : ixscans) {
+            assert(apn instanceof IndexScanPlanNode);
+            IndexScanPlanNode ixs = (IndexScanPlanNode) apn;
+            setParamIndexes(ints, ixs.getBindings());
+        }
+
+        ArrayList<AbstractPlanNode> ixcounts = rootPlanGraph.findAllNodesOfType(PlanNodeType.INDEXCOUNT);
+        if (subPlanGraph != null) {
+            ixcounts.addAll(subPlanGraph.findAllNodesOfType(PlanNodeType.INDEXCOUNT));
+        }
+        for (AbstractPlanNode apn : ixcounts) {
+            assert(apn instanceof IndexCountPlanNode);
+            IndexCountPlanNode ixc = (IndexCountPlanNode) apn;
+            setParamIndexes(ints, ixc.getBindings());
+        }
+        return bitSetToIntVector(ints);
     }
 
 }

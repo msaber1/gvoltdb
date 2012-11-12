@@ -26,11 +26,11 @@ import java.nio.channels.SelectionKey;
 import java.nio.channels.SocketChannel;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 /** Encapsulates a socket registration for a VoltNetwork */
 public class VoltPort implements Connection
 {
@@ -49,12 +49,7 @@ public class VoltPort implements Connection
     private static final ThreadPoolExecutor m_es =
             new ThreadPoolExecutor(0, 16, 1, TimeUnit.SECONDS,
                                    new LinkedBlockingQueue<Runnable>(),
-                                   new ThreadFactory() {
-                @Override
-                public Thread newThread(Runnable r) {
-                    return new Thread(r, "VoltPort DNS Reverse Lookup");
-                }
-            });
+                                   CoreUtils.getThreadFactory("VoltPort DNS Reverse Lookup"));
 
     /** The currently selected operations on this port. */
     private int m_readyOps = 0;
@@ -318,7 +313,7 @@ public class VoltPort implements Connection
     }
 
     boolean readyForRead() {
-        return (readyOps() & SelectionKey.OP_READ) != 0;
+        return (readyOps() & SelectionKey.OP_READ) != 0 && (m_interestOps & SelectionKey.OP_READ) != 0;
     }
 
     boolean isRunning() {
@@ -368,19 +363,27 @@ public class VoltPort implements Connection
         m_handler.stopping(this);
     }
 
+    private boolean m_alreadyStopped = false;
+
     /**
      * Called when unregistration is complete and the Connection can no
      * longer be interacted with.
+     *
+     * Various error paths fall back to unregistering so it can happen multiple times and is really
+     * annoying. Suppress it here with a flag
      */
     void unregistered() {
         try {
-            try {
-                m_handler.stopped(this);
-            } finally {
+            if (!m_alreadyStopped) {
+                m_alreadyStopped = true;
                 try {
-                    m_writeStream.shutdown();
+                    m_handler.stopped(this);
                 } finally {
-                    m_readStream.shutdown();
+                    try {
+                        m_writeStream.shutdown();
+                    } finally {
+                        m_readStream.shutdown();
+                    }
                 }
             }
         } finally {
@@ -432,6 +435,11 @@ public class VoltPort implements Connection
     @Override
     public Future<?> unregister() {
         return m_network.unregisterChannel(this);
+    }
+
+    @Override
+    public void queueTask(Runnable r) {
+        m_network.queueTask(r);
     }
 
 }

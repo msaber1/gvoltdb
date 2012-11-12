@@ -31,6 +31,7 @@ import junit.framework.TestCase;
 import org.voltdb.CatalogContext;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
@@ -58,11 +59,11 @@ public class TestPlannerTool extends TestCase {
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, catalog, bytes, 0, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, catalog, bytes, 0, 0, 0);
 
-        m_pt = new PlannerTool(context.cluster, context.database);
+        m_pt = new PlannerTool(context.cluster, context.database, 0);
 
-        PlannerTool.Result result = null;
+        AdHocPlannedStatement result = null;
         result = m_pt.planSql("select * from warehouse;", false, true, false);
         System.out.println(result);
 
@@ -151,9 +152,9 @@ public class TestPlannerTool extends TestCase {
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
-        CatalogContext context = new CatalogContext(0, c, bytes, 0, 0, 0);
+        CatalogContext context = new CatalogContext(0, 0, c, bytes, 0, 0, 0);
 
-        m_pt = new PlannerTool(context.cluster, context.database);
+        m_pt = new PlannerTool(context.cluster, context.database, 0);
 
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error
