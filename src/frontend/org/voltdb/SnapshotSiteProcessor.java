@@ -75,6 +75,10 @@ public class SnapshotSiteProcessor {
     public static final Object m_snapshotCreateLock = new Object();
     public static Semaphore m_snapshotCreateSetupPermit = null;
 
+    //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
+    public static ArrayList<Long> m_partitionLastSeenTransactionIds =
+            new ArrayList<Long>();
+
     /**
      * Only proceed once permits are available after setup completes
      */
@@ -228,12 +232,18 @@ public class SnapshotSiteProcessor {
         m_idlePredicate = idlePredicate;
     }
 
-    public void shutdown() {
+    public void shutdown() throws InterruptedException {
         for (BBContainer c : m_snapshotBufferOrigins ) {
             c.discard();
         }
         m_snapshotBufferOrigins.clear();
         m_availableSnapshotBuffers.clear();
+        m_snapshotCreateSetupPermit = null;
+        if (m_snapshotTargetTerminators != null) {
+            for (Thread t : m_snapshotTargetTerminators) {
+                t.join();
+            }
+        }
     }
 
     void initializeBufferPool() {
