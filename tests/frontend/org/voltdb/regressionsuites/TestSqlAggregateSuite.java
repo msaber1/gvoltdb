@@ -54,7 +54,8 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             Client client = getClient();
             for (int i = 0; i < ROWS; ++i)
             {
-                client.callProcedure("Insert", table, i, "desc",
+                String str = "desc_" + Integer.toString(i % 2);
+                client.callProcedure("Insert", table, i, str,
                                      new BigDecimal(10.0), i / 2, 14.5);
             }
             String query = String.format("select distinct %s.NUM from %s",
@@ -63,6 +64,11 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             // lazy check that we get 5 rows back, put off checking contents
             assertEquals(5, results[0].getRowCount());
             query = String.format("select distinct %s.DESC, %s.RATIO  from %s",
+                    table, table, table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            // lazy check that we get ` rows back, put off checking contents
+            assertEquals(2, results[0].getRowCount());
+            query = String.format("select distinct %s.RATIO  from %s",
                     table, table, table);
             results = client.callProcedure("@AdHoc", query).getResults();
             // lazy check that we get ` rows back, put off checking contents
