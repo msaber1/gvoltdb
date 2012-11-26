@@ -221,7 +221,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public CountDownLatch snapshotCompleted(String nonce,
                                                 long txnId,
                                                 long partitionTxnIds[],
-                                                boolean truncationSnapshot) {
+                                                boolean truncationSnapshot,
+                                                String requestId) {
             if (m_rejoinSnapshotTxnId != -1) {
                 if (m_rejoinSnapshotTxnId == txnId) {
                     m_rejoinLog.debug("Rejoin snapshot for site " + getSiteId() +
@@ -1866,6 +1867,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      */
     private void discoverGlobalFaultData(ExecutionSiteNodeFailureMessage message)
     {
+        if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
+            VoltDB.crashGlobalVoltDB("Detected node failure during command log replay. Cluster will shut down.",
+                                     false, null);
+        }
+
         //Keep it simple and don't try to recover on the recovering node.
         if (m_rejoining) {
             VoltDB.crashLocalVoltDB("Aborting rejoin due to a remote node failure. Retry again.", false, null);
@@ -2333,7 +2339,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                              fragmentId,
                                              params);
 
-            sendDependency(currentFragResponse, dep.depId, dep.dependency);
+            if (dep != null) {
+                sendDependency(currentFragResponse, dep.depId, dep.dependency);
+            }
         }
         catch (final EEException e)
         {

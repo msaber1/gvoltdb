@@ -49,10 +49,13 @@ public abstract class ExpressionUtil {
         Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
         stack.addAll(exps);
 
-        // TODO: This code probably doesn't need to go through all this trouble to create balanced AND trees
-        // like "(A and B) and (C and D)".
-        // Simpler skewed AND trees like "A and (B and (C and D))" are likely as good if not better and can be
-        // constructed serially with much less effort.
+        // TODO: This code probably doesn't need to go through all this trouble to create AND trees
+        // like "((D and C) and B) and A)" from the list "[A, B, C, D]".
+        // There is an easier algorithm that does not require stacking intermediate results.
+        // Even better, it would be easier here to generate "(D and (C and (B and A)))"
+        // which would also short-circuit slightly faster in the executor.
+        // NOTE: Any change to the structure of the trees produced by this algorithm should be
+        // reflected in the algorithm used to reverse the process in uncombine(AbstractExpression expr).
 
         AbstractExpression ret = null;
         while (stack.size() > 1) {
@@ -81,6 +84,37 @@ public abstract class ExpressionUtil {
     }
 
     /**
+     * Undo the effects of the combine(List<AbstractExpression> exps) method to reconstruct the list
+     * of expressions in its original order, basically right-to-left in the given expression tree.
+     * NOTE: This implementation is tuned to the odd shape of the trees produced by combine,
+     * namely leaf-nodes-on-the-right "(((D and C) and B) and A)" from "[A,B,C,D]".
+     * Any change there should have a corresponding change here.
+     * @param expr
+     * @return
+     */
+    public static List<AbstractExpression> uncombine(AbstractExpression expr)
+    {
+        if (expr == null) {
+            return new ArrayList<AbstractExpression>();
+        }
+        if (expr instanceof ConjunctionExpression) {
+            ConjunctionExpression conj = (ConjunctionExpression)expr;
+            if (conj.getExpressionType() == ExpressionType.CONJUNCTION_AND) {
+                // Calculate the list for the tree or leaf on the left.
+                List<AbstractExpression> branch = uncombine(conj.getLeft());
+                // Insert the leaf on the right at the head of that list
+                branch.add(0, conj.getRight());
+                return branch;
+            }
+            // Any other kind of conjunction must have been a leaf. Fall through.
+        }
+        // At the left-most leaf, start a new list.
+        List<AbstractExpression> leaf = new ArrayList<AbstractExpression>();
+        leaf.add(expr);
+        return leaf;
+    }
+
+    /**
      *
      * @param left
      * @param right
@@ -88,30 +122,6 @@ public abstract class ExpressionUtil {
      */
     public static AbstractExpression combine(AbstractExpression left, AbstractExpression right) {
         return new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, left, right);
-    }
-
-    public static AbstractExpression getOtherTableExpression(AbstractExpression expr, String tableName) {
-        assert(expr != null);
-        AbstractExpression retval = expr.getLeft();
-
-        AbstractExpression left = expr.getLeft();
-        if (left instanceof TupleValueExpression) {
-            TupleValueExpression lv = (TupleValueExpression) left;
-            if (lv.getTableName().equals(tableName))
-                retval = null;
-        }
-
-        if (retval == null) {
-            retval = expr.getRight();
-            AbstractExpression right = expr.getRight();
-            if (right instanceof TupleValueExpression) {
-                TupleValueExpression rv = (TupleValueExpression) right;
-                if (rv.getTableName().equals(tableName))
-                    retval = null;
-            }
-        }
-
-        return retval;
     }
 
     /**
