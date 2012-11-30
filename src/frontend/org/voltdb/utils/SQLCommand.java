@@ -26,9 +26,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.PrintWriter;
-import java.io.Writer;
 import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -44,8 +41,9 @@ import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import jline.ConsoleReader;
-import jline.SimpleCompletor;
+import jline.console.ConsoleReader;
+import jline.console.completer.Completer;
+import jline.console.completer.StringsCompleter;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -1087,7 +1085,7 @@ public class SQLCommand
     }
 
     private static InputStream in = null;
-    private static Writer out = null;
+    private static OutputStream out = null;
     // Application entry point
     public static void main(String args[])
     {
@@ -1169,11 +1167,14 @@ public class SQLCommand
             loadStoredProcedures(Procedures);
 
             in = new FileInputStream(FileDescriptor.in);
-            out = new PrintWriter(new OutputStreamWriter(System.out, System.getProperty("jline.WindowsTerminal.output.encoding", System.getProperty("file.encoding"))));
-            Input = new ConsoleReader(in, out);
+            out = System.out;
+            Input = new ConsoleReader(in, out/*, new UnixTerminal()*/);
 
             Input.setBellEnabled(false);
-            Input.addCompletor(new SimpleCompletor(new String[] {"select", "update", "insert", "delete", "exec", "file", "recall", "SELECT", "UPDATE", "INSERT", "DELETE", "EXEC", "FILE", "RECALL" }));
+            Completer completer = new StringsCompleter(new String[] {
+                    "select", "update", "insert", "delete", "exec", "file", "recall",
+                    "SELECT", "UPDATE", "INSERT", "DELETE", "EXEC", "FILE", "RECALL" });
+            Input.addCompleter(completer);
 
             boolean interactive = true;
             if (queries != null && !queries.isEmpty())
