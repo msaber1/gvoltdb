@@ -25,7 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Server('start',
-             description = 'Start the VoltDB server.')
+@VOLT.Command(
+    description = 'Start the VoltDB server.',
+    bundles = VOLT.ServerBundle('start'),
+)
 def start(runner):
     runner.go()

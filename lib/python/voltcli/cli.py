@@ -290,14 +290,14 @@ class CLIParser(ExtendedHelpOptionParser):
     Command/sub-command (verb) argument and option parsing and validation.
     """
 
-    def __init__(self, verbs, base_options, usage, description, version):
+    def __init__(self, verbs_by_name, base_options, usage, description, version):
         """
         Command line processor constructor.
         """
-        self.verb         = None
-        self.verbs        = verbs
-        self.verb_names   = verbs.keys()
-        self.base_options = base_options
+        self.verb          = None
+        self.verbs_by_name = verbs_by_name
+        self.verb_names    = verbs_by_name.keys()
+        self.base_options  = base_options
         self.verb_names.sort()
         self.base_options.sort()
         optparse.OptionParser.__init__(self,
@@ -384,9 +384,9 @@ class CLIParser(ExtendedHelpOptionParser):
         # See if we know about the verb.
         if verb_name.startswith('-'):
             self._abort('The first argument must be a verb, not an option.')
-        if verb_name not in self.verbs:
+        if verb_name not in self.verbs_by_name:
             self._abort('Unknown verb: %s' % verb_name)
-        self.verb = self.verbs[verb_name]
+        self.verb = self.verbs_by_name[verb_name]
 
         # Change the messaging from generic to verb-specific.
         self.set_usage(get_verb_usage(self.verb))
@@ -469,7 +469,7 @@ class CLIParser(ExtendedHelpOptionParser):
         rows1 = []
         rows2 = []
         for verb_name in self.verb_names:
-            verb = self.verbs[verb_name]
+            verb = self.verbs_by_name[verb_name]
             if not verb.cli_spec.hideverb:
                 if verb.cli_spec.baseverb:
                     rows2.append((get_verb_usage(verb), verb.cli_spec.description))
@@ -572,7 +572,7 @@ def get_verb_usage(verb):
         usage2 = ' %s' % verb.cli_spec.usage
     else:
         usage2 = ''
-    args = [get_argument_usage(a) for a in verb.iter_arguments()]
+    args = [get_argument_usage(a) for a in verb.iter_required_arguments()]
     if args:
         sargs = ' %s' % (' '.join(args))
     else:

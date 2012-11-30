@@ -25,6 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Command(description = 'Export to file. Run without arguments for usage.')
+@VOLT.Command(
+    description = 'Export to file. Run without arguments for usage.',
+    bundles = VOLT.JavaBundle('org.voltdb.exportclient.ExportToFileClient', passthrough = True),
+)
 def exporttofile(runner):
-    runner.java.execute('org.voltdb.exportclient.ExportToFileClient', None, *runner.args)
+    runner.go()

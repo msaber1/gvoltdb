@@ -851,7 +851,8 @@ class INIConfigManager(object):
                 parser.add_section(section)
                 cur_section = section
             parser.set(cur_section, name, d[key])
-        f = FileWriter(path)
+        f = File(path, mode = 'w')
+        f.open()
         try:
             parser.write(f)
         finally:

@@ -25,7 +25,9 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-@VOLT.Server('rejoin',
-             description = 'Rejoin host to the VoltDB cluster.')
+@VOLT.Command(
+    description = 'Rejoin host to the VoltDB cluster.',
+    bundles = VOLT.ServerBundle('rejoin'),
+)
 def rejoin(runner):
     runner.go()

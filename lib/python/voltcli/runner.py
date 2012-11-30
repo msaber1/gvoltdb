@@ -32,10 +32,12 @@ import os
 import inspect
 
 import voltdbclient
-from verbs import *
-from voltcli import cli
-from voltcli import environment
-from voltcli import utility
+import cli
+import environment
+import utility
+import decorators
+import bundles
+import verbs
 
 #===============================================================================
 # Global data
@@ -191,12 +193,12 @@ class VerbRunner(object):
         all = utility.kwargs_get_boolean(kwargs, 'all', default = False)
         if all:
             for verb_name in self.verbspace.verb_names:
-                verb_spec = self.verbspace.verbs[verb_name].cli_spec
+                verb_spec = self.verbspace.verbs_by_name[verb_name].cli_spec
                 if not verb_spec.baseverb and not verb_spec.hideverb:
                     sys.stdout.write('\n===== Verb: %s =====\n' % verb_name)
                     self._print_verb_help(verb_name)
             for verb_name in self.verbspace.verb_names:
-                verb_spec = self.verbspace.verbs[verb_name].cli_spec
+                verb_spec = self.verbspace.verbs_by_name[verb_name].cli_spec
                 if verb_spec.baseverb and not verb_spec.hideverb:
                     sys.stdout.write('\n===== Common Verb: %s =====\n' % verb_name)
                     self._print_verb_help(verb_name)
@@ -323,7 +325,7 @@ the package file to an explicit python version, e.g.
 
     def _print_verb_help(self, verb_name):
         # Internal method to display help for a verb
-        verb = self.verbspace.verbs[verb_name]
+        verb = self.verbspace.verbs_by_name[verb_name]
         parser = VoltCLIParser(self.verbspace)
         parser.initialize_verb(verb_name)
         sys.stdout.write('\n')
@@ -391,11 +393,13 @@ class VOLT(object):
         self.VoltColumn      = voltdbclient.VoltColumn
         self.FastSerializer  = voltdbclient.FastSerializer
         # For declaring multi-command verbs like "show".
-        self.Modifier = Modifier
+        self.Modifier = verbs.Modifier
         # Bundles
-        self.ConnectionBundle = ConnectionBundle
-        self.ClientBundle     = ClientBundle
-        self.AdminBundle      = AdminBundle
+        self.ConnectionBundle = bundles.ConnectionBundle
+        self.ClientBundle     = bundles.ClientBundle
+        self.AdminBundle      = bundles.AdminBundle
+        self.ServerBundle     = bundles.ServerBundle
+        self.JavaBundle       = bundles.JavaBundle
         # As a convenience expose the utility module so that commands don't
         # need to import it.
         self.utility = utility
@@ -420,13 +424,13 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
 
     # Build the VOLT namespace with the specific set of classes, functions and
     # decorators we make available to command implementations.
-    verbs = {}
-    verb_decorators = VerbDecorators(verbs)
+    verbs_by_name = {}
+    verb_decorators = decorators.VerbDecorators(verbs_by_name)
     namespace_VOLT = VOLT(verb_decorators)
 
     # Build the verbspace by executing modules found based on the calling
     # script location and the location of this module. The executed modules
-    # have decorator calls that populate the verbs dictionary.
+    # have decorator calls that populate the verbs_by_name dictionary.
     finder = utility.PythonSourceFinder()
     for scan_dir in scan_base_dirs:
         finder.add_path(os.path.join(scan_dir, verbs_subdir))
@@ -438,11 +442,11 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
     # Add standard verbs if they aren't supplied.
     def default_func(runner):
         runner.go()
-    for verb_name, verb_cls in (('help', HelpVerb), ('package', PackageVerb)):
-        if verb_name not in verbs:
-            verbs[verb_name] = verb_cls(verb_name, default_func)
+    for name, bundle in (('help', bundles.HelpBundle), ('package', bundles.PackageBundle)):
+        if name not in verbs_by_name:
+            verbs_by_name[name] = verbs.CommandVerb(name, default_func, bundles = [bundle()])
 
-    return VerbSpace(command_name, version, description, namespace_VOLT, verbs)
+    return verbs.VerbSpace(command_name, version, description, namespace_VOLT, verbs_by_name)
 
 #===============================================================================
 class VoltConfig(utility.PersistentConfig):
@@ -468,7 +472,7 @@ class VoltCLIParser(cli.CLIParser):
         """
         VoltCLIParser constructor.
         """
-        cli.CLIParser.__init__(self, verbspace.verbs,
+        cli.CLIParser.__init__(self, verbspace.verbs_by_name,
                                      base_cli_spec.options,
                                      base_cli_spec.usage,
                                      '\n'.join((verbspace.description,
@@ -486,8 +490,9 @@ def run_command(verbspace, internal_verbspaces, config, *args, **kwargs):
     command = parser.parse(*args)
 
     # Initialize utility function options according to parsed options.
-    utility.set_verbose(command.opts.verbose)
-    utility.set_debug(  command.opts.debug)
+    if command.opts:
+        utility.set_verbose(command.opts.verbose)
+        utility.set_debug(  command.opts.debug)
 
     # Run the command. Pass along kwargs. This allows verbs calling other verbs
     # to add keyword arguments like "classpath".
