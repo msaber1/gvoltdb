@@ -32,7 +32,7 @@ import org.voltdb.VoltTable;
  */
 public class AddMsg extends VoltProcedure {
     private static final SQLStmt insert =
-            new SQLStmt("INSERT INTO MSGS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+            new SQLStmt("INSERT INTO MSGS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     private static final SQLStmt getMsgsForTxn =
         new SQLStmt("SELECT * FROM msgs WHERE txnid = ? ORDER BY localhsid, ts;");
@@ -47,6 +47,7 @@ public class AddMsg extends VoltProcedure {
                            long spHandle,
                            long truncationHandle,
                            byte isMP,
+                           byte inSeq,
                            String procName,
                            byte status)
     {
@@ -64,6 +65,7 @@ public class AddMsg extends VoltProcedure {
                      spHandle,
                      truncationHandle,
                      isMP,
+                     inSeq,
                      procName,
                      status);
         return voltExecuteSQL(true);

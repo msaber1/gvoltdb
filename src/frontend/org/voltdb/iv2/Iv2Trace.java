@@ -24,6 +24,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientInterfaceHandleManager;
@@ -110,6 +111,10 @@ public class Iv2Trace
                     if (msg.isMP != null) {
                         isMP = msg.isMP ? 1 : (byte) 0;
                     }
+                    byte inSeq = -1;
+                    if (msg.inSeq != null) {
+                        inSeq = msg.inSeq ? 1 : (byte) 0;
+                    }
 
                     m_client.callProcedure("AddMsg",
                                            txnId,
@@ -122,6 +127,7 @@ public class Iv2Trace
                                            msg.spHandle,
                                            msg.truncationHandle,
                                            isMP,
+                                           inSeq,
                                            msg.procName,
                                            msg.status);
                 } catch (InterruptedException e) {
@@ -217,6 +223,7 @@ public class Iv2Trace
         public final long spHandle;
         public final long truncationHandle;
         public final Boolean isMP;
+        public final Boolean inSeq;
         public final String procName;
         public final byte status;
 
@@ -230,8 +237,8 @@ public class Iv2Trace
                        long spHandle,
                        long truncationHandle,
                        Boolean isMP,
-                       String procName,
-                       byte status)
+                       Boolean inSeq,
+                       String procName, byte status)
         {
             this.action = action;
             this.type = type;
@@ -243,6 +250,7 @@ public class Iv2Trace
             this.spHandle = spHandle;
             this.truncationHandle = truncationHandle;
             this.isMP = isMP;
+            this.inSeq = inSeq;
             this.procName = procName;
             this.status = status;
         }
@@ -298,8 +306,8 @@ public class Iv2Trace
                                          msg.getSpHandle(),
                                          msg.getTruncationHandle(),
                                          msg.isSinglePartition() == false,
-                                         msg.getStoredProcedureInvocation().getProcName(),
-                                         (byte)0);
+                                         null,
+                                         msg.getStoredProcedureInvocation().getProcName(), (byte)0);
             msgQueue.offer(logmsg);
         }
     }
@@ -317,8 +325,8 @@ public class Iv2Trace
                                          msg.getSpHandle(),
                                          0,
                                          null,
-                                         "",
-                                         msg.getClientResponseData().getStatus());
+                                         null,
+                                         "", msg.getClientResponseData().getStatus());
             msgQueue.offer(logmsg);
         }
     }
@@ -372,8 +380,8 @@ public class Iv2Trace
                                              iresp.getSpHandle(),
                                              Long.MIN_VALUE,
                                              null,
-                                             "",
-                                             iresp.getClientResponseData().getStatus());
+                                             null,
+                                             "", iresp.getClientResponseData().getStatus());
                 msgQueue.offer(logmsg);
             }
             else if (msg instanceof FragmentResponseMessage) {
@@ -388,8 +396,8 @@ public class Iv2Trace
                                              fresp.getSpHandle(),
                                              Long.MIN_VALUE,
                                              null,
-                                             "",
-                                             fresp.getStatusCode());
+                                             null,
+                                             "", fresp.getStatusCode());
                 msgQueue.offer(logmsg);
             }
         }
@@ -418,8 +426,8 @@ public class Iv2Trace
                                          itask.getSpHandle(),
                                          itask.getTruncationHandle(),
                                          itask.isSinglePartition() == false,
-                                         itask.getStoredProcedureInvocation().getProcName(),
-                                         (byte)0);
+                                         null,
+                                         itask.getStoredProcedureInvocation().getProcName(), (byte)0);
             msgQueue.offer(logmsg);
         }
     }
@@ -438,8 +446,8 @@ public class Iv2Trace
                                          message.getSpHandle(),
                                          message.getTruncationHandle(),
                                          message.isSinglePartition() == false,
-                                         "",
-                                         (byte)0);
+                                         null,
+                                         "", (byte)0);
             msgQueue.offer(logmsg);
         }
     }
@@ -457,8 +465,8 @@ public class Iv2Trace
                                          ftask.getSpHandle(),
                                          ftask.getTruncationHandle(),
                                          ftask.isSinglePartition() == false,
-                                         "",
-                                         (byte)0);
+                                         null,
+                                         "", (byte)0);
             msgQueue.offer(logmsg);
         }
     }
@@ -482,8 +490,48 @@ public class Iv2Trace
                                          ftask.getSpHandle(),
                                          ftask.getTruncationHandle(),
                                          ftask.isSinglePartition() == false,
-                                         "",
-                                         (byte)0);
+                                         null,
+                                         "", (byte)0);
+            msgQueue.offer(logmsg);
+        }
+    }
+
+    public static void logReplaySequencerOffer(VoltMessage msg, long localHSId)
+    {
+        if (iv2queuelog.isTraceEnabled()) {
+            TransactionInfoBaseMessage info = (TransactionInfoBaseMessage)msg;
+            TaskMsg logmsg = new TaskMsg(ACTION.RECEIVE,
+                                         MSG_TYPE.typeFromMsg(msg),
+                                         localHSId,
+                                         msg.m_sourceHSId,
+                                         0,
+                                         info.getCoordinatorHSId(),
+                                         info.getTxnId(),
+                                         info.getSpHandle(),
+                                         Long.MIN_VALUE,
+                                         null,
+                                         true,
+                                         "", (byte)0);
+            msgQueue.offer(logmsg);
+        }
+    }
+
+    public static void logReplaySequencerPoll(VoltMessage msg, long localHSId)
+    {
+        if (iv2queuelog.isTraceEnabled()) {
+            TransactionInfoBaseMessage info = (TransactionInfoBaseMessage)msg;
+            TaskMsg logmsg = new TaskMsg(ACTION.RECEIVE,
+                                         MSG_TYPE.typeFromMsg(msg),
+                                         localHSId,
+                                         msg.m_sourceHSId,
+                                         0,
+                                         info.getCoordinatorHSId(),
+                                         info.getTxnId(),
+                                         info.getSpHandle(),
+                                         Long.MIN_VALUE,
+                                         null,
+                                         false,
+                                         "", (byte)0);
             msgQueue.offer(logmsg);
         }
     }
@@ -503,8 +551,8 @@ public class Iv2Trace
                                          task.getSpHandle(),
                                          Long.MIN_VALUE,
                                          txn.isSinglePartition() == false,
-                                         invocation == null ? "" : invocation.getProcName(),
-                                         (byte)0);
+                                         null,
+                                         invocation == null ? "" : invocation.getProcName(), (byte)0);
             msgQueue.offer(logmsg);
         }
     }
@@ -524,8 +572,8 @@ public class Iv2Trace
                                          task.getSpHandle(),
                                          Long.MIN_VALUE,
                                          txn.isSinglePartition() == false,
-                                         invocation == null ? "" : invocation.getProcName(),
-                                         (byte)0);
+                                         null,
+                                         invocation == null ? "" : invocation.getProcName(), (byte)0);
             msgQueue.offer(logmsg);
         }
     }

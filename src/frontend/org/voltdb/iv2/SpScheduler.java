@@ -239,6 +239,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private void deliverReadyTxns() {
         VoltMessage m = m_replaySequencer.poll();
         while(m != null) {
+            Iv2Trace.logReplaySequencerOffer(m, m_mailbox.getHSId());
             deliver2(m);
             m = m_replaySequencer.poll();
         }
@@ -277,6 +278,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 deliver2(message);
             }
             else {
+                Iv2Trace.logReplaySequencerOffer(message, m_mailbox.getHSId());
                 deliverReadyTxns();
             }
         }

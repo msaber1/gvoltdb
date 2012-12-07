@@ -13,15 +13,24 @@ CREATE TABLE msgs
 ,  sphandle          bigint
 ,  truncationhandle  bigint
 ,  ismp              tinyint
+,  inseq             tinyint
 ,  procname          varchar(255)
 ,  status            tinyint    NOT  NULL
-
-, PRIMARY KEY
-  (
-    txnid, procname, ts, action
-  )
 );
 PARTITION TABLE msgs ON COLUMN txnid;
+
+CREATE INDEX msgs_txnid_idx ON msgs
+(
+    txnid
+);
+CREATE INDEX msgs_type_idx ON msgs
+(
+    type, txnid, action
+);
+CREATE INDEX msgs_inseq_idx ON msgs
+(
+    inseq, txnid, type
+);
 
 -- procedures
 CREATE PROCEDURE FROM CLASS iv2trace.procedures.AddMsg;
