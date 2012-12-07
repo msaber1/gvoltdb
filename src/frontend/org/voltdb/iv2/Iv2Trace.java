@@ -70,13 +70,13 @@ public class Iv2Trace
             }
         }
     };
+    private static String traceServers = null;
     private static final Runnable dbWorker = new Runnable() {
         private final Client m_client = ClientFactory.createClient();
 
         private void connectToServers()
         {
-            String servers = System.getenv().get("IV2TRACE_DB");
-            String[] serverArray = servers.split(",");
+            String[] serverArray = traceServers.split(",");
             for (int i = 0; i < serverArray.length; i++) {
                 try {
                     m_client.createConnection(serverArray[i]);
@@ -88,7 +88,7 @@ public class Iv2Trace
                     i--; // retry this server
                 }
             }
-            iv2log.trace("Connected to IV2 trace database: " + servers);
+            iv2log.trace("Connected to IV2 trace database: " + traceServers);
         }
 
         @Override
@@ -146,7 +146,12 @@ public class Iv2Trace
     static
     {
         if (iv2log.isTraceEnabled() || iv2queuelog.isTraceEnabled()) {
-            if (System.getenv().get("IV2TRACE_DB") == null) {
+            traceServers = System.getenv().get("IV2TRACE_DB");
+            if (traceServers == null) {
+                traceServers = System.getProperty("IV2TRACE_DB");
+            }
+
+            if (traceServers == null) {
                 es.execute(log4jWorker);
             } else {
                 es.execute(dbWorker);
