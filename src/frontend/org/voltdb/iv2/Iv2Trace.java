@@ -274,7 +274,7 @@ public class Iv2Trace
     public static void logTopology(long leaderHSId, List<Long> replicas, int partitionId)
     {
         if (iv2log.isTraceEnabled()) {
-            String logmsg = new String("topology partition %d leader %s replicas (%s)");
+            String logmsg = "topology partition %d leader %s replicas (%s)";
             iv2log.trace(String.format(logmsg, partitionId, CoreUtils.hsIdToString(leaderHSId),
                     CoreUtils.hsIdCollectionToString(replicas)));
         }
