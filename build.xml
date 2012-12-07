@@ -264,6 +264,11 @@ PRIMARY ENTRY POINTS
             <include name="*" />
         </fileset>
     </copy>
+    <chmod perm="ugo+rx">
+        <fileset dir="${raw.dist.dir}/voltdb-tools-${dist.version}">
+            <include name="voltadmin" />
+        </fileset>
+    </chmod>
     <exec executable="tar" failonerror="true">
         <arg value="-cz"/>
         <arg value="-C"/>
@@ -736,6 +741,7 @@ JAR BUILDING
             <include name="org/voltdb/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/hadoop_voltpatches/**" />
+            <include name="jsr166y/**" />
         </fileset>
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
