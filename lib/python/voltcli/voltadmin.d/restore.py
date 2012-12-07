@@ -37,5 +37,7 @@ def restore(runner):
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING, VOLT.FastSerializer.VOLTTYPE_STRING]
     params  = [runner.opts.directory, runner.opts.nonce]
     response = runner.call_proc('@SnapshotRestore', columns, params)
-    runner.info('The snapshot was restored.')
-    print response.table(0).format_table(caption = 'Snapshot Restore Results')
+    # Stay-alive mode may allow errors to not abort.
+    if response and response.status() != -1:
+        runner.info('The snapshot was restored.')
+        print response.table(0).format_table(caption = 'Snapshot Restore Results')

@@ -361,31 +361,43 @@ the package file to an explicit python version, e.g.
     def call(self, *args, **kwargs):
         """
         Call a verbspace verb with arguments.
+        Set stayalive=True to prevent abort() from exiting.
         """
         if not args:
-            utility.abort('No arguments were passed to VerbRunner.call().')
-        if args[0].find('.') == -1:
-            self._run_command(self.verbspace, *args, **kwargs)
-        else:
-            verbspace_name, verb_name = args[0].split('.', 1)
-            verb_name = verb_name.lower()
-            if verbspace_name not in self.internal_verbspaces:
-                utility.abort('Unknown name passed to VerbRunner.call(): %s' % verbspace_name)
-            verbspace = self.internal_verbspaces[verbspace_name]
-            if verb_name not in verbspace.verb_names:
-                utility.abort('Unknown verb passed to VerbRunner.call(): %s' % args[0],
-                              'Available verbs in "%s":' % verbspace_name,
-                              verbspace.verb_names)
-            args2 = [verb_name] + list(args[1:])
-            self._run_command(verbspace, *args2, **kwargs)
+            return utility.abort('No arguments were passed to VerbRunner.call().')
+        save_stayalive = utility.is_stayalive()
+        utility.set_stayalive(utility.kwargs_get_boolean(kwargs, 'stayalive', default = False))
+        try:
+            if args[0].find('.') == -1:
+                self._run_command(self.verbspace, *args, **kwargs)
+            else:
+                verbspace_name, verb_name = args[0].split('.', 1)
+                verb_name = verb_name.lower()
+                if verbspace_name not in self.internal_verbspaces:
+                    # Stay-alive mode will still return from abort.
+                    return utility.abort('Unknown name passed to VerbRunner.call(): %s'
+                                                % verbspace_name)
+                verbspace = self.internal_verbspaces[verbspace_name]
+                if verb_name not in verbspace.verb_names:
+                    return utility.abort('Unknown verb passed to VerbRunner.call(): %s' % args[0],
+                                         'Available verbs in "%s":' % verbspace_name,
+                                         verbspace.verb_names)
+                args2 = [verb_name] + list(args[1:])
+                self._run_command(verbspace, *args2, **kwargs)
+        finally:
+            utility.set_stayalive(save_stayalive)
 
     def call_proc(self, sysproc_name, types, args, check_status = True):
+        if not self.client:
+            # Stay-alive mode will still return from abort.
+            return utility.abort('Connection not available for "%s" procedure call.' % sysproc_name)
         utility.verbose_info('Call procedure: %s%s' % (sysproc_name, tuple(args)))
         proc = voltdbclient.VoltProcedure(self.client, sysproc_name, types)
         response = proc.call(params = args)
         if check_status and response.status != 1:
-            utility.abort('"%s" procedure call failed.' % sysproc_name, (response,))
-        utility.verbose_info(response)
+            return utility.abort('"%s" procedure call failed.' % sysproc_name, (response,))
+        else:
+            utility.verbose_info(response)
         return utility.VoltResponseWrapper(response)
 
     def _print_verb_help(self, verb_name):
@@ -429,6 +441,7 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s',
         runner = VerbRunner(command, verbspace, self.internal_verbspaces, self.config, **kwargs)
         runner.execute()
 
+
     def _abort(self, show_help, *msgs):
         if self.verb:
             utility.error('Fatal error in "%s" command.' % self.verb.name, *msgs)
@@ -439,6 +452,32 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s',
             if show_help:
                 self.help()
         sys.exit(1)
+
+    def connect(self, host,
+                      port        = 21212,
+                      username    = None,
+                      password    = None,
+                      retries     = 5,
+                      retry_sleep = 5,
+                      quiet       = False):
+        for retry in range(retries + 1):
+            if retry > 0:
+                utility.warning('Retry #%d ...' % retry)
+                time.sleep(retry_sleep)
+            try:
+                kwargs = {}
+                if username:
+                    kwargs['username'] = username
+                    if password:
+                        kwargs['password'] = password
+                self.client = FastSerializer(host, port, **kwargs)
+                return True
+            except Exception, e:
+                if not quiet:
+                    utility.warning('Client connection failure:', e)
+        if not quiet:
+            utility.abort('Client connection failed.')
+        return False
 
 #===============================================================================
 class VOLT(object):

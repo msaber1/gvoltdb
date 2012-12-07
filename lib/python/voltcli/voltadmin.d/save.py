@@ -56,4 +56,7 @@ def save(runner):
     runner.verbose_info('@SnapshotSave "%s"' % json_opts)
     columns = [VOLT.FastSerializer.VOLTTYPE_STRING]
     response = runner.call_proc('@SnapshotSave', columns, json_opts)
-    print response.table(0).format_table(caption = 'Snapshot Save Results')
+    # Stay-alive mode may allow errors to not abort.
+    if response and response.status() != -1:
+        runner.info('The snapshot was saved.')
+        print response.table(0).format_table(caption = 'Snapshot Save Results')

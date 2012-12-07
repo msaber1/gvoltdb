@@ -31,9 +31,11 @@
 
 import sys
 import os
+import errno
 import subprocess
 import glob
 import copy
+import time
 import inspect
 import ConfigParser
 import zipfile
@@ -50,10 +52,11 @@ class Global:
     """
     Global data for utilities.
     """
-    verbose_enabled = False
-    debug_enabled   = False
-    dryrun_enabled  = False
-    manifest_path   = 'MANIFEST'
+    verbose_enabled   = False
+    debug_enabled     = False
+    dryrun_enabled    = False
+    stayalive_enabled = False
+    manifest_path     = 'MANIFEST'
 
 #===============================================================================
 def set_dryrun(dryrun):
@@ -82,6 +85,14 @@ def set_debug(debug):
         Global.verbose_enabled = True
 
 #===============================================================================
+def set_stayalive(stayalive):
+#===============================================================================
+    """
+    Enable or disable stay-alive mode (don't exit when abort is called).
+    """
+    Global.stayalive_enabled = stayalive
+
+#===============================================================================
 def is_dryrun():
 #===============================================================================
     """
@@ -104,6 +115,14 @@ def is_debug():
     Return True if debug messages are enabled.
     """
     return Global.debug_enabled
+
+#===============================================================================
+def is_stayalive():
+#===============================================================================
+    """
+    Return True if stay-alive mode is enabled.
+    """
+    return Global.stayalive_enabled
 
 #===============================================================================
 def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
@@ -193,8 +212,44 @@ def abort(*msgs):
     """
     error(*msgs)
     sys.stderr.write('\n')
-    display_messages('Exiting.', f = sys.stderr, tag = 'FATAL')
-    sys.exit(1)
+    if not Global.stayalive_enabled:
+        display_messages('Exiting.', f = sys.stderr, tag = 'FATAL')
+        sys.exit(1)
+    else:
+        display_messages('Not exiting due to stay-alive mode.', f = sys.stderr, tag = 'FATAL')
+
+#===============================================================================
+def is_process_alive(pid):
+#===============================================================================
+    """
+    Check whether process pid is alive.
+    """
+    # http://stackoverflow.com/a/6940314
+    if pid < 0:
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError, e:
+        return e.errno == errno.EPERM
+    else:
+        return True
+
+#===============================================================================
+def wait_for_dead_process(pid, retry_limit = None, retry_sleep = 5, force_kill = None):
+#===============================================================================
+    """
+    Wait for process to die or force kill after timeout.
+    """
+    nretry = 0
+    while retry_limit is None or nretry < retry_limit:
+        nretry += 1
+        if not is_process_alive(pid):
+            break
+        info('Waiting for process %d to die (%d)...' % (pid, nretry))
+        time.sleep(retry_sleep)
+    else:
+        info('Killing process %d.' % pid)
+        os.system('kill -9 %d' % pid)
 
 #===============================================================================
 def find_in_path(name):

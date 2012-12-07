@@ -47,7 +47,7 @@ class VoterClient(VOLT.JavaBundle):
 def build(runner):
     if not runner.opts.conditional or not os.path.exists('voter.jar'):
         runner.java.compile('obj', 'src/voter/*.java', 'src/voter/procedures/*.java')
-    runner.call('volt.compile', 'obj', 'voter.jar')
+        runner.call('volt.compile', '-c', 'obj', '-o', 'voter.jar', 'ddl.sql')
 
 @VOLT.Command(
     description = 'Clean the Voter build output.',
