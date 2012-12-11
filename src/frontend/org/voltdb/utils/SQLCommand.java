@@ -30,7 +30,6 @@ import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -43,8 +42,8 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import jline.console.ConsoleReader;
-import jline.console.KeyMap;
 import jline.console.completer.Completer;
+import jline.console.completer.StringsCompleter;
 
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -54,9 +53,6 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-
-import sun.misc.Signal;
-import sun.misc.SignalHandler;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -124,7 +120,6 @@ public class SQLCommand
         }
         return queries;
     }
-
     public static List<String> parseQueryProcedureCallParameters(String query)
     {
         if (query == null)
@@ -162,57 +157,21 @@ public class SQLCommand
     }
 
     // Command line interaction
-    private static ConsoleReader lineInputReader = null;
+    private static ConsoleReader Input = null;
     private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListProceduresToken = Pattern.compile("^\\s*(list proc|list procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListToken = Pattern.compile("^\\s*(list proc|list procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ListTablesToken = Pattern.compile("^\\s*(list tables);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
     private static int LineIndex = 1;
     private static List<String> Lines = new ArrayList<String>();
-
-    /**
-     * The list of recognized basic tab-complete-able SQL commands.
-     * Comparisons are done in uppercase.
-     */
-    private static final String[] m_commands = new String[] {
-        "DELETE",
-        "EXEC",
-        "EXIT",
-        "EXPLAIN",
-        "EXPLAINPROC",
-        "FILE",
-        "GO",
-        "INSERT",
-        "LIST PROCEDURES",
-        "LIST TABLES",
-        "QUIT",
-        "RECALL",
-        "SELECT",
-        "UPDATE",
-    };
-
-    /**
-     *  As an optimization pre-calculate the longest possible string length
-     *  for the initial command token.
-     */
-    private static int m_maxCommandLength = 0;
-    static {
-        for (final String command : m_commands) {
-            if (command.length() > m_maxCommandLength) {
-                m_maxCommandLength = command.length();
-            }
-        }
-    }
-
     private static List<String> getQuery(boolean interactive) throws Exception
     {
         StringBuilder query = new StringBuilder();
         boolean isRecall = false;
         String line = null;
-
         do
         {
             if (interactive)
@@ -220,14 +179,14 @@ public class SQLCommand
                 if (isRecall)
                 {
                     isRecall = false;
-                    line = lineInputReader.readLine("");
+                    line = Input.readLine("");
 
                 }
                 else
-                    line = lineInputReader.readLine((LineIndex++) + "> ");
+                    line = Input.readLine((LineIndex++) + "> ");
             }
             else
-                line = lineInputReader.readLine();
+                line = Input.readLine();
 
             if (line == null)
             {
@@ -248,7 +207,7 @@ public class SQLCommand
                         if (recall > -1 && recall < Lines.size())
                         {
                             line = Lines.get(recall);
-                            lineInputReader.putString(line);
+                            Input.putString(line);
                             out.flush();
                             isRecall = true;
                             continue;
@@ -274,8 +233,8 @@ public class SQLCommand
                 if (interactive)
                     return null;
             }
-            // LIST PROCEDURES command
-            else if (ListProceduresToken.matcher(line).matches())
+            // EXIT command - ONLY in interactive mode, exit immediately (without running any queued statements)
+            else if (ListToken.matcher(line).matches())
             {
                 if (interactive)
                 {
@@ -321,15 +280,26 @@ public class SQLCommand
                     System.out.print("\n");
                 }
             }
-            // LIST TABLES command
+            // EXIT command - ONLY in interactive mode, exit immediately (without running any queued statements)
             else if (ListTablesToken.matcher(line).matches())
             {
                 if (interactive)
                 {
-                    Tables tables = getTables();
-                    printTables("User Tables", tables.tables);
-                    printTables("User Views", tables.views);
-                    printTables("User Export Streams", tables.exports);
+                    Object[] lists = GetTableList();
+                    for(int i=0;i<3;i++)
+                    {
+                        if (i == 0)
+                            System.out.println("\n--- User Tables --------------------------------------------");
+                        else if (i == 1)
+                            System.out.println("\n--- User Views ---------------------------------------------");
+                        else
+                            System.out.println("\n--- User Export Streams ------------------------------------");
+                        @SuppressWarnings("unchecked")
+                        Iterator<String> list = ((TreeSet<String>)lists[i]).iterator();
+                        while(list.hasNext())
+                            System.out.println(list.next());
+                        System.out.print("\n");
+                    }
                     System.out.print("\n");
                 }
             }
@@ -372,7 +342,6 @@ public class SQLCommand
                         return null;
                 }
             }
-            // Regular SQL query - collect until the next semi-colon.
             else
             {
                 query.append(line);
@@ -383,15 +352,6 @@ public class SQLCommand
             line = null;
         }
         while(true);
-    }
-
-    private static void printTables(final String name, final Collection<String> tables)
-    {
-        System.out.printf("\n--- %s --------------------------------------------\n", name);
-        Iterator<String> list = tables.iterator();
-        while(list.hasNext())
-            System.out.println(list.next());
-        System.out.print("\n");
     }
 
     public static String readScriptFile(String filePath)
@@ -1012,35 +972,30 @@ public class SQLCommand
         }
     }
 
-    private static class Tables
+    private static Object[] GetTableList() throws Exception
     {
+        VoltTable tableData = VoltDB.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
         TreeSet<String> tables = new TreeSet<String>();
         TreeSet<String> exports = new TreeSet<String>();
         TreeSet<String> views = new TreeSet<String>();
-    }
-
-    private static Tables getTables() throws Exception
-    {
-        Tables tables = new Tables();
-        VoltTable tableData = VoltDB.callProcedure("@SystemCatalog", "TABLES").getResults()[0];
         for(int i = 0; i < tableData.getRowCount(); i++)
         {
             String tableName = tableData.fetchRow(i).getString("TABLE_NAME");
             String tableType = tableData.fetchRow(i).getString("TABLE_TYPE");
             if (tableType.equalsIgnoreCase("EXPORT"))
             {
-                tables.exports.add(tableName);
+                exports.add(tableName);
             }
             else if (tableType.equalsIgnoreCase("VIEW"))
             {
-                tables.views.add(tableName);
+                views.add(tableName);
             }
             else
             {
-                tables.tables.add(tableName);
+                tables.add(tableName);
             }
         }
-        return tables;
+        return new Object[] {tables, views, exports};
     }
 
     private static void loadStoredProcedures(Map<String,Map<Integer, List<String>>> procedures)
@@ -1129,34 +1084,6 @@ public class SQLCommand
         VoltDB = testVoltDB;
     }
 
-    private static class SQLCompleter implements Completer
-    {
-        /* (non-Javadoc)
-         * @see jline.console.completer.Completer#complete(java.lang.String, int, java.util.List)
-         */
-        @Override
-        public int complete(String buffer, int cursor, List<CharSequence> candidates)
-        {
-            // For now only support tab completion at the end of the line.
-            if (cursor == buffer.length()) {
-                // Check for an initial token match?
-                if (cursor <= m_maxCommandLength) {
-                    final String bufferu = buffer.toUpperCase();
-                    for (final String command : m_commands) {
-                        if (command.startsWith(bufferu)) {
-                            candidates.add(command);
-                        }
-                    }
-                    if (!candidates.isEmpty()) {
-                        return 0;
-                    }
-                }
-            }
-            return cursor;
-        }
-
-    }
-
     private static InputStream in = null;
     private static OutputStream out = null;
     // Application entry point
@@ -1241,33 +1168,13 @@ public class SQLCommand
 
             in = new FileInputStream(FileDescriptor.in);
             out = System.out;
-            lineInputReader = new ConsoleReader(in, out);
+            Input = new ConsoleReader(in, out/*, new UnixTerminal()*/);
 
-            lineInputReader.setBellEnabled(false);
-
-            // Provide a custom completer.
-            Completer completer = new SQLCompleter();
-            lineInputReader.addCompleter(completer);
-
-            // Make Ctrl-D exit.
-            KeyMap keyMap = lineInputReader.getKeys();
-            keyMap.bind(new Character(KeyMap.CTRL_D).toString(), "exit\r");
-
-            // Disable Ctrl-C in interactive mode to prevent accidental exit.
-            sun.misc.Signal.handle(new Signal("INT"), new SignalHandler() {
-                @Override
-                public void handle(Signal arg0) {
-                    try {
-                        if (lineInputReader != null) {
-                            // Beep and clear the line so that it does something useful.
-                            lineInputReader.beep();
-                            lineInputReader.setCursorPosition(0);
-                            lineInputReader.killLine();
-                        }
-                    }
-                    catch (IOException e) {}
-                }
-            });
+            Input.setBellEnabled(false);
+            Completer completer = new StringsCompleter(new String[] {
+                    "select", "update", "insert", "delete", "exec", "file", "recall",
+                    "SELECT", "UPDATE", "INSERT", "DELETE", "EXEC", "FILE", "RECALL" });
+            Input.addCompleter(completer);
 
             boolean interactive = true;
             if (queries != null && !queries.isEmpty())
