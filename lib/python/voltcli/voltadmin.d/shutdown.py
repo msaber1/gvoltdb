@@ -26,7 +26,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 @VOLT.Command(
-    bundles = VOLT.AdminBundle(),
+    bundles = VOLT.AdminBundle(retries = 0),
     description = 'Shut down the running VoltDB cluster.'
 )
 def shutdown(runner):

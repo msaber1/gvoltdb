@@ -77,14 +77,16 @@ class BaseClientBundle(ConnectionBundle):
     assigning an instance to the "bundles" keyword inside a decorator
     invocation.
     """
-    def __init__(self, default_port):
+    def __init__(self, default_port, retries = 5):
+        self.retries = retries
         ConnectionBundle.__init__(self, default_port = default_port, min_count = 1, max_count = 1)
 
     def start(self, verb, runner):
         runner.connect(runner.opts.host.host,
                        port     = runner.opts.host.port,
                        username = runner.opts.username,
-                       password = runner.opts.password)
+                       password = runner.opts.password,
+                       retries  = self.retries)
 
     def stop(self, verb, runner):
         if runner.client:
@@ -98,8 +100,8 @@ class ClientBundle(BaseClientBundle):
     by assigning an instance to the "bundles" keyword inside a decorator
     invocation.
     """
-    def __init__(self, **kwargs):
-        BaseClientBundle.__init__(self, 21212, **kwargs)
+    def __init__(self, retries = 5):
+        BaseClientBundle.__init__(self, 21212, retries = retries)
 
 #===============================================================================
 class AdminBundle(BaseClientBundle):
@@ -109,8 +111,8 @@ class AdminBundle(BaseClientBundle):
     assigning an instance to the "bundles" keyword inside a decorator
     invocation.
     """
-    def __init__(self, **kwargs):
-        BaseClientBundle.__init__(self, 21211, **kwargs)
+    def __init__(self, retries = 5):
+        BaseClientBundle.__init__(self, 21211, retries = retries)
 
 #===============================================================================
 class JavaBundle(object):

@@ -30,6 +30,7 @@ __author__ = 'scooper'
 import sys
 import os
 import inspect
+import time
 
 import voltdbclient
 import cli
@@ -496,7 +497,7 @@ runner.main('%(name)s', '', '%(version)s', '%(description)s',
                     kwargs['username'] = username
                     if password:
                         kwargs['password'] = password
-                self.client = FastSerializer(host, port, **kwargs)
+                self.client = voltdbclient.FastSerializer(host, port, **kwargs)
                 return True
             except Exception, e:
                 if not quiet:
