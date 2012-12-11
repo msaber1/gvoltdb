@@ -312,7 +312,7 @@ public class SystemStatsCollector {
         try {
             rss = ExecutionEngine.nativeGetRSS();
         }
-        catch (Exception e) {}
+        catch (Throwable e) {}
         if (rss > 0) mode = GetRSSMode.MACOSX_NATIVE;
 
         // try procfs
