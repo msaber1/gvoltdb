@@ -99,8 +99,8 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
     add_dir(os.path.realpath(os.environ.get('VOLTCORE', None)))
     utility.verbose_info('Base directories for scan:', dirs)
 
-    lib_search_globs    = []
-    voltdb_search_globs = []
+    lib_search_globs    = set()
+    voltdb_search_globs = set()
 
     voltdb_lib    = os.environ.get('VOLTDB_LIB', '')
     voltdb_voltdb = os.environ.get('VOLTDB_VOLTDB', '')
@@ -119,7 +119,7 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
             if not voltdb_lib:
                 for subdir in ('lib', os.path.join('lib', 'voltdb')):
                     glob_chk = os.path.join(dir, subdir, 'zmq*.jar')
-                    lib_search_globs.append(glob_chk)
+                    lib_search_globs.add(glob_chk)
                     if glob.glob(glob_chk):
                         voltdb_lib = os.path.join(dir, subdir)
                         os.environ['VOLTDB_LIB'] = voltdb_lib
@@ -133,11 +133,11 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
                     voltdb_dirs.append(voltdb_voltdb)
                 # Then search the voltdb and lib/voltdb subdirectories of the scan directory.
                 # The lib/voltdb subdir is needed for the package installation file layout.
-                voltdb_dirs.append(os.path.join(dir, 'lib'))
+                voltdb_dirs.append(os.path.join(dir, 'voltdb'))
                 voltdb_dirs.append(os.path.join(dir, 'lib', 'voltdb'))
                 for voltdb_dir in voltdb_dirs:
                     glob_chk = os.path.join(voltdb_dir,  'voltdb-*.jar')
-                    voltdb_search_globs.append(glob_chk)
+                    voltdb_search_globs.add(glob_chk)
                     for voltdb_jar_chk in glob.glob(glob_chk):
                         if re_voltdb_jar.match(os.path.basename(voltdb_jar_chk)):
                             voltdb_jar = voltdb_jar_chk
@@ -151,14 +151,18 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
 
     # If the VoltDB jar was found then VOLTDB_VOLTDB will also be set.
     if voltdb_jar is None:
+        globs = list(voltdb_search_globs)
+        globs.sort()
         utility.abort('Failed to find the VoltDB jar file.',
                         ('You may need to perform a build.',
-                         'Searched the following:', voltdb_search_globs))
+                         'Searched the following:', globs))
 
     if not voltdb_lib:
+        globs = list(lib_search_globs)
+        globs.sort()
         utility.abort('Failed to find the VoltDB library directory.',
                         ('You may need to perform a build.',
-                         'Searched the following:', lib_search_globs))
+                         'Searched the following:', globs))
 
     # LOG4J configuration
     if 'LOG4J_CONFIG_PATH' not in os.environ:
