@@ -24,6 +24,12 @@
 
 import os
 
+# Automatically provide a license file if building as PRO.
+distdir = os.path.join(os.path.dirname(os.path.dirname(os.getcwd())), 'obj', 'release', 'dist')
+license_path = os.path.join(distdir, 'voltdb', 'license.xml')
+if not os.environ.get('VOLTPRO') or not os.path.exists(license_path):
+    license_path = None
+
 class VoterServer(VOLT.ServerBundle):
     def __init__(self, action):
         VOLT.ServerBundle.__init__(self, action)
@@ -57,11 +63,14 @@ def clean(runner):
 
 @VOLT.Command(
      description = 'Start the Voter VoltDB server.',
-     bundles = VoterServer('start'),
 )
 def server(runner):
+    if license_path is not None:
+        license_option = ['-l', license_path]
+    else:
+        license_option = []
     runner.call('build', '-C')
-    runner.go()
+    runner.call('volt.start', 'voter.jar', *license_option)
 
 @VOLT.Command(
     description = 'Run the Voter asynchronous benchmark.',
