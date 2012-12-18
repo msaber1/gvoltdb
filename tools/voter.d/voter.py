@@ -23,12 +23,7 @@
 # All the commands supported by the Voter application.
 
 import os
-
-# Automatically provide a license file if building as PRO.
-distdir = os.path.join(os.path.dirname(os.path.dirname(os.getcwd())), 'obj', 'release', 'dist')
-license_path = os.path.join(distdir, 'voltdb', 'license.xml')
-if not os.environ.get('VOLTPRO') or not os.path.exists(license_path):
-    license_path = None
+import voter_utility
 
 class VoterServer(VOLT.ServerBundle):
     def __init__(self, action):
@@ -65,8 +60,8 @@ def clean(runner):
      description = 'Start the Voter VoltDB server.',
 )
 def server(runner):
-    if license_path is not None:
-        license_option = ['-l', license_path]
+    if voter_utility.license_path is not None:
+        license_option = ['-l', voter_utility.license_path]
     else:
         license_option = []
     runner.call('build', '-C')
