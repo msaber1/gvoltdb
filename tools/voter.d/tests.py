@@ -132,7 +132,9 @@ def master(runner):
 
 def replica(runner):
     tester = Tester(runner, runner.opts.legacy)
-    tester.replica()
+    if len(runner.opts.arg) != 1:
+        utility.abort('Expecting a single master host as the argument.')
+    tester.replica(runner.opts.arg[0])
 
 def tail_replication(runner):
     tester = Tester(runner, runner.opts.legacy)
@@ -149,7 +151,7 @@ def tail_replication(runner):
         VOLT.Modifier('master', master,
                       'Run replication master server and populate database.'),
         VOLT.Modifier('replica', replica,
-                      'Run replica server and dragent.'),
+                      'Run replica server and dragent.', 'master'),
         VOLT.Modifier('tail_replication', tail_replication,
                       'Tail master and replica logs (requires multitail).'),
     ],
@@ -184,7 +186,8 @@ class Tester(object):
             self.license_option = ['-l', Global.license_path]
         else:
             self.license_option = []
-        self.server_pid = None
+        self.server_pid  = None
+        self.dragent_pid = None
 
     def get_paths(self, tag):
         return Tester.Paths(Global.edition, tag, self.mode,
@@ -197,11 +200,15 @@ class Tester(object):
                 voltdbroot = 'tmp/voltdbroot',
         )
 
-    def prepare(self, tag):
-        print '\n=== Prepare test ===\n'
+    def prepare_server(self):
         # Look for and shutdown a running server.
         if self.runner.connect('localhost', quiet = True, retries = 0):
-            self.shutdown()
+            self.stop_server()
+
+    def prepare_environment(self, tag):
+        print '\n=== Prepare test ===\n'
+        # Make sure this will be the only running server.
+        self.prepare_server()
         # Set up the paths generator
         self.paths = self.get_paths(tag)
         # Wipe and recreate the needed directories.
@@ -266,27 +273,18 @@ class Tester(object):
         print '\n=== Snapshot restore %s from %s ===\n' % (nonce, self.paths.snapshots)
         self.runner.call('voltadmin.restore', self.paths.snapshots, nonce, stayalive = fails)
 
-    def shutdown(self):
-        print '\n=== Shutdown server ===\n'
-        self.runner.call('voltadmin.shutdown', stayalive = True)
+    def stop_server(self):
         if self.server_pid:
-            retry = 0
-            while os.waitpid(self.server_pid, os.WNOHANG) == (0, 0):
-                retry += 1
-                print 'Waiting for server (pid=%d) to exit (%d)...' % (self.server_pid, retry)
-                if retry == 5:
-                    utility.abort('Server never exited.')
-                time.sleep(5)
-            print 'Server exited.'
-            self.server_pid = 0
+            print '\n=== Shutdown server ===\n'
+            self.runner.call('voltadmin.shutdown', stayalive = True)
+            wait_for_shutdown(self.server_pid,  'server')
+            self.server_pid = None
 
-    def wait_for_server(self):
-        if self.server_pid:
-            os.waitpid(self.server_pid, 0)
-            print 'Server exited.'
-            self.server_pid = 0
-        else:
-            print '* Server is not running. *'
+    def stop_dragent(self):
+        if self.dragent_pid:
+            print '\n=== Shutdown dragent ===\n'
+            wait_for_shutdown(self.dragent_pid, 'dragent')
+            self.dragent_pid = None
 
     def start_server(self, action):
         print('\n=== Start %s server (pid=%d, mode=%s) ===\n'
@@ -302,12 +300,23 @@ class Tester(object):
             os._exit(0)
         else:
             time.sleep(10)
-            return
+
+    def start_dragent(self, master):
+        self.runner.connect('localhost', retries = 10)
+        print('\n=== Start dragent (pid=%d) ===\n' % os.getpid())
+        self.runner.call('volt.dragent', '-H', 'localhost', master)
+        print('\n=== Exit dragent (pid=%d) ===\n' % os.getpid())
+
+    def spawn_dragent(self, master):
+        self.dragent_pid = os.fork()
+        if self.dragent_pid == 0:
+            self.start_dragent(master)
+            os._exit(0)
 
     def snapshots(self):
 
         # Prepare and compile.
-        self.prepare('snapshots')
+        self.prepare_environment('snapshots')
         self.runner.call('build', '-C')
 
         # Test sequence 1:
@@ -330,7 +339,7 @@ class Tester(object):
             self.snapshot('s3',  True, False)   # Fails
             self.populate()
         finally:
-            self.shutdown()
+            self.stop_server()
 
         # Test sequence 2:
         #   - Recover database.
@@ -346,23 +355,17 @@ class Tester(object):
                 self.restore('s1', False)
             self.restore('xx',  True)           # Fails
         finally:
-            self.shutdown()
+            self.stop_server()
 
     def master(self):
-
-        # Look for and shutdown a running server.
-        if self.runner.connect('localhost', quiet = True, retries = 0):
-            self.shutdown()
-
-        # Prepare and compile.
-        self.prepare('master')
+        # Master test sequence:
+        #   - Shutdown any existing server.
+        #   - Build the catalog.
+        #   - Spawn a parallel server process.
+        #   - Create and populate the database until the user terminates.
+        #   - Shutdown the server.
+        self.prepare_environment('master')
         self.runner.call('build', '-C')
-
-        # Test sequence:
-        #   - Create database.
-        #   - Populate database.
-        #   - Shutdown database.
-        # Spawn a parallel server process.
         self.spawn_server('create')
         try:
             print '\n=== Start replication server client (pid=%d) ===\n' % os.getpid()
@@ -376,14 +379,49 @@ class Tester(object):
                     sys.stdout.flush()
                     s = raw_input()
                 if s == 'q':
-                    self.shutdown()
+                    self.stop_server()
                     break
-            self.wait_for_server()
+            wait_for_server(self.server_pid, 'server')
+            self.server_pid = None
         except Exception:
-            # Make sure the server shuts down no matter what.
-            self.shutdown()
+            self.stop_server()
+
+    def replica(self, master):
+        # Replica test sequence:
+        #   - Shutdown any existing server.
+        #   - Spawn the dragent.
+        #   - Spawn the replica server.
+        #   - Shutdown the server.
+        self.prepare_environment('replica')
+        try:
+            self.spawn_server('replica')
+            self.spawn_dragent(master)
+            sys.stdout.write("Press Enter to shut down replica server and dragent: ")
+            sys.stdout.flush()
+            s = raw_input()
+        finally:
+            self.stop_dragent()
+            self.stop_server()
 
     def tail_replication(self):
         master_log  = self.get_paths('master').log
         replica_log = self.get_paths('replica').log
         os.system('multitail -iw %s 10 -iw %s 10' % (master_log, replica_log))
+
+def wait_for_shutdown(pid, name):
+    if pid:
+        retry = 0
+        while os.waitpid(pid, os.WNOHANG) == (0, 0):
+            retry += 1
+            if retry == 5:
+                utility.abort('The %s never exited.' % name)
+            print 'Waiting for %s (pid=%d) to exit (%d)...' % (name, pid, retry)
+            time.sleep(5)
+        print 'The %s exited.' % name
+
+def wait_for_server(pid, name):
+    if pid:
+        os.waitpid(pid, 0)
+        print 'The %s exited.' % name
+    else:
+        print '* The %s is not running. *' % name

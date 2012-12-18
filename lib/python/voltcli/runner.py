@@ -538,6 +538,7 @@ class VOLT(object):
         self.ClientBundle     = bundles.ClientBundle
         self.AdminBundle      = bundles.AdminBundle
         self.ServerBundle     = bundles.ServerBundle
+        self.DRAgentBundle    = bundles.DRAgentBundle
         self.JavaBundle       = bundles.JavaBundle
         # As a convenience expose the utility module so that commands don't
         # need to import it.

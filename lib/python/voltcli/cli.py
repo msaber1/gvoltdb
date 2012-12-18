@@ -187,7 +187,7 @@ class HostOption(StringOption):
         self.max_count    = utility.kwargs_get_integer(kwargs, 'max_count', default = 1)
         self.default_port = utility.kwargs_get_integer(kwargs, 'default_port', default = 21212)
         if self.max_count == 1:
-            help_msg = 'the %s HOST[:PORT]' % name
+            help_msg = '%s HOST[:PORT]' % name
         else:
             help_msg = 'the comma-separated %s HOST[:PORT] list' % name
         if self.default_port:
@@ -235,6 +235,20 @@ class IntegerArgument(BaseArgument):
             return int(value)
         except ValueError, e:
             utility.abort('"%s" argument is not a valid integer: %s' % value)
+
+#===============================================================================
+class HostArgument(StringArgument):
+#===============================================================================
+    """
+    HOST[:PORT] argument.
+    """
+    def __init__(self, name, help, **kwargs):
+        self.default_port = utility.kwargs_get_integer(kwargs, 'default_port', default = 21212)
+        StringArgument.__init__(self, name, '%s HOST[:PORT]' % help, **kwargs)
+    def postprocess_value(self, value):
+        hosts = utility.parse_hosts(value, min_hosts = 1, max_hosts = 1,
+                                    default_port = self.default_port)
+        return hosts[0]
 
 #===============================================================================
 class ParsedCommand(object):
@@ -351,6 +365,7 @@ class CLIParser(ExtendedHelpOptionParser):
             # spec and it's optional.
             if iarg > len(args) or (iarg == len(args) and arg.min_count > 0):
                 missing.append((arg.name, arg.help))
+                iarg += 1
             else:
                 # The last argument can have repeated arguments. If more than
                 # one are allowed the values are put into a list.

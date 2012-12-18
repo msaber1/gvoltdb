@@ -151,7 +151,24 @@ class JavaBundle(object):
         runner.java.execute(self.java_class, opts_override, *args)
 
 #===============================================================================
-class ServerBundle(JavaBundle):
+class ServerBundleBase(JavaBundle):
+#===============================================================================
+    """
+    Bundle base class to add appropriate server options.
+    """
+    # Java opts for running a server.
+    java_opts = ['-server', '-XX:+HeapDumpOnOutOfMemoryError',
+                 '-XX:HeapDumpPath=/tmp', '-XX:-ReduceInitialCardMarks']
+
+    def __init__(self, java_class):
+        JavaBundle.__init__(self, java_class, java_opts_override = ServerBundleBase.java_opts)
+
+    def initialize(self, verb):
+        verb.add_options(
+            cli.HostOption('-H', '--host', 'host', 'the host', default = 'localhost'))
+
+#===============================================================================
+class ServerBundle(ServerBundleBase):
 #===============================================================================
     """
     Bundle class to add appropriate VoltDB server options and to start a server.
@@ -159,25 +176,19 @@ class ServerBundle(JavaBundle):
     invocation.
     """
     def __init__(self, server_subcommand):
-        # Add appropriate server-ish Java options.
-        JavaBundle.__init__(self, 'org.voltdb.VoltDB',
-                                  java_opts_override = [
-                                        '-server',
-                                        '-XX:+HeapDumpOnOutOfMemoryError',
-                                        '-XX:HeapDumpPath=/tmp',
-                                        '-XX:-ReduceInitialCardMarks'])
         self.server_subcommand = server_subcommand
+        # Add appropriate server-ish Java options.
+        ServerBundleBase.__init__(self, 'org.voltdb.VoltDB')
 
     def initialize(self, verb):
+        ServerBundleBase.initialize(self, verb)
         verb.add_options(
             cli.StringOption('-d', '--deployment', 'deployment',
                              'the deployment configuration file path',
                              default = 'deployment.xml'),
-            cli.HostOption('-H', '--host', 'host', 'the host', default = 'localhost'),
             cli.StringOption('-l', '--license', 'license', 'the license file path'))
         verb.add_arguments(
-            cli.StringArgument('catalog',
-                               'the application catalog jar file path'))
+            cli.StringArgument('catalog', 'the application catalog jar file path'))
 
     def go(self, verb, runner):
         args = [self.server_subcommand]
@@ -196,6 +207,26 @@ class ServerBundle(JavaBundle):
         if runner.opts.license:
             args.extend(['license', runner.opts.license])
         self.run_java(verb, runner, *args)
+
+#===============================================================================
+class DRAgentBundle(ServerBundleBase):
+#===============================================================================
+    """
+    Bundle class to add appropriate DRAgent server options and to start a server.
+    Use by assigning an instance to the "bundles" keyword inside a decorator
+    invocation.
+    """
+    def __init__(self):
+        # Add appropriate server-ish Java options.
+        ServerBundleBase.__init__(self, 'org.voltdb.dr.VoltDBReplicationAgent')
+
+    def initialize(self, verb):
+        ServerBundleBase.initialize(self, verb)
+        verb.add_arguments(cli.HostArgument('master', 'the master VoltDB host'))
+
+    def go(self, verb, runner):
+        self.run_java(verb, runner, 'master',  str(runner.opts.master),
+                                    'replica', str(runner.opts.host))
 
 #===============================================================================
 class HelpBundle(object):

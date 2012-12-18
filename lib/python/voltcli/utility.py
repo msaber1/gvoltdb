@@ -793,6 +793,10 @@ def parse_hosts(host_string, min_hosts = None, max_hosts = None, default_port = 
         def __init__(self, host, port):
             self.host = host
             self.port = port
+        def __str__(self):
+            if self.port is None:
+                return self.host
+            return '%s:%s' % (self.host, self.port)
     hosts = []
     for host_port in host_string.split(','):
         split_host = host_port.split(':')
