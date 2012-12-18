@@ -26,101 +26,8 @@ import shutil
 import time
 import traceback
 import glob
-from voltcli import utility
-
-class Global:
-    distdir = os.path.join(os.path.dirname(os.path.dirname(os.getcwd())), 'obj', 'release', 'dist')
-    tmpdir = '/tmp/voter'
-
-    # Pro tests are a little different. Assume the working directory is examples/voter.
-    if os.environ.get('VOLTPRO'):
-        recover_action = 'recover'
-        edition = "pro"
-        license_path = os.path.join(distdir, 'voltdb', 'license.xml')
-        cmdlog_xml = '''
-        <commandlog enabled="true">
-            <frequency time="100" transactions="1000" />
-        </commandlog>'''
-    else:
-        recover_action = 'start'
-        edition = "community"
-        license_path = None
-        cmdlog_xml = ''
-
-    # Deployment file contents with command logging for pro.
-    # Paths are substituted later to allow differences between master and replica, etc..
-    deployment_xml = '''\
-<?xml version="1.0"?>
-<deployment>
-    <cluster hostcount="1" sitesperhost="2" kfactor="0" />
-    <httpd enabled="true">
-        <jsonapi enabled="true" />
-    </httpd>%(cmdlog_xml)s
-    <paths>
-        <voltdbroot path="%%(voltdbroot)s" />
-        <snapshots path="%%(snapshots)s" />
-        <commandlog path="%%(commandlog)s" />
-        <commandlogsnapshot path="%%(commandlog)s/snapshots" />
-    </paths>
-</deployment>''' % locals()
-
-    log4j_xml = '''\
-<?xml version="1.0" encoding="UTF-8" ?>
-<!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
-<log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
-    <appender name="console" class="org.apache.log4j.ConsoleAppender">
-        <layout class="org.apache.log4j.PatternLayout">
-            <param name="ConversionPattern"
-            value="%m%n"/>
-        </layout>
-        <filter class="org.apache.log4j.varia.LevelRangeFilter">
-            <param name="levelMin" value="TRACE"/>
-            <param name="levelMax" value="INFO"/>
-        </filter>
-    </appender>
-    <appender name="consolefiltered" class="org.apache.log4j.ConsoleAppender">
-        <layout class="org.apache.log4j.PatternLayout">
-            <param name="ConversionPattern"
-            value="%p: %m%n"/>
-        </layout>
-        <filter class="org.apache.log4j.varia.LevelRangeFilter">
-            <param name="levelMin" value="WARN"/>
-            <param name="levelMax" value="FATAL"/>
-        </filter>
-    </appender>
-    <appender name="file" class="org.apache.log4j.DailyRollingFileAppender">
-        <param name="file" value="${VOLT_LOG}"/>
-        <param name="DatePattern" value="'.'yyyy-MM-dd" />
-        <layout class="org.apache.log4j.PatternLayout">
-            <param name="ConversionPattern" value="%d %-5p [%t] %c: %m%n"/>
-        </layout>
-    </appender>
-    <logger name="DRAGENT">
-        <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
-    <logger name="DRSTATS">
-        <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
-    <logger name="TM">
-        <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
-    <logger name="REJOIN">
-        <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
-    <logger name="CONSOLE">
-        <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
-    <root>
-        <priority value="info" />
-        <appender-ref ref="file" />
-        <appender-ref ref="consolefiltered" />
-    </root>
-</log4j:configuration>'''
+from voltcli import utility, environment
+import voter_utility
 
 def snapshots(runner):
     tester = Tester(runner, runner.opts.legacy)
@@ -172,7 +79,7 @@ class Tester(object):
                             edition = self.edition,
                             tag     = self.tag,
                             mode    = self.mode)
-            return os.path.join(Global.tmpdir, subdir, self.kwargs[name])
+            return os.path.join(voter_utility.tmpdir, subdir, self.kwargs[name])
 
     def __init__(self, runner, legacy):
         self.runner  = runner
@@ -182,15 +89,15 @@ class Tester(object):
         else:
             os.environ['VOLT_ENABLEIV2'] = 'true'
             self.mode = 'IV2'
-        if Global.license_path is not None:
-            self.license_option = ['-l', Global.license_path]
+        if voter_utility.license_path is not None:
+            self.license_option = ['-l', voter_utility.license_path]
         else:
             self.license_option = []
         self.server_pid  = None
         self.dragent_pid = None
 
     def get_paths(self, tag):
-        return Tester.Paths(Global.edition, tag, self.mode,
+        return Tester.Paths(voter_utility.edition, tag, self.mode,
                 log        = 'volt.log',
                 log4j      = 'log4j.xml',
                 deployment = 'deployment.xml',
@@ -218,9 +125,9 @@ class Tester(object):
         os.makedirs(os.path.join(self.paths.commandlog, 'snapshots'))
         os.makedirs(self.paths.voltdbroot)
         # Generate log4j.xml
-        log4j_xml = Global.log4j_xml.replace('${VOLT_LOG}', self.paths.log)
+        log4j_xml = voter_utility.log4j_xml.replace('${VOLT_LOG}', self.paths.log)
         open(self.paths.log4j, 'w').write(log4j_xml)
-        deployment_xml = Global.deployment_xml % dict(
+        deployment_xml = voter_utility.deployment_xml % dict(
                 voltdbroot = self.paths.voltdbroot,
                 snapshots  = self.paths.snapshots,
                 commandlog = self.paths.commandlog,
@@ -288,7 +195,7 @@ class Tester(object):
 
     def start_server(self, action):
         print('\n=== Start %s server (pid=%d, mode=%s) ===\n'
-                    % (Global.edition, os.getpid(), self.mode))
+                    % (voter_utility.edition, os.getpid(), self.mode))
         self.runner.call('volt.%s' % action, '-d', self.paths.deployment,
                          'voter.jar', *self.license_option)
         print '\n=== Exit server (pid=%d) ===\n' % os.getpid()
@@ -345,13 +252,13 @@ class Tester(object):
         #   - Recover database.
         #   - Perform good and bad snapshot restore.
         #   - Shutdown database.
-        self.start_server(Global.recover_action)
+        self.start_server(voter_utility.recover_action)
         try:
             print '\n=== Start restore client (pid=%d) ===\n' % os.getpid()
             time.sleep(10)
             self.runner.connect('localhost', retries = 10)
             # In a Pro recovery startup snapshots are are automatically restored.
-            if Global.edition == 'community':
+            if voter_utility.edition == 'community':
                 self.restore('s1', False)
             self.restore('xx',  True)           # Fails
         finally:

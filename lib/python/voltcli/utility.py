@@ -321,7 +321,15 @@ class PythonSourceFinder(object):
                 for modpath in glob.glob(os.path.join(scan_loc.path, '*.py')):
                     debug('Executing module "%s"...' % modpath)
                     syms_tmp = copy.copy(syms)
-                    execfile(modpath, syms_tmp)
+                    # Temporarily add the module's directory to the Python system path
+                    # so that utility modules in that directory can be imported.
+                    # WARNING: This does not work for packaged commands. For now
+                    # packaged commands can't use external modules (other than voltcli).
+                    sys.path.insert(0, os.path.dirname(modpath))
+                    try:
+                        execfile(modpath, syms_tmp)
+                    finally:
+                        del sys.path[0]
 
 #===============================================================================
 def normalize_list(items, width, filler = None):
