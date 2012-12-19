@@ -306,6 +306,8 @@ class Tester(object):
             sys.stdout.write("Press Enter to shut down replica server and dragent: ")
             sys.stdout.flush()
             s = raw_input()
+        except Exception, e:
+            traceback.print_exc()
         finally:
             self.stop_dragent()
             self.stop_server()

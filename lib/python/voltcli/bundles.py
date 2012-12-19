@@ -40,6 +40,7 @@
 
 __author__ = 'scooper'
 
+import os
 import copy
 
 from voltdbclient import *
@@ -225,8 +226,13 @@ class DRAgentBundle(ServerBundleBase):
         verb.add_arguments(cli.HostArgument('master', 'the master VoltDB host'))
 
     def go(self, verb, runner):
-        self.run_java(verb, runner, 'master',  str(runner.opts.master),
-                                    'replica', str(runner.opts.host))
+        # HACK: If VOLT_ENABLEIV2 is false add the "disableiv2" argument.
+        # It's a work-around for dragent not obeying the environment variable
+        # and also avoids needing an additional option.
+        args = ['master',  str(runner.opts.master), 'replica', str(runner.opts.host)]
+        if os.environ.get('VOLT_ENABLEIV2', '').lower() == 'false':
+            args.append('disableiv2')
+        self.run_java(verb, runner, *args)
 
 #===============================================================================
 class HelpBundle(object):
