@@ -30,6 +30,8 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 
+import org.voltdb.VoltDB;
+
 public class ClusterConfig
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -132,8 +134,8 @@ public class ClusterConfig
 
     private static class Partition {
         private Node m_master;
-        private Set<Node> m_replicas = new HashSet<Node>();
-        private Integer m_partitionId;
+        private final Set<Node> m_replicas = new HashSet<Node>();
+        private final Integer m_partitionId;
 
         private int m_neededReplicas;
 
@@ -459,6 +461,11 @@ public class ClusterConfig
         }
 
         boolean useFallbackStrategy = Boolean.valueOf(System.getenv("VOLT_REPLICA_FALLBACK"));
+        if ((sitesPerHost * hostCount) % (getReplicationFactor() + 1) > 0) {
+            VoltDB.crashGlobalVoltDB("The cluster has more hosts and sites per hosts than required for the " +
+                    "requested k-safety value.  The number of total sites (sitesPerHost * hostCount) must be a " +
+                    "whole multiple of the number of copies of the database (k-safety + 1)", false, null);
+        }
         if (sitesPerHost * hostCount % partitionCount > 0 || partitionCount < hostCount) {
             hostLog.warn("Unable to use optimal replica placement strategy with this configuration. " +
                     " Falling back to a less optimal strategy that may result in worse performance. " +
@@ -479,7 +486,7 @@ public class ClusterConfig
             }
         }
 
-        hostLog.info("TOPO: " + topo.toString(2));
+        hostLog.debug("TOPO: " + topo.toString(2));
         return topo;
     }
 

@@ -31,7 +31,11 @@ public interface CommandLog {
      *            The txnId of the truncation snapshot at the end of restore, or
      *            Long.MIN if there was none.
      */
-    public abstract void init(CatalogContext context, long txnId, long perPartitionTxnId[]);
+    public abstract void init(
+            CatalogContext context,
+            long txnId,
+            long perPartitionTxnId[],
+            String coreBinding);
 
     /**
     *
@@ -39,7 +43,12 @@ public interface CommandLog {
     *            The txnId of the truncation snapshot at the end of restore, or
     *            Long.MIN if there was none.
     */
-    public abstract void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin);
+    public abstract void initForRejoin(
+            CatalogContext context,
+            long txnId,
+            long perPartitionTxnId[],
+            boolean isRejoin,
+            String coreBinding);
 
     public abstract boolean needsInitialization();
 
@@ -71,11 +80,6 @@ public interface CommandLog {
      */
     public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
-
-    /**
-     * IV2-only method.  Write this MP transaction fault to the fault log portion of the command lawg.
-     */
-    public abstract void logIv2MPFault(final long txnId);
 
     public abstract void logHeartbeat(final long txnId);
 

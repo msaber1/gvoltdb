@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -42,11 +43,12 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -101,6 +103,7 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -112,6 +115,7 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
 import com.google.common.collect.ImmutableMap;
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListenableFutureTask;
 import com.google.common.util.concurrent.MoreExecutors;
 
@@ -151,9 +155,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     // Atomically allows the catalog reference to change between access
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
 
-    /** If this is true, update the catalog */
-    private final AtomicBoolean m_shouldUpdateCatalog = new AtomicBoolean(false);
-
     /**
      * Counter of the number of client connections. Used to enforce a limit on the maximum number of connections
      */
@@ -163,6 +164,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * IV2 stuff
      */
     private final LeaderCacheReader m_iv2Masters;
+
+    /**
+     * ZooKeeper is used for @Promote to trigger a truncation snapshot.
+     */
+    ZooKeeper m_zk;
 
     /**
      * The CIHM is unique to the connection and the ACG is shared by all connections
@@ -535,7 +541,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Schedule a timeout to close the socket in case there is no response for the timeout
              * period. This will wake up the current thread that is blocked on reading the login message
              */
-            ScheduledFuture<?> timeoutFuture = VoltDB.instance().scheduleWork(new Runnable() {
+            ScheduledFuture<?> timeoutFuture = VoltDB.instance().schedulePriorityWork(new Runnable() {
                                                     @Override
                                                     public void run() {
                                                         try {
@@ -1001,7 +1007,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final String connectionHostname,
             final boolean adminConnection,
             final long txnId,
-            final long timestamp,
+            final long uniqueId,
             final StoredProcedureInvocation invocation,
             final boolean isReadOnly,
             final boolean isSinglePartition,
@@ -1040,7 +1046,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             invocation.getProcName().equalsIgnoreCase("@LoadMultipartitionTable")) &&
                             invocation.getOriginalTxnId() <= lastTxnId)
                     {
-                        hostLog.debug("Dropping duplicate replicated transaction, txnid: " +
+                        hostLog.debug("Dropping duplicate replicated transaction " + invocation.getProcName() + ", txnid: " +
                                 invocation.getOriginalTxnId() + ", last seen: " + lastTxnId);
                         return false;
                     }
@@ -1081,7 +1087,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         initiatorHSId,
                         Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
                         txnId,
-                        timestamp,
+                        uniqueId,
                         isReadOnly,
                         isSinglePartition,
                         invocation,
@@ -1182,6 +1188,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             ClientResponseImpl clientResponse = response.getClientResponseData();
                                             ClientInterfaceHandleManager.Iv2InFlight clientData =
                                                     cihm.findHandle(response.getClientInterfaceHandle());
+                                            if (clientData == null) {
+                                                return new ByteBuffer[] {};
+                                            }
                                             final long now = System.currentTimeMillis();
                                             final int delta = (int)(now - clientData.m_creationTime);
 
@@ -1197,6 +1206,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                                             clientResponse.setClientHandle(clientData.m_clientHandle);
                                             clientResponse.setClusterRoundtrip(delta);
+                                            clientResponse.setHash(null); // not part of wire protocol
 
                                             ByteBuffer results =
                                                     ByteBuffer.allocate(
@@ -1230,9 +1240,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_isIV2Enabled = VoltDB.instance().isIV2Enabled();
         messenger.createMailbox(m_mailbox.getHSId(), m_mailbox);
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
-        registerMailbox(messenger.getZK());
+        m_zk = messenger.getZK();
+        registerMailbox(m_zk);
         m_siteId = m_mailbox.getHSId();
-        m_iv2Masters = new LeaderCache(messenger.getZK(), VoltZK.iv2masters);
+        m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters);
         m_iv2Masters.start(true);
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
@@ -1271,7 +1282,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         for (Iv2InFlight inFlight : transactions) {
             ClientResponseImpl response =
                     new ClientResponseImpl(
-                            ClientResponseImpl.GRACEFUL_FAILURE,
+                            ClientResponseImpl.RESPONSE_UNKNOWN,
                             ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                             null,
                             new VoltTable[0],
@@ -1397,14 +1408,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (VoltDB.instance().getSiteTracker().isFirstHost() &&
             schedule != null && schedule.getEnabled())
         {
-            Future<Void> future = m_snapshotDaemon.makeActive(schedule);
-            try {
-                future.get();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            } catch (ExecutionException e) {
-                throw new RuntimeException(e.getCause());
-            }
+            final ListenableFuture<Void> future = m_snapshotDaemon.makeActive(schedule);
+            future.addListener(new Runnable() {
+                @Override
+                public void run() {
+                    try {
+                        future.get();
+                    } catch (InterruptedException e) {
+                        VoltDB.crashLocalVoltDB("Failed to make SnapshotDaemon active", false, e);
+                    } catch (ExecutionException e) {
+                        VoltDB.crashLocalVoltDB("Failed to make SnapshotDaemon active", false, e);
+                    }
+                }
+            }, MoreExecutors.sameThreadExecutor());
         } else {
             m_snapshotDaemon.makeInactive();
         }
@@ -1415,7 +1431,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * catalog when it's threadsafe.
      */
     public void notifyOfCatalogUpdate() {
-        m_shouldUpdateCatalog.set(true);
+        m_catalogContext.set(VoltDB.instance().getCatalogContext());
+        /*
+         * Update snapshot daemon settings.
+         *
+         * Don't do it if the system is still initializing (CL replay),
+         * because snapshot daemon may call @SnapshotScan on activation and
+         * it will mess replaying txns up.
+         */
+        if (VoltDB.instance().getMode() != OperationMode.INITIALIZING) {
+            mayActivateSnapshotDaemon();
+        }
     }
 
     private ClientResponseImpl errorResponse(Connection c, long handle, byte status, String reason, Exception e, boolean log) {
@@ -1583,7 +1609,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_siteId,
                 false, task.clientHandle, handler.connectionId(),
                 handler.m_hostname, handler.isAdmin(), ccxn,
-                sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler);
+                sql, sqlStatements, partitionParam, null, false, true,
+                task.type, task.originalTxnId, task.originalUniqueId,
+                m_adhocCompletionHandler);
         if( isExplain ){
             ahpw.setIsExplainWork();
         }
@@ -1729,6 +1757,89 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
+    /**
+     * Allows delayed transaction for @Promote promotion so that it can optionally
+     * happen after a truncation snapshot. (ENG-3880)
+     */
+    private class Promoter
+    {
+        final Config m_sysProc;
+        final StoredProcedureInvocation m_task;
+        final org.voltdb.catalog.CommandLog m_commandLog;
+        final Connection m_ccxn;
+        final boolean m_isAdmin;
+        final String m_hostName;
+        final long m_connectionId;
+        final int m_messageSize;
+
+        // Constructor
+        Promoter(final Config sysProc,
+                 final StoredProcedureInvocation task,
+                 final org.voltdb.catalog.CommandLog commandLog,
+                 final Connection ccxn,
+                 final boolean isAdmin,
+                 final String hostName,
+                 final long connectionId,
+                 final int messageSize)
+        {
+            m_sysProc = sysProc;
+            m_task = task.getShallowCopy();
+            m_task.setProcName("@PromoteReplicaStatus");
+            m_commandLog = commandLog;
+            m_ccxn = ccxn;
+            m_isAdmin = isAdmin;
+            m_hostName = hostName;
+            m_connectionId = connectionId;
+            m_messageSize = messageSize;
+        }
+
+        // Promote the replica.
+        void promote() {
+            m_task.procName = "@PromoteReplicaStatus";
+            int[] involvedPartitions = m_allPartitions;
+            createTransaction(m_connectionId,
+                              m_hostName,
+                              m_isAdmin,
+                              m_task,
+                              m_sysProc.getReadonly(),
+                              m_sysProc.getSinglepartition(),
+                              m_sysProc.getEverysite(),
+                              involvedPartitions,
+                              involvedPartitions.length,
+                              m_ccxn,
+                              m_messageSize,
+                              System.currentTimeMillis(),
+                              false);
+        }
+
+        // Trigger a truncation snapshot and then promote the replica.
+        void truncateAndPromote() {
+            try {
+                // Use the current time as an identifier (nonce) that can be
+                // recognized below by the monitor so that the promote doesn't
+                // happen until our snapshot completes.
+                final String reqId = java.util.UUID.randomUUID().toString();
+                SnapshotCompletionMonitor completionMonitor =
+                        VoltDB.instance().getSnapshotCompletionMonitor();
+                completionMonitor.addInterest(new SnapshotCompletionInterest() {
+                    @Override
+                    public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
+                        // Is this our snapshot?
+                        if (event.truncationSnapshot && reqId.equals(event.requestId)) {
+                            promote();
+                        }
+                        return null;
+                    }
+                });
+                m_zk.create(VoltZK.request_truncation_snapshot, reqId.getBytes(),
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            }
+            catch (Exception e) {
+                VoltDB.crashGlobalVoltDB("ZK truncation snapshot request failed", false, e);
+            }
+        }
+    }
+
     ClientResponseImpl dispatchPromote(Config sysProc,
                                        ByteBuffer buf,
                                        StoredProcedureInvocation task,
@@ -1743,18 +1854,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle);
         }
 
-        // the shared dispatch for sysprocs
-        int[] involvedPartitions = m_allPartitions;
-        createTransaction(handler.connectionId(), handler.m_hostname,
-                          handler.isAdmin(),
-                          task,
-                          sysProc.getReadonly(),
-                          sysProc.getSinglepartition(),
-                          sysProc.getEverysite(),
-                          involvedPartitions, involvedPartitions.length,
-                          ccxn, buf.capacity(),
-                          System.currentTimeMillis(),
-                          false);
+        // ENG-3880 Perform a truncation snapshot so that transaction IDs and
+        // timestamps generated locally for command logging aren't used for durability.
+        // The host with the lowest host ID initiates the truncation snapshot.
+        org.voltdb.catalog.CommandLog logConfig = m_catalogContext.get().cluster.getLogconfig().get("log");
+        Promoter promoter = new Promoter(sysProc, task, logConfig, ccxn, handler.isAdmin(),
+                                         handler.m_hostname, handler.connectionId(), buf.capacity());
+        // This only happens on one node so we don't need to pick a leader.
+        if (logConfig.getEnabled()) {
+            promoter.truncateAndPromote();
+        }
+        else {
+            promoter.promote();
+        }
         return null;
     }
 
@@ -1790,12 +1902,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final Procedure catProc = catalogContext.procedures.get(task.procName);
         Config sysProc = SystemProcedureCatalog.listing.get(task.procName);
 
-        // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
-        // configured differently for @AdHoc... variants this code will have to
-        // change in order to use the proper variant based on whether the work
-        // is single or multi partition and read-only or read-write.
         if (sysProc == null ) {
             if( task.procName.equals("@AdHoc") ){
+                // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
+                // configured differently for @AdHoc... variants this code will have to
+                // change in order to use the proper variant based on whether the work
+                // is single or multi partition and read-only or read-write.
                 sysProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP");
                 assert(sysProc != null);
             }
@@ -1807,6 +1919,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             else if (task.procName.equals("@SendSentinel")) {
                 return dispatchSendSentinel(buf, task);
+            }
+            else if (task.procName.equals("@Promote")) {
+                // Map @Promote to @PromoteReplicaState.
+                sysProc = SystemProcedureCatalog.listing.get("@PromoteReplicaStatus");
+                assert(sysProc != null);
             }
         }
 
@@ -1991,6 +2108,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch) {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
+        // DR stuff
+        task.type = plannedStmtBatch.type;
+        task.originalTxnId = plannedStmtBatch.originalTxnId;
+        task.originalUniqueId = plannedStmtBatch.originalUniqueId;
         // pick the sysproc based on the presence of partition info
         // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
@@ -2104,6 +2225,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             null,
                                             false,
                                             true,
+                                            plannedStmtBatch.type,
+                                            plannedStmtBatch.originalTxnId,
+                                            plannedStmtBatch.originalUniqueId,
                                             m_adhocCompletionHandler));
 
                             m_mailbox.send(m_plannerSiteId, work);
@@ -2205,40 +2329,25 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return ft;
     }
 
-    /**
-     * Tick counter used to perform dead client detection every N ticks
-     */
-    private long m_tickCounter = 0;
-
-    public final void processPeriodicWork() {
-        long time;
-        if (m_isIV2Enabled) {
-            time = System.currentTimeMillis();
-        }
-        else {
-            time = m_initiator.tick();
-        }
-        m_tickCounter++;
-        if (m_tickCounter % 20 == 0) {
-            checkForDeadConnections(time);
-        }
-
-        // check for catalog updates
-        if (m_shouldUpdateCatalog.compareAndSet(true, false)) {
-            m_catalogContext.set(VoltDB.instance().getCatalogContext());
-            /*
-             * Update snapshot daemon settings.
-             *
-             * Don't do it if the system is still initializing (CL replay),
-             * because snapshot daemon may call @SnapshotScan on activation and
-             * it will mess replaying txns up.
-             */
-            if (VoltDB.instance().getMode() != OperationMode.INITIALIZING) {
-                mayActivateSnapshotDaemon();
+    public void schedulePeriodicWorks() {
+        VoltDB.instance().scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    //Using the current time makes this vulnerable to NTP weirdness...
+                    checkForDeadConnections(System.currentTimeMillis());
+                } catch (Exception ex) {
+                    log.warn("Exception while checking for dead connections", ex);
+                }
             }
-        }
+        }, 200, 200, TimeUnit.MILLISECONDS);
+    }
 
-        return;
+    /*
+     * This is now a pre-IV2 only method
+     */
+    public final void processPeriodicWork() {
+        m_initiator.tick();
     }
 
     /**
@@ -2587,6 +2696,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         false,  // isReadOnly
                         true);  // isForReplay
         m_mailbox.send(initiatorHSId, mppm);
+    }
+
+    /**
+     * Sends an end of log message to the master of that partition. This should
+     * only be called at the end of replay.
+     *
+     * @param partitionId
+     */
+    public void sendEOLMessage(int partitionId) {
+        assert(m_isIV2Enabled);
+        final long initiatorHSId;
+        if (partitionId == MpInitiator.MP_INIT_PID) {
+            initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
+        } else {
+            initiatorHSId = m_iv2Masters.get(partitionId);
+        }
+        Iv2EndOfLogMessage message = new Iv2EndOfLogMessage(false);
+        m_mailbox.send(initiatorHSId, message);
     }
 
     public List<Iterator<Map.Entry<String, InvocationInfo>>> getIV2InitiatorStats() {

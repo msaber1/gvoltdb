@@ -94,8 +94,8 @@ bool IndexCountExecutor::p_init()
 
     // The planner sometimes used to lie in this case: index_lookup_type_eq is incorrect.
     // Index_lookup_type_gte is necessary.
-    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
-           m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
+    assert(m_startType != INDEX_LOOKUP_TYPE_EQ ||
+           m_startKey.getSchema()->columnCount() == m_numOfStartKeys);
     return true;
 }
 
@@ -132,49 +132,48 @@ bool IndexCountExecutor::p_execute()
     //
     // SEARCH KEY
     //
-    m_startKey.setAllNulls();
-    const std::vector<AbstractExpression*>& startKeys = node->getStartKeys();
-    VOLT_DEBUG("<Index Count>Initial (all null) search key: '%s'", m_startKey.debugNoHeader().c_str());
-    for (int ctr = 0; ctr < activeNumOfStartKeys; ctr++) {
-        NValue candidateValue = startKeys[ctr]->eval(&m_dummy, NULL);
-        try {
-            m_startKey.setNValue(ctr, candidateValue);
-        }
-        catch (SQLException e) {
-            // This next bit of logic handles underflow and overflow while
-            // setting up the search keys.
-            // e.g. TINYINT > 200 or INT <= 6000000000
-
-            // re-throw if not an overflow or underflow
-            // currently, it's expected to always be an overflow or underflow
-            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
-                throw e;
+    if (m_numOfStartKeys != 0) {
+        m_startKey.setAllNulls();
+        const std::vector<AbstractExpression*>& startKeys = node->getStartKeys();
+        VOLT_DEBUG("<Index Count>Initial (all null) search key: '%s'", m_startKey.debugNoHeader().c_str());
+        for (int ctr = 0; ctr < activeNumOfStartKeys; ctr++) {
+            NValue candidateValue = startKeys[ctr]->eval(&m_dummy, NULL);
+            try {
+                m_startKey.setNValue(ctr, candidateValue);
             }
+            catch (SQLException e) {
+                // This next bit of logic handles underflow and overflow while
+                // setting up the search keys.
+                // e.g. TINYINT > 200 or INT <= 6000000000
 
-            // handle the case where this is a comparison, rather than equality match
-            // comparison is the only place where the executor might return matching tuples
-            // e.g. TINYINT < 1000 should return all values
-
-            if ((localStartType != INDEX_LOOKUP_TYPE_EQ) &&
-                (ctr == (activeNumOfStartKeys - 1))) {
-                assert (localStartType == INDEX_LOOKUP_TYPE_GT || localStartType == INDEX_LOOKUP_TYPE_GTE);
-
-                if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                    output_temp_table->insertTempTuple(tmptup);
-                    return true;
-                } else if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                    startKeyUnderflow = true;
-                    break;
-                } else {
+                // re-throw if not an overflow or underflow
+                // currently, it's expected to always be an overflow or underflow
+                if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
                     throw e;
                 }
-            }
-            // if a EQ comparision is out of range, then return no tuples
-            else {
-                output_temp_table->insertTempTuple(tmptup);
+
+                // handle the case where this is a comparison, rather than equality match
+                // comparison is the only place where the executor might return matching tuples
+                // e.g. TINYINT < 1000 should return all values
+
+                if ((localStartType != INDEX_LOOKUP_TYPE_EQ) &&
+                    (ctr == (activeNumOfStartKeys - 1))) {
+                    assert (localStartType == INDEX_LOOKUP_TYPE_GT || localStartType == INDEX_LOOKUP_TYPE_GTE);
+
+                    if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
+                        output_temp_table->insertTempTuple(tmptup);
+                        return true;
+                    } else if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
+                        startKeyUnderflow = true;
+                        break;
+                    }
+
+                    throw e;
+                }
+                // if a EQ comparision is out of range, then return no tuples
+                output_temp_table->insertTuple(tmptup);
                 return true;
             }
-            break;
         }
     }
 
@@ -238,29 +237,22 @@ bool IndexCountExecutor::p_execute()
     // Deal with multi-map
     VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numStartKeys(%d) key:%s",
                localStartType, activeNumOfStartKeys, m_startKey.debugNoHeader().c_str());
-    if (startKeyUnderflow == false) {
-        if (localStartType == INDEX_LOOKUP_TYPE_GT) {
-            rkStart = m_index->getCounterLET(&m_startKey, true);
-        } else if (localStartType == INDEX_LOOKUP_TYPE_GTE) {
-            if (m_index->hasKey(&m_startKey)) {
-                leftIncluded = 1;
-                rkStart = m_index->getCounterLET(&m_startKey, false);
-            } else {
+    if (activeNumOfStartKeys != 0) {
+        if (startKeyUnderflow == false) {
+            if (localStartType == INDEX_LOOKUP_TYPE_GT) {
                 rkStart = m_index->getCounterLET(&m_startKey, true);
+            } else {
+                // handle start inclusive cases.
+                if (m_index->hasKey(&m_startKey)) {
+                    leftIncluded = 1;
+                    rkStart = m_index->getCounterLET(&m_startKey, false);
+                } else {
+                    rkStart = m_index->getCounterLET(&m_startKey, true);
+                }
             }
-            if (m_startKey.getSchema()->columnCount() > activeNumOfStartKeys) {
-                // search key is not complete:
-                // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
-                // like: SELECT count(*) from T2 WHERE POINTS < ?
-                // but it actually finds the previous rank. (If m_startKey is null, find 0 rank)
-                // Add 1 back.
-                rkStart++;
-                leftIncluded = 1;
-            }
-        } else {
-            return false;
         }
     }
+
     if (m_numOfEndKeys != 0) {
         if (endKeyOverflow) {
             rkEnd = m_index->getCounterGET(&m_endKey, true);
@@ -268,14 +260,13 @@ bool IndexCountExecutor::p_execute()
             IndexLookupType localEndType = m_endType;
             if (localEndType == INDEX_LOOKUP_TYPE_LT) {
                 rkEnd = m_index->getCounterGET(&m_endKey, false);
-            } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
-                if (m_index->hasKey(&m_endKey)) {
-                    rkEnd = m_index->getCounterGET(&m_endKey, true);
-                    rightIncluded = 1;
-                } else
-                    rkEnd = m_index->getCounterGET(&m_endKey, false);
             } else {
-                return false;
+                if (m_index->hasKey(&m_endKey)) {
+                    rightIncluded = 1;
+                    rkEnd = m_index->getCounterGET(&m_endKey, true);
+                } else {
+                    rkEnd = m_index->getCounterGET(&m_endKey, false);
+                }
             }
         }
     } else {

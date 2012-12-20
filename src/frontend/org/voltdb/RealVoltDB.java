@@ -54,8 +54,8 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.zip.CRC32;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
@@ -155,7 +155,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.8.4";
+    private static final String m_defaultVersionString = "3.0";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -249,8 +249,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
     }
 
-    HeartbeatThread heartbeatThread;
+    private HeartbeatThread m_heartbeatThread;
     private ScheduledThreadPoolExecutor m_periodicWorkThread;
+    private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
 
     // The configured license api: use to decide enterprise/cvommunity edition feature enablement
     LicenseApi m_licenseApi;
@@ -278,7 +279,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
             if (config.m_enableIV2) {
-                consoleLog.warn("Running Iv2 (3.0 preview). NOT SUPPORTED IN PRODUCTION.");
+                consoleLog.warn("Running 3.0 preview (iv2 mode). NOT SUPPORTED IN PRODUCTION.");
+            } else {
+                consoleLog.warn("Running 3.0 preview (legacy mode). NOT SUPPORTED IN PRODUCTION.");
             }
 
             // If there's no deployment provide a default and put it under voltdbroot.
@@ -321,6 +324,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
             m_replicationActive = false;
+            m_heartbeatThread = null;
 
             // set up site structure
             m_localSites = new COWMap<Long, ExecutionSite>();
@@ -328,7 +332,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_runners = new ArrayList<ExecutionSiteRunner>();
             final int computationThreads = Math.max(2, CoreUtils.availableProcessors() / 4);
             m_computationService =
-                    CoreUtils.getListeningExecutorService("Computation service thread", computationThreads);
+                    CoreUtils.getListeningExecutorService(
+                            "Computation service thread",
+                            computationThreads, m_config.m_computationCoreBindings);
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
@@ -379,7 +385,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
 
             // Create the thread pool here. It's needed by buildClusterMesh()
-            m_periodicWorkThread = CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, 1024 * 128);
+            m_periodicWorkThread =
+                    CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, CoreUtils.SMALL_STACK_SIZE);
+            m_periodicPriorityWorkThread =
+                    CoreUtils.getScheduledThreadPoolExecutor("Periodic Priority Work", 1, CoreUtils.SMALL_STACK_SIZE);
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
             if (m_licenseApi == null) {
@@ -415,6 +424,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     m_cartographer = new Cartographer(m_messenger.getZK(), iv2config.getPartitionCount());
                     if (isRejoin) {
                         List<Integer> partitionsToReplace = m_cartographer.getIv2PartitionsToReplace(topo);
+                        if (partitionsToReplace.size() == 0) {
+                            VoltDB.crashLocalVoltDB("The VoltDB cluster already has enough nodes to satisfy " +
+                                    "the requested k-safety factor of " +
+                                    iv2config.getReplicationFactor() + ".\n" +
+                                    "No more nodes can join.", false, null);
+                        }
                         m_iv2InitiatorStartingTxnIds = new long[partitionsToReplace.size()];
                         for (int ii = 0; ii < partitionsToReplace.size(); ii++) {
                             m_iv2InitiatorStartingTxnIds[ii] = TxnEgo.makeZero(partitionsToReplace.get(ii)).getTxnId();
@@ -484,7 +499,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             m_catalogContext.cluster.getVoltroot(),
                             m_config.m_startAction == START_ACTION.LIVE_REJOIN);
                     m_messenger.registerMailbox(m_rejoinCoordinator);
-                    hostLog.info("Using iv2 community rejoin");
+                    if (m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
+                        hostLog.info("Using live rejoin.");
+                    }
+                    else {
+                        hostLog.info("Using blocking rejoin.");
+                    }
                 }
                 else if (isRejoin && m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
                     SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());
@@ -603,12 +623,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              */
             if (isIV2Enabled()) {
                 try {
+                    boolean usingCommandLog = m_config.m_isEnterprise &&
+                        m_catalogContext.cluster.getLogconfig().get("log").getEnabled();
                     m_leaderAppointer = new LeaderAppointer(
                             m_messenger,
                             clusterConfig.getPartitionCount(),
                             m_deployment.getCluster().getKfactor(),
                             m_catalogContext.cluster.getNetworkpartition(),
                             m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
+                            usingCommandLog,
                             topo, m_MPI);
                     m_globalServiceElector.registerService(m_leaderAppointer);
 
@@ -624,7 +647,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 m_statsAgent,
                                 m_memoryStats,
                                 m_commandLog,
-                                m_nodeDRGateway);
+                                m_nodeDRGateway,
+                                m_config.m_executionCoreBindings.poll());
                     }
                 } catch (Exception e) {
                     Throwable toLog = e;
@@ -809,7 +833,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 //but the newest snapshot will always be the truncation snapshot taken after rejoin
                 //completes at which point the node will mark itself as actually recovered.
                 m_commandLog.initForRejoin(
-                        m_catalogContext, Long.MIN_VALUE, m_iv2InitiatorStartingTxnIds, true);
+                        m_catalogContext,
+                        Long.MIN_VALUE,
+                        m_iv2InitiatorStartingTxnIds,
+                        true,
+                        m_config.m_commandLogBinding);
             }
 
             /*
@@ -844,9 +872,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         true, null);
             }
 
-            heartbeatThread = new HeartbeatThread(m_clientInterfaces);
-            heartbeatThread.start();
+            if (!isIV2Enabled()) {
+                m_heartbeatThread = new HeartbeatThread(m_clientInterfaces);
+                m_heartbeatThread.start();
+            }
             schedulePeriodicWorks();
+            m_clientInterfaces.get(0).schedulePeriodicWorks();
 
             // print out a bunch of useful system info
             logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
@@ -1163,7 +1194,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             "Deployment file could not be found locally or remotely at "
                             + m_config.m_pathToDeployment);
                 }
-                CRC32 crc = new CRC32();
+                PureJavaCrc32 crc = new PureJavaCrc32();
                 crc.update(deploymentBytes);
                 final long checksumHere = crc.getValue();
                 crc.reset();
@@ -1351,6 +1382,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         hmconfig.zkInterface = m_config.m_zkInterface;
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
+        hmconfig.coreBindIds = m_config.m_networkCoreBindings;
 
         m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
 
@@ -1409,11 +1441,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
         // replay command line args that we can see
         List<String> iargs = ManagementFactory.getRuntimeMXBean().getInputArguments();
-        StringBuilder sb = new StringBuilder("Available JVM arguments:");
+        StringBuilder sb = new StringBuilder(2048).append("Available JVM arguments:");
         for (String iarg : iargs)
             sb.append(" ").append(iarg);
         if (iargs.size() > 0) hostLog.info(sb.toString());
         else hostLog.info("No JVM command line args known.");
+
+        sb.delete(0, sb.length()).append("JVM class path: ");
+        sb.append(System.getProperty("java.class.path", "[not available]"));
+        hostLog.info(sb.toString());
 
         // java heap size
         long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
@@ -1626,8 +1662,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_faultManager.shutDown();
                 m_snapshotCompletionMonitor.shutdown();
                 m_periodicWorkThread.shutdown();
-                heartbeatThread.interrupt();
-                heartbeatThread.join();
+                m_periodicPriorityWorkThread.shutdown();
+                if (m_heartbeatThread != null) {
+                    m_heartbeatThread.interrupt();
+                    m_heartbeatThread.join();
+                }
 
                 if (m_leaderAppointer != null) {
                     m_leaderAppointer.shutdown();
@@ -1740,6 +1779,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_mailboxPublisher = null;
 
                 AdHocCompilerCache.clearVersionCache();
+                org.voltdb.iv2.InitiatorMailbox.m_allInitiatorMailboxes.clear();
 
                 // probably unnecessary
                 System.gc();
@@ -2084,7 +2124,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
          */
         if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
             // Initialize command logger
-            m_commandLog.init(m_catalogContext, txnId, perPartitionTxnIds);
+            m_commandLog.init(m_catalogContext, txnId, perPartitionTxnIds, m_config.m_commandLogBinding);
         }
 
         /*
@@ -2152,6 +2192,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         m_rejoining = false;
     }
 
+    /**
+     * See comment on {@link VoltDBInterface#scheduleWork(Runnable, long, long, TimeUnit)} vs
+     * {@link VoltDBInterface#schedulePriorityWork(Runnable, long, long, TimeUnit)}
+     */
     @Override
     public ScheduledFuture<?> scheduleWork(Runnable work,
             long initialDelay,
@@ -2373,5 +2417,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }, null);
 
         return retval;
+    }
+
+    /**
+     * See comment on {@link VoltDBInterface#schedulePriorityWork(Runnable, long, long, TimeUnit)} vs
+     * {@link VoltDBInterface#scheduleWork(Runnable, long, long, TimeUnit)}
+     */
+    @Override
+    public ScheduledFuture<?> schedulePriorityWork(Runnable work,
+            long initialDelay,
+            long delay,
+            TimeUnit unit) {
+        if (delay > 0) {
+            return m_periodicPriorityWorkThread.scheduleWithFixedDelay(work,
+                    initialDelay, delay,
+                    unit);
+        } else {
+            return m_periodicPriorityWorkThread.schedule(work, initialDelay, unit);
+        }
     }
 }

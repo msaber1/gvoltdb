@@ -23,7 +23,8 @@ import java.util.Iterator;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.exceptions.SerializableException;
+import org.voltdb.exceptions.TransactionRestartException;
+
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -37,13 +38,6 @@ public class TransactionTaskQueue
      * Multi-part transactions create a backlog of tasks behind them. A queue is
      * created for each multi-part task to maintain the backlog until the next
      * multi-part task.
-     *
-     * DR uses m_drMPSentinelBacklog to queue additional sentinels than the one
-     * currently in progress because DR uses GENERIC_MP_SENTINEL value for all
-     * sentinels. When a DR multipart completes, another sentinel will be polled
-     * from m_drMPSentinelBacklog and put in this map. It is impossible to have
-     * an empty m_backlog while m_drMPSentinelBacklog has more
-     * sentinels queued.
      */
     Deque<TransactionTask> m_backlog = new ArrayDeque<TransactionTask>();
 
@@ -101,10 +95,17 @@ public class TransactionTaskQueue
     // faking an unsuccessful FragmentResponseMessage.
     synchronized void repair(SiteTasker task, List<Long> masters)
     {
+        // At the MPI's TransactionTaskQueue, we know that there can only be
+        // one transaction in the SiteTaskerQueue at a time, because the
+        // TransactionTaskQueue will only release one MP transaction to the
+        // SiteTaskerQueue at a time.  So, when we offer this repair task, we
+        // know it will be the next thing to run once we poison the current
+        // TXN.
         m_taskQueue.offer(task);
         Iterator<TransactionTask> iter = m_backlog.iterator();
         if (iter.hasNext()) {
-            TransactionTask next = iter.next();
+            MpProcedureTask next = (MpProcedureTask)iter.next();
+            next.doRestart(masters);
             // get head
             // Only the MPI's TransactionTaskQueue is ever called in this way, so we know
             // that the TransactionTasks we pull out of it have to be MP transactions, so this
@@ -114,19 +115,19 @@ public class TransactionTaskQueue
             FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false, false);
             FragmentResponseMessage poison =
                 new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
-            // Provide a serializable exception so that the procedure runner sees
-            // this as an Expected (allowed) exception and doesn't take the crash-
-            // cluster-path.
-            SerializableException forcedTermination = new SerializableException(
-                    "Transaction rolled back by fault recovery or shutdown.");
-            poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, forcedTermination);
+            // Provide a TransactionRestartException which will be converted
+            // into a ClientResponse.RESTART, so that the MpProcedureTask can
+            // detect the restart and take the appropriate actions.
+            TransactionRestartException restart = new TransactionRestartException(
+                    "Transaction being restarted due to fault recovery or shutdown.", next.getTxnId());
+            poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, restart);
             txn.offerReceivedFragmentResponse(poison);
             // Now, iterate through the rest of the data structure and update the partition masters
             // for all MpProcedureTasks not at the head of the TransactionTaskQueue
             while (iter.hasNext())
             {
-                next = iter.next();
-                ((MpProcedureTask)next).updateMasters(masters);
+                next = (MpProcedureTask)iter.next();
+                next.updateMasters(masters);
             }
         }
     }
@@ -190,6 +191,16 @@ public class TransactionTaskQueue
             }
         }
         return offered;
+    }
+
+    /**
+     * Restart the current task at the head of the queue.  This will be called
+     * instead of flush by the currently blocking MP transaction in the event a
+     * restart is necessary.
+     */
+    synchronized void restart()
+    {
+        taskQueueOffer(m_backlog.getFirst());
     }
 
     /**

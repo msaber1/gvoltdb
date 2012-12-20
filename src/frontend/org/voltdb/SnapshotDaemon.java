@@ -59,6 +59,9 @@ import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.base.Throwables;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -86,9 +89,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger loggingLog = new VoltLogger("LOGGING");
-    private final ScheduledThreadPoolExecutor m_es =
-            new ScheduledThreadPoolExecutor(1, CoreUtils.getThreadFactory("SnapshotDaemon"),
+    private final ScheduledThreadPoolExecutor m_esBase =
+            new ScheduledThreadPoolExecutor(1,
+                    CoreUtils.getThreadFactory(null, "SnapshotDaemon", CoreUtils.SMALL_STACK_SIZE, false, null),
                                             new java.util.concurrent.ThreadPoolExecutor.DiscardPolicy());
+    private final ListeningScheduledExecutorService m_es = MoreExecutors.listeningDecorator(m_esBase);
 
     private ZooKeeper m_zk;
     private DaemonInitiator m_initiator;
@@ -178,8 +183,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private State m_state = State.STARTUP;
 
     SnapshotDaemon() {
-        m_es.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
-        m_es.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
+        m_esBase.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
+        m_esBase.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
 
         m_frequencyUnit = null;
         m_retain = 0;
@@ -487,10 +492,25 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             final WatchedEvent event) {
         loggingLog.info("Snapshot truncation leader received snapshot truncation request");
         String snapshotPathTemp;
+        // Get the snapshot path.
         try {
             snapshotPathTemp = new String(m_zk.getData(VoltZK.truncation_snapshot_path, false, null), "UTF-8");
         } catch (Exception e) {
             loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
+            return;
+        }
+        // Get the truncation request ID if provided.
+        final String truncReqId;
+        try {
+            byte[] data = m_zk.getData(event.getPath(), true, null);
+            if (data != null) {
+                truncReqId = new String(data, "UTF-8");
+            }
+            else {
+                truncReqId = "";
+            }
+        } catch (Exception e) {
+            loggingLog.error("Unable to retrieve truncation snapshot request ID from ZK, log can't be truncated");
             return;
         }
         m_truncationSnapshotPath = snapshotPathTemp;
@@ -510,9 +530,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         }
         JSONObject jsObj = new JSONObject();
         try {
+            String sData = "";
+            if (truncReqId != null) {
+                JSONObject jsData = new JSONObject();
+                jsData.put("truncReqId", truncReqId);
+                sData = jsData.toString();
+            }
             jsObj.put("path", snapshotPath );
             jsObj.put("nonce", nonce);
             jsObj.put("perPartitionTxnIds", retrievePerPartitionTransactionIds());
+            jsObj.put("data", sData);
         } catch (JSONException e) {
             /*
              * Should never happen, so fail fast
@@ -586,7 +613,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
                     int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
                     if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
-                                                                      hostId, true)) {
+                                                                      hostId, true, truncReqId)) {
                         SnapshotSaveAPI.increaseParticipateHostCount(snapshotTxnId, hostId);
                     }
 
@@ -961,7 +988,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     /**
      * Make this SnapshotDaemon responsible for generating snapshots
      */
-    public Future<Void> makeActive(final SnapshotSchedule schedule)
+    public ListenableFuture<Void> makeActive(final SnapshotSchedule schedule)
     {
         return m_es.submit(new Callable<Void>() {
             @Override
@@ -1750,9 +1777,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     @Override
-    public CountDownLatch snapshotCompleted(
-            final String nonce, final long txnId, final long partitionTxnIds[], final boolean truncation) {
-        if (!truncation) {
+    public CountDownLatch snapshotCompleted(final SnapshotCompletionEvent event) {
+        if (!event.truncationSnapshot) {
             return new CountDownLatch(0);
         }
         final CountDownLatch latch = new CountDownLatch(1);
@@ -1760,10 +1786,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             @Override
             public void run() {
                 try {
-                    TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(txnId);
+                    TruncationSnapshotAttempt snapshotAttempt = m_truncationSnapshotAttempts.get(event.multipartTxnId);
                     if (snapshotAttempt == null) {
                         snapshotAttempt = new TruncationSnapshotAttempt();
-                        m_truncationSnapshotAttempts.put(txnId, snapshotAttempt);
+                        m_truncationSnapshotAttempts.put(event.multipartTxnId, snapshotAttempt);
                     }
                     snapshotAttempt.finished = true;
                     groomTruncationSnapshots();

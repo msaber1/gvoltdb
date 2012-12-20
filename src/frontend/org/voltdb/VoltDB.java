@@ -21,12 +21,14 @@ import java.io.File;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
@@ -66,11 +68,11 @@ public class VoltDB {
         if (iv2 == null) {
             iv2 = System.getProperty("VOLT_ENABLEIV2");
         }
-        if (iv2 != null && iv2.equalsIgnoreCase("true")) {
-            return true;
+        if (iv2 != null && iv2.equalsIgnoreCase("false")) {
+            return false;
         }
         else {
-            return false;
+            return true;
         }
     }
 
@@ -87,13 +89,29 @@ public class VoltDB {
                startAction == VoltDB.START_ACTION.LIVE_REJOIN;
     }
 
-    public static Charset UTF8ENCODING = Charset.forName("UTF-8");
+    public static final Charset UTF8ENCODING = Charset.forName("UTF-8");
+
+    //The GMT time zone you know and love
+    public static final TimeZone GMT_TIMEZONE = TimeZone.getTimeZone("GMT+0");
+
+    //The time zone Volt is actually using, currently always GMT
+    public static final TimeZone VOLT_TIMEZONE = GMT_TIMEZONE;
+
+    //Whatever the default timezone was for this locale before we replaced it
+    public static final TimeZone REAL_DEFAULT_TIMEZONE;
+
+    // ODBC Datetime Format
+    // if you need microseconds, you'll have to change this code or
+    //  export a bigint representing microseconds since an epoch
+    public static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
 
     // if VoltDB is running in your process, prepare to use UTC (GMT) timezone
     public synchronized static void setDefaultTimezone() {
-        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
+        TimeZone.setDefault(GMT_TIMEZONE);
     }
+
     static {
+        REAL_DEFAULT_TIMEZONE = TimeZone.getDefault();
         setDefaultTimezone();
     }
 
@@ -187,7 +205,12 @@ public class VoltDB {
         public boolean m_isRejoinTest = false;
 
         /** set to true to run with iv2 initiation. Good Luck! */
-        public boolean m_enableIV2 = false;
+        public boolean m_enableIV2 = true;
+
+        public final Queue<String> m_networkCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_computationCoreBindings = new ArrayDeque<String>();
+        public final Queue<String> m_executionCoreBindings = new ArrayDeque<String>();
+        public String m_commandLogBinding = null;
 
         public Configuration() {
             m_enableIV2 = VoltDB.checkTestEnvForIv2();
@@ -289,6 +312,30 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
+                } else if (arg.startsWith("networkbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_networkCoreBindings.offer(core);
+                    }
+                    System.out.println("Network bindings are " + m_networkCoreBindings);
+                }
+                else if (arg.startsWith("computationbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_computationCoreBindings.offer(core);
+                    }
+                    System.out.println("Computation bindings are " + m_computationCoreBindings);
+                }
+                else if (arg.startsWith("executionbindings")) {
+                    for (String core : args[++i].split(",")) {
+                        m_executionCoreBindings.offer(core);
+                    }
+                    System.out.println("Execution bindings are " + m_executionCoreBindings);
+                } else if (arg.startsWith("commandlogbinding")) {
+                    String binding = args[++i];
+                    if (binding.split(",").length > 1) {
+                        throw new RuntimeException("Command log only supports a single set of bindings");
+                    }
+                    m_commandLogBinding = binding;
+                    System.out.println("Commanglog binding is " + m_commandLogBinding);
                 }
                 else if (arg.equals("host") || arg.equals("leader")) {
                     m_leader = args[++i].trim();

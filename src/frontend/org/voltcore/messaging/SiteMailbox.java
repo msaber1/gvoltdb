@@ -32,9 +32,9 @@ public class SiteMailbox implements Mailbox {
 
     private CommandLog m_commandLog = new CommandLog() {
         @Override
-        public void init(CatalogContext context, long txnId, long perPartitionTxnId[]) {}
+        public void init(CatalogContext context, long txnId, long perPartitionTxnId[], String affinity) {}
         @Override
-        public void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin) {}
+        public void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin, String affinity) {}
         @Override
         public boolean needsInitialization() {
             return false;
@@ -65,8 +65,6 @@ public class SiteMailbox implements Mailbox {
         public void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
                 int partitionId, long spHandle) {
         }
-        @Override
-        public void logIv2MPFault(long txnId) {}
         };
     final HostMessenger m_hostMessenger;
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();

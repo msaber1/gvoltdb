@@ -34,6 +34,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Properties;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.FutureTask;
@@ -46,6 +47,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
 import org.voltdb.types.TimestampType;
@@ -75,10 +77,6 @@ public class ExportToFileClient extends ExportClientBase2 {
     // active means the folder is being written to
     private static final String ACTIVE_PREFIX = "active-";
 
-    // ODBC Datetime Format
-    // if you need microseconds, you'll have to change this code or
-    //  export a bigint representing microseconds since an epoch
-    public static final String ODBC_DATE_FORMAT_STRING = "yyyy-MM-dd HH:mm:ss.SSS";
     // use thread-local to avoid SimpleDateFormat thread-safety issues
     protected ThreadLocal<SimpleDateFormat> m_ODBCDateformat;
     protected char m_delimiter;
@@ -108,19 +106,28 @@ public class ExportToFileClient extends ExportClientBase2 {
 
     protected final ReentrantReadWriteLock m_batchLock = new ReentrantReadWriteLock();
 
+    private static final Object m_batchDirNamingLock = new Object();
+
     // timer used to roll batches
     protected ScheduledExecutorService m_ses;
+
+    public static enum BinaryEncoding {
+        BASE64,
+        HEX
+    }
+
+    private BinaryEncoding m_binaryEncoding;
+
     /**
     *
     */
     public void notifyRollIsComplete(File[] files) {}
 
     class PeriodicExportContext {
-        final File m_dirContainingFiles;
+        File m_dirContainingFiles;
         final Map<FileHandle, CSVWriter> m_writers = new TreeMap<FileHandle, CSVWriter>();
         boolean m_hasClosed = false;
-        protected final Date start;
-        protected Date end = null;
+        protected Date start;
         protected final Set<String> m_batchSchemasWritten = new HashSet<String>();
 
         class FileHandle implements Comparable<FileHandle> {
@@ -188,11 +195,32 @@ public class ExportToFileClient extends ExportClientBase2 {
             }
         }
 
-        PeriodicExportContext(Date batchStart) {
-            start = batchStart;
-
+        PeriodicExportContext() {
             if (m_batched) {
-                m_dirContainingFiles = new VoltFile(getPathOfBatchDir(ACTIVE_PREFIX));
+                /*
+                 * The batch dir name is by default only named to second granularity.
+                 * What can happen is that when using on server export the client
+                 * can be rapidly cycled sub-second resulting in collisions with the previous
+                 * client. Spin here until a new one can be generated.
+                 *
+                 * Going to do this under a global lock to ensure that if this ends
+                 * up being done in parallel it is properly sequenced
+                 */
+                synchronized (m_batchDirNamingLock) {
+                    File dirContainingFiles = null;
+                    do {
+                        start = new Date();
+                        dirContainingFiles = new VoltFile(getPathOfBatchDir(ACTIVE_PREFIX));
+                        if (dirContainingFiles.exists()) {
+                            try {
+                                Thread.sleep(1000);
+                            } catch (InterruptedException e) {
+                                Throwables.propagate(e);
+                            }
+                        }
+                    } while (dirContainingFiles.exists());
+                    m_dirContainingFiles = dirContainingFiles;
+                }
                 m_logger.trace(String.format("Creating dir for batch at %s", m_dirContainingFiles.getPath()));
                 m_dirContainingFiles.mkdirs();
                 if (m_dirContainingFiles.exists() == false) {
@@ -201,6 +229,7 @@ public class ExportToFileClient extends ExportClientBase2 {
                 }
             }
             else {
+                start = new Date();
                 m_dirContainingFiles = m_outDir;
             }
         }
@@ -499,7 +528,11 @@ public class ExportToFileClient extends ExportClientBase2 {
                     if (row[i] == null) {
                         fields[i - m_firstfield] = "NULL";
                     } else if (m_tableSchema.get(i) == VoltType.VARBINARY) {
-                        fields[i - m_firstfield] = Encoder.hexEncode((byte[]) row[i]);
+                        if (m_binaryEncoding == BinaryEncoding.HEX) {
+                            fields[i - m_firstfield] = Encoder.hexEncode((byte[]) row[i]);
+                        } else {
+                            fields[i - m_firstfield] = Encoder.base64Encode((byte[]) row[i]);
+                        }
                     } else if (m_tableSchema.get(i) == VoltType.STRING) {
                         fields[i - m_firstfield] = (String) row[i];
                     } else if (m_tableSchema.get(i) == VoltType.TIMESTAMP) {
@@ -574,9 +607,11 @@ public class ExportToFileClient extends ExportClientBase2 {
             boolean useAdminPorts,
             boolean batched,
             boolean withSchema,
-            int throughputMonitorPeriod) {
+            int throughputMonitorPeriod,
+            BinaryEncoding be) {
         this(delimiter, nonce, outdir, period, dateformatString, fullDelimiters,
-                firstfield, useAdminPorts, batched, withSchema, throughputMonitorPeriod, true);
+                firstfield, useAdminPorts, batched, withSchema, throughputMonitorPeriod,
+                true, TimeZone.getDefault(), be);
     }
 
     public ExportToFileClient() {
@@ -594,8 +629,10 @@ public class ExportToFileClient extends ExportClientBase2 {
                               boolean batched,
                               boolean withSchema,
                               int throughputMonitorPeriod,
-                              boolean autodiscoverTopolgy) {
-        super(useAdminPorts, throughputMonitorPeriod, autodiscoverTopolgy);
+                              boolean autodiscoverTopology,
+                              TimeZone tz,
+                              BinaryEncoding be) {
+        super(useAdminPorts, throughputMonitorPeriod, autodiscoverTopology);
         configureInternal(
                 delimiter,
                 nonce,
@@ -605,7 +642,9 @@ public class ExportToFileClient extends ExportClientBase2 {
                 fullDelimiters,
                 firstfield,
                 batched,
-                withSchema);
+                withSchema,
+                tz,
+                be);
     }
 
     @Override
@@ -649,13 +688,11 @@ public class ExportToFileClient extends ExportClientBase2 {
      * be active until all writers have finished writing their current blocks
      * to it.
      */
-    void roll(final Date rollTime) {
+    void roll() {
         m_batchLock.writeLock().lock();
         final PeriodicExportContext previous = m_current;
         try {
-            m_current.end = rollTime;
-
-            m_current = new PeriodicExportContext(rollTime);
+            m_current = new PeriodicExportContext();
 
             m_logger.trace("Rolling batch.");
 
@@ -724,7 +761,9 @@ public class ExportToFileClient extends ExportClientBase2 {
                         + "[--skipinternals] "
                         + "[--delimiters html-escaped delimiter set (4 chars)] "
                         + "[--user export_username] "
-                        + "[--password export_password]");
+                        + "[--password export_password]"
+                        + "[--timezone GMT+0]"
+                        + "[--binaryencoding [ HEX | BASE64 ]]");
         System.out.println("Note that server hostnames may be appended with a specific port:");
         System.out.println("  --servers server1:port1[,server2:port2,...,serverN:portN]");
 
@@ -747,6 +786,8 @@ public class ExportToFileClient extends ExportClientBase2 {
         String fullDelimiters = null;
         int throughputMonitorPeriod = 0;
         boolean autodiscoverTopolgy = true;
+        TimeZone tz = VoltDB.GMT_TIMEZONE;
+        BinaryEncoding be = BinaryEncoding.HEX;
 
         for (int ii = 0; ii < args.length; ii++) {
             String arg = args[ii];
@@ -830,6 +871,14 @@ public class ExportToFileClient extends ExportClientBase2 {
                     System.exit(-1);
                 }
                 ii++;
+            } else if (args.equals("--timezone")) {
+                if (args.length < ii + 1) {
+                    System.err.println("Error: Not enough args following --timezone");
+                    printHelpAndQuit(-1);
+                }
+                String tzId = args[ii + 1];
+                ii++;
+                tz = TimeZone.getTimeZone(tzId);
             }
             else if (arg.equals("--nonce")) {
                 if (args.length < ii + 1) {
@@ -894,6 +943,21 @@ public class ExportToFileClient extends ExportClientBase2 {
                     printHelpAndQuit(-1);
                 }
             }
+            else if (arg.equals("--binaryencoding")) {
+                if (args.length < ii + 1) {
+                    System.err.println("Error: Not enough args following --binaryencoding");
+                    printHelpAndQuit(-1);
+                }
+                try {
+                    be = BinaryEncoding.valueOf(args[ii + 1].trim().toUpperCase());
+                } catch (IllegalArgumentException e) {
+                    System.err.println(
+                            "The binary encoding \"" + args[ii + 1].trim().toUpperCase() +
+                            "\" is unsupported. Must be one of [ HEX | BASE64 ]");
+                    printHelpAndQuit(-1);
+                }
+                ii++;
+            }
             else if (arg.equals("--disable-topology-autodiscovery")) {
                 autodiscoverTopolgy = false;
             }
@@ -950,7 +1014,9 @@ public class ExportToFileClient extends ExportClientBase2 {
                                                            batched,
                                                            withSchema,
                                                            throughputMonitorPeriod,
-                                                           autodiscoverTopolgy);
+                                                           autodiscoverTopolgy,
+                                                           tz,
+                                                           be);
 
         // add all of the servers specified
         for (String server : volt_servers) {
@@ -982,6 +1048,9 @@ public class ExportToFileClient extends ExportClientBase2 {
     public void configure( Properties conf) throws Exception {
         String nonce = conf.getProperty("nonce");
 
+        if (nonce == null) {
+            throw new IllegalArgumentException("ExportToFile: must provide a filename nonce");
+        }
         char delimiter = '\0';
         String type = conf.getProperty("type", "").trim();
         if (type != null) {
@@ -1033,6 +1102,11 @@ public class ExportToFileClient extends ExportClientBase2 {
             }
         }
 
+        TimeZone tz = TimeZone.getTimeZone(conf.getProperty("timezone", VoltDB.GMT_TIMEZONE.getID()));
+
+        BinaryEncoding encoding = BinaryEncoding.valueOf(
+                conf.getProperty("binaryencoding", "HEX").trim().toUpperCase());
+
         configureInternal(
                 delimiter,
                 nonce,
@@ -1042,7 +1116,9 @@ public class ExportToFileClient extends ExportClientBase2 {
                 fullDelimiters,
                 firstfield,
                 batched,
-                withSchema);
+                withSchema,
+                tz,
+                encoding);
     }
 
     private void configureInternal(
@@ -1054,7 +1130,9 @@ public class ExportToFileClient extends ExportClientBase2 {
                               String fullDelimiters,
                               int firstfield,
                               boolean batched,
-                              boolean withSchema) {
+                              boolean withSchema,
+                              final TimeZone tz,
+                              final BinaryEncoding be) {
         m_delimiter = delimiter;
         m_extension = (delimiter == ',') ? ".csv" : ".tsv";
         m_nonce = nonce;
@@ -1073,9 +1151,12 @@ public class ExportToFileClient extends ExportClientBase2 {
         m_ODBCDateformat = new ThreadLocal<SimpleDateFormat>() {
             @Override
             protected SimpleDateFormat initialValue() {
-                return new SimpleDateFormat(ODBC_DATE_FORMAT_STRING);
+                SimpleDateFormat sdf = new SimpleDateFormat(VoltDB.ODBC_DATE_FORMAT_STRING);
+                sdf.setTimeZone(tz);
+                return sdf;
             }
         };
+        m_binaryEncoding = be;
         m_firstfield = firstfield;
         m_batched = batched;
         m_withSchema = withSchema;
@@ -1093,7 +1174,7 @@ public class ExportToFileClient extends ExportClientBase2 {
 
         // init the batch system with the first batch
         assert(m_current == null);
-        m_current = new PeriodicExportContext(new Date());
+        m_current = new PeriodicExportContext();
 
 
         // schedule rotations every m_period minutes
@@ -1101,13 +1182,15 @@ public class ExportToFileClient extends ExportClientBase2 {
             @Override
             public void run() {
                 try {
-                    roll(new Date());
+                    roll();
                 } catch (Throwable t) {
                     t.printStackTrace();
                 }
             }
         };
-        m_ses = CoreUtils.getScheduledThreadPoolExecutor("Export file rotate timer for nonce " + nonce, 1, 131072);
+        m_ses =
+                CoreUtils.getScheduledThreadPoolExecutor(
+                        "Export file rotate timer for nonce " + nonce, 1, CoreUtils.SMALL_STACK_SIZE);
         m_ses.scheduleWithFixedDelay(rotator, m_period, m_period, TimeUnit.MINUTES);
     }
 }
