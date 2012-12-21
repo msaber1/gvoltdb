@@ -226,12 +226,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             return m_siteId;
         }
 
+        /*
+         * Expensive to compute, memoize it
+         */
+        private Boolean m_isLowestSiteId = null;
         @Override
         public boolean isLowestSiteId()
         {
-            // FUTURE: should pass this status in at construction.
-            long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
-            return m_siteId == lowestSiteId;
+            if (m_isLowestSiteId != null) {
+                return m_isLowestSiteId;
+            } else {
+                // FUTURE: should pass this status in at construction.
+                long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
+                m_isLowestSiteId = m_siteId == lowestSiteId;
+                return m_isLowestSiteId;
+            }
         }
 
 
@@ -320,7 +329,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_rejoinState = VoltDB.createForRejoin(startAction) ? kStateRejoining : kStateRunning;
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
-        m_startupConfig = new StartupConfig(serializedCatalog, context.m_timestamp);
+        m_startupConfig = new StartupConfig(serializedCatalog, context.m_uniqueId);
         m_lastCommittedTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
@@ -848,9 +857,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
                 // rollup the table memory stats for this site
                 while (stats.advanceRow()) {
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
                     tupleCount += stats.getLong(7);
+                    assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
                     tupleAllocatedMem += (int) stats.getLong(8);
+                    assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
                     tupleDataMem += (int) stats.getLong(9);
+                    assert(stats.getColumnName(10).equals("STRING_DATA_MEMORY"));
                     stringMem += (int) stats.getLong(10);
                 }
                 stats.resetRowPosition();
@@ -867,7 +881,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
                 // rollup the index memory stats for this site
                 while (stats.advanceRow()) {
-                    indexMem += stats.getLong(10);
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(11).equals("MEMORY_ESTIMATE"));
+                    indexMem += stats.getLong(11);
                 }
                 stats.resetRowPosition();
 
@@ -1006,7 +1022,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             //Necessary to quiesce before updating the catalog
             //so export data for the old generation is pushed to Java.
             m_ee.quiesce(m_lastCommittedTxnId);
-            m_ee.updateCatalog(m_context.m_timestamp, diffCmds);
+            m_ee.updateCatalog(m_context.m_uniqueId, diffCmds);
         }
 
         return true;

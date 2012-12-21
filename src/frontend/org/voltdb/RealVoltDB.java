@@ -434,7 +434,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         for (int ii = 0; ii < partitionsToReplace.size(); ii++) {
                             m_iv2InitiatorStartingTxnIds[ii] = TxnEgo.makeZero(partitionsToReplace.get(ii)).getTxnId();
                         }
-                        m_iv2Initiators = createIv2Initiators(partitionsToReplace);
+                        m_iv2Initiators = createIv2Initiators(partitionsToReplace, true);
                     }
                     else {
                         List<Integer> partitions =
@@ -443,7 +443,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         for (int ii = 0; ii < partitions.size(); ii++) {
                             m_iv2InitiatorStartingTxnIds[ii] = TxnEgo.makeZero(partitions.get(ii)).getTxnId();
                         }
-                        m_iv2Initiators = createIv2Initiators(partitions);
+                        m_iv2Initiators = createIv2Initiators(partitions, false);
                     }
                     // each node has an MPInitiator (and exactly 1 node has the master MPI).
                     long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
@@ -1067,13 +1067,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return topo;
     }
 
-    private List<Initiator> createIv2Initiators(Collection<Integer> partitions)
+    private List<Initiator> createIv2Initiators(Collection<Integer> partitions, boolean forRejoin)
     {
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, m_statsAgent,
-                    m_snapshotCompletionMonitor);
+                    m_snapshotCompletionMonitor, forRejoin);
             initiators.add(initiator);
         }
         return initiators;
@@ -1404,9 +1404,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         String startAction = m_config.m_startAction.toString();
         String startActionLog = "Database start action is " + (startAction.substring(0, 1).toUpperCase() +
                 startAction.substring(1).toLowerCase()) + ".";
-        if (m_config.m_startAction == START_ACTION.START) {
-            startActionLog += " Will create a new database if there is nothing to recover from.";
-        }
         if (!m_rejoining) {
             hostLog.info(startActionLog);
         }
@@ -1833,7 +1830,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             byte[] newCatalogBytes,
             int expectedCatalogVersion,
             long currentTxnId,
-            long currentTxnTimestamp,
+            long currentTxnUniqueId,
             long deploymentCRC)
     {
         synchronized(m_catalogUpdateLock) {
@@ -1860,7 +1857,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_catalogContext =
                 m_catalogContext.update(
                         currentTxnId,
-                        currentTxnTimestamp,
+                        currentTxnUniqueId,
                         newCatalogBytes,
                         diffCommands,
                         true,
