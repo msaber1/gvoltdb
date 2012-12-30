@@ -35,6 +35,7 @@ import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.messaging.LocalMailbox;
@@ -60,7 +61,7 @@ public class StatsAgent {
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
     private final ScheduledThreadPoolExecutor m_es =
-        org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, 1024 * 128);
+        org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, CoreUtils.SMALL_STACK_SIZE);
 
     private final HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
         new HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>>();
@@ -191,17 +192,6 @@ public class StatsAgent {
     }
 
     private void collectStatsImpl(Connection c, long clientHandle, String selector) throws Exception {
-        if (selector.equals("TOPO")) {
-            PendingStatsRequest psr = new PendingStatsRequest(
-                selector,
-                c,
-                clientHandle,
-                new VoltTable[1],
-                System.currentTimeMillis());
-            collectTopoStats(psr);
-            return;
-        }
-
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
             /*
              * Defensively check for an expired request not caught
@@ -227,6 +217,27 @@ public class StatsAgent {
                 c.writeStream().enqueue(buf);
                 return;
             }
+        }
+
+        if (selector.equals("TOPO")) {
+            if (!VoltDB.instance().isIV2Enabled()) {
+                final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
+                                             new VoltTable[0], "IV2 is not enabled", clientHandle);
+                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                errorResponse.flattenToBuffer(buf).flip();
+                c.writeStream().enqueue(buf);
+                return;
+            }
+            PendingStatsRequest psr = new PendingStatsRequest(
+                selector,
+                c,
+                clientHandle,
+                new VoltTable[1],
+                System.currentTimeMillis());
+            collectTopoStats(psr);
+            return;
         }
 
         PendingStatsRequest psr =
@@ -270,7 +281,7 @@ public class StatsAgent {
         ClientResponseImpl response =
             new ClientResponseImpl(
                     ClientResponse.GRACEFUL_FAILURE,
-                    Byte.MIN_VALUE,
+                    ClientResponse.UNINITIALIZED_APP_STATUS_CODE,
                     null,
                     new VoltTable[0], "Stats request hit sixty second timeout before all responses were received");
         response.setClientHandle(psr.clientData);
@@ -299,7 +310,7 @@ public class StatsAgent {
         }
 
         ClientResponseImpl response =
-            new ClientResponseImpl(statusCode, Byte.MIN_VALUE, null, responseTables, statusString);
+            new ClientResponseImpl(statusCode, ClientResponse.UNINITIALIZED_APP_STATUS_CODE, null, responseTables, statusString);
         response.setClientHandle(request.clientData);
         ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
         buf.putInt(buf.capacity() - 4);

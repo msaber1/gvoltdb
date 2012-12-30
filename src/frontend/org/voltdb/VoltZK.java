@@ -45,12 +45,13 @@ public class VoltZK {
     public static final String buildstring = "/db/buildstring";
     public static final String catalogbytes = "/db/catalogbytes";
     public static final String topology = "/db/topology";
-    public static final String replicationrole = "/db/replicationrole";
+    public static final String replicationconfig = "/db/replicationconfig";
     public static final String deploymentBytes = "/db/deploymentBytes";
     public static final String rejoinLock = "/db/rejoin_lock";
     public static final String restoreMarker = "/db/did_restore";
     public static final String perPartitionTxnIds = "/db/perPartitionTxnIds";
     public static final String operationMode = "/db/operation_mode";
+    public static final String exportGenerations = "/db/export_generations";
 
     // configuration (ports, interfaces, ...)
     public static final String cluster_metadata = "/db/cluster_metadata";
@@ -82,7 +83,6 @@ public class VoltZK {
     public static final String truncation_snapshot_path = "/db/truncation_snapshot_path";
     public static final String user_snapshot_request = "/db/user_snapshot_request";
     public static final String user_snapshot_response = "/db/user_snapshot_response";
-    public static final String initial_catalog_txnid = "/db/initial_catalog_txnid";
 
     // leader election
     public static final String iv2masters = "/db/iv2masters";
@@ -91,6 +91,7 @@ public class VoltZK {
     public static final String leaders = "/db/leaders";
     public static final String leaders_initiators = "/db/leaders/initiators";
     public static final String leaders_globalservice = "/db/leaders/globalservice";
+    public static final String lastKnownLiveNodes = "/db/lastKnownLiveNodes";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -103,7 +104,8 @@ public class VoltZK {
             iv2mpi,
             leaders,
             leaders_initiators,
-            leaders_globalservice
+            leaders_globalservice,
+            lastKnownLiveNodes
     };
 
     /**

@@ -48,6 +48,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
@@ -75,6 +76,12 @@ public class SnapshotSaveAPI
     // ugh, ick, ugh
     public static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
 
+    /*
+     * Ugh!, needs to be visible to all the threads doing the snapshot,
+     * pbulished under the snapshot create lock.
+     */
+    private static Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers;
+
     /**
      * The only public method: do all the work to start a snapshot.
      * Assumes that a snapshot is feasible, that the caller has validated it can
@@ -98,7 +105,8 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
-        final int numLocalSites = (context.getSiteTrackerForSnapshot().getLocalSites().length -
+        final SiteTracker st = context.getSiteTrackerForSnapshot();
+        final int numLocalSites = (st.getLocalSites().length -
                 recoveringSiteCount.get());
 
         // One site wins the race to create the snapshot targets, populating
@@ -142,10 +150,10 @@ public class SnapshotSaveAPI
                      * it isn't fatal we can just skip it.
                      */
                     for (long txnId : legacyPerPartitionTxnIds) {
-                        final int legacyPartition = (int)TxnEgo.getPartitionId(txnId);
+                        final int legacyPartition = TxnEgo.getPartitionId(txnId);
                         boolean isDup = false;
                         for (long existingId : partitionTransactionIds) {
-                            final int existingPartition = (int)TxnEgo.getPartitionId(existingId);
+                            final int existingPartition = TxnEgo.getPartitionId(existingId);
                             if (existingPartition == legacyPartition) {
                                 HOST_LOG.warn("While saving a snapshot and propagating legacy " +
                                         "transaction ids found an id that matches currently active partition" +
@@ -158,7 +166,7 @@ public class SnapshotSaveAPI
                         }
                     }
                 }
-
+                exportSequenceNumbers = SnapshotSiteProcessor.getExportSequenceNumbers();
                 createSetup(
                         file_path,
                         file_nonce,
@@ -168,7 +176,9 @@ public class SnapshotSaveAPI
                         data,
                         context,
                         hostname,
-                        result);
+                        result,
+                        exportSequenceNumbers,
+                        st);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
             }
@@ -189,7 +199,8 @@ public class SnapshotSaveAPI
                 context.getSiteSnapshotConnection().initiateSnapshots(
                         m_taskList,
                         multiPartTxnId,
-                        context.getSiteTrackerForSnapshot().getAllHosts().size());
+                        context.getSiteTrackerForSnapshot().getAllHosts().size(),
+                        exportSequenceNumbers);
             }
         }
 
@@ -234,7 +245,7 @@ public class SnapshotSaveAPI
 
 
     private void logSnapshotStartToZK(long txnId,
-            SystemProcedureExecutionContext context, String nonce) {
+            SystemProcedureExecutionContext context, String nonce, String truncReqId) {
         /*
          * Going to send out the requests async to make snapshot init move faster
          */
@@ -288,7 +299,7 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        if (!createSnapshotCompletionNode(nonce, txnId, context.getHostId(), isTruncation)) {
+        if (!createSnapshotCompletionNode(nonce, txnId, context.getHostId(), isTruncation, truncReqId)) {
             // the node already exists, add local host ID to the list
             increaseParticipateHostCount(txnId, context.getHostId());
         }
@@ -362,12 +373,14 @@ public class SnapshotSaveAPI
      * @param txnId
      * @param hostId The local host ID
      * @param isTruncation Whether or not this is a truncation snapshot
+     * @param truncReqId Optional unique ID fed back to the monitor for identification
      * @return true if the node is created successfully, false if the node already exists.
      */
     public static boolean createSnapshotCompletionNode(String nonce,
-                                                       long txnId,
-                                                       int hostId,
-                                                       boolean isTruncation) {
+                                                          long txnId,
+                                                          int hostId,
+                                                          boolean isTruncation,
+                                                          String truncReqId) {
         if (!(txnId > 0)) {
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
         }
@@ -381,6 +394,8 @@ public class SnapshotSaveAPI
             stringer.key("isTruncation").value(isTruncation);
             stringer.key("finishedHosts").value(0);
             stringer.key("nonce").value(nonce);
+            stringer.key("truncReqId").value(truncReqId);
+            stringer.key("exportSequenceNumbers").object().endObject();
             stringer.endObject();
             JSONObject jsonObj = new JSONObject(stringer.toString());
             nodeBytes = jsonObj.toString(4).getBytes("UTF-8");
@@ -409,15 +424,27 @@ public class SnapshotSaveAPI
             String file_path, String file_nonce, SnapshotFormat format,
             long txnId, List<Long> partitionTransactionIds,
             String data, SystemProcedureExecutionContext context,
-            String hostname, final VoltTable result) {
+            String hostname, final VoltTable result,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+            SiteTracker tracker) {
         {
-            SiteTracker tracker = context.getSiteTrackerForSnapshot();
             final int numLocalSites =
                     (tracker.getLocalSites().length - recoveringSiteCount.get());
 
             // non-null if targeting only one site (used for rejoin)
             // set later from the "data" JSON string
             Long targetHSid = null;
+
+            JSONObject jsData = null;
+            if (data != null && !data.isEmpty()) {
+                try {
+                    jsData = new JSONObject(data);
+                }
+                catch (JSONException e) {
+                    HOST_LOG.error(String.format("JSON exception on snapshot data \"%s\".", data),
+                            e);
+                }
+            }
 
             MessageDigest digest;
             try {
@@ -429,7 +456,7 @@ public class SnapshotSaveAPI
             /*
              * List of partitions to include if this snapshot is
              * going to be deduped. Attempts to break up the work
-             * by seeding an RNG selecting
+             * by seeding and RNG selecting
              * a random replica to do the work. Will not work in failure
              * cases, but we don't use dedupe when we want durability.
              *
@@ -469,7 +496,9 @@ public class SnapshotSaveAPI
                 assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1);
 
                 final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
-
+                /*
+                 * For a file based snapshot
+                 */
                 if (format.isFileBased()) {
                     Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                                                   txnId,
@@ -478,7 +507,7 @@ public class SnapshotSaveAPI
                                                   file_nonce,
                                                   tables,
                                                   context.getHostId(),
-                                                  SnapshotSiteProcessor.getExportSequenceNumbers(),
+                                                  exportSequenceNumbers,
                                                   partitionTransactionIds,
                                                   VoltDB.instance().getHostMessenger().getInstanceId());
                     if (completionTask != null) {
@@ -509,13 +538,12 @@ public class SnapshotSaveAPI
                         schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
                     }
 
-                    if (format == SnapshotFormat.STREAM && data != null) {
-                        JSONObject jsObj = new JSONObject(data);
-                        long hsId = jsObj.getLong("hsId");
+                    if (format == SnapshotFormat.STREAM && jsData != null) {
+                        long hsId = jsData.getLong("hsId");
 
                         // if a target_hsid exists, set it for filtering a snapshot for a specific site
                         try {
-                            targetHSid = jsObj.getLong("target_hsid");
+                            targetHSid = jsData.getLong("target_hsid");
                         }
                         catch (JSONException e) {} // leave value as null on exception
 
@@ -568,7 +596,8 @@ public class SnapshotSaveAPI
                                         table,
                                         context.getHostId(),
                                         tracker.m_numberOfPartitions,
-                                        txnId);
+                                        txnId,
+                                        tracker.getPartitionsForHost(context.getHostId()));
                         }
 
                         if (sdt == null) {
@@ -597,7 +626,7 @@ public class SnapshotSaveAPI
                                     final SnapshotRegistry.Snapshot completed =
                                         SnapshotRegistry.finishSnapshot(snapshotRecord);
                                     final double duration =
-                                        (completed.timeFinished - org.voltdb.TransactionIdManager.getTimestampFromTransactionId(completed.txnId)) / 1000.0;
+                                        (completed.timeFinished - completed.timeStarted) / 1000.0;
                                     HOST_LOG.info(
                                             "Snapshot " + snapshotRecord.nonce + " finished at " +
                                              completed.timeFinished + " and took " + duration
@@ -720,7 +749,12 @@ public class SnapshotSaveAPI
                          */
                         VoltDB.instance().getSnapshotCompletionMonitor().registerPartitionTxnIdsForSnapshot(
                                 txnId, partitionTransactionIds);
-                        logSnapshotStartToZK( txnId, context, file_nonce);
+                        // Provide the truncation request ID so the monitor can recognize a specific snapshot.
+                        String truncReqId = "";
+                        if (jsData != null && jsData.has("truncReqId")) {
+                            truncReqId = jsData.getString("truncReqId");
+                        }
+                        logSnapshotStartToZK( txnId, context, file_nonce, truncReqId);
                     }
                 }
             } catch (Exception ex) {
@@ -777,7 +811,8 @@ public class SnapshotSaveAPI
             Table table,
             int hostId,
             int numPartitions,
-            long txnId)
+            long txnId,
+            List<Integer> partitionsForHost)
     throws IOException
     {
         return new DefaultSnapshotDataTarget(f,
@@ -787,7 +822,7 @@ public class SnapshotSaveAPI
                                              table.getTypeName(),
                                              numPartitions,
                                              table.getIsreplicated(),
-                                             context.getSiteTrackerForSnapshot().getPartitionsForHost(hostId),
+                                             partitionsForHost,
                                              CatalogUtil.getVoltTable(table),
                                              txnId);
     }

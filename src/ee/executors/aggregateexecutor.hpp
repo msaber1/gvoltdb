@@ -841,8 +841,6 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
     assert(limits);
 
     assert(node->getInputTables().size() == 1);
-    int columnCount = (int)node->getOutputSchema().size();
-    assert(columnCount >= 1);
 
     assert(node->getChildren()[0] != NULL);
     for (int i = 0; i < node->getAggregateInputExpressions().size(); i++)
@@ -883,18 +881,7 @@ AggregateExecutor<aggregateType>::p_init(AbstractPlanNode *abstract_node,
         }
     }
 
-    TupleSchema* schema = node->generateTupleSchema(true);
-    std::string* columnNames = new std::string[columnCount];
-    for (int ctr = 0; ctr < columnCount; ctr++)
-    {
-        columnNames[ctr] = node->getOutputSchema()[ctr]->getColumnName();
-    }
-    node->setOutputTable(TableFactory::getTempTable(node->databaseId(),
-                                                    "temp",
-                                                    schema,
-                                                    columnNames,
-                                                    limits));
-    delete[] columnNames;
+    setTempOutputTable(limits);
 
     std::vector<ValueType> groupByColumnTypes;
     std::vector<int32_t> groupByColumnSizes;

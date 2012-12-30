@@ -17,13 +17,16 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
+import org.voltdb.rejoin.TaskLog;
 
 /**
  * Scheduler's rough current responsibility is to take appropriate local action
@@ -47,6 +50,21 @@ import org.voltdb.VoltDB;
 abstract public class Scheduler implements InitiatorMessageHandler
 {
     protected VoltLogger hostLog = new VoltLogger("HOST");
+
+    // A null task that unblocks the site task queue, used during shutdown
+    protected static final SiteTasker m_nullTask = new SiteTasker() {
+        @Override
+        public void run(SiteProcedureConnection siteConnection)
+        {
+        }
+
+        @Override
+        public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+        throws IOException
+        {
+        }
+    };
+
     // The queue which the Site's runloop is going to poll for new work.  This
     // is fronted here by the TransactionTaskQueue and should not be directly
     // offered work.
@@ -56,12 +74,33 @@ abstract public class Scheduler implements InitiatorMessageHandler
     final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
+    final protected int m_partitionId;
+
+    /*
+     * This lock is extremely dangerous to use without known the pattern.
+     * It is the intrinsic lock on the InitiatorMailbox. For an SpInitiator
+     * this is a real thing, but for the MpInitiator the intrinsic lock isn't used
+     * because it uses MpInitiatorMailbox (as subclass of InitiatorMailbox)
+     * which uses a dedicated thread instead of locking.
+     *
+     * In the MpInitiator case locking on this will not provide any isolation because
+     * the InitiatorMailbox thread doesn't use the lock.
+     *
+     * Right now this lock happens to only be used to gain isolation for
+     * command logging while submitting durable tasks. Only SpInitiators log
+     * so this is fine.
+     *
+     * Think twice and ask around before using it for anything else.
+     * You should probably be going through InitiatorMailbox.deliver which automatically
+     * handles the transition between locking vs. submitting to the MpInitiatorMailbox task queue.
+     */
     protected Object m_lock;
 
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_tasks = taskQueue;
         m_pendingTasks = new TransactionTaskQueue(m_tasks);
+        m_partitionId = partitionId;
         m_txnEgo = TxnEgo.makeZero(partitionId);
     }
 
@@ -119,4 +158,5 @@ abstract public class Scheduler implements InitiatorMessageHandler
     @Override
     abstract public void deliver(VoltMessage message);
 
+    abstract public void enableWritingIv2FaultLog();
 }

@@ -47,6 +47,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
+import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -227,13 +228,14 @@ SnapshotCompletionInterest
         public final Map<Integer, Long> partitionToTxnId = new TreeMap<Integer, Long>();
         // This is not serialized, the name of the ZK node already has the host ID embedded.
         public final int hostId;
+        public final InstanceId instanceId;
 
         public void setPidToTxnIdMap(Map<Integer,Long> map) {
             partitionToTxnId.putAll(map);
         }
 
         public SnapshotInfo(long txnId, String path, String nonce, int partitions,
-                            long catalogCrc, int hostId)
+                            long catalogCrc, int hostId, InstanceId instanceId)
         {
             this.txnId = txnId;
             this.path = path;
@@ -241,6 +243,7 @@ SnapshotCompletionInterest
             this.partitionCount = partitions;
             this.catalogCrc = catalogCrc;
             this.hostId = hostId;
+            this.instanceId = instanceId;
         }
 
         public SnapshotInfo(JSONObject jo) throws JSONException
@@ -251,6 +254,7 @@ SnapshotCompletionInterest
             partitionCount = jo.getInt("partitionCount");
             catalogCrc = jo.getLong("catalogCrc");
             hostId = jo.getInt("hostId");
+            instanceId = new InstanceId(jo.getJSONObject("instanceId"));
 
             JSONArray tables = jo.getJSONArray("tables");
             int cnt = tables.length();
@@ -304,12 +308,44 @@ SnapshotCompletionInterest
                     stringer.key(e.getKey().toString()).value(e.getValue());
                 }
                 stringer.endObject(); // partitionToTxnId
+                stringer.key("instanceId").value(instanceId.serializeToJSONObject());
                 stringer.endObject();
                 return new JSONObject(stringer.toString());
             } catch (JSONException e) {
                 VoltDB.crashLocalVoltDB("Invalid JSON communicate snapshot info.", true, e);
             }
             throw new RuntimeException("impossible.");
+        }
+
+        public boolean isNewerThan(SnapshotInfo other)
+        {
+            if (other.instanceId.getTimestamp() > instanceId.getTimestamp()) {
+                return false;
+            }
+            else if (other.instanceId.getTimestamp() < instanceId.getTimestamp()) {
+                return true;
+            }
+            // Same instance ID timestamps, compare all the partition txn IDs until we find
+            // some hint that one ran longer than the other
+            if (other.txnId > txnId) {
+                return false;
+            }
+            else if (other.txnId < txnId) {
+                return true;
+            }
+            for (Entry<Integer, Long> e : other.partitionToTxnId.entrySet()) {
+                if (partitionToTxnId.containsKey(e.getKey())) {
+                    if (e.getValue() > partitionToTxnId.get(e.getKey())) {
+                        return false;
+                    }
+                    else if (e.getValue() < partitionToTxnId.get(e.getKey())) {
+                        return true;
+                    }
+                }
+                // When we start adding/removing partitions on the fly this
+                // missing else will need to do something
+            }
+            return false;
         }
     }
 
@@ -464,7 +500,7 @@ SnapshotCompletionInterest
      * Exists the restore process. Waits for all other hosts to complete first.
      * This method blocks.
      */
-    private void exitRestore() {
+    void exitRestore() {
         try {
             m_zk.delete(m_generatedRestoreBarrier2, -1);
         } catch (Exception e) {
@@ -521,16 +557,16 @@ SnapshotCompletionInterest
      *             has failed. Should crash the cluster.
      */
     SnapshotInfo generatePlans() throws Exception {
-        TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, SnapshotUtil.Snapshot>();
+        Map<String, Snapshot> snapshots = new HashMap<String, SnapshotUtil.Snapshot>();
 
         // Only scan if startup might require a snapshot restore.
-        if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
+        if (m_action == START_ACTION.RECOVER) {
             snapshots = getSnapshots();
         }
 
         final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
         Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
-        for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
+        for (Snapshot e : snapshots.values()) {
             if (!VoltDB.instance().isIV2Enabled()) {
                 /*
                  * If the txn of the snapshot is before the latest txn
@@ -539,12 +575,20 @@ SnapshotCompletionInterest
                  * taken and the beginning of the log. So the snapshot is
                  * not viable for replay.
                  */
-                if (maxLastSeenTxn != null && e.getKey() < maxLastSeenTxn) {
+                if (maxLastSeenTxn != null && e.getTxnId() < maxLastSeenTxn) {
                     continue;
                 }
             }
 
-            SnapshotInfo info = checkSnapshotIsComplete(e.getKey(), e.getValue());
+            SnapshotInfo info = checkSnapshotIsComplete(e.getTxnId(), e);
+            // if the cluster instance IDs in the snapshot and command log don't match, just move along
+            if (m_replayAgent.getInstanceId() != null && info != null &&
+                !m_replayAgent.getInstanceId().equals(info.instanceId)) {
+                LOG.debug("Rejecting snapshot due to mismatching instance IDs.");
+                LOG.debug("Command log ID: " + m_replayAgent.getInstanceId().serializeToJSONObject().toString());
+                LOG.debug("Snapshot ID: " + info.instanceId.serializeToJSONObject().toString());
+                continue;
+            }
             if (VoltDB.instance().isIV2Enabled() && info != null) {
                 final Map<Integer, Long> cmdlogmap = m_replayAgent.getMaxLastSeenTxnByPartition();
                 final Map<Integer, Long> snapmap = info.partitionToTxnId;
@@ -552,6 +596,8 @@ SnapshotCompletionInterest
                 // don't do any TXN ID consistency checking between command log and snapshot
                 if (cmdlogmap != null) {
                     if (snapmap == null || cmdlogmap.size() != snapmap.size()) {
+                        LOG.debug("Rejecting snapshot due to mismatching partition count (THIS IS BOGUS)");
+                        LOG.debug("command log count: " + cmdlogmap.size() + ", snapshot count: " + snapmap.size());
                         info = null;
                     }
                     else {
@@ -559,9 +605,14 @@ SnapshotCompletionInterest
                             Long snaptxnId = snapmap.get(cmdpart);
                             if (snaptxnId == null) {
                                 info = null;
+                                LOG.debug("Rejecting snapshot due to missing partition: " + cmdpart);
                                 break;
                             }
                             else if (snaptxnId < cmdlogmap.get(cmdpart)) {
+                                LOG.debug("Rejecting snapshot because it does not overlap the command log");
+                                LOG.debug("for partition: " + cmdpart);
+                                LOG.debug("command log txn ID: " + cmdlogmap.get(cmdpart));
+                                LOG.debug("snapshot txn ID: " + snaptxnId);
                                 info = null;
                                 break;
                             }
@@ -579,14 +630,13 @@ SnapshotCompletionInterest
         sendLocalRestoreInformation(maxLastSeenTxn, snapshotInfos);
 
         // Negotiate with other hosts about which snapshot to restore
-        Set<SnapshotInfo> lastSnapshot = getRestorePlan();
-        SnapshotInfo infoWithMinHostId = consolidateSnapshotInfos(lastSnapshot);
+        SnapshotInfo infoWithMinHostId = getRestorePlan();
 
         /*
          * Generate the replay plan here so that we don't have to wait until the
          * snapshot restore finishes.
          */
-        if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
+        if (m_action == START_ACTION.RECOVER) {
             m_replayAgent.generateReplayPlan();
         }
 
@@ -604,6 +654,7 @@ SnapshotCompletionInterest
 
             for (boolean completed : tf.m_completed) {
                 if (!completed) {
+                    LOG.debug("Rejecting snapshot because it was not completed.");
                     return null;
                 }
             }
@@ -613,6 +664,7 @@ SnapshotCompletionInterest
                 if (partitionCount == -1) {
                     partitionCount = count;
                 } else if (count != partitionCount) {
+                    LOG.debug("Rejecting snapshot because it had the wrong partition count.");
                     return null;
                 }
             }
@@ -621,6 +673,8 @@ SnapshotCompletionInterest
         File digest = s.m_digests.get(0);
         Long catalog_crc = null;
         Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
+        // Create a valid but meaningless InstanceId to support pre-instanceId checking versions
+        InstanceId instanceId = new InstanceId(0, 0);
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
@@ -635,6 +689,10 @@ SnapshotCompletionInterest
                     Long txnidval = pidToTxnId.getLong(pidkey);
                     pidToTxnMap.put(Integer.valueOf(pidkey), txnidval);
                 }
+            }
+
+            if (digest_detail.has("instanceId")) {
+                instanceId = new InstanceId(digest_detail.getJSONObject("instanceId"));
             }
         }
         catch (IOException ioe)
@@ -652,8 +710,8 @@ SnapshotCompletionInterest
 
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
-                    parseDigestFilename(digest.getName()),
-                    partitionCount, catalog_crc, m_hostId);
+                    SnapshotUtil.parseNonceFromDigestFilename(digest.getName()),
+                    partitionCount, catalog_crc, m_hostId, instanceId);
         // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();
@@ -803,7 +861,7 @@ SnapshotCompletionInterest
      * @return The snapshot to restore from, null if none.
      * @throws Exception
      */
-    private Set<SnapshotInfo> getRestorePlan() throws Exception {
+    private SnapshotInfo getRestorePlan() throws Exception {
         // Wait for ZK to publish the snapshot fragment/info structures.
         List<String> children = waitOnVoltZK_restore();
 
@@ -812,7 +870,7 @@ SnapshotCompletionInterest
             return null;
         }
 
-        TreeMap<Long, Set<SnapshotInfo>> snapshotFragments = new TreeMap<Long, Set<SnapshotInfo>>();
+        Map<String, Set<SnapshotInfo>> snapshotFragments = new HashMap<String, Set<SnapshotInfo>>();
         Long clStartTxnId = deserializeRestoreInformation(children, snapshotFragments);
 
         // If command log has no snapshot requirement clear the fragment set directly
@@ -823,16 +881,17 @@ SnapshotCompletionInterest
         LOG.debug("There are " + snapshotFragments.size() + " restore candidate snapshots available in the cluster");
 
         // Find the last complete snapshot and use it
-        HashMap<Long, Map<String, Set<Integer>>> snapshotTablePartitions =
-            new HashMap<Long, Map<String,Set<Integer>>>();
-        Iterator<Entry<Long, Set<SnapshotInfo>>> it = snapshotFragments.entrySet().iterator();
+        HashMap<String, Map<String, Set<Integer>>> snapshotTablePartitions =
+            new HashMap<String, Map<String,Set<Integer>>>();
+        Iterator<Entry<String, Set<SnapshotInfo>>> it = snapshotFragments.entrySet().iterator();
+        SnapshotInfo newest = null;
         while (it.hasNext()) {
-            Entry<Long, Set<SnapshotInfo>> e = it.next();
-            long txnId = e.getKey();
-            Map<String, Set<Integer>> tablePartitions = snapshotTablePartitions.get(txnId);
+            Entry<String, Set<SnapshotInfo>> e = it.next();
+            String nonce = e.getKey();
+            Map<String, Set<Integer>> tablePartitions = snapshotTablePartitions.get(nonce);
             if (tablePartitions == null) {
                 tablePartitions = new HashMap<String, Set<Integer>>();
-                snapshotTablePartitions.put(txnId, tablePartitions);
+                snapshotTablePartitions.put(nonce, tablePartitions);
             }
 
             int totalPartitions = -1;
@@ -871,6 +930,12 @@ SnapshotCompletionInterest
             if (inconsistent) {
                 it.remove();
             }
+            else {
+                SnapshotInfo current = consolidateSnapshotInfos(fragments);
+                if (newest == null || current.isNewerThan(newest)) {
+                    newest = current;
+                }
+            }
         }
 
         // If we have a command log and it requires a snapshot but no snapshot
@@ -883,7 +948,7 @@ SnapshotCompletionInterest
         if (snapshotFragments.isEmpty()) {
             return null;
         } else {
-            return snapshotFragments.lastEntry().getValue();
+            return newest;
         }
     }
 
@@ -894,7 +959,7 @@ SnapshotCompletionInterest
      * And, it errors if the remote start action does not match the local action.
      */
     private Long deserializeRestoreInformation(List<String> children,
-            Map<Long, Set<SnapshotInfo>> snapshotFragments) throws Exception
+            Map<String, Set<SnapshotInfo>> snapshotFragments) throws Exception
     {
         try {
             int recover = m_action.ordinal();
@@ -926,10 +991,10 @@ SnapshotCompletionInterest
                 for (int i=0; i < snapInfoCnt; i++) {
                     JSONObject jsonInfo = snapInfos.getJSONObject(i);
                     SnapshotInfo info = new SnapshotInfo(jsonInfo);
-                    Set<SnapshotInfo> fragments = snapshotFragments.get(info.txnId);
+                    Set<SnapshotInfo> fragments = snapshotFragments.get(info.nonce);
                     if (fragments == null) {
                         fragments = new HashSet<SnapshotInfo>();
-                        snapshotFragments.put(info.txnId, fragments);
+                        snapshotFragments.put(info.nonce, fragments);
                     }
                     fragments.add(info);
                 }
@@ -1100,7 +1165,7 @@ SnapshotCompletionInterest
      *
      * @return All snapshots
      */
-    private TreeMap<Long, Snapshot> getSnapshots() {
+    private Map<String, Snapshot> getSnapshots() {
         /*
          * Use the individual snapshot directories instead of voltroot, because
          * they can be set individually
@@ -1114,7 +1179,7 @@ SnapshotCompletionInterest
         if (m_snapshotPath != null) {
             paths.add(m_snapshotPath);
         }
-        TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, Snapshot>();
+        HashMap<String, Snapshot> snapshots = new HashMap<String, Snapshot>();
         FileFilter filter = new SnapshotUtil.SnapshotFilter();
 
         for (String path : paths) {
@@ -1125,36 +1190,17 @@ SnapshotCompletionInterest
     }
 
     /**
-     * Get the nonce from the filename of the digest file.
-     * @param filename The filename of the digest file
-     * @return The nonce
-     */
-    private static String parseDigestFilename(String filename) {
-        if (filename == null || !filename.endsWith(".digest")) {
-            throw new IllegalArgumentException();
-        }
-
-        String nonce = filename.substring(0, filename.indexOf(".digest"));
-        if (nonce.contains("-host_")) {
-            nonce = nonce.substring(0, nonce.indexOf("-host_"));
-        }
-
-        return nonce;
-    }
-
-    /**
      * All nodes will be notified about the completion of the truncation
      * snapshot.
      */
     @Override
-    public CountDownLatch snapshotCompleted(final String nonce, long txnId, long partitionTxnIds[],
-                                            boolean truncationSnapshot) {
-        if (!truncationSnapshot) {
+    public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
+        if (!event.truncationSnapshot) {
             VoltDB.crashGlobalVoltDB("Failed to truncate command logs by snapshot",
                                      false, null);
         } else {
-            m_truncationSnapshot = txnId;
-            m_truncationSnapshotPerPartition = partitionTxnIds;
+            m_truncationSnapshot = event.multipartTxnId;
+            m_truncationSnapshotPerPartition = event.partitionTxnIds;
             m_replayAgent.returnAllSegments();
             changeState();
         }

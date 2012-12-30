@@ -31,13 +31,14 @@ import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.SysProcSelector;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
@@ -125,11 +126,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertEquals(1, results.length);
         System.out.println("Test initiators table: " + results[0].toString());
-        assertEquals(1, results[0].getRowCount());
-        VoltTableRow resultRow = results[0].fetchRow(0);
-        assertNotNull(resultRow);
-        assertEquals("@Statistics", resultRow.getString("PROCEDURE_NAME"));
-        assertEquals( 1, resultRow.getLong("INVOCATIONS"));
+        //Now two entries because client affinity also does a query
+        assertEquals(2, results[0].getRowCount());
+
+        int counts = 0;
+        while (results[0].advanceRow()) {
+            String procName = results[0].getString("PROCEDURE_NAME");
+            if (procName.equals("@SystemCatalog")) {
+                assertEquals( 1, results[0].getLong("INVOCATIONS"));
+                counts++;
+            } else if (procName.equals("@Statistics")) {
+                assertEquals( 1, results[0].getLong("INVOCATIONS"));
+                counts++;
+            }
+        }
+        assertEquals(2, counts);
 
         //
         // invalid selector
@@ -202,14 +213,22 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         //
         // 3 seconds translates to 3 billion nanos, which overflows internal
         // values (ENG-1039)
-        results = client.callProcedure("GoSleep", 3000, 0, null).getResults();
+        //It's possible that the nanosecond count goes backwards... so run this a couple
+        //of times to make sure the min value gets set
+        for (int ii = 0; ii < 3; ii++) {
+            results = client.callProcedure("GoSleep", 3000, 0, null).getResults();
+        }
         results = client.callProcedure("@Statistics", "procedure", 0).getResults();
         // one aggregate table returned
         assertEquals(1, results.length);
         System.out.println("Test procedures table: " + results[0].toString());
 
         VoltTable stats = results[0];
-        stats.advanceRow();
+        String procname = "blerg";
+        while (!procname.equals("org.voltdb_testprocs.regressionsuites.malicious.GoSleep")) {
+            stats.advanceRow();
+            procname = (String)stats.get("PROCEDURE", VoltType.STRING);
+        }
 
         // Retrieve all statistics
         long min_time = (Long)stats.get("MIN_EXECUTION_TIME", VoltType.BIGINT);
@@ -278,6 +297,25 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertEquals(1, results.length);
         System.out.println("Test iostats table: " + results[0].toString());
+
+        //
+        // TOPO
+        //
+        if (VoltDB.checkTestEnvForIv2()) {
+            results = client.callProcedure("@Statistics", "TOPO", 0).getResults();
+            // one aggregate table returned
+            assertEquals(1, results.length);
+            System.out.println("Test TOPO table: " + results[0].toString());
+            VoltTable topo = results[0];
+            // Make sure we can find the MPI, at least
+            boolean found = false;
+            while (topo.advanceRow()) {
+                if ((int)topo.getLong("Partition") == TxnEgo.MP_PARTITIONID) {
+                    found = true;
+                }
+            }
+            assertTrue(found);
+        }
     }
 
     //
@@ -383,7 +421,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void testLoadMultipartitionTable() throws IOException {
+    public void testLoadMultipartitionTableAndIndexStats() throws IOException {
         Client client = getClient();
 
         // try the failure case first
@@ -460,6 +498,38 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 }
             }
             assertEquals(6, foundItem);
+
+            VoltTable indexStats =
+                    client.callProcedure("@Statistics", "INDEX", 0).getResults()[0];
+            System.out.println(indexStats);
+            long memorySum = 0;
+            while (indexStats.advanceRow()) {
+                memorySum += indexStats.getLong("MEMORY_ESTIMATE");
+            }
+
+            /*
+             * It takes about a minute to spin through this 1000 times.
+             * Should definitely give a 1 second tick time to fire
+             */
+            long indexMemorySum = 0;
+            for (int ii = 0; ii < 1000; ii++) {
+                indexMemorySum = 0;
+                indexStats = client.callProcedure("@Statistics", "MEMORY", 0).getResults()[0];
+                System.out.println(indexStats);
+                while (indexStats.advanceRow()) {
+                    indexMemorySum += indexStats.getLong("INDEXMEMORY");
+                }
+                boolean success = indexMemorySum != 120;//That is a row count, not memory usage
+                if (success) {
+                    success = memorySum == indexMemorySum;
+                    if (success) {
+                        return;
+                    }
+                }
+                Thread.sleep(1);
+            }
+            assertTrue(indexMemorySum != 120);//That is a row count, not memory usage
+            assertEquals(memorySum, indexMemorySum);
         }
         catch (Exception e) {
             e.printStackTrace();

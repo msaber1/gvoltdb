@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.io.UnsupportedEncodingException;
+
 import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.Future;
@@ -27,7 +29,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -41,9 +42,10 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
 
+import org.voltdb.VoltDB;
+
 import com.google.common.collect.ImmutableMap;
 import com.google.common.util.concurrent.ListeningExecutorService;
-import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * Tracker monitors and provides snapshots of a single ZK node's
@@ -120,12 +122,17 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     @Override
     public void put(int partitionId, long HSId) throws KeeperException, InterruptedException {
         try {
-            m_zk.create(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
-                    Long.toString(HSId).getBytes(),
-                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (KeeperException.NodeExistsException e) {
-            m_zk.setData(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
-                        Long.toString(HSId).getBytes(), -1);
+            try {
+                m_zk.create(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
+                        Long.toString(HSId).getBytes("UTF-8"),
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            } catch (KeeperException.NodeExistsException e) {
+                m_zk.setData(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
+                        Long.toString(HSId).getBytes("UTF-8"), -1);
+            }
+        }
+        catch (UnsupportedEncodingException utf8) {
+            VoltDB.crashLocalVoltDB("Invalid string encoding: UTF-8", true, utf8);
         }
     }
 
@@ -141,9 +148,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     private final String m_rootNode;
 
     // All watch processing is run serially in this thread.
-    private final ListeningExecutorService m_es =
-            MoreExecutors.listeningDecorator(
-                    Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("LeaderCache", 1024 * 128)));
+    private final ListeningExecutorService m_es = CoreUtils.getCachedSingleThreadExecutor("LeaderCache", 15000);
 
     // previous children snapshot for internal use.
     private Set<String> m_lastChildren = new HashSet<String>();
@@ -288,11 +293,13 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         ByteArrayCallback cb = new ByteArrayCallback();
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
+            // cb.getData() and cb.getPath() throw KeeperException
             byte payload[] = cb.getData();
             long HSId = Long.valueOf(new String(payload, "UTF-8"));
             cacheCopy.put(getPartitionIdFromZKPath(cb.getPath()), HSId);
         } catch (KeeperException.NoNodeException e) {
-            cacheCopy.remove(event.getPath());
+            // rtb: I think result's path is the same as cb.getPath()?
+            cacheCopy.remove(getPartitionIdFromZKPath(event.getPath()));
         }
         m_publicCache.set(ImmutableMap.copyOf(cacheCopy));
         if (m_cb != null) {

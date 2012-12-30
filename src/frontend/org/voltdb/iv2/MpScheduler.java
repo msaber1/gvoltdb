@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -37,7 +38,9 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 
 public class MpScheduler extends Scheduler
 {
@@ -50,16 +53,18 @@ public class MpScheduler extends Scheduler
 
     private final List<Long> m_iv2Masters;
     private final long m_buddyHSId;
+    //Generator of pre-IV2ish timestamp based unique IDs
+    private final UniqueIdGenerator m_uniqueIdGenerator;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
-    private CommandLog m_cl;
 
     MpScheduler(int partitionId, long buddyHSId, SiteTaskerQueue taskQueue)
     {
         super(partitionId, taskQueue);
         m_buddyHSId = buddyHSId;
         m_iv2Masters = new ArrayList<Long>();
+        m_uniqueIdGenerator = new UniqueIdGenerator(partitionId, 0);
     }
 
     @Override
@@ -69,16 +74,7 @@ public class MpScheduler extends Scheduler
         // response to roll back. This function must be called with
         // the deliver lock held to be correct. The null task should
         // never run; the site thread is expected to be told to stop.
-        SiteTasker nullTask = new SiteTasker() {
-            @Override
-            public void run(SiteProcedureConnection siteConnection) {
-            }
-
-            @Override
-            public void runForRejoin(SiteProcedureConnection siteConnection) {
-            }
-        };
-        m_pendingTasks.repair(nullTask);
+        m_pendingTasks.repair(m_nullTask, m_iv2Masters);
     }
 
 
@@ -86,9 +82,9 @@ public class MpScheduler extends Scheduler
     public void updateReplicas(final List<Long> replicas)
     {
         // Handle startup and promotion semi-gracefully
+        m_iv2Masters.clear();
+        m_iv2Masters.addAll(replicas);
         if (!m_isLeader) {
-            m_iv2Masters.clear();
-            m_iv2Masters.addAll(replicas);
             return;
         }
 
@@ -113,13 +109,6 @@ public class MpScheduler extends Scheduler
                     boolean success = result.getFirst();
                     if (success) {
                         tmLog.info(whoami + "finished repair.");
-                        // We need to update the replicas with the InitiatorMailbox's
-                        // deliver() lock held.  Since we're not calling
-                        // InitiatorMailbox.updateReplicas() here, grab the lock manually
-                        synchronized (initiatorMailbox) {
-                            m_iv2Masters.clear();
-                            m_iv2Masters.addAll(replicaCopy);
-                        }
                     }
                     else {
                         tmLog.info(whoami + "interrupted during repair.  Retrying.");
@@ -132,12 +121,13 @@ public class MpScheduler extends Scheduler
             }
 
             @Override
-            public void runForRejoin(SiteProcedureConnection siteConnection)
+            public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+            throws IOException
             {
                 throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
             }
         };
-        m_pendingTasks.repair(repairTask);
+        m_pendingTasks.repair(repairTask, replicaCopy);
     }
 
     @Override
@@ -151,6 +141,9 @@ public class MpScheduler extends Scheduler
         }
         else if (message instanceof FragmentResponseMessage) {
             handleFragmentResponseMessage((FragmentResponseMessage)message);
+        }
+        else if (message instanceof Iv2EndOfLogMessage) {
+            handleEOLMessage();
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
@@ -169,15 +162,17 @@ public class MpScheduler extends Scheduler
          * If this is CL replay, use the txnid from the CL and use it to update the current txnid
          */
         long mpTxnId;
+        //Timestamp is actually a pre-IV2ish style time based transaction id
         long timestamp;
         if (message.isForReplay()) {
             mpTxnId = message.getTxnId();
-            timestamp = message.getTimestamp();
+            timestamp = message.getUniqueId();
             setMaxSeenTxnId(mpTxnId);
+            m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
         } else {
             TxnEgo ego = advanceTxnEgo();
             mpTxnId = ego.getTxnId();
-            timestamp = ego.getWallClock();
+            timestamp = m_uniqueIdGenerator.getNextUniqueId();
         }
 
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
@@ -229,15 +224,36 @@ public class MpScheduler extends Scheduler
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, procedureName,
-                    m_pendingTasks, mp, m_iv2Masters, m_buddyHSId);
+                    m_pendingTasks, mp, m_iv2Masters, m_buddyHSId, false);
         m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
         m_pendingTasks.offer(task);
     }
 
     @Override
     public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
-        // MP initiate tasks are never repaired.
-        throw new RuntimeException("Impossible code path through MPI repair.");
+        // just reforward the Iv2InitiateTaskMessage for the txn being restarted
+        // this copy may be unnecessary
+        final String procedureName = message.getStoredProcedureName();
+        Iv2InitiateTaskMessage mp =
+            new Iv2InitiateTaskMessage(
+                    message.getInitiatorHSId(),
+                    message.getCoordinatorHSId(),
+                    message.getTruncationHandle(),
+                    message.getTxnId(),
+                    message.getUniqueId(),
+                    message.isReadOnly(),
+                    message.isSinglePartition(),
+                    message.getStoredProcedureInvocation(),
+                    message.getClientInterfaceHandle(),
+                    message.getConnectionId(),
+                    message.isForReplay());
+        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getUniqueId());
+        // Multi-partition initiation (at the MPI)
+        final MpProcedureTask task =
+            new MpProcedureTask(m_mailbox, procedureName,
+                    m_pendingTasks, mp, m_iv2Masters, m_buddyHSId, true);
+        m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
+        m_pendingTasks.offer(task);
     }
 
     // The MpScheduler will see InitiateResponseMessages from the Partition masters when
@@ -254,19 +270,20 @@ public class MpScheduler extends Scheduler
                 m_duplicateCounters.remove(message.getTxnId());
                 m_repairLogTruncationHandle = message.getTxnId();
                 m_outstandingTxns.remove(message.getTxnId());
+
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
-            return;
         }
-
-        // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-        m_repairLogTruncationHandle = message.getTxnId();
-        m_outstandingTxns.remove(message.getTxnId());
-        m_mailbox.send(message.getInitiatorHSId(), message);
+        else {
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+            m_repairLogTruncationHandle = message.getTxnId();
+            m_outstandingTxns.remove(message.getTxnId());
+            m_mailbox.send(message.getInitiatorHSId(), message);
+        }
     }
 
     public void handleFragmentTaskMessage(FragmentTaskMessage message,
@@ -301,8 +318,27 @@ public class MpScheduler extends Scheduler
         throw new RuntimeException("MpScheduler should never see a CompleteTransactionMessage");
     }
 
+    /**
+     * Inject a task into the transaction task queue to flush it. When it
+     * executes, it will send out MPI end of log messages to all partition
+     * initiators.
+     */
+    public void handleEOLMessage()
+    {
+        Iv2EndOfLogMessage msg = new Iv2EndOfLogMessage(true);
+        MPIEndOfLogTransactionState txnState = new MPIEndOfLogTransactionState(msg);
+        MPIEndOfLogTask task = new MPIEndOfLogTask(m_mailbox, m_pendingTasks,
+                                                   txnState, m_iv2Masters);
+        m_pendingTasks.offer(task);
+    }
+
     @Override
     public void setCommandLog(CommandLog cl) {
-        m_cl = cl;
+        // the MPI currently doesn't do command logging.  Don't have a reference to one.
+    }
+
+    @Override
+    public void enableWritingIv2FaultLog() {
+        // This is currently a no-op for the MPI
     }
 }

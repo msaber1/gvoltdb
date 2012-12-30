@@ -29,9 +29,10 @@ import java.nio.channels.SelectableChannel;
 import java.nio.channels.SelectionKey;
 import java.nio.channels.Selector;
 import java.nio.channels.spi.SelectorProvider;
-import java.util.Set;
 import java.util.HashSet;
-import junit.framework.*;
+import java.util.Set;
+
+import junit.framework.TestCase;
 
 public class TestVoltNetwork extends TestCase {
 

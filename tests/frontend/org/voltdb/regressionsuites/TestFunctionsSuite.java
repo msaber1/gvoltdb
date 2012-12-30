@@ -28,7 +28,6 @@ import java.math.BigDecimal;
 import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -44,21 +43,171 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
 public class TestFunctionsSuite extends RegressionSuite {
 
-    /**
-     * Inner class procedure to see if we can invoke it.
-     */
-    public static class InnerProc extends VoltProcedure {
-        public long run() {
-            return 0L;
-        }
-    }
-
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
+    // Padding used to purposely exercise non-inline strings.
+    private static final String paddedToNonInlineLength =
+        "will you still free me (will memcheck see me) when Im sixty-four";
+
+
+    public void testStringExpressionIndex() throws Exception {
+        System.out.println("STARTING testStringExpressionIndex");
+        Client client = getClient();
+        initialLoad(client, "P1");
+
+        ClientResponse cr = null;
+        VoltTable result = null;
+        /*
+                "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                // Test generalized indexes on a string function and combos.
+                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE INDEX P1_SUBSTRING_WITH_COL_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), DESC ); " +
+                "CREATE INDEX P1_NUM_EXPR_WITH_STRING_COL ON P1 ( DESC, ABS(ID) ); " +
+                "CREATE INDEX P1_MIXED_TYPE_EXPRS1 ON P1 ( ABS(ID+2), SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) ); " +
+        */
+
+        // Do some rudimentary indexed queries -- the real challenge to string expression indexes is defining and loading/maintaining them.
+        // TODO: For that reason, it might make sense to break them out into their own suite to make their specific issues easier to isolate.
+        cr = client.callProcedure("@AdHoc", "select ID from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 order by NUM, ID");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(5, result.getRowCount());
+
+        VoltTable r;
+        long resultA;
+        long resultB;
+
+        // Filters intended to be close enough to bring two different indexes to the same result as no index at all.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID+3) = 7 order by NUM, ID");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) >= 'X1' and ABS(ID+2) = 8");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 and ABS(ID+2) < 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        // Do some updates intended to be non-corrupting and inconsequential to the test query results.
+        cr = client.callProcedure("@AdHoc", "delete from P1 where ABS(ID+3) <> 7");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        long killCount = r.asScalarLong();
+        assertEquals(7, killCount);
+
+        // Repeat the queries on updated indexes.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) >= 'X1' and ABS(ID+2) = 8");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 1 for 2) = 'X1' and ABS(ID+2) > 7 and ABS(ID+2) < 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+}
+
+    public void testNumericExpressionIndex() throws Exception {
+        System.out.println("STARTING testNumericExpressionIndex");
+        Client client = getClient();
+        initialLoad(client, "R1");
+
+        ClientResponse cr = null;
+        VoltTable result = null;
+        /*
+                "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                // Test generalized index on a function of a non-indexed column.
+                "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " +
+                // Test generalized index on an expression of multiple columns.
+                "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " +
+                // Test generalized index on a string function.
+                // "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE TABLE R1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+                // Test unique generalized index on a function of an already indexed column.
+                "CREATE UNIQUE INDEX R1_ABS_ID ON R1 ( ABS(ID) ); " +
+                // Test generalized expression index with a constant argument.
+                "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
+        */
+        cr = client.callProcedure("@AdHoc", "select ID from R1 where ABS(ID) > 9 order by NUM, ID");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(5, result.getRowCount());
+
+        VoltTable r;
+        long resultA;
+        long resultB;
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where (ID+ID) / 6 = -3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        // Here's some hard-won functionality -- matching expression indexes with only the right constants in them.
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where ID / 3 = -3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where (ID+ID) / 6 = -2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        // Expecting to use the cached index plan and still get a correct result.
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where ID / 3 = -2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where (ID+ID) / 4 = -3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        // Not expecting to use the index -- that's the whole point.
+        cr = client.callProcedure("@AdHoc", "select count(*) from R1 where ID / 2 = -3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+    }
+
     public void testAbsWithLimit_ENG3572() throws Exception
     {
-        System.out.println("STARTING testAbs");
+        System.out.println("STARTING testAbsWithLimit_ENG3572");
         Client client = getClient();
         /*
         CREATE TABLE P1 (
@@ -79,36 +228,23 @@ public class TestFunctionsSuite extends RegressionSuite {
     {
         System.out.println("STARTING testAbs");
         Client client = getClient();
-        ProcedureCallback callback = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse)
-                    throws Exception {
-                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
-                }
-            }
-        };
-        /*
-        CREATE TABLE P1 (
-                ID INTEGER DEFAULT '0' NOT NULL,
-                DESC VARCHAR(300),
-                NUM INTEGER,
-                RATIO FLOAT,
-                PAST TIMESTAMP DEFAULT NULL,
-                PRIMARY KEY (ID)
-                );
-        */
-        for(int id=7; id < 15; id++) {
-            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
-            client.drain();
-        }
+        initialLoad(client, "P1");
+
         ClientResponse cr = null;
         VoltTable r = null;
+
+        // The next two queries used to fail due to ENG-3913,
+        // abuse of compound indexes for partial GT filters.
+        // An old issue only brought to light by the addition of a compound index to this suite.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) > 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong()); // used to get 6, matching like >=
 
         cr = client.callProcedure("WHERE_ABS");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        assertEquals(5, r.asScalarLong());
+        assertEquals(5, r.asScalarLong()); // used to get 6, matching like >=
 
         try {
             // test decimal support and non-column expressions
@@ -288,35 +424,28 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
         assertTrue(caught);
 
+        cr = client.callProcedure("@AdHoc", "insert into R1 values (1, null, null, null, null)");
+
+        caught = false;
+        try {
+            // This should violate the UNIQUE ABS constraint without violating the primary key constraint.
+            cr = client.callProcedure("@AdHoc", "insert into R1 values (-1, null, null, null, null)");
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("violation of constraint") != -1);
+            caught = true;
+        }
+        // If the insert succeeds on VoltDB, the constraint failed to trigger.
+        // If the insert fails on HSQL, the test is invalid -- HSQL should not detect the subtle constraint violation we are trying to trigger.
+        assertEquals( ! isHSQL(), caught);
     }
 
     public void testSubstring() throws Exception
     {
         System.out.println("STARTING testSubstring");
         Client client = getClient();
-        ProcedureCallback callback = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse)
-                    throws Exception {
-                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
-                }
-            }
-        };
-        /*
-        CREATE TABLE P1 (
-                ID INTEGER DEFAULT '0' NOT NULL,
-                DESC VARCHAR(300),
-                NUM INTEGER,
-                RATIO FLOAT,
-                PAST TIMESTAMP DEFAULT NULL,
-                PRIMARY KEY (ID)
-                );
-        */
-        for(int id=7; id < 15; id++) {
-            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
-            client.drain();
-        }
+        initialLoad(client, "P1");
+
         ClientResponse cr = null;
         VoltTable r = null;
 
@@ -336,6 +465,12 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
+        assertEquals("12"+paddedToNonInlineLength, r.getString(0));
+
+        cr = client.callProcedure("DISPLAY_SUBSTRING2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
         assertEquals("12", r.getString(0));
 
         // Test ORDER BY by support
@@ -348,6 +483,12 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         // Test GROUP BY by support
         cr = client.callProcedure("AGG_OF_SUBSTRING");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        assertEquals("10"+paddedToNonInlineLength, r.getString(0));
+
+        cr = client.callProcedure("AGG_OF_SUBSTRING2");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
@@ -779,6 +920,37 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals("Xin@VoltDB", result.getString(1));
     }
 
+    private void initialLoad(Client client, String tableName) throws IOException, NoConnectionsException, InterruptedException {
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse) throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
+
+        /*
+        CREATE TABLE ??? (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID)
+                );
+        */
+        for(int id=7; id < 15; id++) {
+            client.callProcedure(callback, tableName+".insert",
+                                 - id, // ID
+                                 "X"+String.valueOf(id)+paddedToNonInlineLength, // DESC
+                                  10, // NUM
+                                  1.1, // RATIO
+                                  new Timestamp(100000000L)); // PAST
+            client.drain();
+        }
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -802,10 +974,33 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "RATIO FLOAT, " +
                 "PAST TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); " +
-                "CREATE INDEX P1_ABS_ID ON P1 ( ABS(ID) ); " + // Test generalized index on a function of an already indexed column.
-                "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " + // Test generalized index on a function of a non-indexed column.
-                "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " + // Test generalized index on an expression of multiple columns.
-                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " + // Test generalized index on a string function.
+
+                // Test generalized index on a function of a non-indexed column.
+                "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " +
+
+                // Test generalized index on an expression of multiple columns.
+                "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " +
+
+                // Test generalized indexes on a string function and various combos.
+                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE INDEX P1_SUBSTRING_WITH_COL_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), DESC ); " +
+                "CREATE INDEX P1_NUM_EXPR_WITH_STRING_COL ON P1 ( ABS(ID), DESC ); " +
+                "CREATE INDEX P1_MIXED_TYPE_EXPRS1 ON P1 ( ABS(ID+2), SUBSTRING(DESC FROM 1 FOR 2) ); " +
+                "CREATE INDEX P1_MIXED_TYPE_EXPRS2 ON P1 ( SUBSTRING(DESC FROM 1 FOR 2), ABS(ID+2) ); " +
+
+                "CREATE TABLE R1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
+                "PRIMARY KEY (ID) ); " +
+
+                // Test unique generalized index on a function of an already indexed column.
+                "CREATE UNIQUE INDEX R1_ABS_ID ON R1 ( ABS(ID) ); " +
+
+                // Test generalized expression index with a constant argument.
+                "CREATE INDEX R1_ABS_ID_SCALED ON R1 ( ID / 3 ); " +
                 "";
         try {
             project.addLiteralSchema(literalSchema);
@@ -828,17 +1023,24 @@ public class TestFunctionsSuite extends RegressionSuite {
         // RuntimeException seems to stem from parser failure similar to ENG-2901
         // project.addStmtProcedure("ABS_OF_AGG", "select ABS(MIN(ID+9)) from P1");
 
-        project.addStmtProcedure("WHERE_SUBSTRING2", "select count(*) from P1 where SUBSTRING (DESC FROM 2) > '12'");
-        project.addStmtProcedure("WHERE_SUBSTRING3", "select count(*) from P1 where not SUBSTRING (DESC FROM 2 FOR 1) > '13'");
+        project.addStmtProcedure("WHERE_SUBSTRING2",
+                                 "select count(*) from P1 " +
+                                 "where SUBSTRING (DESC FROM 2) > '12"+paddedToNonInlineLength+"'");
+        project.addStmtProcedure("WHERE_SUBSTRING3",
+                                 "select count(*) from P1 " +
+                                 "where not SUBSTRING (DESC FROM 2 FOR 1) > '13'");
 
         // Test select support
         project.addStmtProcedure("DISPLAY_SUBSTRING", "select SUBSTRING (DESC FROM 2) from P1 where ID = -12");
+        project.addStmtProcedure("DISPLAY_SUBSTRING2", "select SUBSTRING (DESC FROM 2 FOR 2) from P1 where ID = -12");
+
 
         // Test ORDER BY by support
         project.addStmtProcedure("ORDER_SUBSTRING", "select ID+15 from P1 order by SUBSTRING (DESC FROM 2)");
 
         // Test GROUP BY by support
         project.addStmtProcedure("AGG_OF_SUBSTRING", "select MIN(SUBSTRING (DESC FROM 2)) from P1 where ID < -7");
+        project.addStmtProcedure("AGG_OF_SUBSTRING2", "select MIN(SUBSTRING (DESC FROM 2 FOR 2)) from P1 where ID < -7");
 
         // Test parameterizing functions
         // next one disabled until ENG-3486
@@ -856,8 +1058,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
-        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        // /* alternative for debug*/ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        // alternative to enable for debugging */ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

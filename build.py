@@ -165,6 +165,7 @@ CTX.INPUT['catalog'] = """
  columnref.cpp
  connector.cpp
  connectortableinfo.cpp
+ connectorproperty.cpp
  constraint.cpp
  constraintref.cpp
  database.cpp
@@ -323,6 +324,15 @@ CTX.THIRD_PARTY_INPUT['json_spirit'] = """
  json_spirit_value.cpp
 """
 
+CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
+ jsoncpp.cpp
+"""
+
+CTX.THIRD_PARTY_INPUT['crc'] = """
+ crc32c.cc
+ crc32ctables.cc 
+"""
+
 ###############################################################################
 # SPECIFY THE TESTS
 ###############################################################################
@@ -354,6 +364,7 @@ if whichtests in ("${eetestsuite}", "common"):
      undolog_test
      valuearray_test
      nvalue_test
+     pool_test
      tabletuple_test
     """
 

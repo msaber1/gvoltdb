@@ -33,13 +33,18 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected long m_initiatorHSId;
     protected long m_coordinatorHSId;
     protected long m_txnId;
-    protected long m_timestamp;
+    protected long m_uniqueId;
     // IV2: within a partition, the primary initiator and its replicas
     // use this for intra-partition ordering/lookup
     private long m_spHandle;
     // IV2: allow PI to signal RI repair log truncation with a new task.
     private long m_truncationHandle;
+    // The originalTxnId for DR. Duplicates logic in ProcedureInvocation
+    // to communicate DR state and ordering for CompleteTransaction
+    // and FragmentTaskMessages and MultipartitionParticipantMessages.
+    protected long m_originalDRTxnId = -1;
     protected boolean m_isReadOnly;
+    // Message create for command log replay.
     protected boolean m_isForReplay;
 
 
@@ -51,14 +56,15 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected TransactionInfoBaseMessage(long initiatorHSId,
                                       long coordinatorHSId,
                                       long txnId,
-                                      long timestamp,
+                                      long uniqueId,
                                       boolean isReadOnly,
-                                      boolean isForReplay) {
+                                      boolean isForReplay)
+    {
         m_initiatorHSId = initiatorHSId;
         m_coordinatorHSId = coordinatorHSId;
         m_txnId = txnId;
         m_spHandle = Long.MIN_VALUE;
-        m_timestamp = timestamp;
+        m_uniqueId = uniqueId;
         m_isReadOnly = isReadOnly;
         m_subject = Subject.DEFAULT.getId();
         m_isForReplay = isForReplay;
@@ -71,12 +77,13 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_initiatorHSId = initiatorHSId;
         m_coordinatorHSId = coordinatorHSId;
         m_txnId = rhs.m_txnId;
-        m_timestamp = rhs.m_timestamp;
+        m_uniqueId = rhs.m_uniqueId;
         m_isReadOnly = rhs.m_isReadOnly;
         m_isForReplay = rhs.m_isForReplay;
         m_subject = rhs.m_subject;
         m_spHandle = rhs.m_spHandle;
         m_truncationHandle = rhs.m_truncationHandle;
+        m_originalDRTxnId = rhs.m_originalDRTxnId;
     }
 
     public long getInitiatorHSId() {
@@ -95,12 +102,12 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return m_txnId;
     }
 
-    public long getTimestamp() {
-        return m_timestamp;
+    public long getUniqueId() {
+        return m_uniqueId;
     }
 
-    public void setTimestamp(long timestamp) {
-        m_timestamp = timestamp;
+    public void setUniqueId(long uniqueId) {
+        m_uniqueId = uniqueId;
     }
 
     public void setSpHandle(long spHandle) {
@@ -131,6 +138,18 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return m_isForReplay;
     }
 
+    public boolean isForDR() {
+        return m_originalDRTxnId != -1;
+    }
+
+    public void setOriginalTxnId(long txnId) {
+        m_originalDRTxnId = txnId;
+    }
+
+    public long getOriginalTxnId() {
+        return m_originalDRTxnId;
+    }
+
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
@@ -140,6 +159,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
             + 8        // m_timestamp
             + 8        // m_spHandle
             + 8        // m_truncationHandle
+            + 8        // m_originalDRTxnId
             + 1        // m_isReadOnly
             + 1;       // is for replay flag
         return msgsize;
@@ -150,9 +170,10 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         buf.putLong(m_initiatorHSId);
         buf.putLong(m_coordinatorHSId);
         buf.putLong(m_txnId);
-        buf.putLong(m_timestamp);
+        buf.putLong(m_uniqueId);
         buf.putLong(m_spHandle);
         buf.putLong(m_truncationHandle);
+        buf.putLong(m_originalDRTxnId);
         buf.put(m_isReadOnly ? (byte) 1 : (byte) 0);
         buf.put(m_isForReplay ? (byte) 1 : (byte) 0);
     }
@@ -162,9 +183,10 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_initiatorHSId = buf.getLong();
         m_coordinatorHSId = buf.getLong();
         m_txnId = buf.getLong();
-        m_timestamp = buf.getLong();
+        m_uniqueId = buf.getLong();
         m_spHandle = buf.getLong();
         m_truncationHandle = buf.getLong();
+        m_originalDRTxnId = buf.getLong();
         m_isReadOnly = buf.get() == 1;
         m_isForReplay = buf.get() == 1;
     }

@@ -503,7 +503,15 @@ bool VoltDBEngine::updateCatalogDatabaseReference() {
     return true;
 }
 
-bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload) {
+bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPayload) {
+    assert(m_executorContext != NULL);
+    ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
+    if (executorContext == NULL) {
+        VOLT_DEBUG("Rebinding EC (%ld) to new thread", (long)m_executorContext);
+        // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
+        m_executorContext->bindToThread();
+    }
+
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
     m_catalog->execute(catalogPayload);
@@ -530,7 +538,7 @@ bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload
     }
 
     // load up all the tables, adding all tables
-    if (processCatalogAdditions(true, txnId) == false) {
+    if (processCatalogAdditions(true, timestamp) == false) {
         return false;
     }
 
@@ -562,7 +570,7 @@ bool VoltDBEngine::loadCatalog(const int64_t txnId, const string &catalogPayload
  * processCatalogAdditions(..) for dumb reasons.
  */
 bool
-VoltDBEngine::processCatalogDeletes(int64_t txnId)
+VoltDBEngine::processCatalogDeletes(int64_t timestamp )
 {
     vector<string> deletions;
     m_catalog->getDeletedPaths(deletions);
@@ -579,7 +587,7 @@ VoltDBEngine::processCatalogDeletes(int64_t txnId)
              */
             if (tcd && tcd->exportEnabled()) {
                 m_exportingTables.erase(tcd->signature());
-                tcd->getTable()->setSignatureAndGeneration( tcd->signature(), txnId);
+                tcd->getTable()->setSignatureAndGeneration( tcd->signature(), timestamp);
             }
             pos->second->deleteCommand();
             delete pos->second;
@@ -598,7 +606,7 @@ VoltDBEngine::processCatalogDeletes(int64_t txnId)
  * data.
  */
 bool
-VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
+VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 {
     // iterate over all of the tables in the new catalog
     map<string, catalog::Table*>::const_iterator catTableIter;
@@ -620,7 +628,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                                                                  catalogTable->signature());
 
             // use the delegate to init the table and create indexes n' stuff
-            if (tcd->init(m_executorContext, *m_database, *catalogTable) != 0) {
+            if (tcd->init(*m_database, *catalogTable) != 0) {
                 VOLT_ERROR("Failed to initialize table '%s' from catalog",
                            catTableIter->second->name().c_str());
                 return false;
@@ -629,7 +637,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
 
             // set export info on the new table
             if (tcd->exportEnabled()) {
-                tcd->getTable()->setSignatureAndGeneration(catalogTable->signature(), txnId);
+                tcd->getTable()->setSignatureAndGeneration(catalogTable->signature(), timestamp);
                 m_exportingTables[catalogTable->signature()] = tcd->getTable();
             }
         }
@@ -662,7 +670,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
              * that no more data is coming for the previous generation
              */
             if (tcd->exportEnabled()) {
-                table->setSignatureAndGeneration(catalogTable->signature(), txnId);
+                table->setSignatureAndGeneration(catalogTable->signature(), timestamp);
             }
 
             vector<TableIndex*> currentIndexes = table->allIndexes();
@@ -678,13 +686,15 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                  indexIter++)
             {
                 std::string indexName = indexIter->first;
-
+                std::string indexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
 
                 // Look for an index on the table to match the catalog index
                 bool found = false;
                 for (int i = 0; i < currentIndexes.size(); i++) {
-                    std::string currentIndexName = currentIndexes[i]->getName();
-                    if (indexName.compare(currentIndexName) == 0) {
+                    std::string currentIndexId = currentIndexes[i]->getId();
+                    if (indexId.compare(currentIndexId) == 0) {
+                        // rename the index if needed (or even if not)
+                        currentIndexes[i]->rename(indexName);
                         found = true;
                         break;
                     }
@@ -712,10 +722,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                     // add the index to the stats source
                     index->getIndexStats()->configure(index->getName() + " stats",
                                                       table->name(),
-                                                      m_executorContext->m_hostId,
-                                                      m_executorContext->m_hostname,
-                                                      m_executorContext->m_siteId,
-                                                      m_executorContext->m_partitionId,
                                                       indexIter->second->relativeIndex());
                 }
             }
@@ -728,7 +734,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
             bool found = false;
             // iterate through all of the existing indexes
             for (int i = 0; i < currentIndexes.size(); i++) {
-                std::string indexName = currentIndexes[i]->getName();
+                std::string indexId = currentIndexes[i]->getId();
 
                 // iterate through all of the catalog indexes,
                 //  looking for a match.
@@ -737,8 +743,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
                      indexIter != catalogTable->indexes().end();
                      indexIter++)
                 {
-                    std::string currentIndexName = indexIter->first;
-                    if (indexName.compare(currentIndexName) == 0) {
+                    std::string currentIndexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
+                    if (indexId.compare(currentIndexId) == 0) {
                         found = true;
                         break;
                     }
@@ -763,7 +769,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t txnId)
  * delete or modify the corresponding exectution engine objects.
  */
 bool
-VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload)
+VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayload)
 {
     assert(m_catalog != NULL); // the engine must be initialized
 
@@ -778,12 +784,12 @@ VoltDBEngine::updateCatalog(const int64_t txnId, const string &catalogPayload)
         return false;
     }
 
-    if (processCatalogDeletes(txnId) == false) {
+    if (processCatalogDeletes(timestamp) == false) {
         VOLT_ERROR("Error processing catalog deletions.");
         return false;
     }
 
-    if (processCatalogAdditions(false, txnId) == false) {
+    if (processCatalogAdditions(false, timestamp) == false) {
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
@@ -1263,11 +1269,19 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
     }
 }
 
+
+void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
+{
+    m_currentUndoQuantum = undoQuantum;
+    m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
+}
+
+
 /*
  * Exists to transition pre-existing unit test cases.
  */
 ExecutorContext * VoltDBEngine::getExecutorContext() {
-    m_executorContext->setupForPlanFragments(getCurrentUndoQuantum());
+    m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
     return m_executorContext;
 }
 

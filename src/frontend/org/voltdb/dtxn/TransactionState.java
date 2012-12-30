@@ -17,19 +17,16 @@
 
 package org.voltdb.dtxn;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.iv2.Site;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -62,8 +59,8 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected long m_beginUndoToken;
     volatile public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
-    protected List<byte[]> m_adhocStmts = null;
     protected final boolean m_isForReplay;
+    protected int m_hash = -1; // -1 shows where the value comes from (they only have to match)
 
     // is this transaction run during a rejoin
     protected RejoinState m_rejoinState = RejoinState.NORMAL;
@@ -72,7 +69,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected TransactionState(Mailbox mbox,
                                TransactionInfoBaseMessage notice)
     {
-        super(notice.getTxnId(), notice.getSpHandle(), notice.getTimestamp(), notice.getInitiatorHSId());
+        super(notice.getTxnId(), notice.getSpHandle(), notice.getUniqueId(), notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = null;
         m_notice = notice;
@@ -94,7 +91,7 @@ public abstract class TransactionState extends OrderableTransaction  {
                                TransactionInfoBaseMessage notice)
     {
         super(notice.getTxnId(), notice.getSpHandle(),
-                TransactionIdManager.getTimestampFromTransactionId(notice.getTxnId()),
+                notice.getTxnId(),
                 notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = site;
@@ -139,6 +136,10 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_isForReplay;
     }
 
+    public int getHash() {
+        return m_hash;
+    }
+
     /**
      * Indicate whether or not the transaction represented by this
      * TransactionState is single-partition.  Should be overridden to provide
@@ -153,6 +154,10 @@ public abstract class TransactionState extends OrderableTransaction  {
     public abstract boolean hasTransactionalWork();
 
     public abstract boolean doWork(boolean rejoining);
+
+    public void setHash(Integer hash) {
+        m_hash = hash == null ? 0 : hash; // don't allow null
+    }
 
     public void storeResults(ClientResponseImpl response) {
         m_response = response;
@@ -269,32 +274,5 @@ public abstract class TransactionState extends OrderableTransaction  {
     public Map<Integer, List<VoltTable>> recursableRun(SiteProcedureConnection siteConnection)
     {
         return null;
-    }
-
-    /**
-     * Add to the log of sql run for adhocs (for DR, usually)
-     */
-    public void appendAdHocSQL(byte[] sql) {
-        if (m_adhocStmts == null) {
-            m_adhocStmts = new ArrayList<byte[]>();
-        }
-        m_adhocStmts.add(sql);
-    }
-
-    /**
-     * Get a string that combines all of the adhoc SQL run
-     * combined by a semicolon (for DR, usually)
-     */
-    public String getBatchFormattedAdHocSQLString() {
-        if ((m_adhocStmts == null) || (m_adhocStmts.size() == 0)) {
-            return null;
-        }
-
-        StringBuilder sb = new StringBuilder();
-        for (byte[] bytes : m_adhocStmts) {
-            sb.append(new String(bytes, VoltDB.UTF8ENCODING)).append(';');
-        }
-
-        return sb.toString();
     }
 }

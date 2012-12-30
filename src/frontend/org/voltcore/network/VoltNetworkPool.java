@@ -25,9 +25,9 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Queue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
@@ -44,13 +44,20 @@ public class VoltNetworkPool {
         this(1, null);
     }
 
-    public VoltNetworkPool(int numThreads, ScheduledExecutorService ses) {
+    public VoltNetworkPool(int numThreads, Queue<String> coreBindIds) {
         if (numThreads < 1) {
             throw new IllegalArgumentException("Must specify a postive number of threads");
         }
-        m_networks = new VoltNetwork[numThreads];
-        for (int ii = 0; ii < numThreads; ii++) {
-            m_networks[ii] = new VoltNetwork(ii, ses);
+        if (coreBindIds == null || coreBindIds.isEmpty()) {
+            m_networks = new VoltNetwork[numThreads];
+            for (int ii = 0; ii < numThreads; ii++) {
+                m_networks[ii] = new VoltNetwork(ii, null);
+            }
+        } else {
+            m_networks = new VoltNetwork[coreBindIds.size()];
+            for (int ii = 0; ii < coreBindIds.size(); ii++) {
+                m_networks[ii] = new VoltNetwork(ii, coreBindIds.poll());
+            }
         }
     }
 

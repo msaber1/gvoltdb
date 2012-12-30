@@ -22,6 +22,7 @@ import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.BufferOverflowException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -138,6 +139,11 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
     int m_rowCount = -1;
     int m_colCount = -1;
 
+    // kept around if provided for schema enforcement - only really used for test code
+    ColumnInfo[] m_originalColumnInfos = null;
+    // used for test code that generates schema from tables
+    String m_name = null;
+
     // JSON KEYS FOR SERIALIZATION
     static final String JSON_NAME_KEY = "name";
     static final String JSON_TYPE_KEY = "type";
@@ -159,7 +165,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
      * <p>Note: VoltDB current supports ASCII encoded column names only. Column values are
      * still UTF-8 encoded.</p>
      */
-    public static final class ColumnInfo {
+    public static class ColumnInfo {
 
         /**
          * Construct an immutable <tt>ColumnInfo</tt> instance.
@@ -186,6 +192,16 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         // immutable actual data
         final String name;
         final VoltType type;
+
+        // data below not exposed publicly / not serialized
+        int size = VoltType.MAX_VALUE_LENGTH;
+        boolean nullable = true;
+        boolean unique = false;
+        int pkeyIndex = -1; // -1 when not part of pkey
+        String defaultValue = NO_DEFAULT_VALUE;
+
+        // pick a random string as sigil for no default
+        static final String NO_DEFAULT_VALUE = "!@#$%^&*(!@#$%^&*(";
     }
 
     /**
@@ -262,6 +278,9 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         // allocate a 1K table backing for starters
         int allocationSize = 1024;
         m_buffer = ByteBuffer.allocate(allocationSize);
+
+        // save these around for tests that use them for schema checking during addRow
+        m_originalColumnInfos = columns;
 
         // while not successful at initializing,
         //  use a bigger and bigger backing
@@ -458,6 +477,68 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         return retval;
     }
 
+    // package-private methods to get constraint for test code
+    final boolean getColumnNullable(int index) {
+        if (m_originalColumnInfos != null) {
+            return m_originalColumnInfos[index].nullable;
+        }
+        return true;
+    }
+
+    // package-private methods to get constraint for test code
+    final int getColumnMaxSize(int index) {
+        if (m_originalColumnInfos != null) {
+            return m_originalColumnInfos[index].size;
+        }
+        return VoltType.MAX_VALUE_LENGTH;
+    }
+
+    // package-private methods to get constraint for test code
+    final int getColumnPkeyIndex(int index) {
+        if (m_originalColumnInfos != null) {
+            return m_originalColumnInfos[index].pkeyIndex;
+        }
+        return -1;
+    }
+
+    // package-private methods to get constraint for test code
+    final int[] getPkeyColumnIndexes() {
+        if (m_originalColumnInfos != null) {
+            int pkeyCount = 0;
+            for (ColumnInfo colInfo : m_originalColumnInfos) {
+                if (colInfo.pkeyIndex != -1) {
+                    pkeyCount++;
+                }
+            }
+            int[] retval = new int[pkeyCount];
+            for (int i = 0; i < m_originalColumnInfos.length; i++) {
+                if (m_originalColumnInfos[i].pkeyIndex != -1) {
+                    retval[m_originalColumnInfos[i].pkeyIndex] = i;
+                }
+            }
+            return retval;
+        }
+        return new int[0];
+    }
+
+    // package-private methods to get constraint for test code
+    final boolean getColumnUniqueness(int index) {
+        if (m_originalColumnInfos != null) {
+            return m_originalColumnInfos[index].unique;
+        }
+        return false;
+    }
+
+    // package-private methods to get constraint for test code
+    final String getColumnDefaultValue(int index) {
+        if (m_originalColumnInfos != null) {
+            return m_originalColumnInfos[index].defaultValue;
+        }
+        return null;
+    }
+
+
+
     @Override
     public final int getColumnIndex(String name) {
         assert(verifyTableInvariants());
@@ -551,10 +632,26 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                 Object value = values[col];
                 VoltType columnType = VoltType.get(m_buffer.get(typePos + col));
 
+                // schema checking code that is used for some tests
+                boolean allowNulls = true;
+                int maxColSize = VoltType.MAX_VALUE_LENGTH;
+                if (m_originalColumnInfos != null) {
+                    allowNulls = m_originalColumnInfos[col].nullable;
+                    maxColSize = m_originalColumnInfos[col].size;
+                }
+
                 try
                 {
                     if (VoltType.isNullVoltType(value))
                     {
+                        // schema checking code that is used for some tests
+                        // alllowNulls should always be true in production
+                        if (allowNulls == false) {
+                            throw new IllegalArgumentException(
+                                    String.format("Column %s at index %d doesn't allow NULL values.",
+                                    getColumnName(col), col));
+                        }
+
                         switch (columnType) {
                         case TINYINT:
                             m_buffer.put(VoltType.NULL_TINYINT);
@@ -669,18 +766,20 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                         case STRING: {
                             // Accept byte[] and String
                             if (value instanceof byte[]) {
-                                if (((byte[]) value).length > VoltType.MAX_VALUE_LENGTH)
+                                if (((byte[]) value).length > maxColSize)
                                     throw new VoltOverflowException(
-                                            "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+                                            "Value in VoltTable.addRow(...) larger than allowed max " +
+                                                    VoltType.humanReadableSize(maxColSize));
 
                                 // bytes MUST be a UTF-8 encoded string.
                                 assert(testForUTF8Encoding((byte[]) value));
                                 writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                             }
                             else {
-                                if (((String) value).length() > VoltType.MAX_VALUE_LENGTH)
+                                if (((String) value).length() > maxColSize)
                                     throw new VoltOverflowException(
-                                            "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+                                            "Value in VoltTable.addRow(...) larger than allowed max " +
+                                                    VoltType.humanReadableSize(maxColSize));
 
                                 writeStringToBuffer((String) value, ROWDATA_ENCODING, m_buffer);
                             }
@@ -693,9 +792,10 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                                 value = Encoder.hexDecode((String) value);
                             }
                             if (value instanceof byte[]) {
-                                if (((byte[]) value).length > VoltType.MAX_VALUE_LENGTH)
+                                if (((byte[]) value).length > maxColSize)
                                     throw new VoltOverflowException(
-                                            "Value in VoltTable.addRow(...) larger than allowed max " + VoltType.MAX_VALUE_LENGTH_STR);
+                                            "Value in VoltTable.addRow(...) larger than allowed max " +
+                                                    VoltType.humanReadableSize(maxColSize));
                                 writeStringOrVarbinaryToBuffer((byte[]) value, m_buffer);
                             }
                             break;
@@ -988,6 +1088,99 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
 
         assert(verifyTableInvariants());
         return buffer.toString();
+    }
+
+    /**
+     * Return a "pretty print" representation of this table.  Output will be formatted
+     * in a tabular textual format suitable for display.
+     * @return A string containing a pretty-print formatted representation of this table.
+     */
+    public String toFormattedString() {
+        StringBuffer sb = new StringBuffer();
+
+        int columnCount = this.getColumnCount();
+        int[] padding = new int[columnCount];
+        String[] fmt = new String[columnCount];
+        for (int i = 0; i < columnCount; i++) {
+            padding[i] = this.getColumnName(i).length();
+        }
+        this.resetRowPosition();
+
+        // Compute the padding needed for each column of the table (note must
+        // visit every row)
+        while (this.advanceRow()) {
+            for (int i = 0; i < columnCount; i++) {
+                Object v = this.get(i, this.getColumnType(i));
+                if (this.wasNull()) {
+                    v = "NULL";
+                }
+                int len = 0; // length
+                if (this.getColumnType(i) == VoltType.VARBINARY
+                        && !this.wasNull()) {
+                    len = ((byte[]) v).length * 2;
+                } else {
+                    len = v.toString().length();
+                }
+
+                if (padding[i] < len) {
+                    padding[i] = len;
+                }
+            }
+        }
+
+        // Determine the formatting string for each column
+        for (int i = 0; i < columnCount; i++) {
+            padding[i] += 1;
+            fmt[i] = "%1$"
+                    + ((this.getColumnType(i) == VoltType.STRING
+                            || this.getColumnType(i) == VoltType.TIMESTAMP || this
+                            .getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
+                    + padding[i] + "s";
+        }
+
+        // Create the column headers
+        for (int i = 0; i < columnCount; i++) {
+            sb.append(String.format("%1$-" + padding[i] + "s",
+                    this.getColumnName(i)));
+            if (i < columnCount - 1) {
+                sb.append(" ");
+            }
+        }
+        sb.append("\n");
+
+        // Create the separator between the column headers and the rows of data
+        for (int i = 0; i < columnCount; i++) {
+            char[] underline_array = new char[padding[i]];
+            Arrays.fill(underline_array, '-');
+            sb.append(new String(underline_array));
+            if (i < columnCount - 1) {
+                sb.append(" ");
+            }
+        }
+        sb.append("\n");
+
+        // Now display each row of data.
+        this.resetRowPosition();
+        while (this.advanceRow()) {
+            for (int i = 0; i < columnCount; i++) {
+                Object value = this.get(i, this.getColumnType(i));
+                if (this.wasNull()) {
+                    value = "NULL";
+                }
+                else if (this.getColumnType(i) == VoltType.VARBINARY) {
+                    value = Encoder.hexEncode((byte[]) value);
+                }
+                else {
+                    value = value.toString();
+                }
+                sb.append(String.format(fmt[i], value));
+                if (i < columnCount - 1) {
+                    sb.append(" ");
+                }
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
     }
 
     /**

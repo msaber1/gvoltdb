@@ -17,20 +17,30 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.rejoin.TaskLog;
 
 public class CompleteTransactionTask extends TransactionTask
 {
     final private CompleteTransactionMessage m_msg;
+    final private PartitionDRGateway m_drGateway;
 
     public CompleteTransactionTask(TransactionState txn,
                                    TransactionTaskQueue queue,
-                                   CompleteTransactionMessage msg)
+                                   CompleteTransactionMessage msg,
+                                   PartitionDRGateway drGateway)
     {
         super(txn, queue);
         m_msg = msg;
+        m_drGateway = drGateway;
     }
 
     @Override
@@ -44,17 +54,68 @@ public class CompleteTransactionTask extends TransactionTask
             // eventual encapsulation.
             siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
         }
-        m_txn.setDone();
-        m_queue.flush();
-        hostLog.debug("COMPLETE: " + this);
+        if (!m_msg.isRestart()) {
+            m_txn.setDone();
+            m_queue.flush();
+
+            // Log invocation to DR
+            if (m_drGateway != null && !m_txn.isForReplay() && !m_txn.isReadOnly() && !m_msg.isRollback()) {
+                FragmentTaskMessage fragment = (FragmentTaskMessage) m_txn.getNotice();
+                Iv2InitiateTaskMessage initiateTask = fragment.getInitiateTask();
+                assert(initiateTask != null);
+                StoredProcedureInvocation invocation = initiateTask.getStoredProcedureInvocation().getShallowCopy();
+                m_drGateway.onSuccessfulMPCall(m_txn.spHandle, m_txn.txnId, m_txn.uniqueId, m_msg.getHash(),
+                                               invocation, m_txn.getResults());
+            }
+            hostLog.debug("COMPLETE: " + this);
+        }
+        else
+        {
+            // If we're going to restart the transaction, then reset the begin undo token so the
+            // first FragmentTask will set it correctly.  Otherwise, don't set the Done state or
+            // flush the queue; we want the TransactionTaskQueue to stay blocked on this TXN ID
+            // for the restarted fragments.
+            m_txn.setBeginUndoToken(Site.kInvalidUndoToken);
+            hostLog.debug("RESTART: " + this);
+        }
     }
 
     @Override
-    public void runForRejoin(SiteProcedureConnection siteConnection)
+    public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
-        // future: offer to siteConnection.IBS for replay.
-        m_txn.setDone();
-        m_queue.flush();
+        if (!m_msg.isRestart()) {
+            // future: offer to siteConnection.IBS for replay.
+            m_txn.setDone();
+            m_queue.flush();
+        }
+        // We need to log the restarting message to the task log so we'll replay the whole
+        // stream faithfully
+        taskLog.logTask(m_msg);
+    }
+
+    @Override
+    public long getSpHandle()
+    {
+        return m_msg.getSpHandle();
+    }
+
+    @Override
+    public void runFromTaskLog(SiteProcedureConnection siteConnection)
+    {
+        if (!m_txn.isReadOnly()) {
+            // the truncation point token SHOULD be part of m_txn. However, the
+            // legacy interaces don't work this way and IV2 hasn't changed this
+            // ownership yet. But truncateUndoLog is written assuming the right
+            // eventual encapsulation.
+            siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId, m_txn.spHandle);
+        }
+        if (!m_msg.isRestart()) {
+            m_txn.setDone();
+        }
+        else {
+            m_txn.setBeginUndoToken(Site.kInvalidUndoToken);
+        }
     }
 
     @Override
@@ -62,8 +123,8 @@ public class CompleteTransactionTask extends TransactionTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("CompleteTransactionTask:");
-        sb.append("  TXN ID: ").append(getTxnId());
-        sb.append("  SP HANDLE: ").append(getSpHandle());
+        sb.append("  TXN ID: ").append(TxnEgo.txnIdToString(getTxnId()));
+        sb.append("  SP HANDLE: ").append(TxnEgo.txnIdToString(getSpHandle()));
         sb.append("  UNDO TOKEN: ").append(m_txn.getBeginUndoToken());
         sb.append("  MSG: ").append(m_msg.toString());
         return sb.toString();

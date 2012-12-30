@@ -143,6 +143,18 @@ class AbstractExecutor {
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode);
 
+    /**
+     * Set up a multi-column temp output table for those executors that require one.
+     * Called from p_init.
+     */
+    void setTempOutputTable(TempTableLimits* limits, const std::string tempTableName="temp");
+
+    /**
+     * Set up a single-column temp output table for DML executors that require one to return their counts.
+     * Called from p_init.
+     */
+    void setDMLCountOutputTable(TempTableLimits* limits);
+
   private:
     /** Concrete executor classes implement initialization in p_init() */
     virtual bool p_init(AbstractPlanNode*,

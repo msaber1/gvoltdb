@@ -42,10 +42,12 @@ public class ExportToBatchesClientTest {
 
         // compile a voltdb app
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema("create table blah (ival bigint not null, sval varchar(255) not null);");
+        builder.addLiteralSchema(
+                "create table blah (ival bigint not null, sval varchar(255) not null);" +
+                "export table blah;"
+                );
         builder.addPartitionInfo("blah", "ival");
         builder.addStmtProcedure("Insert", "insert into blah values (?, ?);", "blah.ival: 0");
-        builder.setTableAsExportOnly("blah");
         builder.addExport("org.voltdb.export.processors.RawProcessor", true, null);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("sqexport.jar"), 1, 1, 0);
         if (!success) {
@@ -88,7 +90,8 @@ public class ExportToBatchesClientTest {
         File dir = new File(System.getProperty("user.dir") + File.separator + "00_exportout");
         System.out.printf("Working dir is %s\n", dir.getPath());
         ExportToFileClient exportClient = new ExportToFileClient(
-                ',', "testy", dir, 1, "yyyyMMddHHmmss", null, 0, false, true, true, 0);
+                ',', "testy", dir, 1, "yyyyMMddHHmmss", null, 0,
+                false, true, true, 0, ExportToFileClient.BinaryEncoding.HEX);
         //ExportToFileClient exportClient = new ExportToFileClient(',', "testy", dir, 1, "yyyyMMddHHmmss", 0, false);
         //DiscardingExportClient exportClient = new DiscardingExportClient(false);
         exportClient.addServerInfo("localhost", false);

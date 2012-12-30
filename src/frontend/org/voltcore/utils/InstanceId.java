@@ -20,6 +20,10 @@ import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
+
 public class InstanceId
 {
     private final int m_coord;
@@ -29,6 +33,12 @@ public class InstanceId
     {
         m_coord = coord;
         m_timestamp = timestamp;
+    }
+
+    public InstanceId(JSONObject jsObj) throws JSONException
+    {
+        m_coord = jsObj.getInt("coord");
+        m_timestamp = jsObj.getLong("timestamp");
     }
 
     public int getCoord()
@@ -41,7 +51,8 @@ public class InstanceId
         return m_timestamp;
     }
 
-    public long getHash()
+    @Override
+    public int hashCode()
     {
         ByteBuffer buf = ByteBuffer.allocate(12);
         buf.putLong(m_timestamp);
@@ -60,6 +71,35 @@ public class InstanceId
         }
         md.update(buf);
         byte[] digest = md.digest();
-        return ByteBuffer.wrap(digest).getLong();
+        return ByteBuffer.wrap(digest).getInt();
+    }
+
+    public JSONObject serializeToJSONObject() throws JSONException
+    {
+        JSONStringer stringer = new JSONStringer();
+        stringer.object();
+        stringer.key("coord").value(m_coord);
+        stringer.key("timestamp").value(m_timestamp);
+        stringer.endObject();
+        return new JSONObject(stringer.toString());
+    }
+
+    @Override
+    public boolean equals(Object rhs)
+    {
+        if (rhs == null) {
+            return false;
+        }
+        if (rhs == this) {
+            return true;
+        }
+        if (!(rhs instanceof InstanceId)) {
+            return false;
+        }
+        InstanceId other = (InstanceId)rhs;
+        if (m_coord == other.m_coord && m_timestamp == other.m_timestamp) {
+            return true;
+        }
+        return false;
     }
 }

@@ -107,7 +107,7 @@ IndexStats::generateEmptyIndexStatsTable()
         reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
                                                             name,
                                                             schema,
-                                                            &columnNames[0],
+                                                            columnNames,
                                                             NULL));
 }
 
@@ -133,18 +133,18 @@ IndexStats::IndexStats(TableIndex* index)
 void IndexStats::configure(
         string name,
         string tableName,
-        CatalogId hostId,
-        string hostname,
-        int64_t siteId,
-        CatalogId partitionId,
         CatalogId databaseId) {
-
-    StatsSource::configure(name, hostId, hostname, siteId, partitionId, databaseId);
+    StatsSource::configure(name, databaseId);
     m_indexName = ValueFactory::getStringValue(m_index->getName());
     m_tableName = ValueFactory::getStringValue(tableName);
     m_indexType = ValueFactory::getStringValue(m_index->getTypeName());
     m_isUnique = static_cast<int8_t>(m_index->isUniqueIndex() ? 1 : 0);
     m_isCountable = static_cast<int8_t>(m_index->isCountableIndex() ? 1 : 0);
+}
+
+void IndexStats::rename(std::string name) {
+    m_indexName.free();
+    m_indexName = ValueFactory::getStringValue(name);
 }
 
 /**

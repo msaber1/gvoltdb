@@ -26,16 +26,18 @@ import java.io.InputStream;
 import java.io.UnsupportedEncodingException;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
-import java.util.zip.CRC32;
+import java.util.TreeSet;
 
 import javax.xml.bind.JAXBContext;
 import javax.xml.bind.JAXBElement;
@@ -44,18 +46,25 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.mindrot.BCrypt;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltZK;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
+import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
@@ -73,18 +82,25 @@ import org.voltdb.compiler.deploymentfile.ClusterType;
 import org.voltdb.compiler.deploymentfile.CommandLogType;
 import org.voltdb.compiler.deploymentfile.CommandLogType.Frequency;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
+import org.voltdb.compiler.deploymentfile.ExportConfigurationType;
+import org.voltdb.compiler.deploymentfile.ExportOnServerType;
 import org.voltdb.compiler.deploymentfile.ExportType;
 import org.voltdb.compiler.deploymentfile.HeartbeatType;
 import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PartitionDetectionType;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
+import org.voltdb.compiler.deploymentfile.PropertyType;
 import org.voltdb.compiler.deploymentfile.SecurityType;
+import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType;
 import org.voltdb.compiler.deploymentfile.SystemSettingsType.Temptables;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
+import org.voltdb.export.processors.GuestProcessor;
+import org.voltdb.export.processors.RawProcessor;
+import org.voltdb.exportclient.ExportToFileClient;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
@@ -376,8 +392,7 @@ public abstract class CatalogUtil {
             // Primary Keys / Unique Constraints
             if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
                 Index catalog_idx = catalog_const.getIndex();
-                IndexType idx_type = IndexType.get(catalog_idx.getType());
-                String idx_suffix = idx_type.getSQLSuffix();
+                String idx_suffix = IndexType.getSQLSuffix(catalog_idx.getType());
 
                 ret += add + spacer +
                        (!idx_suffix.isEmpty() ? "CONSTRAINT " + catalog_const.getTypeName() + " " : "") +
@@ -681,8 +696,8 @@ public abstract class CatalogUtil {
             for (User u : users) {
                 sb.append(" USER ");
                 sb.append(u.getName()).append(",");
-                sb.append(u.getGroups()).append(",");
-                sb.append(u.getPassword()).append(",");
+                sb.append(Arrays.toString(mergeUserRoles(u).toArray()));
+                sb.append(",").append(u.getPassword()).append(",");
             }
         }
         sb.append("\n");
@@ -710,6 +725,39 @@ public abstract class CatalogUtil {
             }
         }
 
+        sb.append(" EXPORT ");
+        ExportType export = deployment.getExport();
+        if( export != null) {
+            sb.append(" ENABLE ").append(export.isEnabled());
+            // mimic what is done when the catalog is built, which
+            // ignores anything else within the export XML stanza
+            // when enabled is false
+            ExportOnServerType onServer = export.getOnserver();
+            if (onServer != null && export.isEnabled()) {
+                sb.append(" ONSERVER ");
+                ServerExportEnum exportTo = onServer.getExportto();
+                if (exportTo != null) {
+                    sb.append( "EXPORTTO ").append(exportTo.name());
+                }
+                ExportConfigurationType config = onServer.getConfiguration();
+                if (config != null) {
+                    List<PropertyType> props = config.getProperty();
+                    if( props != null && !props.isEmpty()) {
+                        sb.append(" CONFIGURATION");
+                        int propCnt = 0;
+                        for( PropertyType prop: props) {
+                            if( propCnt++ > 0) {
+                                sb.append(",");
+                            }
+                            sb.append(" ").append(prop.getName());
+                            sb.append(": ").append(prop.getValue());
+                        }
+                    }
+                }
+            }
+            sb.append("\n");
+        }
+
         byte[] data = null;
         try {
             data = sb.toString().getBytes("UTF-8");
@@ -720,7 +768,7 @@ public abstract class CatalogUtil {
             data = new byte[]{0x0}; // should generate a CRC mismatch.
         }
 
-        CRC32 crc = new CRC32();
+        PureJavaCrc32 crc = new PureJavaCrc32();
         crc.update(data);
 
         long retval = crc.getValue();
@@ -832,11 +880,10 @@ public abstract class CatalogUtil {
         }
 
         for (UsersType.User user : deployment.getUsers().getUser()) {
-            if (user.getGroups() == null)
+            if (user.getGroups() == null && user.getRoles() == null)
                 continue;
 
-            for (String group : user.getGroups().split(",")) {
-                group = group.trim();
+            for (String group : mergeUserRoles(user)) {
                 if (!validGroups.contains(group)) {
                     hostLog.error("Cannot assign user \"" + user.getName() + "\" to non-existent group \"" + group +
                             "\"");
@@ -892,19 +939,39 @@ public abstract class CatalogUtil {
             catDeploy.setSitesperhost(sitesPerHost);
             catDeploy.setKfactor(kFactor);
             // copy partition detection configuration from xml to catalog
-            if (deployment.getPartitionDetection() != null && deployment.getPartitionDetection().isEnabled()) {
-                catCluster.setNetworkpartition(true);
-                CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
-                SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
-                sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
-                if (printLog) {
-                    hostLog.info("Detection of network partitions in the cluster is enabled.");
+            if (deployment.getPartitionDetection() != null) {
+                if (deployment.getPartitionDetection().isEnabled()) {
+                    catCluster.setNetworkpartition(true);
+                    CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
+                    SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
+                    sched.setPrefix(deployment.getPartitionDetection().getSnapshot().getPrefix());
+                    if (printLog) {
+                        hostLog.info("Detection of network partitions in the cluster is enabled.");
+                    }
+                }
+                else {
+                    catCluster.setNetworkpartition(false);
+                    if (printLog) {
+                        hostLog.info("Detection of network partitions in the cluster is not enabled.");
+                    }
                 }
             }
             else {
-                catCluster.setNetworkpartition(false);
-                if (printLog) {
-                    hostLog.info("Detection of network partitions in the cluster is not enabled.");
+                // Default partition detection on for IV2
+                if (VoltDB.instance().isIV2Enabled()) {
+                    catCluster.setNetworkpartition(true);
+                    CatalogMap<SnapshotSchedule> faultsnapshots = catCluster.getFaultsnapshots();
+                    SnapshotSchedule sched = faultsnapshots.add("CLUSTER_PARTITION");
+                    sched.setPrefix("partition_detection");
+                    if (printLog) {
+                        hostLog.info("Detection of network partitions in the cluster is enabled.");
+                    }
+                }
+                else {
+                    catCluster.setNetworkpartition(false);
+                    if (printLog) {
+                        hostLog.info("Detection of network partitions in the cluster is not enabled.");
+                    }
                 }
             }
 
@@ -998,9 +1065,9 @@ public abstract class CatalogUtil {
         }
 
         boolean adminstate = exportType.isEnabled();
-        String connector = "org.voltdb.export.processors.RawProcessor";
-        if (exportType.getClazz() != null) {
-            connector = exportType.getClazz();
+        String connector = RawProcessor.class.getName();
+        if (exportType.getOnserver() != null) {
+            connector = GuestProcessor.class.getName();
         }
 
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
@@ -1015,6 +1082,33 @@ public abstract class CatalogUtil {
 
         catconn.setLoaderclass(connector);
         catconn.setEnabled(adminstate);
+
+        ExportOnServerType exportOnServer = exportType.getOnserver();
+        if (exportOnServer != null) {
+
+            // this is OK as the deployment file XML schema does not allow for
+            // export configuration property names that begin with underscores
+            ConnectorProperty prop = catconn.getConfig().add(GuestProcessor.EXPORT_TO_TYPE);
+            prop.setName(GuestProcessor.EXPORT_TO_TYPE);
+            switch( exportOnServer.getExportto()) {
+            case FILE: prop.setValue(ExportToFileClient.class.getName()); break;
+            case JDBC: prop.setValue("org.voltdb.exportclient.JDBCExportClient"); break;
+            }
+
+            ExportConfigurationType exportConfiguration = exportOnServer.getConfiguration();
+            if (exportConfiguration != null) {
+
+                List<PropertyType> configProperties = exportConfiguration.getProperty();
+                if (configProperties != null && ! configProperties.isEmpty()) {
+
+                    for( PropertyType configProp: configProperties) {
+                        prop = catconn.getConfig().add(configProp.getName());
+                        prop.setName(configProp.getName());
+                        prop.setValue(configProp.getValue());
+                    }
+                }
+            }
+        }
 
         if (!adminstate) {
             hostLog.info("Export configuration is present and is " +
@@ -1273,18 +1367,44 @@ public abstract class CatalogUtil {
                             BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
             catUser.setShadowpassword(hashedPW);
 
-            // process the @groups comma separated list
-            if (user.getGroups() != null) {
-                String grouplist[] = user.getGroups().split(",");
-                for (final String group : grouplist) {
-                    final GroupRef groupRef = catUser.getGroups().add(group);
-                    final Group catalogGroup = db.getGroups().get(group);
-                    if (catalogGroup != null) {
-                        groupRef.setGroup(catalogGroup);
-                    }
+            // process the @groups and @roles comma separated list
+            for (final String role : mergeUserRoles(user)) {
+                final GroupRef groupRef = catUser.getGroups().add(role);
+                final Group catalogGroup = db.getGroups().get(role);
+                if (catalogGroup != null) {
+                    groupRef.setGroup(catalogGroup);
                 }
             }
         }
+    }
+
+    /**
+     * Takes the list of roles specified in the groups, and roles user
+     * attributes and merges the into one set that contains no duplicates
+     * @param user an instance of {@link UsersType.User}
+     * @return a {@link Set} of role name
+     */
+    public static Set<String> mergeUserRoles(final UsersType.User user) {
+        Set<String> roles = new TreeSet<String>();
+        if (user == null) return roles;
+
+        if (user.getGroups() != null && !user.getGroups().trim().isEmpty()) {
+            String [] grouplist = user.getGroups().trim().split(",");
+            for (String group: grouplist) {
+                if( group == null || group.trim().isEmpty()) continue;
+                roles.add(group.trim());
+            }
+        }
+
+        if (user.getRoles() != null && !user.getRoles().trim().isEmpty()) {
+            String [] rolelist = user.getRoles().trim().split(",");
+            for (String role: rolelist) {
+                if( role == null || role.trim().isEmpty()) continue;
+                roles.add(role.trim());
+            }
+        }
+
+        return roles;
     }
 
     private static void setHTTPDInfo(Catalog catalog, HttpdType httpd) {
@@ -1321,6 +1441,56 @@ public abstract class CatalogUtil {
         }
         final byte passwordHash[] = md.digest(password.getBytes());
         return Encoder.hexEncode(passwordHash);
+    }
+
+    public static void
+        uploadCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+                throws KeeperException, InterruptedException {
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        versionAndBytes.putInt(catalogVersion);
+        versionAndBytes.putLong(txnId);
+        versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogBytes);
+        zk.create(VoltZK.catalogbytes,
+                versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+    }
+
+    public static void
+        setCatalogToZK(ZooKeeper zk, int catalogVersion, long txnId, long uniqueId, byte catalogBytes[])
+            throws KeeperException, InterruptedException {
+        ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 20);
+        versionAndBytes.putInt(catalogVersion);
+        versionAndBytes.putLong(txnId);
+        versionAndBytes.putLong(uniqueId);
+        versionAndBytes.put(catalogBytes);
+        zk.setData(VoltZK.catalogbytes,
+                versionAndBytes.array(), -1);
+    }
+
+    public static class CatalogAndIds {
+        public final long txnId;
+        public final long uniqueId;
+        public final int version;
+        public final byte bytes[];
+
+        public CatalogAndIds(long txnId, long uniqueId, int catalogVersion, byte catalogBytes[]) {
+            this.txnId = txnId;
+            this.uniqueId = uniqueId;
+            this.version = catalogVersion;
+            this.bytes = catalogBytes;
+        }
+    }
+
+    public static CatalogAndIds getCatalogFromZK(ZooKeeper zk) throws KeeperException, InterruptedException {
+        ByteBuffer versionAndBytes =
+                ByteBuffer.wrap(zk.getData(VoltZK.catalogbytes, false, null));
+        int version = versionAndBytes.getInt();
+        long catalogTxnId = versionAndBytes.getLong();
+        long catalogUniqueId = versionAndBytes.getLong();
+        byte catalogBytes[] = new byte[versionAndBytes.remaining()];
+        versionAndBytes.get(catalogBytes);
+        versionAndBytes = null;
+        return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogBytes);
     }
 
 }

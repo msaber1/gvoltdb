@@ -331,8 +331,12 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                                            coordinatorSiteId,
                                            txnId,
                                            true,
+                                           getHash(),
                                            rollback,
-                                           requiresAck);
+                                           requiresAck,
+                                           false,
+                                           false);
+
         return ft;
     }
 

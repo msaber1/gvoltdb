@@ -27,6 +27,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Table;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
@@ -41,11 +42,13 @@ public class CatalogContext {
     public final Cluster cluster;
     public final Database database;
     public final CatalogMap<Procedure> procedures;
+    public final CatalogMap<Table> tables;
     public final AuthSystem authSystem;
     public final int catalogVersion;
     private final long catalogCRC;
     public final long deploymentCRC;
-    public long m_transactionId;
+    public final long m_transactionId;
+    public long m_uniqueId;
     public final JdbcDatabaseMetaDataGenerator m_jdbc;
 
     /*
@@ -60,12 +63,14 @@ public class CatalogContext {
 
     public CatalogContext(
             long transactionId,
+            long uniqueId,
             Catalog catalog,
             byte[] catalogBytes,
             long deploymentCRC,
             int version,
             long prevCRC) {
         m_transactionId = transactionId;
+        m_uniqueId = uniqueId;
         // check the heck out of the given params in this immutable class
         assert(catalog != null);
         if (catalog == null)
@@ -92,6 +97,7 @@ public class CatalogContext {
         cluster = catalog.getClusters().get("cluster");
         database = cluster.getDatabases().get("database");
         procedures = database.getProcedures();
+        tables = database.getTables();
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
         this.deploymentCRC = deploymentCRC;
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
@@ -101,6 +107,7 @@ public class CatalogContext {
 
     public CatalogContext update(
             long txnId,
+            long uniqueId,
             byte[] catalogBytes,
             String diffCommands,
             boolean incrementVersion,
@@ -123,6 +130,7 @@ public class CatalogContext {
         CatalogContext retval =
             new CatalogContext(
                     txnId,
+                    uniqueId,
                     newCatalog,
                     bytes,
                     realDepCRC,

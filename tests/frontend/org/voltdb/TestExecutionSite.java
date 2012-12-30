@@ -419,7 +419,7 @@ public class TestExecutionSite extends TestCase {
                         m_rpqs.get(siteId),
                         new MockProcedureRunnerFactory(),
                         false,
-                        false,
+                        null,
                         0,
                         partitionCount,
                         null));
@@ -561,7 +561,7 @@ public class TestExecutionSite extends TestCase {
 
         @Override
         public
-        ClientResponseImpl call(long txnId, Object... paramList) {
+        ClientResponseImpl call(Object... paramList) {
             m_site.simulateExecutePlanFragments(m_txnState.txnId, m_procedure.testReadOnly());
 
             final ClientResponseImpl response = new ClientResponseImpl(ClientResponseImpl.SUCCESS,
@@ -673,7 +673,7 @@ public class TestExecutionSite extends TestCase {
 
         @Override
         public
-        ClientResponseImpl call(long txnId, Object... paramList)
+        ClientResponseImpl call(Object... paramList)
         {
             try {
                 parseParamList(paramList);
@@ -692,7 +692,7 @@ public class TestExecutionSite extends TestCase {
                         FragmentTaskMessage.createWithOneFragment(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
-                                                m_txnState.timestamp,
+                                                m_txnState.uniqueId,
                                                 m_txnState.isReadOnly(),
                                                 1,
                                                 localTask_outputDep,
@@ -706,7 +706,7 @@ public class TestExecutionSite extends TestCase {
                         FragmentTaskMessage.createWithOneFragment(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
-                                                m_txnState.timestamp,
+                                                m_txnState.uniqueId,
                                                 m_txnState.isReadOnly(),
                                                 0,
                                                 localTask_startDep,

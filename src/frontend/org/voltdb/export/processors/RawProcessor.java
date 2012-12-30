@@ -20,38 +20,38 @@ package org.voltdb.export.processors;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
+import java.util.Properties;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltdb.OperationMode;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
-import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.export.ExportDataProcessor;
-import org.voltdb.export.ExportDataSource;
-import org.voltdb.export.ExportGeneration;
-import org.voltdb.export.ExportProtoMessage;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.InputHandler;
 import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.DeferredSerialization;
-import org.voltcore.utils.Pair;
-import org.voltcore.zk.ZKUtil;
+import org.voltdb.OperationMode;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
+import org.voltdb.export.ExportDataProcessor;
+import org.voltdb.export.ExportDataSource;
+import org.voltdb.export.ExportGeneration;
+import org.voltdb.export.ExportProtoMessage;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.NotImplementedException;
+
+import com.google.common.base.Charsets;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
 
 /**
  * A processor that provides a data block queue over a socket to
@@ -140,14 +140,19 @@ public class RawProcessor implements ExportDataProcessor {
 
         /**
          * This is the only valid method to transition state to closed
-         * @throws MessagingException
          */
         void closeConnection() {
             m_state = RawProcessor.CLOSED;
+            List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
             for (ExportDataSource ds : m_sourcesArray) {
                 ExportProtoMessage m =
                     new ExportProtoMessage( ds.getGeneration(), ds.getPartitionId(), ds.getSignature()).close();
-                ds.exportAction(new ExportInternalMessage(this, m));
+                tasks.add(ds.exportAction(new ExportInternalMessage(this, m)));
+            }
+            try {
+                Futures.allAsList(tasks).get();
+            } catch (Exception e) {
+                m_logger.error("Error inside ExportDataSource on close", e);
             }
         }
 
@@ -155,7 +160,6 @@ public class RawProcessor implements ExportDataProcessor {
          * Produce a protocol error.
          * @param m message that caused the error
          * @param string error message
-         * @throws MessagingException
          */
         void protocolError(ExportProtoMessage m, String string)
         {
@@ -224,34 +228,41 @@ public class RawProcessor implements ExportDataProcessor {
 
                 // Respond by advertising the full data source set and
                 //  the set of up nodes that are up
-                FastSerializer fs = new FastSerializer();
+                byte jsonBytes[] = null;
                 try {
-
-                    // serialize an array of DataSources that are locally available
-                    fs.writeInt(m_sourcesArray.size());
+                    JSONStringer stringer = new JSONStringer();
+                    stringer.object();
+                    stringer.key("sources").array();
                     for (ExportDataSource src : m_sourcesArray) {
-                        src.writeAdvertisementTo(fs);
+                        stringer.object();
+                        src.writeAdvertisementTo(stringer);
+                        stringer.endObject();
                     }
+                    stringer.endArray();
 
                     // serialize the makup of the cluster
                     //  - the catalog context knows which hosts are up
                     //  - the hostmessenger knows the hostnames of hosts
-                    fs.writeInt(m_clusterMetadata.size());
+                    stringer.key("clusterMetadata").array();
                     for (String metadata : m_clusterMetadata.values()) {
-                        fs.writeString(metadata);
+                        stringer.value(metadata);
                     }
+                    stringer.endArray();
+                    stringer.endObject();
+
+                    jsonBytes = new JSONObject(stringer.toString()).toString(4).getBytes(Charsets.UTF_8);
 //                    else {
 //                        // for test code
 //                        fs.writeInt(0);
 //                    }
                 }
-                catch (IOException e) {
+                catch (JSONException e) {
                     protocolError(m, "Error producing open response advertisement.");
                     return;
                 }
 
                 final ExportProtoMessage r = new ExportProtoMessage( -1, -1, "");
-                r.openResponse(fs.getBuffer());
+                r.openResponse(ByteBuffer.wrap(jsonBytes));
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
                         @Override
@@ -448,6 +459,12 @@ public class RawProcessor implements ExportDataProcessor {
         }
         ExportDataSource source = partmap.get(signature);
         return source;
+    }
+
+
+
+    @Override
+    public void setProcessorConfig(Properties config) {
     }
 
     @Override

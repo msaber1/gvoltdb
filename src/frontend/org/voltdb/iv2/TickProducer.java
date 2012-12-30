@@ -17,7 +17,11 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+
 import java.util.concurrent.TimeUnit;
+
+import org.voltdb.rejoin.TaskLog;
 
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
@@ -37,7 +41,7 @@ public class TickProducer extends SiteTasker implements Runnable
     // start schedules a 1 second tick.
     public void start()
     {
-        VoltDB.instance().scheduleWork(
+        VoltDB.instance().schedulePriorityWork(
                 this,
                 1,
                 1,
@@ -58,7 +62,8 @@ public class TickProducer extends SiteTasker implements Runnable
     }
 
     @Override
-    public void runForRejoin(final SiteProcedureConnection siteConnection)
+    public void runForRejoin(final SiteProcedureConnection siteConnection, TaskLog taskLog)
+    throws IOException
     {
         siteConnection.tick();
     }

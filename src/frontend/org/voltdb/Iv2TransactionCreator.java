@@ -58,7 +58,7 @@ public class Iv2TransactionCreator implements TransactionCreator
     @Override
     public final boolean createTransaction(long connectionId,
             String connectionHostname, boolean adminConnection, long txnId,
-            long timestamp,
+            long uniqueId,
             StoredProcedureInvocation invocation, boolean isReadOnly,
             boolean isSinglePartition, boolean isEverySite, int[] partitions,
             int numPartitions, Object clientData, int messageSize, long now,
@@ -68,7 +68,7 @@ public class Iv2TransactionCreator implements TransactionCreator
                 connectionHostname,
                 adminConnection,
                 txnId,
-                timestamp,
+                uniqueId,
                 invocation,
                 isReadOnly,
                 isSinglePartition,
@@ -84,7 +84,13 @@ public class Iv2TransactionCreator implements TransactionCreator
 
     @Override
     public void sendSentinel(long txnId, int partitionId) {
-        m_ci.sendSentinel( txnId, partitionId);
+        m_ci.sendSentinel(txnId, partitionId, true);
+    }
+
+    @Override
+    public void sendEOLMessage(int partitionId)
+    {
+        m_ci.sendEOLMessage(partitionId);
     }
 
     @Override
@@ -102,7 +108,6 @@ public class Iv2TransactionCreator implements TransactionCreator
     @Override
     public boolean isOnBackPressure()
     {
-        // TODO Auto-generated method stub
         return false;
     }
 

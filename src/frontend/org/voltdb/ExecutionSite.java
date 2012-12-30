@@ -66,7 +66,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.ReplayedTxnState;
@@ -219,12 +218,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private final SnapshotCompletionInterest m_snapshotCompletionHandler =
             new SnapshotCompletionInterest() {
         @Override
-        public CountDownLatch snapshotCompleted(String nonce,
-                                                long txnId,
-                                                long partitionTxnIds[],
-                                                boolean truncationSnapshot) {
+        public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event) {
             if (m_rejoinSnapshotTxnId != -1) {
-                if (m_rejoinSnapshotTxnId == txnId) {
+                if (m_rejoinSnapshotTxnId == event.multipartTxnId) {
                     m_rejoinLog.debug("Rejoin snapshot for site " + getSiteId() +
                                         " is finished");
                     VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
@@ -470,7 +466,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             }
         }
 
-        m_snapshotter.shutdown();
+        try {
+            m_snapshotter.shutdown();
+        } catch (InterruptedException e) {
+            hostLog.warn("Interrupted during shutdown", e);
+        }
     }
 
     /**
@@ -615,6 +615,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
     };
 
+    @Override
     public void tick() {
         /*
          * poke the PartitionDRGateway regularly even if we are not idle. In the
@@ -683,9 +684,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
                 // rollup the table memory stats for this site
                 while (stats.advanceRow()) {
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(7).equals("TUPLE_COUNT"));
                     tupleCount += stats.getLong(7);
+                    assert(stats.getColumnName(8).equals("TUPLE_ALLOCATED_MEMORY"));
                     tupleAllocatedMem += (int) stats.getLong(8);
+                    assert(stats.getColumnName(9).equals("TUPLE_DATA_MEMORY"));
                     tupleDataMem += (int) stats.getLong(9);
+                    assert(stats.getColumnName(10).equals("STRING_DATA_MEMORY"));
                     stringMem += (int) stats.getLong(10);
                 }
                 stats.resetRowPosition();
@@ -703,7 +709,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
                 // rollup the index memory stats for this site
                 while (stats.advanceRow()) {
-                    indexMem += stats.getLong(10);
+                    //Assert column index matches name for ENG-4092
+                    assert(stats.getColumnName(11).equals("MEMORY_ESTIMATE"));
+                    indexMem += stats.getLong(11);
                 }
                 stats.resetRowPosition();
 
@@ -810,21 +818,21 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         m_indexStats = null;
 
         // initialize the DR gateway
-        m_partitionDRGateway = new PartitionDRGateway();
+        m_partitionDRGateway = new PartitionDRGateway(false);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
             String serializedCatalog,
             RestrictedPriorityQueue transactionQueue,
             boolean recovering,
-            boolean replicationActive,
+            NodeDRGateway nodeDRGateway,
             final long txnId,
             int configuredNumberOfPartitions,
             CatalogSpecificPlanner csp) throws Exception
     {
         this(voltdb, mailbox, serializedCatalog, transactionQueue,
-             new ProcedureRunnerFactory(), recovering, replicationActive,
-             txnId, configuredNumberOfPartitions, csp);
+             new ProcedureRunnerFactory(), recovering,
+             nodeDRGateway, txnId, configuredNumberOfPartitions, csp);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -832,7 +840,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                   RestrictedPriorityQueue transactionQueue,
                   ProcedureRunnerFactory runnerFactory,
                   boolean recovering,
-                  boolean replicationActive,
+                  NodeDRGateway nodeDRGateway,
                   final long txnId,
                   int configuredNumberOfPartitions,
                   CatalogSpecificPlanner csp) throws Exception
@@ -855,10 +863,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                              FaultType.SITE_FAILURE);
 
         // initialize the DR gateway
-        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "dr_overflow");
-
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, replicationActive, overflowDir);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway, false);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -874,7 +880,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 serializedCatalog = voltdb.getCatalogContext().catalog.serialize();
             }
             hsql = null;
-            ee = initializeEE(voltdb.getBackendTargetType(), serializedCatalog, txnId, configuredNumberOfPartitions);
+            ee =
+                    initializeEE(
+                            voltdb.getBackendTargetType(),
+                            serializedCatalog,
+                            txnId,
+                            m_context.m_uniqueId,
+                            configuredNumberOfPartitions);
         }
 
         m_systemProcedureContext = new SystemProcedureContext();
@@ -943,7 +955,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     private ExecutionEngine
-    initializeEE(BackendTarget target, String serializedCatalog, final long txnId, int configuredNumberOfPartitions)
+    initializeEE(
+            BackendTarget target,
+            String serializedCatalog,
+            final long txnId,
+            final long timestamp,
+            int configuredNumberOfPartitions)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
 
@@ -960,7 +977,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                         configuredNumberOfPartitions);
-                eeTemp.loadCatalog( txnId, serializedCatalog);
+                eeTemp.loadCatalog( timestamp, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, txnId);
             }
@@ -978,7 +995,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                             target,
                             VoltDB.instance().getConfig().m_ipcPorts.remove(0),
                             m_tracker.m_numberOfPartitions);
-                eeTemp.loadCatalog( 0, serializedCatalog);
+                eeTemp.loadCatalog( timestamp, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
             }
@@ -1003,7 +1020,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
         ee.quiesce(lastCommittedTxnId);
-        ee.updateCatalog( context.m_transactionId, catalogDiffCommands);
+        ee.updateCatalog( context.m_uniqueId, catalogDiffCommands);
 
         return true;
     }
@@ -1295,8 +1312,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                        "Rejoin", false);
         Constructor<?> taskLogConstructor;
         try {
-            taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
-            m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(partition, overflowDir);
+            taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class, boolean.class);
+            m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(partition, overflowDir, false);
         } catch (InvocationTargetException e) {
             VoltDB.crashLocalVoltDB("Unable to construct rejoin task log",
                                     true, e.getCause());
@@ -1355,7 +1372,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
          * snapshot request, or it may fail.
          */
         SnapshotResponseHandler handler = new SnapshotResponseHandler() {
-            @SuppressWarnings("static-access")
             @Override
             public void handleResponse(ClientResponse resp) {
                 if (resp == null) {
@@ -1488,14 +1504,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
             if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
-                    String adhocParam = null;
-                    if (invocation.procName.startsWith("@AdHoc")) {
-                        adhocParam = txnState.getBatchFormattedAdHocSQLString();
-                    }
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId,
+                                                                   ts,
+                                                                   txnState.getHash(),
                                                                    invocation,
-                                                                   txnState.getResults(),
-                                                                   adhocParam);
+                                                                   txnState.getResults());
                 }
             }
 
@@ -1788,7 +1801,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       CoreUtils.getHostnameOrAddress());
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
                 snapshotMsg.crash) {
-                String msg = "Executing local snapshot. Finished final snapshot. Shutting down. " +
+                String msg = "Partition detection snapshot completed. Shutting down. " +
                         "Result: " + startSnapshotting.toString();
                 VoltDB.crashLocalVoltDB(msg, false, null);
             }
@@ -1858,6 +1871,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      */
     private void discoverGlobalFaultData(ExecutionSiteNodeFailureMessage message)
     {
+        if (VoltDB.instance().getMode() == OperationMode.INITIALIZING) {
+            VoltDB.crashGlobalVoltDB("Detected node failure during command log replay. Cluster will shut down.",
+                                     false, null);
+        }
+
         //Keep it simple and don't try to recover on the recovering node.
         if (m_rejoining) {
             VoltDB.crashLocalVoltDB("Aborting rejoin due to a remote node failure. Retry again.", false, null);
@@ -2325,7 +2343,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                              fragmentId,
                                              params);
 
-            sendDependency(currentFragResponse, dep.depId, dep.dependency);
+            if (dep != null) {
+                sendDependency(currentFragResponse, dep.depId, dep.dependency);
+            }
         }
         catch (final EEException e)
         {
@@ -2359,16 +2379,19 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         currentFragResponse.addDependency(dependencyId, dependency);
     }
 
+    @Override
+    public void initiateSnapshots(
+            Deque<SnapshotTableTask> tasks,
+            long txnId,
+            int numLiveHosts,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
+        m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts, exportSequenceNumbers);
+    }
 
     /*
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the syncing and closing of snapshot data targets has completed.
      */
-    @Override
-    public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts) {
-        m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts);
-    }
-
     @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
         return m_snapshotter.completeSnapshotWork(ee);
@@ -2731,22 +2754,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 if (callerParams != null) {
                     ClientResponseImpl cr = null;
 
-                    // find the txn id visible to the proc
-                    long txnId = txnState.txnId;
-                    StoredProcedureInvocation invocation = txnState.getInvocation();
-                    // this can't be null, initiate task must have an invocation
-                    if (invocation == null) {
-                        VoltDB.crashLocalVoltDB("Initiate task " + txnId + " missing invocation", false, null);
-                        // Prevent potential null warnings below.
-                        return null;
-                    }
-                    if ((invocation.getType() == ProcedureInvocationType.REPLICATED)) {
-                        txnId = invocation.getOriginalTxnId();
-                    }
-
                     // call the proc
                     runner.setupTransaction(txnState);
-                    cr = runner.call(txnId, itask.getParameters());
+                    cr = runner.call(itask.getParameters());
+                    txnState.setHash(cr.getHash());
                     response.setResults(cr);
 
                     // record the results of write transactions to the transaction state
@@ -2917,7 +2928,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     @Override
-    public void setRejoinComplete() {
+    public void setRejoinComplete(
+            org.voltdb.iv2.RejoinProducer.ReplayCompletionAction ignored,
+            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers) {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
 

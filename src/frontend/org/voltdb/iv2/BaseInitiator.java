@@ -20,22 +20,22 @@ package org.voltdb.iv2;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
-
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Connector;
-import org.voltdb.catalog.Database;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.MemoryStats;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StarvationTracker;
 import org.voltdb.StatsAgent;
 import org.voltdb.SysProcSelector;
+import org.voltdb.VoltDB;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -45,6 +45,9 @@ import org.voltdb.SysProcSelector;
 public abstract class BaseInitiator implements Initiator
 {
     VoltLogger tmLog = new VoltLogger("TM");
+
+    public static final String JSON_PARTITION_ID = "partitionId";
+    public static final String JSON_INITIATOR_HSID = "initiatorHSId";
 
     // External references/config
     protected final HostMessenger m_messenger;
@@ -59,29 +62,37 @@ public abstract class BaseInitiator implements Initiator
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
-    private final TickProducer m_tickProducer;
-
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
-            Scheduler scheduler, String whoamiPrefix, StatsAgent agent)
+            Scheduler scheduler, String whoamiPrefix, StatsAgent agent, boolean forRejoin)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
-        RejoinProducer rejoinProducer =
-            new RejoinProducer(m_partitionId, scheduler.m_tasks);
-        m_initiatorMailbox = new InitiatorMailbox(
-                m_partitionId,
-                m_scheduler,
-                m_messenger,
-                m_repairLog,
-                rejoinProducer);
-
-        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
+        RejoinProducer rejoinProducer = forRejoin ?
+            new RejoinProducer(m_partitionId, scheduler.m_tasks) :
+            null;
+        if (m_partitionId == MpInitiator.MP_INIT_PID) {
+            m_initiatorMailbox = new MpInitiatorMailbox(
+                    m_partitionId,
+                    m_scheduler,
+                    m_messenger,
+                    m_repairLog,
+                    rejoinProducer);
+        } else {
+            m_initiatorMailbox = new InitiatorMailbox(
+                    m_partitionId,
+                    m_scheduler,
+                    m_messenger,
+                    m_repairLog,
+                    rejoinProducer);
+        }
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
-        rejoinProducer.setMailbox(m_initiatorMailbox);
+        if (rejoinProducer != null) {
+            rejoinProducer.setMailbox(m_initiatorMailbox);
+        }
         m_scheduler.setMailbox(m_initiatorMailbox);
         StarvationTracker st = new StarvationTracker(getInitiatorHSId());
         m_scheduler.setStarvationTracker(st);
@@ -98,26 +109,26 @@ public abstract class BaseInitiator implements Initiator
             CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
     }
 
-    private boolean isExportEnabled(CatalogContext catalogContext)
-    {
-        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
-        final Database db = cluster.getDatabases().get("database");
-        final Connector conn= db.getConnectors().get("0");
-        return (conn != null && conn.getEnabled() == true);
-    }
-
     protected void configureCommon(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin,
-                          CommandLog cl)
+                          VoltDB.START_ACTION startAction,
+                          StatsAgent agent,
+                          MemoryStats memStats,
+                          CommandLog cl,
+                          String coreBindIds)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
             if (catalogContext.cluster.getDeployment().get("deployment") != null) {
                 snapshotPriority = catalogContext.cluster.getDeployment().get("deployment").
                     getSystemsettings().get("systemsettings").getSnapshotpriority();
+            }
+
+            // demote rejoin to create for initiators that aren't rejoinable.
+            if (VoltDB.createForRejoin(startAction) && !isRejoinable()) {
+                startAction = VoltDB.START_ACTION.CREATE;
             }
 
             m_executionSite = new Site(m_scheduler.getQueue(),
@@ -127,9 +138,12 @@ public abstract class BaseInitiator implements Initiator
                                        catalogContext.m_transactionId,
                                        m_partitionId,
                                        numberOfPartitions,
-                                       createForRejoin,
+                                       startAction,
                                        snapshotPriority,
-                                       m_initiatorMailbox);
+                                       m_initiatorMailbox,
+                                       agent,
+                                       memStats,
+                                       coreBindIds);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
@@ -142,10 +156,6 @@ public abstract class BaseInitiator implements Initiator
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setCommandLog(cl);
-
-            if (isExportEnabled(catalogContext)) {
-                m_tickProducer.start();
-            }
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
@@ -174,12 +184,12 @@ public abstract class BaseInitiator implements Initiator
             tmLog.info("Exception during shutdown.", e);
         }
 
-        try {
-            if (m_siteThread != null) {
-                m_siteThread.interrupt();
+        if (m_siteThread != null) {
+            try {
+                m_siteThread.join();
+            } catch (InterruptedException e) {
+                tmLog.info("Interrupted during shutdown", e);
             }
-        } catch (Exception e) {
-            tmLog.info("Exception during shutdown.");
         }
     }
 
@@ -187,5 +197,21 @@ public abstract class BaseInitiator implements Initiator
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
+    }
+
+    protected void acceptPromotion() throws Exception {
+        /*
+         * Notify all known client interfaces that the mastership has changed
+         * for the specified partition and that no responses from previous masters will be forthcoming
+         */
+        JSONStringer stringer = new JSONStringer();
+        stringer.object();
+        stringer.key(JSON_PARTITION_ID).value(m_partitionId);
+        stringer.key(JSON_INITIATOR_HSID).value(m_initiatorMailbox.getHSId());
+        stringer.endObject();
+        BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], stringer.toString().getBytes("UTF-8"));
+        for (Integer hostId : m_messenger.getLiveHostIds()) {
+            m_messenger.send(CoreUtils.getHSIdFromHostAndSite(hostId, HostMessenger.CLIENT_INTERFACE_SITE_ID), bpm);
+        }
     }
 }

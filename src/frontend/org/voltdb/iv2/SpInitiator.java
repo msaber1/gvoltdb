@@ -29,10 +29,15 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.MemoryStats;
+import org.voltdb.NodeDRGateway;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.Promotable;
+import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.export.ExportManager;
 
 import com.google.common.collect.ImmutableMap;
 
@@ -45,6 +50,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 {
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
+    private final TickProducer m_tickProducer;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
@@ -63,12 +69,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
     };
 
-    public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent)
+    public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
+            SnapshotCompletionMonitor snapMonitor, boolean forRejoin)
     {
         super(VoltZK.iv2masters, messenger, partition,
-                new SpScheduler(partition, new SiteTaskerQueue()),
-                "SP", agent);
+                new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
+                "SP", agent, forRejoin);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
+        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
     }
 
     @Override
@@ -76,8 +84,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin,
-                          CommandLog cl)
+                          VoltDB.START_ACTION startAction,
+                          StatsAgent agent,
+                          MemoryStats memStats,
+                          CommandLog cl,
+                          NodeDRGateway nodeDRGateway,
+                          String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -87,19 +99,28 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
-                createForRejoin && isRejoinable(),
-                cl);
+                startAction,
+                agent, memStats, cl, coreBindIds);
+
+        m_tickProducer.start();
+
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
+
+        // configure DR
+        ((SpScheduler) m_scheduler).setDRGateway(PartitionDRGateway.getInstance(m_partitionId,
+                                                                                nodeDRGateway,
+                                                                                true));
     }
 
     @Override
     public void acceptPromotion()
     {
         try {
+
             long startTime = System.currentTimeMillis();
             Boolean success = false;
             m_term = createTerm(m_messenger.getZK(),
@@ -111,6 +132,17 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 repair = createPromoteAlgo(m_term.getInterestingHSIds(),
                         m_initiatorMailbox, m_whoami);
 
+                // if rejoining, a promotion can not be accepted. If the rejoin is
+                // in-progress, the loss of the master will terminate the rejoin
+                // anyway. If the rejoin has transferred data but not left the rejoining
+                // state, it will respond REJOINING to new work which will break
+                // the MPI and/or be unexpected to external clients.
+                if (!m_initiatorMailbox.acceptPromotion()) {
+                    tmLog.error(m_whoami
+                            + "rejoining site can not be promoted to leader. Terminating.");
+                    VoltDB.crashLocalVoltDB("A rejoining site can not be promoted to leader.", false, null);
+                    return;
+                }
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
                 Pair<Boolean, Long> result = repair.start().get();
@@ -118,8 +150,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 if (success) {
                     m_initiatorMailbox.setLeaderState(result.getSecond());
                     tmLog.info(m_whoami
-                            + "finished leader promotion. Took "
-                            + (System.currentTimeMillis() - startTime) + " ms.");
+                             + "finished leader promotion. Took "
+                             + (System.currentTimeMillis() - startTime) + " ms.");
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
@@ -138,6 +170,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
                             + "trying. Retrying.");
                 }
             }
+            super.acceptPromotion();
+            // Tag along and become the export master too
+            ExportManager.instance().acceptMastership(m_partitionId);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
@@ -164,5 +199,20 @@ public class SpInitiator extends BaseInitiator implements Promotable
             String whoami)
     {
         return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami, m_partitionId);
+    }
+
+    @Override
+    public void enableWritingIv2FaultLog() {
+        m_initiatorMailbox.enableWritingIv2FaultLog();
+    }
+
+    @Override
+    public void shutdown() {
+        try {
+            m_leaderCache.shutdown();
+        } catch (InterruptedException e) {
+            tmLog.info("Interrupted during shutdown", e);
+        }
+        super.shutdown();
     }
 }

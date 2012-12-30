@@ -603,6 +603,11 @@ public class SQLCommand
             {
                 printResponse(VoltDB.updateApplicationCatalog(new File((String) objectParams[0]),
                                                               new File((String) objectParams[1])));
+
+                // Need to update the stored procedures after a catalog change (could have added/removed SPs!).  ENG-3726
+                Procedures.clear();
+                loadSystemProcedures();
+                loadStoredProcedures(Procedures);
             }
             else
             {
@@ -672,27 +677,7 @@ public class SQLCommand
     // Output generation
     private static String OutputFormat = "fixed";
     private static boolean OutputShowMetadata = true;
-    public static String paddingString(String s, int n, char c, boolean paddingLeft)
-    {
-        if (s == null)
-            return s;
 
-        int add = n - s.length();
-
-        if(add <= 0)
-            return s;
-
-        StringBuffer str = new StringBuffer(s);
-        char[] ch = new char[add];
-        Arrays.fill(ch, c);
-        if(paddingLeft)
-            str.insert(0, ch);
-        else
-            str.append(ch);
-
-
-       return str.toString();
-    }
     private static boolean isUpdateResult(VoltTable table)
     {
         return ((table.getColumnName(0).length() == 0 || table.getColumnName(0).equals("modified_tuples"))&& table.getRowCount() == 1 && table.getColumnCount() == 1 && table.getColumnType(0) == VoltType.BIGINT);
@@ -711,75 +696,10 @@ public class SQLCommand
                         System.out.printf("\n\n(%d row(s) affected)\n", t.fetchRow(0).getLong(0));
                     continue;
                 }
-                int columnCount = t.getColumnCount();
-                int[] padding = new int[columnCount];
-                String[] fmt = new String[columnCount];
-                for (int i = 0; i < columnCount; i++)
-                    padding[i] = OutputShowMetadata ? t.getColumnName(i).length() : 0;
-                t.resetRowPosition();
-                while(t.advanceRow())
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull())
-                            v = "NULL";
-                        int l = 0;  // length
-                        if (t.getColumnType(i) == VoltType.VARBINARY && !t.wasNull()) {
-                            l = ((byte[])v).length*2;
-                        }
-                        else {
-                            l= v.toString().length();
-                        }
 
-                        if (padding[i] < l)
-                            padding[i] = l;
-                    }
-                }
-                for (int i = 0; i < columnCount; i++)
-                {
-                    padding[i] += 1;
-                    fmt[i] = "%1$" +
-                        ((t.getColumnType(i) == VoltType.STRING ||
-                          t.getColumnType(i) == VoltType.TIMESTAMP ||
-                          t.getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
-                        + padding[i] + "s";
-                }
-                if (OutputShowMetadata)
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        System.out.printf("%1$-" + padding[i] + "s", t.getColumnName(i));
-                        if (i < columnCount - 1)
-                            System.out.print(" ");
-                    }
-                    System.out.print("\n");
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        System.out.print(paddingString("", padding[i], '-', false));
-                        if (i < columnCount - 1)
-                            System.out.print(" ");
-                    }
-                    System.out.print("\n");
-                }
-                t.resetRowPosition();
-                while(t.advanceRow())
-                {
-                    for (int i = 0; i < columnCount; i++)
-                    {
-                        Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull())
-                            v = "NULL";
-                        else if (t.getColumnType(i) == VoltType.VARBINARY)
-                            v = byteArrayToHexString((byte[])v);
-                        else
-                            v = v.toString();
-                        System.out.printf(fmt[i], v);
-                        if (i < columnCount - 1)
-                            System.out.print(" ");
-                    }
-                    System.out.print("\n");
-                }
+                // Use the VoltTable pretty printer to display formatted output.
+                System.out.println(t.toFormattedString());
+
                 if (OutputShowMetadata)
                     System.out.printf("\n\n(%d row(s) affected)\n", t.getRowCount());
             }
@@ -930,6 +850,10 @@ public class SQLCommand
         + "[--password=password]\n"
         + "  Password of the user for database login.\n"
         + "  Default: (not defined - connection made without credentials).\n"
+        + "\n"
+        + "[--query=query]\n"
+        + "  Execute a non-interactive query. Multiple query options are allowed.\n"
+        + "  Default: (runs the interactive shell when no query options are present).\n"
         + "\n"
         + "[--output-format=(fixed|csv|tab)]\n"
         + "  Format of returned resultset data (Fixed-width, CSV or Tab-delimited).\n"
@@ -1091,6 +1015,7 @@ public class SQLCommand
             int port = 21212;
             String user = "";
             String password = "";
+            List<String> queries = null;
 
             // Parse out parameters
             for(int i = 0; i < args.length; i++)
@@ -1104,6 +1029,20 @@ public class SQLCommand
                     user = arg.split("=")[1];
                 else if (arg.startsWith("--password="))
                     password = arg.split("=")[1];
+                else if (arg.startsWith("--query="))
+                {
+                    List<String> argQueries = parseQuery(arg.substring(8));
+                    if (!argQueries.isEmpty()) {
+                        if (queries == null)
+                        {
+                            queries = argQueries;
+                        }
+                        else
+                        {
+                            queries.addAll(argQueries);
+                        }
+                    }
+                }
                 else if (arg.startsWith("--output-format="))
                 {
                     if (Pattern.compile("(fixed|csv|tab)", Pattern.CASE_INSENSITIVE).matcher(arg.split("=")[1].toLowerCase()).matches())
@@ -1144,8 +1083,6 @@ public class SQLCommand
             // Load user stored procs
             loadStoredProcedures(Procedures);
 
-            List<String> queries = null;
-
             in = new FileInputStream(FileDescriptor.in);
             out = new PrintWriter(new OutputStreamWriter(System.out, System.getProperty("jline.WindowsTerminal.output.encoding", System.getProperty("file.encoding"))));
             Input = new ConsoleReader(in, out);
@@ -1153,9 +1090,20 @@ public class SQLCommand
             Input.setBellEnabled(false);
             Input.addCompletor(new SimpleCompletor(new String[] {"select", "update", "insert", "delete", "exec", "file", "recall", "SELECT", "UPDATE", "INSERT", "DELETE", "EXEC", "FILE", "RECALL" }));
 
-            // If Standard input comes loaded with data, run in non-interactive mode
+            boolean interactive = true;
+            if (queries != null && !queries.isEmpty())
+            {
+                // If queries are provided via command line options run them in
+                // non-interactive mode.
+                //TODO: Someday we should honor batching.
+                interactive = false;
+                for(int i = 0;i<queries.size();i++)
+                    executeQuery(queries.get(i));
+            }
             if (System.in.available() > 0)
             {
+                // If Standard input comes loaded with data, run in non-interactive mode
+                interactive = false;
                 queries = getQuery(false);
                 if (queries == null)
                     System.exit(0);
@@ -1163,7 +1111,7 @@ public class SQLCommand
                     for(int i = 0;i<queries.size();i++)
                         executeQuery(queries.get(i));
             }
-            else
+            if (interactive)
             {
                 // Print out welcome message
                 System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);

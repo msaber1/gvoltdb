@@ -25,7 +25,6 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.StoredProcedureInvocation;
 
-
 /**
  * Message from a client interface to an initiator, instructing the
  * site to begin executing a stored procedure, coordinating other
@@ -57,7 +56,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long coordinatorHSId,
                         long truncationHandle,
                         long txnId,
-                        long timestamp,
+                        long uniqueId,
                         boolean isReadOnly,
                         boolean isSinglePartition,
                         StoredProcedureInvocation invocation,
@@ -65,9 +64,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long connectionId,
                         boolean isForReplay)
     {
-        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly, isForReplay);
-        setTruncationHandle(truncationHandle);
+        super(initiatorHSId, coordinatorHSId, txnId, uniqueId, isReadOnly, isForReplay);
+        super.setOriginalTxnId(invocation.getOriginalTxnId());
 
+        setTruncationHandle(truncationHandle);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_clientInterfaceHandle = clientInterfaceHandle;
@@ -83,6 +83,11 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_invocation = rhs.m_invocation;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
         m_connectionId = rhs.m_connectionId;
+    }
+
+    @Override
+    public boolean isForDR() {
+        return super.isForDR();
     }
 
     @Override
@@ -180,7 +185,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append(CoreUtils.hsIdToString(getCoordinatorHSId()));
         sb.append(") FOR TXN ");
         sb.append(m_txnId).append("\n");
-        sb.append(" TIMESTAMP ").append(m_timestamp).append("\n");
+        sb.append(" UNIQUE ID ").append(m_uniqueId).append("\n");
         sb.append(") TRUNC HANDLE ");
         sb.append(getTruncationHandle()).append("\n");
         sb.append("SP HANDLE: ").append(getSpHandle()).append("\n");

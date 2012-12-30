@@ -108,6 +108,7 @@
 #include "execution/JNITopend.h"
 #include "json_spirit/json_spirit.h"
 #include "boost/pool/pool.hpp"
+#include "crc/crc32c.h"
 #include "boost/crc.hpp"
 #include "logging/JNILogProxy.h"
 
@@ -303,7 +304,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadCatalog(
     JNIEnv *env, jobject obj,
-    jlong engine_ptr, jlong txnId, jbyteArray serialized_catalog) {
+    jlong engine_ptr, jlong timestamp, jbyteArray serialized_catalog) {
     VOLT_DEBUG("nativeLoadCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -322,7 +323,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->loadCatalog(txnId, str);
+        bool success = engine->loadCatalog(timestamp, str);
 
         if (success) {
             VOLT_DEBUG("loadCatalog succeeded");
@@ -347,7 +348,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     JNIEnv *env, jobject obj,
-    jlong engine_ptr, jlong txnId, jbyteArray catalog_diffs) {
+    jlong engine_ptr, jlong timestamp, jbyteArray catalog_diffs) {
     VOLT_DEBUG("nativeUpdateCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -366,7 +367,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->updateCatalog( txnId, str);
+        bool success = engine->updateCatalog( timestamp, str);
 
         if (success) {
             VOLT_DEBUG("updateCatalog succeeded");
@@ -777,6 +778,38 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32
     boost::crc_32_type crc;
     crc.process_bytes(address + offset, length);
     return static_cast<jint>(crc.checksum());
+}
+
+/*
+ * Class:     org_voltcore_utils_DBBPool
+ * Method:    getBufferCRC32C
+ * Signature: (Ljava/nio/ByteBuffer;II)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getBufferCRC32C
+  (JNIEnv *env, jclass clazz, jobject buffer, jint offset, jint length) {
+    char *address = reinterpret_cast<char*>(env->GetDirectBufferAddress(buffer));
+    if (env->ExceptionCheck()) {
+        env->ExceptionDescribe();
+        return -1;
+    }
+    assert(address);
+    uint32_t crc = vdbcrc::crc32cInit();
+    crc = vdbcrc::crc32c( crc, address + offset, length);
+    return static_cast<jint>(vdbcrc::crc32cFinish(crc));
+}
+
+/*
+ * Class:     org_voltcore_utils_DBBPool
+ * Method:    getBufferCRC32
+ * Signature: (Ljava/nio/ByteBuffer;II)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32C
+  (JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length) {
+    char *address = reinterpret_cast<char*>(ptr);
+    assert(address);
+    uint32_t crc = vdbcrc::crc32cInit();
+    crc = vdbcrc::crc32c( crc, address + offset, length);
+    return static_cast<jint>(vdbcrc::crc32cFinish(crc));
 }
 
 /*

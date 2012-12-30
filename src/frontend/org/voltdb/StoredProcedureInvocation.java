@@ -25,8 +25,8 @@ import java.util.concurrent.FutureTask;
 
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
@@ -44,11 +44,12 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     String procName = null;
 
     /*
-     * The original txn ID the procedure invocation was assigned with. It's
-     * saved here so that if the procedure needs it for determinism, we can
-     * provide it again. -1 means not set.
+     * The original txn ID and the timestamp the procedure invocation was
+     * assigned with. They are saved here so that if the procedure needs them
+     * for determinism, we can provide them again. -1 means not set.
      */
     long originalTxnId = -1;
+    long originalUniqueId = -1;
 
     /*
      * This ByteBuffer is accessed from multiple threads concurrently.
@@ -70,6 +71,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         copy.params = params;
         copy.procName = procName;
         copy.originalTxnId = originalTxnId;
+        copy.originalUniqueId = originalUniqueId;
         if (serializedParams != null)
         {
             copy.serializedParams = serializedParams.duplicate();
@@ -83,8 +85,11 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
     }
 
     private void setType() {
-        type = originalTxnId == -1 ? ProcedureInvocationType.ORIGINAL
-                                   : ProcedureInvocationType.REPLICATED;
+        if (originalTxnId == -1 && originalUniqueId == -1) {
+            type = ProcedureInvocationType.ORIGINAL;
+        } else {
+            type = ProcedureInvocationType.REPLICATED;
+        }
     }
 
     public void setProcName(String name) {
@@ -93,6 +98,11 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     public void setOriginalTxnId(long txnId) {
         originalTxnId = txnId;
+        setType();
+    }
+
+    public void setOriginalUniqueId(long uniqueId) {
+        originalUniqueId = uniqueId;
         setType();
     }
 
@@ -119,6 +129,10 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     public long getOriginalTxnId() {
         return originalTxnId;
+    }
+
+    public long getOriginalUniqueId() {
+        return originalUniqueId;
     }
 
     public ParameterSet getParams() {
@@ -160,7 +174,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
         if (type == ProcedureInvocationType.REPLICATED)
         {
-            size += 8; // original TXN ID for WAN replication procedures
+            size += 8 + // original TXN ID for WAN replication procedures
+                    8; // original timestamp for WAN replication procedures
         }
 
         if (serializedParams != null)
@@ -182,6 +197,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         buf.put(type.getValue()); //version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
             buf.putLong(originalTxnId);
+            buf.putLong(originalUniqueId);
         }
         buf.putInt(procName.length());
         buf.put(procName.getBytes());
@@ -190,6 +206,9 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         {
             if (!serializedParams.isReadOnly())
             {
+                // if position can be non-zero, then the dup/rewind logic below
+                // would be wrong?
+                assert(serializedParams.position() == 0);
                 buf.put(serializedParams.array(),
                         serializedParams.position() + serializedParams.arrayOffset(),
                         serializedParams.remaining());
@@ -197,6 +216,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
             else
             {
                 // duplicate for thread-safety
+                assert(serializedParams.position() == 0);
                 ByteBuffer dup = serializedParams.duplicate();
                 dup.rewind();
                 buf.put(dup);
@@ -220,6 +240,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
          */
         if (type == ProcedureInvocationType.REPLICATED) {
             originalTxnId = in.readLong();
+            originalUniqueId = in.readLong();
         }
 
         procName = in.readString();
@@ -248,6 +269,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
          */
         if (type == ProcedureInvocationType.REPLICATED) {
             originalTxnId = in.readLong();
+            originalUniqueId = in.readLong();
         }
 
         procName = in.readString();
@@ -271,6 +293,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         out.write(type.getValue());//version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
             out.writeLong(originalTxnId);
+            out.writeLong(originalUniqueId);
         }
         out.writeString(procName);
         out.writeLong(clientHandle);
@@ -287,11 +310,16 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         ParameterSet params = getParams();
         if (params != null)
             for (Object o : params.toArray()) {
-                retval += o.toString() + ", ";
+                retval += String.valueOf(o) + ", ";
             }
         else
             retval += "null";
         retval += ")";
+        retval += " type=" + String.valueOf(type);
+        retval += " clientHandle=" + String.valueOf(clientHandle);
+        retval += " originalTxnId=" + String.valueOf(originalTxnId);
+        retval += " originalUniqueId=" + String.valueOf(originalUniqueId);
+
         return retval;
     }
 

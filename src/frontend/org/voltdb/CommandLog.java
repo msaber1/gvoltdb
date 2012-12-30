@@ -31,7 +31,11 @@ public interface CommandLog {
      *            The txnId of the truncation snapshot at the end of restore, or
      *            Long.MIN if there was none.
      */
-    public abstract void init(CatalogContext context, long txnId, long perPartitionTxnId[]);
+    public abstract void init(
+            CatalogContext context,
+            long txnId,
+            long perPartitionTxnId[],
+            String coreBinding);
 
     /**
     *
@@ -39,7 +43,12 @@ public interface CommandLog {
     *            The txnId of the truncation snapshot at the end of restore, or
     *            Long.MIN if there was none.
     */
-    public abstract void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin);
+    public abstract void initForRejoin(
+            CatalogContext context,
+            long txnId,
+            long perPartitionTxnId[],
+            boolean isRejoin,
+            String coreBinding);
 
     public abstract boolean needsInitialization();
 
@@ -65,6 +74,12 @@ public interface CommandLog {
      */
     public abstract Semaphore logFault(Set<Long> failedInitiators,
                                        Set<Long> faultedTxns);
+
+    /**
+     * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log
+     */
+    public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+            int partitionId, long spHandle);
 
     public abstract void logHeartbeat(final long txnId);
 

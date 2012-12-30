@@ -26,7 +26,7 @@ package org.voltcore.network;
 import java.nio.channels.Channel;
 import java.nio.channels.SelectionKey;
 
-import junit.framework.*;
+import junit.framework.TestCase;
 
 /*
  * Not a lot of functionality in VoltPort. The only tricky bit

@@ -29,10 +29,13 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+import org.voltdb.MemoryStats;
+import org.voltdb.NodeDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
  * Subclass of Initiator to manage multi-partition operations.
@@ -53,7 +56,8 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     buddyHSId,
                     new SiteTaskerQueue()),
                 "MP",
-                agent);
+                agent,
+                false /* never for rejoin */);
     }
 
     @Override
@@ -61,13 +65,21 @@ public class MpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin,
-                          CommandLog cl)
+                          VoltDB.START_ACTION startAction,
+                          StatsAgent agent,
+                          MemoryStats memStats,
+                          CommandLog cl,
+                          NodeDRGateway drGateway,
+                          String coreBindIds)
         throws KeeperException, InterruptedException, ExecutionException
     {
+        // note the mp initiator always uses a non-ipc site, even though it's never used for anything
+        if ((backend == BackendTarget.NATIVE_EE_IPC) || (backend == BackendTarget.NATIVE_EE_VALGRIND_IPC)) {
+            backend = BackendTarget.NATIVE_EE_JNI;
+        }
+
         super.configureCommon(backend, serializedCatalog, catalogContext,
-                csp, numberOfPartitions,
-                createForRejoin && isRejoinable(), cl);
+                csp, numberOfPartitions, startAction, null, null, cl, coreBindIds);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
@@ -96,9 +108,14 @@ public class MpInitiator extends BaseInitiator implements Promotable
                 success = result.getFirst();
                 if (success) {
                     m_initiatorMailbox.setLeaderState(result.getSecond());
+                    List<Iv2InitiateTaskMessage> restartTxns = ((MpPromoteAlgo)repair).getInterruptedTxns();
+                    if (!restartTxns.isEmpty()) {
+                        // Should only be one restarting MP txn
+                        m_initiatorMailbox.repairReplicasWith(null, restartTxns.get(0));
+                    }
                     tmLog.info(m_whoami
-                            + "finished leader promotion. Took "
-                            + (System.currentTimeMillis() - startTime) + " ms.");
+                             + "finished leader promotion. Took "
+                             + (System.currentTimeMillis() - startTime) + " ms.");
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
@@ -112,11 +129,12 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     // CrashVoltDB here means one node failure causing another.
                     // Don't create a cascading failure - just try again.
                     tmLog.info(m_whoami
-                            + "interrupted during leader promotion after "
-                            + (System.currentTimeMillis() - startTime) + " ms. of "
-                            + "trying. Retrying.");
+                             + "interrupted during leader promotion after "
+                             + (System.currentTimeMillis() - startTime) + " ms. of "
+                             + "trying. Retrying.");
                 }
             }
+            super.acceptPromotion();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
         }
@@ -155,5 +173,10 @@ public class MpInitiator extends BaseInitiator implements Promotable
     public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
         m_executionSite.updateCatalog(diffCmds, context, csp, true);
+    }
+
+    @Override
+    public void enableWritingIv2FaultLog() {
+        m_initiatorMailbox.enableWritingIv2FaultLog();
     }
 }

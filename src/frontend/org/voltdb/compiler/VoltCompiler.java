@@ -28,6 +28,8 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
@@ -49,6 +51,7 @@ import javax.xml.bind.Unmarshaller;
 import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -73,8 +76,10 @@ import org.voltdb.compiler.projectfile.DatabaseType;
 import org.voltdb.compiler.projectfile.ExportType;
 import org.voltdb.compiler.projectfile.ExportType.Tables;
 import org.voltdb.compiler.projectfile.GroupsType;
+import org.voltdb.compiler.projectfile.InfoType;
 import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
+import org.voltdb.compiler.projectfile.RolesType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
@@ -314,25 +319,80 @@ public class VoltCompiler {
     }
 
     /**
-     * Compile with this method for general use.
+     * Compile from a set of DDL files, but no project.xml.
+     *
+     * @param jarOutputPath The location to put the finished JAR to.
+     * @param ddlFilePaths The array of DDL files to compile (at least one is required).
+     * @return true if successful
+     */
+    public boolean compileFromDDL(
+            final String jarOutputPath,
+            final String... ddlFilePaths)
+    {
+        return compileInternal(null, jarOutputPath, ddlFilePaths);
+    }
+
+    /**
+     * Compile from a set of DDL files, but no project.xml.
+     *
+     * @param jarOutputPath The location to put the finished JAR to.
+     * @param ddlFilePaths The collection of DDL files to compile (at least one is required).
+     * @return true if successful
+     */
+    public boolean compileFromDDL(
+            final String jarOutputPath,
+            final Collection<String> ddlFilePaths)
+    {
+        return compileInternal(null, jarOutputPath, ddlFilePaths.toArray(new String[ddlFilePaths.size()]));
+    }
+
+    /**
+     * Compile using a project.xml file (DEPRECATED).
      *
      * @param projectFileURL URL of the project file.
      * @param jarOutputPath The location to put the finished JAR to.
-     * @param output Where to print status/errors to, usually stdout.
-     * @param procInfoOverrides Optional overridden values for procedure annotations.
+     * @return true if successful
      */
-    public boolean compile(final String projectFileURL, final String jarOutputPath) {
+    public boolean compileWithProjectXML(
+            final String projectFileURL,
+            final String jarOutputPath)
+    {
+        return compileInternal(projectFileURL, jarOutputPath, new String[] {});
+    }
+
+    /**
+     * Internal method for compiling with and without a project.xml file or DDL files.
+     *
+     * @param projectFileURL URL of the project file or null if not used.
+     * @param jarOutputPath The location to put the finished JAR to.
+     * @param ddlFilePaths The list of DDL files to compile (when no project is provided).
+     * @return true if successful
+     */
+    private boolean compileInternal(
+            final String projectFileURL,
+            final String jarOutputPath,
+            final String[] ddlFilePaths)
+    {
         m_hsql = null;
         m_projectFileURL = projectFileURL;
         m_jarOutputPath = jarOutputPath;
 
-        // clear out the warnigns and errors
+        if (m_projectFileURL == null && (ddlFilePaths == null || ddlFilePaths.length == 0)) {
+            addErr("One or more DDL files are required.");
+            return false;
+        }
+        if (m_jarOutputPath == null) {
+            addErr("The output jar path is null.");
+            return false;
+        }
+
+        // clear out the warnings and errors
         m_warnings.clear();
         m_infos.clear();
         m_errors.clear();
 
         // do all the work to get the catalog
-        final Catalog catalog = compileCatalog(projectFileURL);
+        final Catalog catalog = compileCatalog(projectFileURL, ddlFilePaths);
         if (catalog == null) {
             compilerLog.error("Catalog compilation failed.");
             return false;
@@ -346,7 +406,8 @@ public class VoltCompiler {
         byte[] catalogBytes = null;
         try {
             catalogBytes =  catalogCommands.getBytes("UTF-8");
-        } catch (final UnsupportedEncodingException e1) {
+        }
+        catch (final UnsupportedEncodingException e1) {
             addErr("Can't encode the compiled catalog file correctly");
             return false;
         }
@@ -363,14 +424,20 @@ public class VoltCompiler {
             byte buildinfoBytes[] = buildinfo.toString().getBytes("UTF-8");
             m_jarOutput.put("buildinfo.txt", buildinfoBytes);
             m_jarOutput.put("catalog.txt", catalogBytes);
-            m_jarOutput.put("project.xml", new File(projectFileURL));
+            if (projectFileURL != null) {
+                File projectFile = new File(projectFileURL);
+                if (projectFile.exists()) {
+                    m_jarOutput.put("project.xml", projectFile);
+                }
+            }
             for (final Entry<String, String> e : m_ddlFilePaths.entrySet())
                 m_jarOutput.put(e.getKey(), new File(e.getValue()));
             // write all the plans to a folder in the jarfile
             for (final Entry<String, byte[]> e : explainPlans.entrySet())
                 m_jarOutput.put("plans/" + e.getKey(), e.getValue());
             m_jarOutput.writeToFile(new File(jarOutputPath)).run();
-        } catch (final Exception e) {
+        }
+        catch (final Exception e) {
             e.printStackTrace();
             return false;
         }
@@ -411,63 +478,71 @@ public class VoltCompiler {
     }
 
     @SuppressWarnings("unchecked")
-    public Catalog compileCatalog(final String projectFileURL)
+    public Catalog compileCatalog(final String projectFileURL, final String... ddlFilePaths)
     {
         // Compiler instance is reusable. Clear the cache.
         cachedAddedClasses.clear();
-        m_currentFilename = new File(projectFileURL).getName();
+        m_currentFilename = (projectFileURL != null ? new File(projectFileURL).getName() : "null");
         m_jarOutput = new InMemoryJarfile();
         ProjectType project = null;
 
+        if (projectFileURL != null && !projectFileURL.isEmpty()) {
+            try {
+                JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.projectfile");
+                // This schema shot the sheriff.
+                SchemaFactory sf = SchemaFactory.newInstance(
+                  javax.xml.XMLConstants.W3C_XML_SCHEMA_NS_URI);
+                Schema schema = sf.newSchema(this.getClass().getResource("ProjectFileSchema.xsd"));
+                Unmarshaller unmarshaller = jc.createUnmarshaller();
+                // But did not shoot unmarshaller!
+                unmarshaller.setSchema(schema);
+                JAXBElement<ProjectType> result = (JAXBElement<ProjectType>) unmarshaller.unmarshal(new File(projectFileURL));
+                project = result.getValue();
+            }
+            catch (JAXBException e) {
+                // Convert some linked exceptions to more friendly errors.
+                if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
+                    addErr(e.getLinkedException().getMessage());
+                    compilerLog.error(e.getLinkedException().getMessage());
+                    return null;
+                }
+
+                DeprecatedProjectElement deprecated = DeprecatedProjectElement.valueOf(e);
+                if( deprecated != null) {
+                    addErr("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file, "
+                            + deprecated.getSuggestion());
+                    addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
+                    compilerLog.error("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file");
+                    compilerLog.error(e.getMessage());
+                    compilerLog.error(projectFileURL);
+                    return null;
+                }
+
+                if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
+                    addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
+                    compilerLog.error("Error schema validating project.xml file: " + e.getLinkedException().getMessage());
+                    compilerLog.error(e.getMessage());
+                    compilerLog.error(projectFileURL);
+                    return null;
+                }
+
+                throw new RuntimeException(e);
+            }
+            catch (SAXException e) {
+                addErr("Error schema validating project.xml file. " + e.getMessage());
+                compilerLog.error("Error schema validating project.xml file. " + e.getMessage());
+                return null;
+            }
+        }
+        else {
+            // No project.xml - create a stub object.
+            project = new ProjectType();
+            project.setInfo(new InfoType());
+            project.setDatabase(new DatabaseType());
+        }
+
         try {
-            JAXBContext jc = JAXBContext.newInstance("org.voltdb.compiler.projectfile");
-            // This schema shot the sheriff.
-            SchemaFactory sf = SchemaFactory.newInstance(
-              javax.xml.XMLConstants.W3C_XML_SCHEMA_NS_URI);
-            Schema schema = sf.newSchema(this.getClass().getResource("ProjectFileSchema.xsd"));
-            Unmarshaller unmarshaller = jc.createUnmarshaller();
-            // But did not shoot unmarshaller!
-            unmarshaller.setSchema(schema);
-            JAXBElement<ProjectType> result = (JAXBElement<ProjectType>) unmarshaller.unmarshal(new File(projectFileURL));
-            project = result.getValue();
-        }
-        catch (JAXBException e) {
-            // Convert some linked exceptions to more friendly errors.
-            if (e.getLinkedException() instanceof java.io.FileNotFoundException) {
-                addErr(e.getLinkedException().getMessage());
-                compilerLog.error(e.getLinkedException().getMessage());
-                return null;
-            }
-
-            DeprecatedProjectElement deprecated = DeprecatedProjectElement.valueOf(e);
-            if( deprecated != null) {
-                addErr("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file, "
-                        + deprecated.getSuggestion());
-                addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
-                compilerLog.error("Found deprecated XML element \"" + deprecated.name() + "\" in project.xml file");
-                compilerLog.error(e.getMessage());
-                compilerLog.error(projectFileURL);
-                return null;
-            }
-
-            if (e.getLinkedException() instanceof org.xml.sax.SAXParseException) {
-                addErr("Error schema validating project.xml file. " + e.getLinkedException().getMessage());
-                compilerLog.error("Error schema validating project.xml file: " + e.getLinkedException().getMessage());
-                compilerLog.error(e.getMessage());
-                compilerLog.error(projectFileURL);
-                return null;
-            }
-
-            throw new RuntimeException(e);
-        }
-        catch (SAXException e) {
-            addErr("Error schema validating project.xml file. " + e.getMessage());
-            compilerLog.error("Error schema validating project.xml file. " + e.getMessage());
-            return null;
-        }
-
-        try {
-            compileXMLRootNode(project);
+            compileXMLRootNode(project, ddlFilePaths);
         } catch (final VoltCompilerException e) {
             compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
             return null;
@@ -493,13 +568,13 @@ public class VoltCompiler {
         return m_catalog;
     }
 
-    void compileXMLRootNode(ProjectType project) throws VoltCompilerException {
+    void compileXMLRootNode(ProjectType project, String... ddlFilePaths) throws VoltCompilerException {
         m_catalog = new Catalog();
         temporaryCatalogInit();
 
         DatabaseType database = project.getDatabase();
         if (database != null) {
-            compileDatabaseNode(database);
+            compileDatabaseNode(database, ddlFilePaths);
         }
     }
 
@@ -511,12 +586,12 @@ public class VoltCompiler {
         m_catalog.getClusters().get("cluster").setSecurityenabled(false);
     }
 
-    void compileDatabaseNode(DatabaseType database) throws VoltCompilerException {
+    void compileDatabaseNode(DatabaseType database, String... ddlFilePaths) throws VoltCompilerException {
         final ArrayList<String> programs = new ArrayList<String>();
-        final ArrayList<String> schemas = new ArrayList<String>();
+        final List<String> schemas = new ArrayList<String>(Arrays.asList(ddlFilePaths));
         final ArrayList<ProcedureDescriptor> procedures = new ArrayList<ProcedureDescriptor>();
         final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
-        final PartitionMap partitionMap = new PartitionMap(this);
+        final VoltDDLElementTracker voltDdlTracker = new VoltDDLElementTracker(this);
 
         final String databaseName = database.getName();
 
@@ -532,13 +607,15 @@ public class VoltCompiler {
         Database db = m_catalog.getClusters().get("cluster").getDatabases().get(databaseName);
 
         // schemas/schema
-        for (SchemasType.Schema schema : database.getSchemas().getSchema()) {
-            compilerLog.l7dlog( Level.INFO, LogKeys.compiler_VoltCompiler_CatalogPath.name(),
-                                new Object[] {schema.getPath()}, null);
-            schemas.add(schema.getPath());
+        if (database.getSchemas() != null) {
+            for (SchemasType.Schema schema : database.getSchemas().getSchema()) {
+                compilerLog.l7dlog( Level.INFO, LogKeys.compiler_VoltCompiler_CatalogPath.name(),
+                                    new Object[] {schema.getPath()}, null);
+                schemas.add(schema.getPath());
+            }
         }
 
-        // groups/group.
+        // groups/group (alias for roles/role).
         if (database.getGroups() != null) {
             for (GroupsType.Group group : database.getGroups().getGroup()) {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
@@ -548,10 +625,20 @@ public class VoltCompiler {
             }
         }
 
+        // roles/role (alias for groups/group).
+        if (database.getRoles() != null) {
+            for (RolesType.Role role : database.getRoles().getRole()) {
+                org.voltdb.catalog.Group catGroup = db.getGroups().add(role.getName());
+                catGroup.setAdhoc(role.isAdhoc());
+                catGroup.setSysproc(role.isSysproc());
+                catGroup.setDefaultproc(role.isDefaultproc());
+            }
+        }
+
         // procedures/procedure
         if (database.getProcedures() != null) {
             for (ProceduresType.Procedure proc : database.getProcedures().getProcedure()) {
-                partitionMap.add(getProcedure(proc));
+                voltDdlTracker.add(getProcedure(proc));
             }
         }
 
@@ -565,7 +652,7 @@ public class VoltCompiler {
         // partitions/table
         if (database.getPartitions() != null) {
             for (org.voltdb.compiler.projectfile.PartitionsType.Partition table : database.getPartitions().getPartition()) {
-                partitionMap.put(table.getTable(), table.getColumn());
+                voltDdlTracker.put(table.getTable(), table.getColumn());
             }
         }
 
@@ -580,7 +667,7 @@ public class VoltCompiler {
         // Actually parse and handle all the DDL
         // DDLCompiler also provides partition descriptors for DDL PARTITION
         // and REPLICATE statements.
-        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql, partitionMap);
+        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql, voltDdlTracker, db);
 
         for (final String schemaPath : schemas) {
             File schemaFile = null;
@@ -599,8 +686,14 @@ public class VoltCompiler {
             }
 
             if (!schemaFile.isAbsolute()) {
-                // Resolve schemaPath relative to the database definition xml file
-                schemaFile = new File(new File(m_projectFileURL).getParent(), schemaPath);
+                // Resolve schemaPath relative to either the database definition xml file
+                // or the working directory.
+                if (m_projectFileURL != null) {
+                    schemaFile = new File(new File(m_projectFileURL).getParent(), schemaPath);
+                }
+                else {
+                    schemaFile = new File(schemaPath);
+                }
             }
 
             // add the file object's path to the list of files for the jar
@@ -614,8 +707,8 @@ public class VoltCompiler {
         // this needs to happen before procedures are compiled
         String msg = "In database \"" + databaseName + "\", ";
         final CatalogMap<Table> tables = db.getTables();
-        for (String tableName : partitionMap.m_map.keySet()) {
-            String colName = partitionMap.m_map.get(tableName);
+        for (String tableName : voltDdlTracker.m_partitionMap.keySet()) {
+            String colName = voltDdlTracker.m_partitionMap.get(tableName);
             // A null column name indicates a replicated table. Ignore it here
             // because it defaults to replicated in the catalog.
             if (colName != null) {
@@ -676,6 +769,11 @@ public class VoltCompiler {
         // add database estimates info
         addDatabaseEstimatesInfo(m_estimates, db);
 
+        // Process DDL exported tables
+        for( String exportedTableName: voltDdlTracker.getExportedTables()) {
+            addExportTableToConnector(exportedTableName, db);
+        }
+
         // Process and add exports and connectors to the catalog
         // Must do this before compiling procedures to deny updates
         // on append-only tables.
@@ -692,7 +790,7 @@ public class VoltCompiler {
         procedures.addAll(autoCrudProcedures);
 
         // Add procedures read from DDL and project file
-        procedures.addAll( partitionMap.getProcedureDescriptors());
+        procedures.addAll( voltDdlTracker.getProcedureDescriptors());
 
         // Actually parse and handle all the Procedures
         for (final ProcedureDescriptor procedureDescriptor : procedures) {
@@ -1183,6 +1281,44 @@ public class VoltCompiler {
         return cls;
     }
 
+    void grantExportToGroup( final String groupName, final Database catdb)
+        throws VoltCompilerException
+    {
+        assert groupName != null && ! groupName.trim().isEmpty() && catdb != null;
+
+        // Catalog Connector
+        // Relying on schema's enforcement of at most 1 connector
+        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
+        if (catconn == null) {
+            catconn = catdb.getConnectors().add("0");
+        }
+
+        final Group group = catdb.getGroups().getIgnoreCase(groupName);
+        if (group == null) {
+            throw new VoltCompilerException("Export has a role " + groupName + " that does not exist");
+        }
+
+        GroupRef groupRef = catconn.getAuthgroups().getIgnoreCase(groupName);
+
+        if      (groupRef == null) {
+            groupRef = catconn.getAuthgroups().add(groupName);
+            groupRef.setGroup(group);
+        }
+        else if (groupRef.getGroup() == null) {
+                groupRef.setGroup(group);
+        }
+
+        if (groupRef.getGroup() != group) {
+            throw new VoltCompilerException(
+                    "Mismatched group reference found in export connector auth groups: " +
+                    "it references '" + groupRef.getGroup().getTypeName() +
+                    "(" + System.identityHashCode(groupRef.getGroup()) +") " +
+                    "', when it should reference '" + group.getTypeName() +
+                    "(" + System.identityHashCode(group) +")" +
+                    "' instead");
+        }
+    }
+
     void compileExport(final ExportType export, final Database catdb)
         throws VoltCompilerException
     {
@@ -1193,7 +1329,16 @@ public class VoltCompiler {
 
         // Catalog Connector
         // Relying on schema's enforcement of at most 1 connector
-        org.voltdb.catalog.Connector catconn = catdb.getConnectors().add("0");
+        //
+        // This check is also done here to mimic the same behavior of the
+        // previous implementation of this method, where the connector is created as
+        // long as the export element is present in project XML. Now that we are
+        // deprecating project.xml, we won't be able to mimic in DDL, what an
+        // empty <export/> element currently implies.
+        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
+        if (catconn == null) {
+            catconn = catdb.getConnectors().add("0");
+        }
 
         // add authorized users and groups
         final ArrayList<String> groupslist = new ArrayList<String>();
@@ -1206,53 +1351,13 @@ public class VoltCompiler {
         }
 
         for (String groupName : groupslist) {
-            final Group group = catdb.getGroups().get(groupName);
-            if (group == null) {
-                throw new VoltCompilerException("Export has a group " + groupName + " that does not exist");
-            }
-            final GroupRef groupRef = catconn.getAuthgroups().add(groupName);
-            groupRef.setGroup(group);
+            grantExportToGroup(groupName, catdb);
         }
 
-
         // Catalog Connector.ConnectorTableInfo
-        Integer i = 0;
         if (export.getTables() != null) {
             for (Tables.Table xmltable : export.getTables().getTable()) {
-                // verify that the table exists in the catalog
-                String tablename = xmltable.getName();
-                org.voltdb.catalog.Table tableref = catdb.getTables().getIgnoreCase(tablename);
-                if (tableref == null) {
-                    throw new VoltCompilerException("While configuring export, table " + tablename + " was not present in " +
-                    "the catalog.");
-                }
-                if (CatalogUtil.isTableMaterializeViewSource(catdb, tableref)) {
-                    compilerLog.error("While configuring export, table " + tablename + " is a source table " +
-                            "for a materialized view. Export only tables do not support views.");
-                    throw new VoltCompilerException("Export table configured with materialized view.");
-                }
-                if (tableref.getMaterializer() != null)
-                {
-                    compilerLog.error("While configuring export, table " + tablename + " is a " +
-                                                "materialized view.  A view cannot be an export table.");
-                    throw new VoltCompilerException("View configured as an export table");
-                }
-                if (tableref.getIndexes().size() > 0) {
-                    compilerLog.error("While configuring export, table " + tablename + " has indexes defined. " +
-                            "Export tables can't have indexes (including primary keys).");
-                    throw new VoltCompilerException("Table with indexes configured as an export table");
-                }
-                if (tableref.getIsreplicated()) {
-                    // if you don't specify partition columns, make
-                    // export tables partitioned, but on no specific column (iffy)
-                    tableref.setIsreplicated(false);
-                    tableref.setPartitioncolumn(null);
-                }
-
-                org.voltdb.catalog.ConnectorTableInfo connTableInfo = catconn.getTableinfo().add(tablename);
-                connTableInfo.setAppendonly(true);
-                connTableInfo.setTable(tableref);
-                ++i;
+                addExportTableToConnector(xmltable.getName(), catdb);
             }
             if (export.getTables().getTable().isEmpty()) {
                 compilerLog.warn("Export defined with an empty <tables> element");
@@ -1262,18 +1367,112 @@ public class VoltCompiler {
         }
     }
 
-    public static void main(final String[] args) {
-        // Parse arguments
-        if (args.length != 2) {
-            System.err.println("Usage: voltcompiler <classpath> <project-file> <output-JAR>");
-            System.exit(1);
-        }
-        final String projectPath = args[0];
-        final String outputJar = args[1];
+    void addExportTableToConnector( final String tableName, final Database catdb)
+            throws VoltCompilerException
+    {
+        assert tableName != null && ! tableName.trim().isEmpty() && catdb != null;
 
-        // Compile and exit with error code if we failed
+        // Catalog Connector
+        // Relying on schema's enforcement of at most 1 connector
+        org.voltdb.catalog.Connector catconn = catdb.getConnectors().getIgnoreCase("0");
+        if (catconn == null) {
+            catconn = catdb.getConnectors().add("0");
+        }
+        org.voltdb.catalog.Table tableref = catdb.getTables().getIgnoreCase(tableName);
+        if (tableref == null) {
+            throw new VoltCompilerException("While configuring export, table " + tableName + " was not present in " +
+            "the catalog.");
+        }
+        if (CatalogUtil.isTableMaterializeViewSource(catdb, tableref)) {
+            compilerLog.error("While configuring export, table " + tableName + " is a source table " +
+                    "for a materialized view. Export only tables do not support views.");
+            throw new VoltCompilerException("Export table configured with materialized view.");
+        }
+        if (tableref.getMaterializer() != null)
+        {
+            compilerLog.error("While configuring export, table " + tableName + " is a " +
+                                        "materialized view.  A view cannot be an export table.");
+            throw new VoltCompilerException("View configured as an export table");
+        }
+        if (tableref.getIndexes().size() > 0) {
+            compilerLog.error("While configuring export, table " + tableName + " has indexes defined. " +
+                    "Export tables can't have indexes (including primary keys).");
+            throw new VoltCompilerException("Table with indexes configured as an export table");
+        }
+        if (tableref.getIsreplicated()) {
+            // if you don't specify partition columns, make
+            // export tables partitioned, but on no specific column (iffy)
+            tableref.setIsreplicated(false);
+            tableref.setPartitioncolumn(null);
+        }
+        org.voltdb.catalog.ConnectorTableInfo connTableInfo =
+                catconn.getTableinfo().getIgnoreCase(tableName);
+
+        if (connTableInfo == null) {
+            connTableInfo = catconn.getTableinfo().add(tableName);
+            connTableInfo.setTable(tableref);
+            connTableInfo.setAppendonly(true);
+        }
+        else  {
+            throw new VoltCompilerException(String.format(
+                    "Table \"%s\" is already exported", tableName
+                    ));
+        }
+
+    }
+
+    // Usage messages for new and legacy syntax.
+    static final String usageNew    = "VoltCompiler <output-JAR> <input-DDL> ...";
+    static final String usageLegacy = "VoltCompiler <project-file> <output-JAR>";
+
+    /**
+     * Main
+     *
+     * Incoming arguments:
+     *
+     *         New syntax: OUTPUT_JAR INPUT_DDL ...
+     *      Legacy syntax: PROJECT_FILE OUTPUT_JAR
+     *
+     * @param args  arguments (see above)
+     */
+    public static void main(final String[] args)
+    {
         final VoltCompiler compiler = new VoltCompiler();
-        final boolean success = compiler.compile(projectPath, outputJar);
+        boolean success = false;
+        if (args.length > 0 && args[0].toLowerCase().endsWith(".jar")) {
+            // The first argument is *.jar for the new syntax.
+            if (args.length >= 2) {
+                // Check for accidental .jar or .xml files specified for argument 2
+                // to catch accidental incomplete use of the legacy syntax.
+                if (args[1].toLowerCase().endsWith(".xml") || args[1].toLowerCase().endsWith(".jar")) {
+                    System.err.println("Error: Expecting a DDL file as the second argument.\n"
+                                     + "      .xml and .jar are invalid DDL file extensions.");
+                    System.exit(-1);
+                }
+                success = compiler.compileFromDDL(args[0], ArrayUtils.subarray(args, 1, args.length));
+            }
+            else {
+                System.err.printf("Usage: %s\n", usageNew);
+                System.exit(-1);
+            }
+        }
+        else if (args.length > 0 && args[0].toLowerCase().endsWith(".xml")) {
+            // The first argument is *.xml for the legacy syntax.
+            if (args.length == 2) {
+                success = compiler.compileWithProjectXML(args[0], args[1]);
+            }
+            else {
+                System.err.printf("Usage: %s\n", usageLegacy);
+                System.exit(-1);
+            }
+        }
+        else {
+            // Can't recognize the arguments or there are no arguments.
+            System.err.printf("Usage: %s\n       %s\n", usageNew, usageLegacy);
+            System.exit(-1);
+        }
+
+        // Exit with error code if we failed
         if (!success) {
             compiler.summarizeErrors(System.out, null);
             System.exit(-1);
@@ -1495,11 +1694,11 @@ public class VoltCompiler {
         /**
          * message regular expression that pertains to the deprecated element
          */
-        private Pattern messagePattern;
+        private final Pattern messagePattern;
         /**
          * a suggestion string to exaplain alternatives
          */
-        private String suggestion;
+        private final String suggestion;
 
         DeprecatedProjectElement(String messageRegex, String suggestion) {
             this.messagePattern = Pattern.compile(messageRegex);

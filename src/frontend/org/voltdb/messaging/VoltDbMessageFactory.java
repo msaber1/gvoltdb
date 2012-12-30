@@ -39,6 +39,8 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte REJOIN_DATA_ID = VOLTCORE_MESSAGE_ID_MAX + 13;
     final public static byte REJOIN_DATA_ACK_ID = VOLTCORE_MESSAGE_ID_MAX + 14;
     final public static byte FRAGMENT_TASK_LOG_ID = VOLTCORE_MESSAGE_ID_MAX + 15;
+    final public static byte IV2_LOG_FAULT_ID = VOLTCORE_MESSAGE_ID_MAX + 16;
+    final public static byte IV2_EOL_ID = VOLTCORE_MESSAGE_ID_MAX + 17;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -96,6 +98,12 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case FRAGMENT_TASK_LOG_ID:
             message = new FragmentTaskLogMessage();
+            break;
+        case IV2_LOG_FAULT_ID:
+            message = new Iv2LogFaultMessage();
+            break;
+        case IV2_EOL_ID:
+            message = new Iv2EndOfLogMessage();
             break;
         default:
             message = null;
