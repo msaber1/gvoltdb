@@ -1136,7 +1136,7 @@ final class RangeVariable {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session)
+    VoltXMLElement voltGetRangeVariableXML(Session session)
     throws HSQLParseException
     {
         Index        index;
@@ -1162,64 +1162,10 @@ final class RangeVariable {
         VoltXMLElement scan = new VoltXMLElement("tablescan");
 
         // output metadata
-        if (isSeqScan)
-            scan.attributes.put("type", "sequential");
-        else
-            scan.attributes.put("type", "index");
-
         scan.attributes.put("table", rangeTable.getName().name);
-
-        if ((index != null) && (isSeqScan == false)) {
-            String indexName = (index.getName() == null ? "UNNAMED" : index.getName().name);
-            scan.attributes.put("index", indexName);
-        }
 
         if (tableAlias != null && !rangeTable.getName().name.equals(tableAlias)) {
             scan.attributes.put("alias", tableAlias.name);
-        }
-
-        // note if this is an outer join
-        if (isLeftJoin || isRightJoin) {
-            scan.attributes.put("isouterjoin", "true");
-        }
-
-        // start with the indexCondition
-        Expression cond = indexCondition;
-        // then go to the indexEndCondition
-        if (indexEndCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond, indexEndCondition);
-            } else {
-                cond = indexEndCondition;
-            }
-        }
-        // then go to the nonIndexJoinCondition
-        if (nonIndexJoinCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond, nonIndexJoinCondition);
-            } else {
-                cond = nonIndexJoinCondition;
-            }
-        }
-        // then go to the nonIndexWhereCondition
-        if (nonIndexWhereCondition != null) {
-            if (cond != null) {
-                cond = new ExpressionLogical(OpTypes.AND, cond, nonIndexWhereCondition);
-            } else {
-                cond = nonIndexWhereCondition;
-            }
-        }
-
-        //
-        // END EXPRESSION
-        //
-        if (indexEndCondition != null) {
-            VoltXMLElement postexp = new VoltXMLElement("postexp");
-            scan.children.add(postexp);
-            assert(postexp != null);
-            VoltXMLElement postexpchild = cond.voltGetXML(session);
-            postexp.children.add(postexpchild);
-            assert(postexpchild != null);
         }
 
         return scan;

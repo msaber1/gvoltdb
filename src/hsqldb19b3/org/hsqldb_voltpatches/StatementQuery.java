@@ -179,7 +179,7 @@ public class StatementQuery extends StatementDMQL {
      * @throws HSQLParseException
      */
     @Override
-    VoltXMLElement voltGetXML(Session session)
+    VoltXMLElement voltGetStatementXML(Session session)
     throws HSQLParseException
     {
         // "select" statements/clauses are always represented by a QueryExpression of type QuerySpecification.
@@ -196,10 +196,6 @@ public class StatementQuery extends StatementDMQL {
         VoltXMLElement query = new VoltXMLElement("select");
         if (select.isDistinctSelect)
             query.attributes.put("distinct", "true");
-        if (select.isGrouped)
-            query.attributes.put("grouped", "true");
-        if (select.isAggregated)
-            query.attributes.put("aggregated", "true");
 
         // limit
         if ((select.sortAndSlice != null) && (select.sortAndSlice.limitCondition != null)) {
@@ -296,7 +292,6 @@ public class StatementQuery extends StatementDMQL {
         // columns
         VoltXMLElement cols = new VoltXMLElement("columns");
         query.children.add(cols);
-        assert(cols != null);
 
         ArrayList<Expression> orderByCols = new ArrayList<Expression>();
         ArrayList<Expression> groupByCols = new ArrayList<Expression>();
@@ -427,23 +422,7 @@ public class StatementQuery extends StatementDMQL {
         }
 
         // parameters
-        VoltXMLElement params = new VoltXMLElement("parameters");
-        query.children.add(params);
-        assert(params != null);
-
-        for (int i = 0; i < parameters.length; i++) {
-            VoltXMLElement parameter = new VoltXMLElement("parameter");
-            params.children.add(parameter);
-            assert(parameter != null);
-
-            parameter.attributes.put("index", String.valueOf(i));
-            ExpressionColumn param = parameters[i];
-            parameter.attributes.put("id", param.getUniqueId(session));
-            Type paramType = param.getDataType();
-            if (paramType != null) {
-                parameter.attributes.put("type", Types.getTypeName(paramType.typeCode));
-            }
-        }
+        voltAppendParameters(session, query);
 
         // scans
         VoltXMLElement scans = new VoltXMLElement("tablescans");
@@ -451,7 +430,7 @@ public class StatementQuery extends StatementDMQL {
         assert(scans != null);
 
         for (RangeVariable rangeVariable : rangeVariables)
-            scans.children.add(rangeVariable.voltGetXML(session));
+            scans.children.add(rangeVariable.voltGetRangeVariableXML(session));
 
         // conditions
         if (select.queryCondition != null) {

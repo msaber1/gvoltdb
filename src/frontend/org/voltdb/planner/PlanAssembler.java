@@ -947,12 +947,13 @@ public class PlanAssembler {
          * "Select A from T group by A" is grouped but has no aggregate operator
          * expressions. Catch that case by checking the grouped flag
          */
-        if (containsAggregateExpression || m_parsedSelect.grouped) {
+        if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
             AggregatePlanNode topAggNode;
             //TODO: add "m_parsedSelect.grouped &&" to the preconditions for HashAggregate.
             // Otherwise, a runtime hash is built for nothing -- just to hold a single entry.
-            if (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
-                ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID) {
+            if (m_parsedSelect.isGrouped() &&
+                (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
+                 ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {
                 aggNode = new HashAggregatePlanNode();
                 topAggNode = new HashAggregatePlanNode();
             } else {

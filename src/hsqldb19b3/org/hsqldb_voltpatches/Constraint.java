@@ -1056,7 +1056,7 @@ public final class Constraint implements SchemaObject {
      * some names.
      * @return XML, correctly indented, representing this object.
      */
-    VoltXMLElement voltGetXML(Session session)
+    VoltXMLElement voltGetConstraintXML(Session session)
     throws HSQLParseException
     {
         VoltXMLElement constraint = null;
@@ -1066,7 +1066,7 @@ public final class Constraint implements SchemaObject {
             constraint = new VoltXMLElement("constraint");
 
             constraint.attributes.put("name", getName().name);
-            constraint.attributes.put("type", getTypeName());
+            constraint.attributes.put("constrainttype", getTypeName());
 
             // Foreign Keys
             if (this.constType == FOREIGN_KEY) {
@@ -1084,7 +1084,7 @@ public final class Constraint implements SchemaObject {
                     String our_colname = our_table.getColumn(our_cols[i]).getName().statementName;
                     String fkey_colname = fkey_table.getColumn(fkey_cols[i]).getName().statementName;
 
-                    VoltXMLElement ref = new VoltXMLElement("constraint");
+                    VoltXMLElement ref = new VoltXMLElement("foreignkeypair");
                     constraint.children.add(ref);
                     assert(ref != null);
                     ref.attributes.put("from", our_colname);
@@ -1093,10 +1093,9 @@ public final class Constraint implements SchemaObject {
             }
             // All other constraints...
             else {
-                if (core.mainIndex != null)
+                if (core.mainIndex != null) {
                     constraint.attributes.put("index", core.mainIndex.getName().name);
-                else
-                    constraint.attributes.put("index", "");
+                }
             }
         }
 

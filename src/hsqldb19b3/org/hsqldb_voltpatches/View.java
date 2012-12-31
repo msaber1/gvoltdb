@@ -249,7 +249,7 @@ public class View extends TableDerived {
         int[] columnIndices = getColumnMap();
         for (int i : columnIndices) {
             ColumnSchema column = getColumn(i);
-            VoltXMLElement colChild = column.voltGetXML(session);
+            VoltXMLElement colChild = column.voltGetColumnXML(session);
             columns.children.add(colChild);
             assert(colChild != null);
         }
@@ -259,7 +259,7 @@ public class View extends TableDerived {
         table.children.add(indexes);
         assert(indexes != null);
         for (Index index : getIndexes()) {
-            VoltXMLElement indexChild = index.voltGetXML(session);
+            VoltXMLElement indexChild = index.voltGetIndexXML(session);
             indexes.children.add(indexChild);
             assert(indexChild != null);
         }
@@ -271,7 +271,7 @@ public class View extends TableDerived {
         for (Constraint constraint : getConstraints()) {
             // giant hack to ignore "CHECK" constraint
             if (constraint.getConstraintType() != Constraint.CHECK) {
-                VoltXMLElement constraintChild = constraint.voltGetXML(session);
+                VoltXMLElement constraintChild = constraint.voltGetConstraintXML(session);
                 constraints.children.add(constraintChild);
                 assert(constraintChild != null);
             }

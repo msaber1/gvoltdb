@@ -1285,23 +1285,7 @@ public class StatementDML extends StatementDMQL {
         }
     }
 
-    private void voltAppendParameters(Session session, VoltXMLElement xml) {
-
-        VoltXMLElement parameterXML = new VoltXMLElement("parameters");
-        xml.children.add(parameterXML);
-        assert(parameterXML != null);
-
-        for (int i = 0; i < parameters.length; i++) {
-            VoltXMLElement parameter = new VoltXMLElement("parameter");
-            parameterXML.children.add(parameter);
-            parameter.attributes.put("index", String.valueOf(i));
-            Expression param = parameters[i];
-            parameter.attributes.put("id", param.getUniqueId(session));
-            parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
-        }
-    }
-
-    private void voltAppendUpdateCondition(Session session, VoltXMLElement xml)
+    private void voltAppendCondition(Session session, VoltXMLElement xml)
     throws HSQLParseException
     {
         assert(targetRangeVariables.length > 0);
@@ -1357,42 +1341,37 @@ public class StatementDML extends StatementDMQL {
      * @throws HSQLParseException
      */
      @Override
-    VoltXMLElement voltGetXML(Session session)
+    VoltXMLElement voltGetStatementXML(Session session)
      throws HSQLParseException
      {
         VoltXMLElement xml = new VoltXMLElement("unknown");
         xml.attributes.put("table", targetTable.getName().name);
+        voltAppendParameters(session, xml);
+
         VoltXMLElement child;
-
         switch (type) {
+        case StatementTypes.INSERT :
+            xml.name = "insert";
+            voltAppendInsertColumns(session, xml);
+            return xml;
 
-            case StatementTypes.INSERT :
-                xml.name = "insert";
-                voltAppendInsertColumns(session, xml);
-                voltAppendParameters(session, xml);
-                break;
+        case StatementTypes.UPDATE_CURSOR :
+        case StatementTypes.UPDATE_WHERE :
+            xml.name = "update";
+            voltAppendUpdateColumns(session, xml);
+            break;
 
-            case StatementTypes.UPDATE_CURSOR :
-            case StatementTypes.UPDATE_WHERE :
-                xml.name = "update";
-                voltAppendUpdateColumns(session, xml);
-                voltAppendParameters(session, xml);
-                child = targetRangeVariables[0].voltGetXML(session);
-                xml.children.add(child);
-                assert(child != null);
-                voltAppendUpdateCondition(session, xml);
-                break;
-
-            case StatementTypes.DELETE_CURSOR :
-            case StatementTypes.DELETE_WHERE :
-                xml.name = "delete";
-                voltAppendParameters(session, xml);
-                child = targetRangeVariables[0].voltGetXML(session);
-                xml.children.add(child);
-                assert(child != null);
-                voltAppendUpdateCondition(session, xml);
-                break;
+        case StatementTypes.DELETE_CURSOR :
+        case StatementTypes.DELETE_WHERE :
+            xml.name = "delete";
+            break;
         }
+
+        voltAppendParameters(session, xml);
+        child = targetRangeVariables[0].voltGetRangeVariableXML(session);
+        xml.children.add(child);
+        assert(child != null);
+        voltAppendCondition(session, xml);
         return xml;
     }
 }

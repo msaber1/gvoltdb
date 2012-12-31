@@ -2675,7 +2675,7 @@ public class Table extends TableBase implements SchemaObject {
         int[] columnIndices = getColumnMap();
         for (int i : columnIndices) {
             ColumnSchema column = getColumn(i);
-            VoltXMLElement colChild = column.voltGetXML(session);
+            VoltXMLElement colChild = column.voltGetColumnXML(session);
             columns.children.add(colChild);
             assert(colChild != null);
         }
@@ -2685,7 +2685,7 @@ public class Table extends TableBase implements SchemaObject {
         table.children.add(indexes);
         assert(indexes != null);
         for (Index index : getIndexes()) {
-            VoltXMLElement indexChild = index.voltGetXML(session);
+            VoltXMLElement indexChild = index.voltGetIndexXML(session);
             indexes.children.add(indexChild);
             assert(indexChild != null);
         }
@@ -2695,7 +2695,9 @@ public class Table extends TableBase implements SchemaObject {
         table.children.add(constraints);
         assert(constraints != null);
         for (Constraint constraint : getConstraints()) {
-            VoltXMLElement constraintChild = constraint.voltGetXML(session);
+
+            
+            VoltXMLElement constraintChild = constraint.voltGetConstraintXML(session);
             if (constraintChild != null) {
                 constraints.children.add(constraintChild);
             }

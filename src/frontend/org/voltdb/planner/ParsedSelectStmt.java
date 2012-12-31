@@ -60,7 +60,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     public long offset = 0;
     private long limitParameterId = -1;
     private long offsetParameterId = -1;
-    public boolean grouped = false;
     public boolean distinct = false;
 
     @Override
@@ -75,8 +74,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             limitParameterId = Long.parseLong(node);
         if ((node = stmtNode.attributes.get("offset_paramid")) != null)
             offsetParameterId = Long.parseLong(node);
-        if ((node = stmtNode.attributes.get("grouped")) != null)
-            grouped = Boolean.parseBoolean(node);
         if ((node = stmtNode.attributes.get("distinct")) != null)
             distinct = Boolean.parseBoolean(node);
 
@@ -170,16 +167,13 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
     void parseOrderColumn(VoltXMLElement orderByNode) {
         // make sure everything is kosher
-        assert(orderByNode.name.equalsIgnoreCase("operation"));
-        String operationType = orderByNode.attributes.get("type");
-        assert(operationType != null);
-        assert(operationType.equalsIgnoreCase("orderby"));
+        assert(orderByNode.name.equalsIgnoreCase("orderby"));
 
         // get desc/asc
         String desc = orderByNode.attributes.get("desc");
         boolean descending = (desc != null) && (desc.equalsIgnoreCase("true"));
 
-        // get the columnref expression inside the orderby node
+        // get the columnref or other expression inside the orderby node
         VoltXMLElement child = orderByNode.children.get(0);
         assert(child != null);
 
@@ -190,9 +184,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         AbstractExpression order_exp = parseExpressionTree(child);
 
         // Cases:
-        // inner child could be columnref, in which case it's just a normal
-        // column.  Just make a ParsedColInfo object for it and the planner
-        // will do the right thing later
+        // child could be columnref, in which case it's just a normal column.
+        // Just make a ParsedColInfo object for it and the planner will do the right thing later
         if (child.name.equals("columnref"))
         {
             order_col.columnName = child.attributes.get("column");
@@ -224,6 +217,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             order_col.columnName = "";
             // I'm not sure anyone actually cares about this table name
             order_col.tableName = "VOLT_TEMP_TABLE";
+        }
+        else if (child.name.equals("simplecolumn")) {
+            order_col.columnName = "";
+            // I'm not sure anyone actually cares about this table name
+            order_col.tableName = "VOLT_TEMP_TABLE";
 
             // If it's a simplecolumn operation.  This means that the alias that
             //    we have should refer to a column that we compute
@@ -233,47 +231,42 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             // This case seems to be the result of cross-referencing a display column
             // by its position, as in "ORDER BY 2, 3". Otherwise the ORDER BY column
             // is a columnref as handled in the prior code block.
-            if (order_exp instanceof TupleValueExpression) {
-                String alias = child.attributes.get("alias");
-                order_col.alias = alias;
-                ParsedColInfo orig_col = null;
-                for (ParsedColInfo col : displayColumns)
-                {
-                    if (col.alias.equals(alias))
-                    {
-                        orig_col = col;
-                        break;
-                    }
+            assert(order_exp instanceof TupleValueExpression);
+            String alias = child.attributes.get("alias");
+            order_col.alias = alias;
+            ParsedColInfo orig_col = null;
+            for (ParsedColInfo col : displayColumns) {
+                if (col.alias.equals(alias)) {
+                    orig_col = col;
+                    break;
                 }
-                // We need the original column expression so we can extract
-                // the value size and type for our TVE that refers back to it.
-                // XXX: This check runs into problems for some cases where a display column expression gets re-used in the ORDER BY.
-                // I THINK one problem case was "select x, max(y) from t group by x order by max(y);" --paul
-                if (orig_col == null)
-                {
-                    throw new PlanningErrorException("Unable to find source " +
-                                                     "column for simplecolumn: " +
-                                                     alias);
-                }
+            }
+            // We need the original column expression so we can extract
+            // the value size and type for our TVE that refers back to it.
+            // XXX: This check runs into problems for some cases where a display column expression gets re-used in the ORDER BY.
+            // I THINK one problem case was "select x, max(y) from t group by x order by max(y);" --paul
+            if (orig_col == null) {
+                throw new PlanningErrorException("Unable to find source " +
+                                                 "column for simplecolumn: " +
+                                                 alias);
+            }
 
-                // Tagging the actual display column as being also an order by column
-                // helps later when trying to determine ORDER BY coverage (for determinism).
-                orig_col.orderBy = true;
-                orig_col.ascending = order_col.ascending;
+            // Tagging the actual display column as being also an order by column
+            // helps later when trying to determine ORDER BY coverage (for determinism).
+            orig_col.orderBy = true;
+            orig_col.ascending = order_col.ascending;
 
-                assert(orig_col.tableName.equals("VOLT_TEMP_TABLE"));
-                // Construct our fake TVE that will point back at the input
-                // column.
-                TupleValueExpression tve = (TupleValueExpression) order_exp;
-                tve.setColumnAlias(alias);
-                tve.setColumnName("");
-                tve.setColumnIndex(-1);
-                tve.setTableName("VOLT_TEMP_TABLE");
-                tve.setValueSize(orig_col.expression.getValueSize());
-                tve.setValueType(orig_col.expression.getValueType());
-                if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
-                    tve.setHasAggregate(true);
-                }
+            assert(orig_col.tableName.equals("VOLT_TEMP_TABLE"));
+            // Construct our fake TVE that will point back at the input column.
+            TupleValueExpression tve = (TupleValueExpression) order_exp;
+            tve.setColumnAlias(alias);
+            tve.setColumnName("");
+            tve.setColumnIndex(-1);
+            tve.setTableName("VOLT_TEMP_TABLE");
+            tve.setValueSize(orig_col.expression.getValueSize());
+            tve.setValueType(orig_col.expression.getValueType());
+            if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                tve.setHasAggregate(true);
             }
         }
         else if (child.name.equals("function") == false)
@@ -402,7 +395,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
      * @return whether there are GROUP BY columns and they are all order-determined by ORDER BY columns
      */
     private boolean orderByColumnsDetermineUniqueColumns(ArrayList<AbstractExpression> outNonOrdered) {
-        if ((grouped == false) || groupByColumns.isEmpty()) {
+        if ( ! isGrouped()) {
             // TODO: Are there other ways to determine a unique set of columns without considering every display column?
             return false;
         }
@@ -525,7 +518,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     boolean guaranteesUniqueRow() {
-        if (((grouped == false) || groupByColumns.isEmpty() ) && displaysAgg()) {
+        if ( ( ! isGrouped() ) && displaysAgg()) {
             return true;
         }
         return false;
@@ -540,4 +533,5 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         return false;
     }
 
+    public boolean isGrouped() { return ! groupByColumns.isEmpty(); }
 }
