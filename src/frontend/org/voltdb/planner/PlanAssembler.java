@@ -949,8 +949,14 @@ public class PlanAssembler {
          */
         if (containsAggregateExpression || m_parsedSelect.isGrouped()) {
             AggregatePlanNode topAggNode;
-            //TODO: add "m_parsedSelect.grouped &&" to the preconditions for HashAggregate.
-            // Otherwise, a runtime hash is built for nothing -- just to hold a single entry.
+            // Use a Hashing aggregate when there are multiple groups that can not be
+            // processed serially -- because their elements are not being provably
+            // scanned in group-key order.
+            // FIXME: An index with a sort direction only guarantees sorting by as many keys
+            // as are in the ORDER BY.
+            // If there are more GROUP BY keys than ORDER BY keys, a HashAggregate is still
+            // required UNLESS the non-ordered GROUP BY keys are also indexed for an implicit
+            // ordering.
             if (m_parsedSelect.isGrouped() &&
                 (root.getPlanNodeType() != PlanNodeType.INDEXSCAN ||
                  ((IndexScanPlanNode) root).getSortDirection() == SortDirectionType.INVALID)) {

@@ -1972,7 +1972,7 @@ public class FunctionSQL extends Expression {
             }
             break;
         case FUNC_EXTRACT :
-            // A little tweaking is needed here because VoltDB wants to define separate functions for each extract "field" (hard-coded node[1] value).
+            // A little tweaking is needed here because VoltDB wants to define separate functions for each extract "field" (hard-coded node[0] value).
             String volt_alias = null;
             int keywordConstant = ((Integer) nodes[0].valueData).intValue();
             switch (keywordConstant) {
@@ -2056,7 +2056,7 @@ public class FunctionSQL extends Expression {
                 throw Error.runtimeError(ErrorCode.U_S0500, "DateTimeTypeForVoltDB: " + String.valueOf(keywordConstant));
             }
 
-            exp.attributes.put("id", String.valueOf(keywordConstant + SQL_EXTRACT_VOLT_FUNC_OFFSET));
+            exp.attributes.put("fn_id", String.valueOf(keywordConstant + SQL_EXTRACT_VOLT_FUNC_OFFSET));
             exp.attributes.put("volt_alias", volt_alias);
             VoltXMLElement vxmle = nodes[1].voltGetXML(session);
             exp.children.add(vxmle);
@@ -2069,7 +2069,7 @@ public class FunctionSQL extends Expression {
             break;
         }
 
-        exp.attributes.put("id", String.valueOf(volt_funcType));
+        exp.attributes.put("fn_id", String.valueOf(volt_funcType));
 
         switch (funcType) {
         case FUNC_SUBSTRING_CHAR :

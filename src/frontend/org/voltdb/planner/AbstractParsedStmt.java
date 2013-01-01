@@ -27,6 +27,7 @@ import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
@@ -172,6 +173,25 @@ public abstract class AbstractParsedStmt {
      * @param db
      */
     abstract void parse(VoltXMLElement stmtElement);
+
+    void parseTargetColumns(VoltXMLElement columnsNode, Table table, HashMap<Column, AbstractExpression> columns)
+    {
+        for (VoltXMLElement child : columnsNode.children) {
+            assert(child.name.equals("column"));
+
+            String name = child.attributes.get("name");
+            assert(name != null);
+            Column col = table.getColumns().getIgnoreCase(name.trim());
+
+            assert(child.children.size() == 1);
+            VoltXMLElement subChild = child.children.get(0);
+            AbstractExpression expr = parseExpressionTree(subChild);
+            assert(expr != null);
+            expr.refineValueType(VoltType.get((byte)col.getType()));
+            ExpressionUtil.finalizeValueTypes(expr);
+            columns.put(col, expr);
+        }
+    }
 
     /**
      * Convert a HSQL VoltXML expression to an AbstractExpression tree.
@@ -421,7 +441,7 @@ public abstract class AbstractParsedStmt {
         }
         String value_type_name = exprNode.attributes.get("valuetype");
         VoltType value_type = VoltType.typeFromString(value_type_name);
-        String id = exprNode.attributes.get("id");
+        String id = exprNode.attributes.get("fn_id");
         assert(id != null);
         int idArg = 0;
         try {

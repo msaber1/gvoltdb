@@ -836,15 +836,13 @@ public class ExpressionColumn extends Expression {
     @Override
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
-        VoltXMLElement exp = new VoltXMLElement("unset");
-        // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", this.getUniqueId(session));
+        VoltXMLElement exp = null;
 
         if (opType == OpTypes.ASTERISK) {
-            exp.name = "asterisk";
+            exp = new VoltXMLElement("asterisk");
         }
         else if (isParam) {
-            exp.name = "value";
+            exp = new VoltXMLElement("value");
             // This eliminates a NullPointerException which MAY be a sign of insufficient type inference,
             // but there MAY be cases where a parameter type can't legitimately be inferred, so let it go.
             if (dataType != null) {
@@ -853,13 +851,14 @@ public class ExpressionColumn extends Expression {
             exp.attributes.put("isparam", "true");
         }
         else {
-            exp.name = "columnref";
+            exp = new VoltXMLElement("columnref");
             if (tableName != null)
                 exp.attributes.put("table", tableName);
             exp.attributes.put("column", columnName);
             exp.attributes.put("alias", (this.alias != null) && (getAlias().length() > 0) ? getAlias() : columnName);
         }
-
+        // We want to keep track of which expressions are the same in the XML output
+        exp.attributes.put("id", this.getUniqueId(session));
         return exp;
     }
 }

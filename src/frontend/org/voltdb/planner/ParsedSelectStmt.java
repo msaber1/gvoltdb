@@ -165,7 +165,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    void parseOrderColumn(VoltXMLElement orderByNode) {
+    private void parseOrderColumn(VoltXMLElement orderByNode) {
         // make sure everything is kosher
         assert(orderByNode.name.equalsIgnoreCase("orderby"));
 

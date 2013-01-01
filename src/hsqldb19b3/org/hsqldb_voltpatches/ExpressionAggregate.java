@@ -305,7 +305,6 @@ public class ExpressionAggregate extends Expression {
         case OpTypes.SIMPLE_COLUMN:
             VoltXMLElement exp = new VoltXMLElement("simplecolumn");
             exp.attributes.put("id", getUniqueId(session));
-            exp.attributes.put("optype", "simplecolumn");
             // This alias is the key to simplecolumn resolution in VoltDB.
             if ((this.alias != null) && (getAlias().length() > 0)) {
                 exp.attributes.put("alias", getAlias());

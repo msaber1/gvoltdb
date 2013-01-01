@@ -811,7 +811,6 @@ public abstract class StatementDMQL extends Statement {
         return rangeVariables;
     }
 
-
     /*************** VOLTDB *********************/
 
     /**
@@ -830,8 +829,8 @@ public abstract class StatementDMQL extends Statement {
         return null;
     }
 
-    protected void voltAppendParameters(Session session, VoltXMLElement xml) {
-
+    protected void voltAppendParameters(Session session, VoltXMLElement xml)
+    {
         VoltXMLElement parameterXML = new VoltXMLElement("parameters");
         xml.children.add(parameterXML);
         assert(parameterXML != null);

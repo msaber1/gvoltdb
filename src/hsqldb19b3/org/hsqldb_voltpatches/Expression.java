@@ -1482,12 +1482,9 @@ public class Expression {
             case OpTypes.ROW_SUBQUERY:
             case OpTypes.SCALAR_SUBQUERY:
             case OpTypes.TABLE_SUBQUERY:
-                throw new HSQLParseException("VoltDB does not yet support subqueries, consider using views instead");
+                throw new HSQLParseException("VoltDB does not support subqueries, consider using views instead");
             }
-            System.err.println("UNSUPPORTED EXPR TYPE: " + String.valueOf(getType()));
-            VoltXMLElement unknown = new VoltXMLElement("unknown");
-            exp.children.add(unknown);
-            assert(unknown != null);
+            throw new HSQLParseException("VoltDB does not support  EXPR TYPE: " + String.valueOf(getType()));
         }
 
         return exp;

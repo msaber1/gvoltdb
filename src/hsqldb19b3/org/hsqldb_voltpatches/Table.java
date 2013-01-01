@@ -2661,7 +2661,7 @@ public class Table extends TableBase implements SchemaObject {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetTableXML(Session session) throws HSQLParseException
     {
         VoltXMLElement table = new VoltXMLElement("table");
 
@@ -2690,17 +2690,14 @@ public class Table extends TableBase implements SchemaObject {
             assert(indexChild != null);
         }
 
-        // read all the constraints
+        // read ALL the constraints -- let the VoltDB DDLCompiler sort them out.
         VoltXMLElement constraints = new VoltXMLElement("constraints");
         table.children.add(constraints);
         assert(constraints != null);
         for (Constraint constraint : getConstraints()) {
-
-            
-            VoltXMLElement constraintChild = constraint.voltGetConstraintXML(session);
-            if (constraintChild != null) {
-                constraints.children.add(constraintChild);
-            }
+            VoltXMLElement constraintChild = constraint.voltGetConstraintXML();
+            assert(constraintChild != null);
+            constraints.children.add(constraintChild);
         }
 
         return table;
