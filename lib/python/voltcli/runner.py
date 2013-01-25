@@ -93,6 +93,17 @@ readme_template = '''
 %(warning)s
 '''
 
+class BuiltinCommand(object):
+    def __init__(self, name, bundle):
+        self.name   = name
+        self.bundle = bundle
+
+builtin_commands = (
+    BuiltinCommand('help',    bundles.HelpBundle   ),
+    BuiltinCommand('package', bundles.PackageBundle),
+    BuiltinCommand('info',    bundles.InfoBundle   )
+)
+
 #===============================================================================
 class JavaRunner(object):
 #===============================================================================
@@ -338,6 +349,48 @@ class VerbRunner(object):
                                                      warning = compat_msg))
         finally:
             readme_file.close()
+            
+    def dump_info(self, all_opt, *tags):
+        """
+        Display useful diagnostic runtime information.
+        """
+        all = all_opt or not tags 
+        tagsu = []
+        tagsb = []
+        for tag in tags:
+            tag = tag.lower()
+            if tag not in ('modules', 'python'):
+                tagsb.append(tag)
+            else:
+                tagsu.append(tag)
+        if tagsb:
+            utility.abort('Bad tag(s): %s' % ' '.join(tagsb))
+        def check(tag):
+            return all or tag in tagsu
+        # Python interpreter
+        if check('python'):
+            sys.stdout.write('''
+-- Python Interpreter --
+
+Executable: %s
+  Platform: %s
+   Version: %s
+''' % (sys.executable, sys.platform, sys.version))
+        # Modules and paths
+        if check('modules'):
+            names = sys.modules.keys()
+            names.sort()
+            width = 0
+            for name in names:
+                if len(name) > width:
+                    width = len(name)
+            module_tuples = []
+            for name in names:
+                if sys.modules[name] is not None and name not in sys.builtin_module_names:
+                    module_tuples.append((name, sys.modules[name].__file__))
+            sys.stdout.write(utility.format_table(module_tuples,
+                                                  caption  = 'Loaded Modules',
+                                                  headings = ['Name', 'Path']))
 
     def usage(self):
         """
@@ -582,9 +635,10 @@ def load_verbspace(command_name, command_dir, config, version, description, pack
     # Add standard verbs if they aren't supplied.
     def default_func(runner):
         runner.go()
-    for name, bundle in (('help', bundles.HelpBundle), ('package', bundles.PackageBundle)):
-        if name not in verbs_by_name:
-            verbs_by_name[name] = verbs.CommandVerb(name, default_func, bundles = [bundle()])
+    for builtin in builtin_commands:
+        if builtin.name not in verbs_by_name:
+            verb = verbs.CommandVerb(builtin.name, default_func, bundles = [builtin.bundle()])
+            verbs_by_name[builtin.name] = verb
 
     return verbs.VerbSpace(command_name, version, description, namespace_VOLT, verbs_by_name)
 

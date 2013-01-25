@@ -279,3 +279,24 @@ packaged.''')
 
     def go(self, verb, runner):
         runner.package(runner.opts.output_dir, runner.opts.force, *runner.opts.name)
+
+#===============================================================================
+class InfoBundle(object):
+#===============================================================================
+    """
+    Bundle class to display runtime information.  Use by assigning an instance
+    to the "bundles" keyword inside a decorator invocation.
+    """
+    def initialize(self, verb):
+        verb.set_defaults(description = 'Display diagnostic runtime information.',
+                          baseverb    = True,
+                          hideverb    = True)
+        verb.add_options(
+            cli.BooleanOption('-a', '--all', 'all', 'display all available information'))
+        verb.add_arguments(
+            cli.StringArgument('tag', 'information tag (python|modules)',
+                               min_count = 0, max_count = None))
+
+    def go(self, verb, runner):
+        runner.dump_info(runner.opts.all, *runner.opts.tag)
+
