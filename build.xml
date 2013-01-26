@@ -778,6 +778,7 @@ JAR BUILDING
             <include name="org/voltcore/**"/>
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/apache/**" />
+            <include name="org/HdrHistogram/**" />
             <include name="vanilla/**" />
             <include name="jsr166y/**"/>
             <include name="org/eclipse/jetty_voltpatches/**" />
@@ -892,6 +893,7 @@ JAR BUILDING
             <include name="javax/servlet_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/jute_voltpatches/**" />
+            <include name="org/HdrHistogram/**" />
             <include name="vanilla/**" />
             <include name="org/apache/zookeeper_voltpatches/**" />
             <include name="org/apache/spearce_voltpatches/**" />
@@ -1022,7 +1024,8 @@ JAVA COMPILATION
         includes="org/voltcore/**/*.java,org/apache/**/*.java
                   au/**/*.java,org/spearce_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
-                  vanilla/**/*.java" />
+                  vanilla/**/*.java
+                  org/HdrHistogram/**/*.java" />
     <!-- non-voltcore voltdb code -->
     <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 

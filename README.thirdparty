@@ -903,6 +903,13 @@ PureJavaCrc32c has an Intel clause added
  * and licensed under the BSD license.
  */
 ================================================================================
+HdrHistogram by Gil Tene of Azul Systems
+/**
+ * Histogram.java
+ * Written by Gil Tene of Azul Systems, and released to the public domain,
+ * as explained at http://creativecommons.org/publicdomain/zero/1.0/
+ */
+================================================================================
 Linked with or Included in VoltDB example applications
 ================================================================================
 Twitter4j (used in the VoltDB Twitter example application)

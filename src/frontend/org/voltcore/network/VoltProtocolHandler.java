@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 import java.io.IOException;
 
 public abstract class VoltProtocolHandler implements InputHandler {
+    public static final int MAX_MESSAGE_SIZE = 52428800;
     /** VoltProtocolPorts each have a unique id */
     private static AtomicLong m_globalConnectionCounter = new AtomicLong(0);
 
@@ -54,10 +55,11 @@ public abstract class VoltProtocolHandler implements InputHandler {
                 throw new IOException(
                         "Next message length is " + m_nextLength + " which is less than 1 and is nonsense");
             }
-            if (m_nextLength > 52428800) {
+            if (m_nextLength > MAX_MESSAGE_SIZE) {
                 throw new IOException(
                         "Next message length is " + m_nextLength + " which is greater then the hard coded " +
-                        "max of 52428800. Break up the work into smaller chunks (2 megabytes is reasonable) " +
+                        "max of " + MAX_MESSAGE_SIZE +
+                        ". Break up the work into smaller chunks (2 megabytes is reasonable) " +
                         "and send as multiple messages or stored procedure invocations");
             }
             assert m_nextLength > 0;
