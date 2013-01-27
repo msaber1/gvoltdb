@@ -21,7 +21,6 @@ import java.util.ArrayList;
 import java.util.Iterator;
 
 import org.HdrHistogram.Histogram;
-import org.HdrHistogram.IntHistogram;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.utils.EstTime;
@@ -60,8 +59,8 @@ class ProcedureStatsCollector extends SiteStatsSource {
 
     private final long POLL_WINDOW = 10000;
     private long m_lastWindowStart = System.currentTimeMillis();
-    //24 hours measured in microseconds
-    private final long EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE = (60 * 60 * 1000 * 100);
+    //60 seconds measured in microseconds
+    private final long EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE = (60 * 1000 * 100);
     private final int  EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS = 1;
 
     /**
@@ -72,14 +71,14 @@ class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * Histogram values returned by poll, replaced periodically
      */
-    private IntHistogram m_lastExecutionTimeHistogram =
-            new IntHistogram( EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE, EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
+    private Histogram m_lastExecutionTimeHistogram =
+            new Histogram( EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE, EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
 
     /**
      * Currently calculated values for window, not visible
      */
-    private IntHistogram m_executionTimeHistogram =
-            new IntHistogram( EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE, EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
+    private Histogram m_executionTimeHistogram =
+            new Histogram( EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE, EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
 
 
     /**
@@ -154,14 +153,14 @@ class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * Histogram values returned by poll, replaced periodically
      */
-    private IntHistogram m_lastResultSizeHistogram =
-            new IntHistogram( SIZE_HISTOGRAM_HIGHEST_TRACKABLE, SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
+    private Histogram m_lastResultSizeHistogram =
+            new Histogram( SIZE_HISTOGRAM_HIGHEST_TRACKABLE, SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
 
     /**
      * Currently calculated values for window, not visible
      */
-    private IntHistogram m_resultSizeHistogram =
-            new IntHistogram( SIZE_HISTOGRAM_HIGHEST_TRACKABLE, SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
+    private Histogram m_resultSizeHistogram =
+            new Histogram( SIZE_HISTOGRAM_HIGHEST_TRACKABLE, SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
 
     /**
      * Smallest parameter set size
@@ -192,14 +191,14 @@ class ProcedureStatsCollector extends SiteStatsSource {
     /**
      * Histogram values returned by poll, replaced periodically
      */
-    private IntHistogram m_lastParameterSetSizeHistogram =
-            new IntHistogram( SIZE_HISTOGRAM_HIGHEST_TRACKABLE, SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
+    private Histogram m_lastParameterSetSizeHistogram =
+            new Histogram( SIZE_HISTOGRAM_HIGHEST_TRACKABLE, SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
 
     /**
      * Currently calculated values for window, not visible
      */
-    private IntHistogram m_parameterSetSizeHistogram =
-            new IntHistogram( SIZE_HISTOGRAM_HIGHEST_TRACKABLE, SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
+    private Histogram m_parameterSetSizeHistogram =
+            new Histogram( SIZE_HISTOGRAM_HIGHEST_TRACKABLE, SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
 
     /**
      * Whether to return results in intervals since polling or since the beginning
@@ -350,17 +349,17 @@ class ProcedureStatsCollector extends SiteStatsSource {
 
             m_lastExecutionTimeHistogram = m_executionTimeHistogram;
             m_executionTimeHistogram =
-                    new IntHistogram(
+                    new Histogram(
                             EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE,
                             EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
             m_lastResultSizeHistogram = m_resultSizeHistogram;
             m_resultSizeHistogram =
-                    new IntHistogram(
+                    new Histogram(
                             SIZE_HISTOGRAM_HIGHEST_TRACKABLE,
                             SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
             m_lastParameterSetSizeHistogram = m_parameterSetSizeHistogram;
             m_parameterSetSizeHistogram =
-                    new IntHistogram(
+                    new Histogram(
                             SIZE_HISTOGRAM_HIGHEST_TRACKABLE,
                             SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
 

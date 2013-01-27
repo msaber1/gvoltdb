@@ -91,8 +91,8 @@ public class InitiatorStats extends SiteStatsSource {
         private int lastMaxExecutionTime = Integer.MIN_VALUE;
         private int maxExecutionTime = Integer.MIN_VALUE;
 
-        //24 hours measured in milliseconds
-        private final long EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE = (60 * 60 * 1000);
+        //60 seconds measured in milliseconds
+        private final long EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE = (60 * 1000);
         private final int  EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS = 1;
 
         private Histogram allExecutionTimeHistogram =
