@@ -9,6 +9,11 @@
 
 package org.HdrHistogram;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
+
+import org.voltdb.utils.CompressionService;
+
 /**
  * <h3>A High Dynamic Range (HDR) Histogram using a <b><code>short</code></b> count type </h3>
  * <p>
@@ -56,4 +61,29 @@ public class ShortHistogram extends AbstractHistogram {
         super(highestTrackableValue, numberOfSignificantValueDigits);
         counts = new short[countsArrayLength];
     }
+
+    public ShortHistogram(ByteBuffer buf) {
+        super(buf.getLong(), buf.getInt());
+        counts = new short[countsArrayLength];
+        totalCount = buf.getLong();
+        for (int ii = 0; ii < counts.length; ii++) {
+            counts[ii] = buf.getShort();
+        }
+    }
+
+    public byte[] toCompressedBytes() {
+        ByteBuffer buf = ByteBuffer.allocate(8 + 12 + 8 + (2 * counts.length));
+        buf.putLong(this.getHighestTrackableValue());
+        buf.putInt(this.getNumberOfSignificantValueDigits());
+        buf.putLong(totalCount);
+        for (int ii = 0; ii < counts[ii]; ii++) {
+            buf.putShort(counts[ii]);
+        }
+        try {
+            return CompressionService.compressBytes(buf.array());
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
 }

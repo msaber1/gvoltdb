@@ -577,6 +577,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         "Failed to initialize site tracker with all hosts before timeout", true, null);
             }
 
+            /*
+             * Believe it or not the pre iv2 initiator mailbox is still
+             * necessary in IV2 because there is a hack around initiator stats
+             * that requires the initiator stats object in the mailbox to be created
+             * and registered
+             */
             initiatorMailbox = createInitiatorMailbox(initiatorHSId);
 
 

@@ -323,6 +323,31 @@ class ProcedureStatsCollector extends SiteStatsSource {
         //Second clause handles time going backwards
         if (now - m_lastWindowStart  > POLL_WINDOW || now < m_lastWindowStart) {
             m_lastWindowStart = now;
+
+            /*
+             * These 3 values are incremented even if no procedure has been profiled
+             * since the last window. That is fine, but for accuracy zero
+             * them out as well
+             */
+            m_lastInvocations = m_invocations;
+            m_allInvocations += m_invocations;
+            m_invocations = 0;
+
+            m_lastAbortCount = m_abortCount;
+            m_allAbortCount += m_abortCount;
+            m_abortCount = 0;
+
+            m_lastFailureCount = m_failureCount;
+            m_allFailureCount += m_allFailureCount;
+            m_failureCount = 0;
+
+            /*
+             * If nothing has happened in this window and the last one there is nothing to do.
+             * They are all zeroes so this is a no op
+             */
+            if (m_timedInvocations == 0 &&
+                    m_lastExecutionTimeHistogram.getHistogramData().getTotalCount() == 0) return;
+
             m_lastExecutionTimeHistogram = m_executionTimeHistogram;
             m_executionTimeHistogram =
                     new IntHistogram(
@@ -338,10 +363,6 @@ class ProcedureStatsCollector extends SiteStatsSource {
                     new IntHistogram(
                             SIZE_HISTOGRAM_HIGHEST_TRACKABLE,
                             SIZE_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
-
-            m_lastInvocations = m_invocations;
-            m_allInvocations += m_invocations;
-            m_invocations = 0;
 
             m_lastTimedInvocations = m_timedInvocations;
             m_allTimedInvocations += m_timedInvocations;
@@ -359,13 +380,7 @@ class ProcedureStatsCollector extends SiteStatsSource {
             m_allMaxExecutionTime = Math.max(m_allMaxExecutionTime, m_maxExecutionTime);
             m_maxExecutionTime = Long.MIN_VALUE;
 
-            m_lastAbortCount = m_abortCount;
-            m_allAbortCount += m_abortCount;
-            m_abortCount = 0;
 
-            m_lastFailureCount = m_failureCount;
-            m_allFailureCount += m_allFailureCount;
-            m_failureCount = 0;
 
             m_lastMinResultSize = m_minResultSize;
             m_allMinResultSize = Math.min(m_allMinResultSize, m_minResultSize);

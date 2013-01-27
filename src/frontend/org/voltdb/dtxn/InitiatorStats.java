@@ -27,6 +27,8 @@ import java.util.NoSuchElementException;
 import java.util.Queue;
 import java.util.Set;
 
+import org.HdrHistogram.Histogram;
+import org.voltcore.utils.EstTime;
 import org.voltdb.ClientInterface;
 import org.voltdb.SiteStatsSource;
 import org.voltdb.StoredProcedureInvocation;
@@ -65,46 +67,116 @@ public class InitiatorStats extends SiteStatsSource {
          */
         private final String connectionHostname;
 
+        private long lastWindowStart = System.currentTimeMillis();
+        private final long POLL_WINDOW = 10000;
+
         /**
          * Number of time procedure has been invoked
          */
-        private long invocationCount = 0;
+        private long allInvocationCount = 0;
         private long lastInvocationCount = 0;
+        private long invocationCount = 0;
 
         /**
          * Shortest amount of time this procedure has executed in
          */
-        private int minExecutionTime = Integer.MAX_VALUE;
+        private int allMinExecutionTime = Integer.MAX_VALUE;
         private int lastMinExecutionTime = Integer.MAX_VALUE;
+        private int minExecutionTime = Integer.MAX_VALUE;
 
         /**
          * Longest amount of time this procedure has executed in
          */
-        private int maxExecutionTime = Integer.MIN_VALUE;
+        private int allMaxExecutionTime = Integer.MIN_VALUE;
         private int lastMaxExecutionTime = Integer.MIN_VALUE;
+        private int maxExecutionTime = Integer.MIN_VALUE;
+
+        //24 hours measured in milliseconds
+        private final long EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE = (60 * 60 * 1000);
+        private final int  EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS = 1;
+
+        private Histogram allExecutionTimeHistogram =
+                new Histogram(
+                        EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE,
+                        EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
+        private Histogram lastExecutionTimeHistogram =
+                new Histogram(
+                        EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE,
+                        EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
+        private Histogram executionTimeHistogram =
+                new Histogram(
+                        EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE,
+                        EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
 
         /**
          * Total amount of time spent executing procedure
          */
-        private long totalExecutionTime = 0;
-        private long lastTotalExecutionTime = 0;
+        private long allExecutionTime = 0;
+        private long lastExecutionTime = 0;
+        private long executionTime;
 
-        private long abortCount = 0;
+        private long allAbortCount = 0;
         private long lastAbortCount = 0;
-        private long failureCount = 0;
+        private long abortCount = 0;
+
+        private long allFailureCount = 0;
         private long lastFailureCount = 0;
+        private long failureCount = 0;
+
 
         public InvocationInfo (String hostname) {
             connectionHostname = hostname;
         }
 
+        public void rollWindow() {
+            final long now = EstTime.currentTimeMillis();
+            //Second clause handles time going backwards
+            if (now - lastWindowStart  > POLL_WINDOW || now < lastWindowStart) {
+                lastWindowStart = now;
+
+                //There are no invocations in this window or the last, nothing to do
+                if (invocationCount == 0 &&
+                        lastExecutionTimeHistogram.getHistogramData().getTotalCount() == 0) return;
+
+                lastInvocationCount = invocationCount;
+                allInvocationCount += invocationCount;
+                invocationCount = 0;
+
+                lastAbortCount = abortCount;
+                allAbortCount += abortCount;
+                abortCount = 0;
+
+                lastFailureCount = failureCount;
+                allFailureCount += allFailureCount;
+                failureCount = 0;
+
+                lastMinExecutionTime = minExecutionTime;
+                allMinExecutionTime = Math.min(allMinExecutionTime, minExecutionTime);
+                minExecutionTime = Integer.MAX_VALUE;
+
+                lastMaxExecutionTime = maxExecutionTime;
+                allMaxExecutionTime = Math.max(allMaxExecutionTime, maxExecutionTime);
+                maxExecutionTime = Integer.MIN_VALUE;
+
+                lastExecutionTime = executionTime;
+                allExecutionTime += executionTime;
+                executionTime = 0;
+
+                lastExecutionTimeHistogram = executionTimeHistogram;
+                executionTimeHistogram = new Histogram(
+                        EXECUTION_HISTOGRAM_HIGHEST_TRACKABLE,
+                        EXECUTION_HISTOGRAM_SIGNIFICANT_VALUE_DIGITS);
+            }
+        }
+
         public void processInvocation(int delta, byte status) {
-            totalExecutionTime += delta;
+            rollWindow();
+            executionTime += delta;
             minExecutionTime = Math.min( delta, minExecutionTime);
             maxExecutionTime = Math.max(  delta, maxExecutionTime);
-            lastMinExecutionTime = Math.min( delta, lastMinExecutionTime);
-            lastMaxExecutionTime = Math.max( delta, lastMaxExecutionTime);
             invocationCount++;
+            executionTimeHistogram.recordValue(delta);
+            allExecutionTimeHistogram.recordValue(delta);
             if (status != ClientResponse.SUCCESS) {
                 if (status == ClientResponse.GRACEFUL_FAILURE || status == ClientResponse.USER_ABORT) {
                     abortCount++;
@@ -171,6 +243,7 @@ public class InitiatorStats extends SiteStatsSource {
         columns.add(new ColumnInfo("MAX_EXECUTION_TIME", VoltType.INTEGER));
         columns.add(new ColumnInfo("ABORTS", VoltType.BIGINT));
         columns.add(new ColumnInfo("FAILURES", VoltType.BIGINT));
+        columns.add(new ColumnInfo("EXECUTION_TIME_99", VoltType.INTEGER));
     }
 
     @Override
@@ -184,30 +257,33 @@ public class InitiatorStats extends SiteStatsSource {
         final String procName = statsKeySplit[0];
         final String connectionId = statsKeySplit[1];
 
-        long invocationCount = info.invocationCount;
-        long totalExecutionTime = info.totalExecutionTime;
-        int minExecutionTime = info.minExecutionTime;
-        int maxExecutionTime = info.maxExecutionTime;
-        long abortCount = info.abortCount;
-        long failureCount = info.failureCount;
+        info.rollWindow();
 
+        long invocationCount = info.allInvocationCount + info.invocationCount;
+        long totalExecutionTime = info.allExecutionTime + info.executionTime;
+        int minExecutionTime = Math.min(info.allMinExecutionTime, info.minExecutionTime);
+        int maxExecutionTime = Math.max(info.allMaxExecutionTime, info.maxExecutionTime);
+        long abortCount = info.allAbortCount + info.abortCount;
+        long failureCount = info.allFailureCount + info.failureCount;
+        int execution99 = 0;
         if (iterator.interval) {
-            invocationCount = info.invocationCount - info.lastInvocationCount;
-            info.lastInvocationCount = info.invocationCount;
+            invocationCount = info.lastInvocationCount;
 
-            totalExecutionTime = info.totalExecutionTime - info.lastTotalExecutionTime;
-            info.lastTotalExecutionTime = info.totalExecutionTime;
+            totalExecutionTime = info.lastExecutionTime;
 
             minExecutionTime = info.lastMinExecutionTime;
             maxExecutionTime = info.lastMaxExecutionTime;
-            info.lastMinExecutionTime = Integer.MAX_VALUE;
-            info.lastMaxExecutionTime = Integer.MIN_VALUE;
 
-            abortCount = info.abortCount - info.lastAbortCount;
-            info.lastAbortCount = info.abortCount;
+            abortCount = info.lastAbortCount;
 
-            failureCount = info.failureCount - info.lastFailureCount;
-            info.lastFailureCount = info.failureCount;
+            failureCount = info.lastFailureCount;
+            if (info.lastInvocationCount > 0) {
+                execution99 = (int)info.lastExecutionTimeHistogram.getHistogramData().getValueAtPercentile(.99);
+            }
+        } else {
+            if (info.allInvocationCount > 0) {
+                execution99 = (int)info.allExecutionTimeHistogram.getHistogramData().getValueAtPercentile(.99);
+            }
         }
 
         rowValues[columnNameToIndex.get("CONNECTION_ID")] = new Long(connectionId);
@@ -219,6 +295,7 @@ public class InitiatorStats extends SiteStatsSource {
         rowValues[columnNameToIndex.get("MAX_EXECUTION_TIME")] = maxExecutionTime;
         rowValues[columnNameToIndex.get("ABORTS")] = abortCount;
         rowValues[columnNameToIndex.get("FAILURES")] = failureCount;
+        rowValues[columnNameToIndex.get("EXECUTION_TIME_99")] = execution99;
         super.updateStatsRow(rowKey, rowValues);
     }
 
@@ -318,7 +395,7 @@ public class InitiatorStats extends SiteStatsSource {
                 d.addAll(ci.getIV2InitiatorStats());
             }
         } else {
-            d.offer(m_connectionStats.entrySet().iterator());
+            throw new UnsupportedOperationException("PreIV2 is gone");
         }
         return new DummyIterator(
                 new AggregatingIterator(d),

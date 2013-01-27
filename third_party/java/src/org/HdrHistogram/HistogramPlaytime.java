@@ -7,8 +7,8 @@ public class HistogramPlaytime {
      */
     public static void main(String[] args) {
         //long a = 1000000000L;
-        long a = 1024 * 1024 * 50;
-        int b = 2;
+        long a = (60 * 60 * 1000);
+        int b = 1;
 
         Histogram hist2 = new Histogram(a, b);
         System.out.println(hist2.getEstimatedFootprintInBytes());
