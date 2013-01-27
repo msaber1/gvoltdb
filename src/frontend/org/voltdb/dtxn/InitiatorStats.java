@@ -175,8 +175,14 @@ public class InitiatorStats extends SiteStatsSource {
             minExecutionTime = Math.min( delta, minExecutionTime);
             maxExecutionTime = Math.max(  delta, maxExecutionTime);
             invocationCount++;
-            executionTimeHistogram.recordValue(delta);
-            allExecutionTimeHistogram.recordValue(delta);
+            if (delta <= executionTimeHistogram.getHighestTrackableValue()) {
+                executionTimeHistogram.recordValue(delta);
+                allExecutionTimeHistogram.recordValue(delta);
+            } else {
+                executionTimeHistogram.recordValue(executionTimeHistogram.getHighestTrackableValue());
+                allExecutionTimeHistogram.recordValue(allExecutionTimeHistogram.getHighestTrackableValue());
+            }
+
             if (status != ClientResponse.SUCCESS) {
                 if (status == ClientResponse.GRACEFUL_FAILURE || status == ClientResponse.USER_ABORT) {
                     abortCount++;
