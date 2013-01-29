@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -129,7 +129,7 @@ public:
 
     void appendTuple(int64_t lastCommittedTxnId, int64_t currentTxnId)
     {
-        m_context.setupTxnIdsForPlanFragments(currentTxnId, lastCommittedTxnId);
+        m_context.setupForPlanFragments(currentTxnId, lastCommittedTxnId);
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {
             int value = rand();
@@ -137,12 +137,12 @@ public:
         }
         // append into the buffer
         m_wrapper.appendTuple(1, m_tuple,
-                               TupleStreamWrapper::INSERT);
+                              TupleStreamWrapper::INSERT);
     }
 
     void periodicFlush(int64_t lastCommittedTxnId,
                        int64_t currentTxnId) {
-        m_context.setupTxnIdsForPlanFragments(currentTxnId, lastCommittedTxnId);
+        m_context.setupForPlanFragments(currentTxnId, lastCommittedTxnId);
         m_wrapper.periodicFlush(-1);
     }
 

@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -31,19 +31,19 @@ void PersistentTableUndoUpdateAction::undo() {
     //has to be looked up
     TableTuple tupleInTable;
     if (m_revertIndexes) {
-        tupleInTable = m_table->lookupTuple(m_newTuple);
+        tupleInTable = m_table->lookupTuple(m_newTupleData);
     } else {
         //TableScan will find the already updated tuple since the copy
         //is done immediately
         if (m_table->primaryKeyIndex() == NULL) {
-            tupleInTable = m_table->lookupTuple(m_newTuple);
+            tupleInTable = m_table->lookupTuple(m_newTupleData);
         } else {
             //IndexScan will find it under the old tuple entry since the
             //index was never updated
-            tupleInTable = m_table->lookupTuple(m_oldTuple);
+            tupleInTable = m_table->lookupTuple(m_oldTupleData);
         }
     }
-    m_table->updateTupleForUndo(tupleInTable, m_oldTuple, m_revertIndexes);
+    m_table->updateTupleForUndo(tupleInTable, m_oldTupleData, m_revertIndexes);
 
     /*
      * Free the strings from the new tuple that updated in the old tuple.
@@ -69,9 +69,6 @@ void PersistentTableUndoUpdateAction::release() {
     {
         NValue::deserializeFromTupleStorage( &(*i), VALUE_TYPE_VARCHAR, false ).free();
     }
-}
-
-PersistentTableUndoUpdateAction::~PersistentTableUndoUpdateAction() {
 }
 
 }

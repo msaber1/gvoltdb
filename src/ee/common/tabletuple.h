@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -107,13 +107,13 @@ public:
 
     // Used to wrap read only tuples in indexing code. TODO Remove
     // constedeness from indexing code so this cast isn't necessary.
-    inline void moveToReadOnlyTuple(const void *address) {
+    inline void moveToReadOnlyTuple(const char *address) {
         assert(m_schema);
         assert(address);
         //Necessary to move the pointer back TUPLE_HEADER_SIZE
         // artificially because Tuples used as keys for indexes do not
         // have the header.
-        m_data = reinterpret_cast<char*>(const_cast<void*>(address)) - TUPLE_HEADER_SIZE;
+        m_data = const_cast<char*>(address) - TUPLE_HEADER_SIZE;
     }
 
     /** Get the address of this tuple in the table's backing store */
@@ -279,13 +279,14 @@ public:
     bool compatibleForCopy(const TableTuple &source);
     void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL);
     void copyForPersistentUpdate(const TableTuple &source);
-    void copy(const TableTuple &source);
+    void copyTuple(const TableTuple &source);
+    void copyColumns(const char* sourceData);
+    void copyData(const char* sourceData);
 
     /** this does set NULL in addition to clear string count.*/
     void setAllNulls();
 
     bool equals(const TableTuple &other) const;
-    bool equalsNoSchemaCheck(const TableTuple &other) const;
 
     int compare(const TableTuple &other) const;
 
@@ -338,8 +339,8 @@ protected:
     const TupleSchema *m_schema;
 
     /**
-     * The column data, padded at the front by 8 bytes
-     * representing whether the tuple is active or deleted
+     * The column data, padded at the front by 1 byte of status bits
+     * representing whether the tuple is active or deleted or dirty etc.
      */
     char *m_data;
 private:
@@ -499,14 +500,14 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
 #endif
 
     if (allowInlinedObjects == oAllowInlinedObjects) {
+        // copy the data AND the isActive flag
+        copyData(source.m_data);
         /*
          * The source and target tuple have the same policy WRT to
          * inlining strings. A memcpy can be used to speed the process
          * up for all columns that are not uninlineable strings.
          */
         if (uninlineableObjectColumnCount > 0) {
-            // copy the data AND the isActive flag
-            ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
             /*
              * Copy each uninlined string column doing an allocation for string copies.
              */
@@ -517,10 +518,6 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
                                                     source.getNValue(uinlineableObjectColumnIndex),
                                                     pool);
             }
-            m_data[0] = source.m_data[0];
-        } else {
-            // copy the data AND the isActive flag
-            ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
         }
     } else {
         // Can't copy the string ptr from the other tuple if the string
@@ -530,9 +527,9 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
         for (uint16_t ii = 0; ii < columnCount; ii++) {
             setNValueAllocateForObjectCopies(ii, source.getNValue(ii), pool);
         }
-
-        m_data[0] = source.m_data[0];
     }
+    // copy the isActive flag
+    m_data[0] = source.m_data[0];
 }
 
 /*
@@ -579,46 +576,23 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source) {
                 setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
             }
         }
-        m_data[0] = source.m_data[0];
     } else {
-        // copy the data AND the isActive flag
-        ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
+        // Copy the data but not the status flags
+        copyData(source.m_data);
     }
 }
 
-inline void TableTuple::copy(const TableTuple &source) {
+inline void TableTuple::copyTuple(const TableTuple& source) {
+    copyData(source.m_data);
+}
+
+inline void TableTuple::copyData(const char* sourceData) {
     assert(m_schema);
-    assert(source.m_schema);
-    assert(source.m_data);
+    assert(sourceData);
     assert(m_data);
 
-    const uint16_t columnCount = m_schema->columnCount();
-    const bool allowInlinedObjects = m_schema->allowInlinedObjects();
-    const TupleSchema *sourceSchema = source.m_schema;
-    const bool oAllowInlinedObjects = sourceSchema->allowInlinedObjects();
-
-#ifndef NDEBUG
-    if(!compatibleForCopy(source)) {
-        std::ostringstream message;
-        message << "src  tuple: " << source.debug("") << std::endl;
-        message << "src schema: " << source.m_schema->debug() << std::endl;
-        message << "dest schema: " << m_schema->debug() << std::endl;
-        throwFatalException("%s", message.str().c_str());
-    }
-#endif
-
-    if (allowInlinedObjects == oAllowInlinedObjects) {
-        // copy the data AND the isActive flag
-        ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
-    } else {
-        // Can't copy the string ptr from the other tuple if the
-        // string is inlined into the tuple
-        assert(!(!allowInlinedObjects && oAllowInlinedObjects));
-        for (uint16_t ii = 0; ii < columnCount; ii++) {
-            setNValue(ii, source.getNValue(ii));
-        }
-        m_data[0] = source.m_data[0];
-    }
+    // copy the data but not the isActive flag
+    ::memcpy(m_data + TUPLE_HEADER_SIZE, sourceData + TUPLE_HEADER_SIZE, m_schema->tupleLength());
 }
 
 inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *dataPool) {
@@ -683,13 +657,6 @@ TableTuple::serializeToExport(ExportSerializeOutput &io,
 }
 
 inline bool TableTuple::equals(const TableTuple &other) const {
-    if (!m_schema->equals(other.m_schema)) {
-        return false;
-    }
-    return equalsNoSchemaCheck(other);
-}
-
-inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other) const {
     for (int ii = 0; ii < m_schema->columnCount(); ii++) {
         const NValue lhs = getNValue(ii);
         const NValue rhs = other.getNValue(ii);
@@ -766,7 +733,7 @@ struct TableTupleHasher : std::unary_function<TableTuple, std::size_t>
 class TableTupleEqualityChecker {
 public:
     inline bool operator()(const TableTuple lhs, const TableTuple rhs) const {
-        return lhs.equalsNoSchemaCheck(rhs);
+        return lhs.equals(rhs);
     }
 };
 

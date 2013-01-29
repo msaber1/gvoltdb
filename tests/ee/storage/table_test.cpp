@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -54,6 +54,8 @@
 #include <string>
 #include "harness.h"
 #include "common/common.h"
+#include "common/DummyUndoQuantum.hpp"
+#include "common/executorcontext.hpp"
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
@@ -92,11 +94,16 @@ bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS] = { true, true, true, true, true };
 
 class TableTest : public Test {
 public:
-    TableTest() : table(NULL), temp_table(NULL), persistent_table(NULL) {
+    TableTest()
+    : dummyUndo()
+    , m_context(0, 0, &dummyUndo, NULL, NULL, NULL, false, "", 0)
+    , table(NULL)
+    {
         srand(0);
         init(false); // default is temp_table. call init(true) to make it transactional
     }
-    ~TableTest() {
+    ~TableTest()
+    {
         delete table;
     }
 
@@ -106,28 +113,33 @@ protected:
         char buffer[32];
 
         vector<string> columnNames(NUM_OF_COLUMNS);
-        vector<ValueType> columnTypes;
-        vector<int32_t> columnLengths;
-        vector<bool> columnAllowNull;
+        vector<ValueType> columnTypes(NUM_OF_COLUMNS);
+        vector<int32_t> columnLengths(NUM_OF_COLUMNS);
+        vector<bool> columnAllowNull(NUM_OF_COLUMNS);
         for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
             snprintf(buffer, 32, "column%02d", ctr);
             columnNames[ctr] = buffer;
-            columnTypes.push_back(COLUMN_TYPES[ctr]);
-            columnLengths.push_back(COLUMN_SIZES[ctr]);
-            columnAllowNull.push_back(COLUMN_ALLOW_NULLS[ctr]);
+            columnTypes[ctr] = COLUMN_TYPES[ctr];
+            columnLengths[ctr] = COLUMN_SIZES[ctr];
+            columnAllowNull[ctr] = COLUMN_ALLOW_NULLS[ctr];
         }
         TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+        delete table;
         if (xact) {
             persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames);
+            temp_table = NULL;
             table = persistent_table;
         } else {
             limits.setMemoryLimit(1024 * 1024);
+            persistent_table = NULL;
             temp_table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, &limits);
             table = temp_table;
         }
         assert(tableutil::addRandomTuples(this->table, NUM_OF_TUPLES));
     }
 
+    DummyUndoQuantum dummyUndo;
+    ExecutorContext m_context;
     Table* table;
     Table* temp_table;
     Table* persistent_table;
@@ -187,6 +199,7 @@ TEST_F(TableTest, TupleInsert) {
 }
 
 TEST_F(TableTest, TupleUpdate) {
+    init(true); // only persistent tables actually need to support update
     //
     // Loop through and randomly update values
     // We will keep track of multiple columns to make sure our updates
@@ -230,7 +243,7 @@ TEST_F(TableTest, TupleUpdate) {
             }
         }
         if (update) {
-            EXPECT_EQ(true, temp_table->updateTuple(tuple, temp_tuple));
+            EXPECT_EQ(true, table->updateTuple(tuple, temp_tuple));
         }
     }
 

@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -492,7 +492,15 @@ struct GenericPersistentKey : public GenericKey<keySize>
         const int columnCount = keySchema->columnCount();
         for (int ii = 0; ii < columnCount; ++ii) {
             AbstractExpression* ae = indexed_expressions[ii];
-            NValue indexedValue = ae->eval(tuple, NULL);
+            NValue indexedValue;
+            try {
+                indexedValue = ae->eval(tuple, NULL);
+            } catch (SQLException& ignoredDuringIndexing) {
+                // For the sake of keeping non-unique index upkeep as a non-failable operation,
+                // all exception-throwing expression evaluations get treated as NULL for index
+                // purposes.
+                indexedValue = NValue::getNullValue(ae->getValueType());
+            }
             // The NULL argument means use the persistent memory pool for the varchar
             // allocation rather than any particular COW context's pool.
             // XXX: Could this ever somehow interact badly with a COW context?
@@ -582,8 +590,8 @@ struct GenericComparator
     GenericComparator(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     inline int operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
-        TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
-        TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
+        TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const char*>(&lhs));
+        TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const char*>(&rhs));
         // lexographical compare could be faster for fixed N
         return lhTuple.compare(rhTuple);
     }
@@ -602,9 +610,9 @@ struct GenericEqualityChecker
     GenericEqualityChecker(const TupleSchema *keySchema) : m_keySchema(keySchema) {}
 
     inline bool operator()(const GenericKey<keySize> &lhs, const GenericKey<keySize> &rhs) const {
-        TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&lhs));
-        TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&rhs));
-        return lhTuple.equalsNoSchemaCheck(rhTuple);
+        TableTuple lhTuple(m_keySchema); lhTuple.moveToReadOnlyTuple(reinterpret_cast<const char*>(&lhs));
+        TableTuple rhTuple(m_keySchema); rhTuple.moveToReadOnlyTuple(reinterpret_cast<const char*>(&rhs));
+        return lhTuple.equals(rhTuple);
     }
 private:
     const TupleSchema *m_keySchema;
@@ -623,7 +631,7 @@ struct GenericHasher
     /** Generate a 64-bit number for the key value */
     inline size_t operator()(GenericKey<keySize> const &p) const
     {
-        TableTuple pTuple(m_keySchema); pTuple.moveToReadOnlyTuple(reinterpret_cast<const void*>(&p));
+        TableTuple pTuple(m_keySchema); pTuple.moveToReadOnlyTuple(reinterpret_cast<const char*>(&p));
         return pTuple.hashCode();
     }
 private:

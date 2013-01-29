@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -50,16 +50,11 @@
 #include "common/UndoQuantumReleaseInterest.h"
 
 #include <cassert>
-#include "boost/shared_ptr.hpp"
 #include "boost/scoped_ptr.hpp"
 #include "common/ids.h"
-#include "common/valuevector.h"
 #include "common/tabletuple.h"
-#include "storage/TupleStreamWrapper.h"
-#include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
-#include "storage/CopyOnWriteContext.h"
-#include "storage/RecoveryContext.h"
+#include "storage/tableiterator.h"
 #include "common/ThreadLocalPool.h"
 
 class CompactionTest_BasicCompaction;
@@ -67,8 +62,11 @@ class CompactionTest_CompactionWithCopyOnWrite;
 
 namespace voltdb {
 
+class CopyOnWriteContext;
 class MaterializedViewMetadata;
+class RecoveryContext;
 class RecoveryProtoMsg;
+class TupleSerializer;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -144,9 +142,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * targetTuple is swapped when making calls on the indexes. This
      * is just an inconsistency in the argument ordering.
      */
-    bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                        TableTuple &sourceTupleWithNewValues,
-                                        std::vector<TableIndex*> &indexesToUpdate);
+    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                                const TableTuple &sourceTupleWithNewValues,
+                                                const std::vector<TableIndex*> &indexesToUpdate);
 
     /*
      * Identical to regular updateTuple except no memory management
@@ -154,7 +152,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * by the UndoAction.
      */
     void updateTupleForUndo(TableTuple &targetTupleToUpdate,
-                            TableTuple &sourceTupleWithNewValues,
+                            char* sourceTupleDataWithNewValues,
                             bool revertIndexes);
 
     /*
@@ -162,13 +160,18 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * index lookup.
      */
     bool deleteTuple(TableTuple &tuple, bool freeAllocatedStrings);
-    void deleteTupleForUndo(voltdb::TableTuple &tupleCopy);
+    void deleteTupleForUndo(const char* tupleData);
 
     /*
      * Lookup the address of the tuple that is identical to the specified tuple.
      * Does a primary key lookup or table scan if necessary.
      */
-    voltdb::TableTuple lookupTuple(TableTuple tuple);
+    TableTuple lookupTuple(const TableTuple &tuple)
+    {
+        const char* tupleData = tuple.address();
+        return lookupTuple(tupleData);
+    }
+    TableTuple lookupTuple(const char* tupleData);
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -177,10 +180,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     virtual std::string debug();
 
     int partitionColumn() { return m_partitionColumn; }
-    /** inlined here because it can't be inlined in base Table, as it
-     *  uses Tuple.copy.
-     */
-    TableTuple& getTempTupleInlined(TableTuple &source);
 
     /** Add a view to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
@@ -268,9 +267,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     bool tryInsertOnAllIndexes(TableTuple *tuple);
     bool checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
                                     const TableTuple &sourceTupleWithNewValues,
-                                    std::vector<TableIndex*> &indexesToUpdate);
+                                    const std::vector<TableIndex*> &indexesToUpdate);
 
-    bool checkNulls(TableTuple &tuple) const;
+    bool checkNulls(const TableTuple &tuple) const;
 
     PersistentTable(int partitionColumn);
     void onSetColumns();
@@ -278,13 +277,16 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     void notifyBlockWasCompactedAway(TBPtr block);
     void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
+    bool deletionMustDeferToCOWContext(const TableTuple& tuple) const;
+
     /**
      * Normally this will return the tuple storage to the free list.
      * In the memcheck build it will return the storage to the heap.
      */
-    void deleteTupleStorage(TableTuple &tuple, TBPtr block = TBPtr(NULL));
+    void deleteTupleStorage(TableTuple &tuple);
+    void deleteTupleStorage(TableTuple &tuple, TBPtr block);
 
-    // helper for deleteTupleStorage
+    // helper for deleteTupleStorage overload where the block is not specified.
     TBPtr findBlock(char *tuple);
 
     /*
@@ -341,12 +343,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     int m_failedCompactionCount;
 };
 
-inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
-    assert (m_tempTuple.m_data);
-    m_tempTuple.copy(source);
-    return m_tempTuple;
+inline void PersistentTable::deleteTupleStorage(TableTuple &tuple)
+{
+    TBPtr block = findBlock(tuple.address());
+    deleteTupleStorage(tuple, block);
 }
-
 
 inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
     tuple.setActiveFalse(); // does NOT free strings
@@ -354,10 +355,6 @@ inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block) 
     // add to the free list
     m_tupleCount--;
     //m_tuplesPendingDelete--;
-
-    if (block.get() == NULL) {
-       block = findBlock(tuple.address());
-    }
 
     bool transitioningToBlockWithSpace = !block->hasFreeTuples();
 

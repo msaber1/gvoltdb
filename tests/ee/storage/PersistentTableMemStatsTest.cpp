@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -192,7 +192,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
      * updating the new tuple.
      */
     TableTuple tempTuple = m_table->tempTuple();
-    tempTuple.copy(tuple);
+    tempTuple.copyTuple(tuple);
     string strval = "123456";
     NValue new_string = ValueFactory::getStringValue(strval);
     tempTuple.setNValue(1, new_string);
@@ -238,7 +238,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
      * updating the new tuple.
      */
     TableTuple tempTuple = m_table->tempTuple();
-    tempTuple.copy(tuple);
+    tempTuple.copyTuple(tuple);
     string strval = "123456";
     NValue new_string = ValueFactory::getStringValue(strval);
     tempTuple.setNValue(1, new_string);

@@ -1,22 +1,23 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "storage/CopyOnWriteContext.h"
 
 #include "common/FatalException.hpp"
+#include "common/TupleSerializer.h"
 #include "storage/persistenttable.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
@@ -82,12 +83,11 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
          */
         if (!m_finishedTableScan && tuple.isPendingDelete()) {
             assert(!tuple.isPendingDeleteOnUndoRelease());
-            if (m_table->m_schema->getUninlinedObjectColumnCount() != 0)
-            {
+            if (m_table->m_schema->getUninlinedObjectColumnCount() != 0) {
                 m_table->decreaseStringMemCount(tuple.getNonInlinedMemorySize());
+                tuple.freeObjectColumns();
             }
             tuple.setPendingDeleteFalse();
-            tuple.freeObjectColumns();
             CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
             //Save the extra lookup if possible
             m_table->deleteTupleStorage(tuple, iter->m_currentBlock);
@@ -108,8 +108,9 @@ bool CopyOnWriteContext::serializeMore(ReferenceSerializeOutput *out) {
     return true;
 }
 
-bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
-    if (tuple.isDirty() || m_finishedTableScan) {
+bool CopyOnWriteContext::canSafelyFreeTuple(const TableTuple& tuple) const
+{
+    if (m_finishedTableScan) {
         return true;
     }
 
@@ -120,25 +121,22 @@ bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
      * in the previous entry. If it doesn't then the block is something new.
      */
     char *address = tuple.address();
-    TBMapI i =
-                            m_blocks.lower_bound(address);
-    if (i == m_blocks.end() && m_blocks.empty()) {
-        return true;
-    }
+    TBMapCI i = m_blocks.lower_bound(address);
     if (i == m_blocks.end()) {
+        if (m_blocks.empty()) {
+            return true;
+        }
         i--;
         if (i.key() + m_table->m_tableAllocationSize < address) {
             return true;
         }
         //OK it is in the very last block
-    } else {
-        if (i.key() != address) {
-            i--;
-            if (i.key() + m_table->m_tableAllocationSize < address) {
-                return true;
-            }
-            //OK... this is in this particular block
+    } else if (i.key() != address) {
+        i--;
+        if (i.key() + m_table->m_tableAllocationSize < address) {
+            return true;
         }
+        //OK... this is in this particular block
     }
 
     const char *blockStartAddress = i.key();
@@ -150,15 +148,8 @@ bool CopyOnWriteContext::canSafelyFreeTuple(TableTuple tuple) {
     return !iter->needToDirtyTuple(blockStartAddress, address);
 }
 
-void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple) {
-    /**
-     * If this an update or a delete of a tuple that is already dirty then no further action is
-     * required.
-     */
-    if (!newTuple && tuple.isDirty()) {
-        return;
-    }
-
+void CopyOnWriteContext::markTupleDirty(TableTuple tuple, bool newTuple)
+{
     /**
      * If the table has been scanned already there is no need to continue marking tuples dirty
      * If the tuple is dirty then it has already been backed up.

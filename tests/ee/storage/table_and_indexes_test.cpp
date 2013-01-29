@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -49,7 +49,7 @@ class TableAndIndexTest : public Test {
             mem(0),
             limits(),
             dummyUndo(),
-            engine(0, 0, &dummyUndo, NULL, NULL, NULL, false, "", 0)
+            m_context(0, 0, &dummyUndo, NULL, NULL, NULL, false, "", 0)
          {
             vector<voltdb::ValueType> districtColumnTypes;
             vector<int32_t> districtColumnLengths;
@@ -246,7 +246,7 @@ class TableAndIndexTest : public Test {
         int mem;
         TempTableLimits limits;
         DummyUndoQuantum dummyUndo;
-        ExecutorContext engine;
+        ExecutorContext m_context;
 
         TupleSchema      *districtTupleSchema;
         vector<TableIndexScheme> districtIndexes;

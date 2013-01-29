@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -328,14 +328,12 @@ static int8_t tick(ipc_command *cmd)
     struct cmd_structure
     {
         int64_t time;
-        int64_t lastTxnId;
+        int64_t lastSpHandle;
     }__attribute__((packed));
     cmd_structure* cs = reinterpret_cast<cmd_structure*>(cmd+1);
 
-    //cout << "tick: time=" << cs->time << " txn=" << cs->lastTxnId << endl;
-
     // no return code. can't fail!
-    s_engine->tick(ntoh(cs->time), ntoh(cs->lastTxnId));
+    s_engine->tick(ntoh(cs->time), ntoh(cs->lastSpHandle));
     return kErrorCode_Success;
 }
 
@@ -343,11 +341,11 @@ static int8_t quiesce(ipc_command *cmd)
 {
     struct cmd_structure
     {
-        int64_t lastTxnId;
+        int64_t lastSpHandle;
     }__attribute__((packed));
     cmd_structure* cs = reinterpret_cast<cmd_structure*>(cmd+1);
 
-    s_engine->quiesce(ntoh(cs->lastTxnId));
+    s_engine->quiesce(ntoh(cs->lastSpHandle));
     return kErrorCode_Success;
 }
 
@@ -355,8 +353,9 @@ static int8_t executePlanFragments(ipc_command *cmd)
 {
     struct cmd_structure
     {
-        int64_t txnId;
-        int64_t lastCommittedTxnId;
+        int64_t spHandle;
+        int64_t lastCommittedSpHandle;
+        int64_t uniqueId;
         int64_t undoToken;
         int32_t numFragmentIds;
         char data[0];
@@ -376,13 +375,13 @@ static int8_t executePlanFragments(ipc_command *cmd)
     int sz = static_cast<int>(ntoh(cmd->msgsize) - usedsize);
 
     if (0)
-        cout << "executepfs:" << " txnId=" << ntoh(cs->txnId)
-                  << " txnId=" << ntoh(cs->txnId)
-                  << " lastCommitted=" << ntoh(cs->lastCommittedTxnId)
+        cout << "executepfs:"
+                  << " spHandle=" << ntoh(cs->spHandle)
+                  << " lastCommittedSphandle=" << ntoh(cs->lastCommittedSpHandle)
+                  << " uniqueId=" << ntoh(cs->uniqueId)
                   << " undoToken=" << ntoh(cs->undoToken)
                   << " numFragIds=" << numFrags << endl;
 
-    // and reset to space for the results output
     s_engine->deserializeParameterSet(parameterset, sz);
     s_engine->resetReusedResultOutputBuffer();
     s_engine->setUndoToken(ntoh(cs->undoToken));
@@ -390,8 +389,9 @@ static int8_t executePlanFragments(ipc_command *cmd)
         if (s_engine->executeQuery(ntoh(fragmentId[i]),
                                    1,
                                    (int32_t)(ntoh(inputDepId[i])), // Java sends int64 but EE wants int32
-                                   ntoh(cs->txnId),
-                                   ntoh(cs->lastCommittedTxnId),
+                                   ntoh(cs->spHandle),
+                                   ntoh(cs->lastCommittedSpHandle),
+                                   ntoh(cs->uniqueId),
                                    i == 0 ? true : false, //first
                                    i == numFrags - 1 ? true : false)) { //last
             ++errors;
@@ -454,26 +454,25 @@ static int8_t loadTable(ipc_command *cmd)
     struct cmd_structure
     {
         int32_t tableId;
-        int64_t txnId;
-        int64_t lastCommittedTxnId;
+        int64_t spHandle;
+        int64_t lastCommittedSpHandle;
         char data[0];
     }__attribute__((packed));
     cmd_structure* cs = reinterpret_cast<cmd_structure*>(cmd+1);
 
+    const int32_t tableId = ntoh(cs->tableId);
+    const int64_t spHandle = ntoh(cs->spHandle);
+    const int64_t lastCommittedSpHandle = ntoh(cs->lastCommittedSpHandle);
     if (0) {
-        cout << "loadTable:" << " tableId=" << ntoh(cs->tableId)
-                  << " txnId=" << ntoh(cs->txnId) << " lastCommitted="
-                  << ntoh(cs->lastCommittedTxnId) << endl;
+        cout << "loadTable:" << " tableId=" << tableId
+                  << " spHandle=" << spHandle << " lastCommittedSpHandle=" << lastCommittedSpHandle << endl;
     }
 
-    const int32_t tableId = ntoh(cs->tableId);
-    const int64_t txnId = ntoh(cs->txnId);
-    const int64_t lastCommittedTxnId = ntoh(cs->lastCommittedTxnId);
     // ...and fast serialized table last.
     const char* tableData = cs->data;
     int sz = static_cast<int>(ntoh(cmd->msgsize) - sizeof(cmd_structure));
     ReferenceSerializeInput serialize_in(tableData, sz);
-    if (s_engine->loadTable(tableId, serialize_in, txnId, lastCommittedTxnId)) {
+    if (s_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle)) {
         return kErrorCode_Success;
     }
     return kErrorCode_Error;

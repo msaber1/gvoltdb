@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -73,12 +73,11 @@ public:
             const int64_t undoToken = (INT64_MIN + 1) + (ii * 3);
             undoTokens.push_back(undoToken);
             voltdb::UndoQuantum *quantum = m_undoLog.generateUndoQuantum(undoToken);
-            voltdb::Pool *pool = quantum->getDataPool();
             std::vector<MockUndoActionHistory*> histories;
             for (int qq = 0; qq < numUndoActions; qq++) {
                 MockUndoActionHistory *history = new MockUndoActionHistory();
                 histories.push_back(history);
-                MockUndoAction *undoAction = new (*pool) MockUndoAction(history);
+                MockUndoAction *undoAction = new (*quantum) MockUndoAction(history);
                 quantum->registerUndoAction(undoAction);
             }
             m_undoActionHistoryByQuantum.push_back(histories);

@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -124,12 +124,12 @@ class Table {
     virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
     virtual bool insertTuple(TableTuple &tuple) = 0;
     bool updateTuple(TableTuple &targetTupleToUpdate,
-                     TableTuple &sourceTupleWithNewValues);
+                     const TableTuple &sourceTupleWithNewValues);
     // optimized version of update that only updates specific indexes
     // if the caller knows which indexes need to be updated
     virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> &indexesToUpdate) = 0;
+                                                const TableTuple &sourceTupleWithNewValues,
+                                                const std::vector<TableIndex*> &indexesToUpdate) = 0;
     virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings) = 0;
 
     // ------------------------------------------------------------------

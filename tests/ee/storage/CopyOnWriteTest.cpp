@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -22,6 +22,7 @@
  */
 
 #include "harness.h"
+#include "common/executorcontext.hpp"
 #include "common/TupleSchema.h"
 #include "common/types.h"
 #include "common/NValue.hpp"
@@ -179,7 +180,7 @@ public:
         }
         }
         m_engine->setUndoToken(++m_undoToken);
-        ExecutorContext::setupTxnIdsForPlanFragmentsForTesting(0, 0);
+        ExecutorContext::setupForPlanFragments();
         m_tuplesDeletedInLastUndo = 0;
         m_tuplesInsertedInLastUndo = 0;
     }
@@ -219,7 +220,7 @@ public:
             TableTuple tuple(m_table->schema());
             TableTuple tempTuple = m_table->tempTuple();
             if (tableutil::getRandomTuple(m_table, tuple)) {
-                tempTuple.copy(tuple);
+                tempTuple.copyTuple(tuple);
                 tempTuple.setNValue(1, ValueFactory::getIntegerValue(::rand()));
                 m_table->updateTuple(tuple, tempTuple);
                 m_tuplesUpdated++;
@@ -403,7 +404,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
 //#endif
     addRandomUniqueTuples(tupleCount);
     m_engine->setUndoToken(0);
-    ExecutorContext::setupTxnIdsForPlanFragmentsForTesting(0, 0);
+    ExecutorContext::setupForPlanFragments();
     DefaultTupleSerializer serializer;
     TableTuple tuple(m_table->schema());
     for (int qq = 0; qq < 10; qq++) {
@@ -501,7 +502,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
 #endif
     addRandomUniqueTuples(tupleCount);
     m_engine->setUndoToken(0);
-    ExecutorContext::setupTxnIdsForPlanFragmentsForTesting(0, 0);
+    ExecutorContext::setupForPlanFragments();
     DefaultTupleSerializer serializer;
     for (int qq = 0; qq < 10; qq++) {
         stx::btree_set<int64_t> originalTuples;
@@ -549,7 +550,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
             }
             m_engine->undoUndoToken(m_undoToken);
             m_engine->setUndoToken(++m_undoToken);
-            ExecutorContext::setupTxnIdsForPlanFragmentsForTesting(0, 0);
+            ExecutorContext::setupForPlanFragments();
         }
 
         std::vector<int64_t> diff;

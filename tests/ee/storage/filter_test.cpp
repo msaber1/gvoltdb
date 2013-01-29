@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -349,7 +349,7 @@ TEST_F(FilterTest, SubstituteFilter) {
     Topend* topless = NULL;
     NValueArray params(1);
     ExecutorContext paramHolder(0, 0, wantNoQuantum, topless, noPool, &params, false, "", 0);
-    paramHolder.setupTxnIdsForPlanFragments(0, 0);
+    paramHolder.setupForPlanFragments(0, 0);
 
     // WHERE id <= 20 AND val4=$1
 

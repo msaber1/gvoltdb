@@ -1,21 +1,21 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
  * terms and conditions:
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 /* Copyright (C) 2008 by H-Store Project
@@ -137,10 +137,8 @@ bool UpdateExecutor::p_execute() {
         void *target_address = m_inputTuple.getSelfAddressColumn();
         m_targetTuple.move(target_address);
 
-        // Loop through input columns and update the values that we need to.
-        // The key thing to note here is that we grab a temp tuple
-        // that is a copy of the target tuple (i.e., the tuple we want to update).
-        TableTuple &tempTuple = static_cast<PersistentTable*>(m_targetTable)->getTempTupleInlined(m_targetTuple);
+        TableTuple &tempTuple = m_targetTable->tempTuple();
+        tempTuple.copyData(static_cast<char*>(target_address));
 
         // The first input column is the tuple address expression and it isn't represented
         // by an updated column, so skip it in the input.

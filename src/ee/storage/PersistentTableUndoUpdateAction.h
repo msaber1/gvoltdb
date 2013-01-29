@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -19,44 +19,24 @@
 #define PERSISTENTTABLEUNDOUPDATEACTION_H_
 
 #include "common/UndoAction.h"
-#include "common/TupleSchema.h"
-#include "common/Pool.hpp"
+
 #include "common/tabletuple.h"
 #include "storage/persistenttable.h"
 
 
 namespace voltdb {
 
-class PersistentTableUndoUpdateAction: public voltdb::UndoAction {
+class PersistentTableUndoUpdateAction: public UndoAction {
 public:
 
-    inline PersistentTableUndoUpdateAction(
-            voltdb::TableTuple &oldTuple,
-            voltdb::PersistentTable *table,
-            voltdb::Pool *pool)
-        : m_oldTuple(oldTuple), m_table(table), m_revertIndexes(false)
-    {
-        /*
-         * Copy the old tuple and the new tuple. The new tuple will be
-         * necessary for undo since we need to look it up in the table
-         * to update it.
-         */
-        void *tupleData = pool->allocate(m_oldTuple.tupleLength());
-        m_oldTuple.move(tupleData);
-        ::memcpy(tupleData, oldTuple.address(), m_oldTuple.tupleLength());
-    }
+    PersistentTableUndoUpdateAction(char* oldTupleData, PersistentTable *table)
+        : m_oldTupleData(oldTupleData), m_table(table), m_revertIndexes(false)
+    { }
 
-    inline TableTuple& getOldTuple() {
-        return m_oldTuple;
-    }
+    void setNewTuple(char* newTupleData) {
+        m_newTupleData = newTupleData;
 
-    inline void setNewTuple(TableTuple &newTuple, voltdb::Pool *pool) {
-        m_newTuple = newTuple;
-        void *tupleData = pool->allocate(m_newTuple.tupleLength());
-        m_newTuple.move(tupleData);
-        ::memcpy(tupleData, newTuple.address(), m_newTuple.tupleLength());
-
-        const voltdb::TupleSchema *schema = m_oldTuple.getSchema();
+        const TupleSchema *schema = m_table->schema();
         const uint16_t uninlineableObjectColumnCount = schema->getUninlinedObjectColumnCount();
 
         /*
@@ -65,19 +45,21 @@ public:
          * undone.
          */
         if (uninlineableObjectColumnCount > 0) {
+            TableTuple oldTuple(m_oldTupleData, schema);
+            TableTuple newTuple(m_newTupleData, schema);
             for (uint16_t ii = 0; ii < uninlineableObjectColumnCount; ii++) {
                 const uint16_t uninlineableObjectColumn = schema->getUninlinedObjectColumnInfoIndex(ii);
-                const char *mPtr = *reinterpret_cast<char* const*>
-                  (m_oldTuple.getDataPtr(uninlineableObjectColumn));
-                const char *oPtr = *reinterpret_cast<char* const*>
-                  (m_newTuple.getDataPtr(uninlineableObjectColumn));
+                const char * const *oPtr = reinterpret_cast<char* const*>
+                  (oldTuple.getDataPtr(uninlineableObjectColumn));
+                const char * const *nPtr = reinterpret_cast<char* const*>
+                  (newTuple.getDataPtr(uninlineableObjectColumn));
                 /*
                  * Only need to record the ones that are different and
                  * thus separate allocations.
                  */
-                if (mPtr != oPtr) {
-                    oldUninlineableColumns.push_back(mPtr);
-                    newUninlineableColumns.push_back(oPtr);
+                if (*oPtr != *nPtr) {
+                    oldUninlineableColumns.push_back(*oPtr);
+                    newUninlineableColumns.push_back(*nPtr);
                 }
             }
         }
@@ -105,12 +87,10 @@ public:
         m_revertIndexes = true;
     }
 
-    virtual ~PersistentTableUndoUpdateAction();
-
 private:
-    voltdb::TableTuple m_oldTuple;
-    voltdb::TableTuple m_newTuple;
-    voltdb::PersistentTable *m_table;
+    char* m_oldTupleData;
+    char* m_newTupleData;
+    PersistentTable *m_table;
     std::vector<const char*> oldUninlineableColumns;
     std::vector<const char*> newUninlineableColumns;
     bool m_revertIndexes;

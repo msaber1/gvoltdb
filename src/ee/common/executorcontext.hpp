@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -51,41 +51,50 @@ class ExecutorContext {
     // not always known at initial construction
     void setEpoch(int64_t epoch) { m_epoch = epoch; }
 
-    // data available via tick()
-    void setupForTick(int64_t lastCommittedTxnId) { m_lastCommittedTxnId = lastCommittedTxnId; }
-
-    // data available via quiesce()
-    void setupForQuiesce(int64_t lastCommittedTxnId) { m_lastCommittedTxnId = lastCommittedTxnId; }
+    // Note new data available via tick() or quiesce()
+    void refreshLastCommitted(int64_t lastCommittedSpHandle) { m_lastCommittedSpHandle = lastCommittedSpHandle; }
 
     // helper to configure the context for a new jni call
-    void setupForPlanFragments(UndoQuantum *undoQuantum) { m_undoQuantum = undoQuantum; }
-
-    void setupTxnIdsForPlanFragments(int64_t txnId, int64_t lastCommittedTxnId)
+    void setupForPlanFragments(int64_t spHandle,
+                               int64_t lastCommittedSpHandle,
+                               int64_t uniqueId = -1)
     {
-        m_txnId = txnId;
-        m_lastCommittedTxnId = lastCommittedTxnId;
+        m_spHandle = spHandle;
+        m_lastCommittedSpHandle = lastCommittedSpHandle;
+        m_currentTxnTimestamp = (uniqueId >> 23) + m_epoch;
+        m_uniqueId = uniqueId;
     }
 
-    static void setupTxnIdsForPlanFragmentsForTesting(int64_t txnId, int64_t lastCommittedTxnId)
+    // helper to configure the context for a new jni call
+    void setUndoQuantum(UndoQuantum *undoQuantum) { m_undoQuantum = undoQuantum; }
+
+    static void setupForPlanFragments()
     {
         ExecutorContext* singleton = getExecutorContext();
-        singleton->setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId);
+        singleton->setupForPlanFragments(0, 0);
     }
 
     static UndoQuantum *currentUndoQuantum() { return getExecutorContext()->m_undoQuantum; }
 
-    /** Current or most recently executed transaction id. */
-    static int64_t currentTxnId() { return getExecutorContext()->m_txnId; }
+    /** Current or most recently sp handle */
+    static int64_t currentSpHandle() {
+        return getExecutorContext()->m_spHandle;
+    }
 
-    /** Current or most recently executed transaction id. */
-    static int64_t currentTxnTimestamp()
-    {
-        ExecutorContext* singleton = getExecutorContext();
-        return (singleton->m_txnId >> 23) + singleton->m_epoch;
+    /** Timestamp from unique id for this transaction */
+    static int64_t currentUniqueId() {
+        return getExecutorContext()->m_uniqueId;
+    }
+
+    /** Timestamp from unique id for this transaction */
+    static int64_t currentTxnTimestamp() {
+        return getExecutorContext()->m_currentTxnTimestamp;
     }
 
     /** Last committed transaction known to this EE */
-    static int64_t lastCommittedTxnId() { return getExecutorContext()->m_lastCommittedTxnId; }
+    static int64_t lastCommittedSpHandle() {
+        return getExecutorContext()->m_lastCommittedSpHandle;
+    }
 
     static ExecutorContext* getExecutorContext();
 
@@ -128,7 +137,7 @@ class ExecutorContext {
                     std::string hostname,
                     CatalogId hostId) :
         m_topEnd(topend), m_tempStringPool(tempStringPool),
-        m_undoQuantum(undoQuantum), m_txnId(0), m_lastCommittedTxnId(0),
+        m_undoQuantum(undoQuantum), m_spHandle(0), m_lastCommittedSpHandle(0),
         m_params(params),
         m_siteId(siteId), m_partitionId(partitionId),
         m_hostname(hostname), m_hostId(hostId),
@@ -139,23 +148,23 @@ class ExecutorContext {
 
     ~ExecutorContext();
 
-  private:
+private:
     void installAsThreadLocalSingleton();
 
     Topend * const m_topEnd;
     Pool * const m_tempStringPool;
     UndoQuantum *m_undoQuantum;
-    int64_t m_txnId;
-    int64_t m_lastCommittedTxnId;
-    const NValueArray* m_params;
-
-  public:
+    int64_t m_spHandle;
+    int64_t m_lastCommittedSpHandle;
+    int64_t m_uniqueId;
+    int64_t m_currentTxnTimestamp;
+    const NValueArray* const m_params;
+public:
     int64_t const m_siteId;
     CatalogId const m_partitionId;
     const std::string m_hostname;
     CatalogId const m_hostId;
-
-  private:
+private:
     /** local epoch for voltdb, sometime around 2008, pulled from catalog */
     int64_t m_epoch;
     bool m_exportFeatureEnabled;
