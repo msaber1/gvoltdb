@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -23,40 +23,17 @@
 
 package org.voltdb.planner;
 
-//import java.util.List;
-
-import junit.framework.TestCase;
-
-//import org.voltdb.catalog.CatalogMap;
-//import org.voltdb.catalog.Cluster;
-//import org.voltdb.catalog.Table;
-//import org.voltdb.plannodes.AbstractPlanNode;
-//import org.voltdb.plannodes.IndexScanPlanNode;
-
-public class TestDeterminism extends TestCase {
-
-    private PlannerTestAideDeCamp aide;
+public class TestDeterminism extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestDeterminism.class.getResource("testplans-determinism-ddl.sql"),
-                                         "testdeterminism");
-
-/* It makes little sense to force tables to be non-replicated but specify no partitioning column.
- * It breaks join planning, anyway.
-        // Set all tables to non-replicated.
-        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
-        for (Table t : tmap) {
-            t.setIsreplicated(false);
-        }
- */
+        final boolean planForSinglePartitionFalse = false;
+        setupSchema(TestDeterminism.class.getResource("testplans-determinism-ddl.sql"), "testdeterminism", planForSinglePartitionFalse);
     }
 
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        aide.tearDown();
     }
 
     /**
@@ -67,20 +44,7 @@ public class TestDeterminism extends TestCase {
      */
     private void assertPlanDeterminism(String sql, boolean order, boolean content)
     {
-        CompiledPlan cp = null;
-        try {
-            cp = aide.compileAdHocPlan(sql);
-        }
-        catch (NullPointerException ex) {
-            // aide may throw NPE if no plangraph was created
-            ex.printStackTrace();
-            fail();
-        }
-        catch (Exception ex) {
-            ex.printStackTrace();
-            fail();
-        }
-        assertTrue(cp != null);
+        CompiledPlan cp = compileAdHocPlan(sql);
         assertTrue(order == cp.isOrderDeterministic());
         assertTrue(content == cp.isContentDeterministic());
         assertTrue(cp.isContentDeterministic() || ! cp.isOrderDeterministic());
@@ -198,5 +162,11 @@ public class TestDeterminism extends TestCase {
         assertPlanDeterminism("update ttree set z = 5 where a < 2;", ORDERED, CONSISTENT);
         assertPlanDeterminism("update tunique set z = 5 where a < 2;", ORDERED, CONSISTENT);
         assertPlanDeterminism("update tpk set z = 5 where a < 2;", ORDERED, CONSISTENT);
+    }
+
+    public void testOrderByWithoutIndex() {
+        assertPlanDeterminism("SELECT * FROM eng4155 ORDER BY ts DESC, id;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        assertPlanDeterminism("SELECT * FROM eng4155 ORDER BY ts DESC;", UNORDERED, CONSISTENT);
+        assertPlanDeterminism("SELECT ts FROM eng4155 ORDER BY ts DESC;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
     }
 }

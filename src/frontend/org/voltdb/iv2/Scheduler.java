@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -22,10 +22,13 @@ import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StarvationTracker;
 import org.voltdb.VoltDB;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.rejoin.TaskLog;
 
 /**
@@ -75,6 +78,9 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected boolean m_isLeader = false;
     private TxnEgo m_txnEgo;
     final protected int m_partitionId;
+
+    // helper class to put command log work in order
+    protected final ReplaySequencer m_replaySequencer = new ReplaySequencer();
 
     /*
      * This lock is extremely dangerous to use without known the pattern.
@@ -150,13 +156,50 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_lock = o;
     }
 
+    /**
+     * Update last seen txnIds in the replay sequencer. This is used on MPI repair.
+     * @param message
+     */
+    public void updateLastSeenTxnIds(VoltMessage message)
+    {
+        long sequenceWithTxnId = Long.MIN_VALUE;
+
+        boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
+                (((TransactionInfoBaseMessage)message).isForReplay()));
+
+        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDR()));
+
+        boolean sentinel = message instanceof MultiPartitionParticipantMessage;
+
+        boolean replay = commandLog || sentinel || dr;
+
+        assert(!(commandLog && dr));
+
+        if (commandLog || sentinel) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+        }
+        else if (dr) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+        }
+
+        if (replay) {
+            // Update last seen and last polled txnId for replicas
+            m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+            m_replaySequencer.updateLastPolledTxnId(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+        }
+    }
+
     abstract public void shutdown();
 
     @Override
     abstract public void updateReplicas(List<Long> replicas);
 
-    @Override
     abstract public void deliver(VoltMessage message);
 
     abstract public void enableWritingIv2FaultLog();
+
+    abstract public boolean sequenceForReplay(VoltMessage m);
 }

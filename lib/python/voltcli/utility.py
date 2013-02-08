@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2013 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -653,6 +653,16 @@ def dict_to_sorted_pairs(d):
     for key in keys:
         results.append((key, d[key]))
     return results
+
+#===============================================================================
+def pluralize(s, count):
+#===============================================================================
+    """
+    Return word with 's' appended if the count > 1.
+    """
+    if count > 1:
+        return '%ss' % s
+    return s
 
 #===============================================================================
 def kwargs_extract(kwargs, defaults, remove = True, check_extras = False):

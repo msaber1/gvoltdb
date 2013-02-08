@@ -1,6 +1,6 @@
 # This file is part of VoltDB.
 
-# Copyright (C) 2008-2012 VoltDB Inc.
+# Copyright (C) 2008-2013 VoltDB Inc.
 #
 # This file contains original code and/or modifications of original code.
 # Any modifications made by VoltDB Inc. are licensed under the following
@@ -29,7 +29,7 @@
     bundles = VOLT.AdminBundle(),
     description = 'Restore a VoltDB database snapshot.',
     arguments = (
-        VOLT.StringArgument('directory', 'the local snapshot directory path'),
+        VOLT.PathArgument('directory', 'the snapshot server directory', absolute = True),
         VOLT.StringArgument('nonce', 'the unique snapshot identifier (nonce)')
     )
 )

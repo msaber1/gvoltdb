@@ -1,17 +1,17 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
@@ -24,10 +24,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CommandLog;
+
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.SystemProcedureCatalog.Config;
@@ -58,6 +60,10 @@ public class MpScheduler extends Scheduler
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
+    // We need to lag the current MP execution point by at least two committed TXN ids
+    // since that's the first point we can be sure is safely agreed on by all nodes.
+    // Let the one we can't be sure about linger here.  See ENG-4211 for more.
+    long m_repairLogAwaitingCommit = Long.MIN_VALUE;
 
     MpScheduler(int partitionId, long buddyHSId, SiteTaskerQueue taskQueue)
     {
@@ -130,6 +136,37 @@ public class MpScheduler extends Scheduler
         m_pendingTasks.repair(repairTask, replicaCopy);
     }
 
+    /**
+     * Sequence the message for replay if it's for DR.
+     * @return true if the message can be delivered directly to the scheduler,
+     * false if the message was a duplicate
+     */
+    public boolean sequenceForReplay(VoltMessage message)
+    {
+        boolean canDeliver = true;
+        long sequenceWithTxnId = Long.MIN_VALUE;
+
+        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDR()));
+
+        if (dr) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+            InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+            if (dupe != null) {
+                canDeliver = false;
+                // Duplicate initiate task message, send response
+                m_mailbox.send(dupe.getInitiatorHSId(), dupe);
+            }
+            else {
+                m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+                canDeliver = true;
+            }
+        }
+        return canDeliver;
+    }
+
     @Override
     public void deliver(VoltMessage message)
     {
@@ -163,12 +200,23 @@ public class MpScheduler extends Scheduler
          */
         long mpTxnId;
         //Timestamp is actually a pre-IV2ish style time based transaction id
-        long timestamp;
+        long timestamp = Long.MIN_VALUE;
+
+        // Update UID if it's for replay
+        if (message.isForReplay()) {
+            timestamp = message.getUniqueId();
+            m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
+        } else if (message.isForDR()) {
+            timestamp = message.getStoredProcedureInvocation().getOriginalUniqueId();
+            // @LoadMultipartitionTable does not have a valid uid
+            if (UniqueIdGenerator.getPartitionIdFromUniqueId(timestamp) == m_partitionId) {
+                m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
+            }
+        }
+
         if (message.isForReplay()) {
             mpTxnId = message.getTxnId();
-            timestamp = message.getUniqueId();
             setMaxSeenTxnId(mpTxnId);
-            m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(timestamp);
         } else {
             TxnEgo ego = advanceTxnEgo();
             mpTxnId = ego.getTxnId();
@@ -230,7 +278,20 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
+    public void handleMessageRepair(List<Long> needsRepair, VoltMessage message)
+    {
+        if (message instanceof Iv2InitiateTaskMessage) {
+            handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
+        }
+        else {
+            // MpInitiatorMailbox should throw RuntimeException for unhandled types before we could get here
+            throw new RuntimeException("MpScheduler.handleMessageRepair() received unhandled message type." +
+                    " This should be impossible");
+        }
+    }
+
+    private void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message)
+    {
         // just reforward the Iv2InitiateTaskMessage for the txn being restarted
         // this copy may be unnecessary
         final String procedureName = message.getStoredProcedureName();
@@ -268,7 +329,11 @@ public class MpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getTxnId());
-                m_repairLogTruncationHandle = message.getTxnId();
+                // Only advance the truncation point on committed transactions.  See ENG-4211
+                if (message.shouldCommit()) {
+                    m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                    m_repairLogAwaitingCommit = message.getTxnId();
+                }
                 m_outstandingTxns.remove(message.getTxnId());
 
                 m_mailbox.send(counter.m_destinationId, message);
@@ -279,9 +344,13 @@ public class MpScheduler extends Scheduler
             // doing duplicate suppresion: all done.
         }
         else {
-            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-            m_repairLogTruncationHandle = message.getTxnId();
+            // Only advance the truncation point on committed transactions.
+            if (message.shouldCommit()) {
+                m_repairLogTruncationHandle = m_repairLogAwaitingCommit;
+                m_repairLogAwaitingCommit = message.getTxnId();
+            }
             m_outstandingTxns.remove(message.getTxnId());
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             m_mailbox.send(message.getInitiatorHSId(), message);
         }
     }
@@ -309,7 +378,7 @@ public class MpScheduler extends Scheduler
             ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
         }
         else {
-            hostLog.info("MpScheduler received a FragmentResponseMessage for a null TXN ID: " + message);
+            hostLog.debug("MpScheduler received a FragmentResponseMessage for a null TXN ID: " + message);
         }
     }
 

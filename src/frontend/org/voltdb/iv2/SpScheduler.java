@@ -1,23 +1,22 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
- * VoltDB is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * VoltDB is distributed in the hope that it will be useful,
+ * This program is distributed in the hope that it will be useful,
  * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
+ * GNU Affero General Public License for more details.
  *
- * You should have received a copy of the GNU General Public License
+ * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
 package org.voltdb.iv2;
 
-import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -33,16 +32,19 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.client.ClientResponse;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
 import org.voltdb.CommandLog.DurabilityListener;
-import org.voltdb.ClientResponseImpl;
+
+import org.voltdb.messaging.DumpMessage;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -51,7 +53,10 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
-import org.voltdb.messaging.MultiPartitionParticipantMessage;
+
+import org.voltdb.VoltTable;
+
+import com.google.common.primitives.Longs;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -119,7 +124,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     };
 
     List<Long> m_replicaHSIds = new ArrayList<Long>();
-    List<Long> m_sendToHSIds = new ArrayList<Long>();
+    long m_sendToHSIds[] = new long[0];
+
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
     private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
@@ -138,16 +144,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    // helper class to put command log work in order
-    private final ReplaySequencer m_replaySequencer = new ReplaySequencer();
-
     SpScheduler(int partitionId, SiteTaskerQueue taskQueue, SnapshotCompletionMonitor snapMonitor)
     {
         super(partitionId, taskQueue);
         m_snapMonitor = snapMonitor;
         m_durabilityListener = new DurabilityListener() {
             @Override
-            public void onDurability(ArrayDeque<Object> durableThings) {
+            public void onDurability(ArrayList<Object> durableThings) {
                 synchronized (m_lock) {
                     for (Object o : durableThings) {
                         m_pendingTasks.offer((TransactionTask)o);
@@ -203,8 +206,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
         // Update the list of remote replicas that we'll need to send to
-        m_sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
-        m_sendToHSIds.remove(m_mailbox.getHSId());
+        List<Long> sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
+        sendToHSIds.remove(m_mailbox.getHSId());
+        m_sendToHSIds = Longs.toArray(sendToHSIds);
 
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
@@ -243,31 +247,98 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      * Poll the replay sequencer and process the messages until it returns null
      */
     private void deliverReadyTxns() {
+        // First, pull all the sequenced messages, if any.
         VoltMessage m = m_replaySequencer.poll();
         while(m != null) {
-            deliver2(m);
+            deliver(m);
             m = m_replaySequencer.poll();
         }
-    }
-
-    /**
-     * Poll the replay sequencer and respond to all SPs with an IGNORED response
-     */
-    private void drainReplaySequencer()
-    {
-        VoltMessage m = m_replaySequencer.poll();
+        // Then, try to pull all the drainable messages, if any.
+        m = m_replaySequencer.drain();
         while (m != null) {
             if (m instanceof Iv2InitiateTaskMessage) {
                 // Send IGNORED response for all SPs
                 Iv2InitiateTaskMessage task = (Iv2InitiateTaskMessage) m;
                 final InitiateResponseMessage response = new InitiateResponseMessage(task);
                 response.setResults(new ClientResponseImpl(ClientResponse.UNEXPECTED_FAILURE,
-                                                           new VoltTable[0],
-                                                           ClientResponseImpl.IGNORED_TRANSACTION));
+                            new VoltTable[0],
+                            ClientResponseImpl.IGNORED_TRANSACTION));
                 m_mailbox.send(response.getInitiatorHSId(), response);
             }
-            m = m_replaySequencer.poll();
+            m = m_replaySequencer.drain();
         }
+    }
+
+    /**
+     * Sequence the message for replay if it's for CL or DR.
+     *
+     * @param message
+     * @return true if the message can be delivered directly to the scheduler,
+     * false if the message is queued
+     */
+    public boolean sequenceForReplay(VoltMessage message)
+    {
+        boolean canDeliver = false;
+        long sequenceWithTxnId = Long.MIN_VALUE;
+
+        boolean commandLog = (message instanceof TransactionInfoBaseMessage &&
+                (((TransactionInfoBaseMessage)message).isForReplay()));
+
+        boolean dr = ((message instanceof TransactionInfoBaseMessage &&
+                ((TransactionInfoBaseMessage)message).isForDR()));
+
+        boolean sentinel = message instanceof MultiPartitionParticipantMessage;
+
+        boolean replay = commandLog || sentinel || dr;
+        boolean sequenceForReplay = m_isLeader && replay;
+
+        assert(!(commandLog && dr));
+
+        if (commandLog || sentinel) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
+        }
+        else if (dr) {
+            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
+        }
+
+        if (sequenceForReplay) {
+            InitiateResponseMessage dupe = m_replaySequencer.dedupe(sequenceWithTxnId,
+                    (TransactionInfoBaseMessage) message);
+            if (dupe != null) {
+                // Duplicate initiate task message, send response
+                m_mailbox.send(dupe.getInitiatorHSId(), dupe);
+            }
+            else if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage) message)) {
+                canDeliver = true;
+            }
+            else {
+                deliverReadyTxns();
+            }
+
+            // If it's a DR sentinel, send an acknowledgement
+            if (sentinel && !commandLog) {
+                MultiPartitionParticipantMessage mppm = (MultiPartitionParticipantMessage) message;
+                final InitiateResponseMessage response = new InitiateResponseMessage(mppm);
+                ClientResponseImpl clientResponse =
+                        new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0], ClientResponseImpl.DUPE_TRANSACTION);
+                response.setResults(clientResponse);
+                m_mailbox.send(response.getInitiatorHSId(), response);
+            }
+        }
+        else {
+            if (replay) {
+                // Update last seen and last polled txnId for replicas
+                m_replaySequencer.updateLastSeenTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+                m_replaySequencer.updateLastPolledTxnId(sequenceWithTxnId,
+                        (TransactionInfoBaseMessage) message);
+            }
+
+            canDeliver = true;
+        }
+
+        return canDeliver;
     }
 
     // SpInitiators will see every message type.  The Responses currently come
@@ -275,49 +346,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     // implemented
     @Override
     public void deliver(VoltMessage message)
-    {
-        long sequenceWithTxnId = Long.MIN_VALUE;
-
-        boolean sequenceForCommandLog =
-            (m_isLeader && message instanceof TransactionInfoBaseMessage &&
-             (((TransactionInfoBaseMessage)message).isForReplay()));
-
-        boolean sequenceForDR = m_isLeader &&
-             ((message instanceof TransactionInfoBaseMessage &&
-                ((TransactionInfoBaseMessage)message).isForDR()));
-
-        boolean sequenceForSentinel = m_isLeader &&
-            (message instanceof MultiPartitionParticipantMessage);
-
-        boolean sequenceForReplay =
-                sequenceForCommandLog || sequenceForSentinel || sequenceForDR;
-
-        assert(!(sequenceForCommandLog && sequenceForDR));
-
-        if (sequenceForCommandLog || sequenceForSentinel) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getTxnId();
-        }
-        else if (sequenceForDR) {
-            sequenceWithTxnId = ((TransactionInfoBaseMessage)message).getOriginalTxnId();
-        }
-
-        if (sequenceForReplay) {
-            if (!m_replaySequencer.offer(sequenceWithTxnId, (TransactionInfoBaseMessage)message)) {
-                deliver2(message);
-            }
-            else if (m_replaySequencer.isMPIEOLReached()) {
-                drainReplaySequencer();
-            }
-            else {
-                deliverReadyTxns();
-            }
-        }
-        else {
-            deliver2(message);
-        }
-    }
-
-    private void deliver2(VoltMessage message)
     {
         if (message instanceof Iv2InitiateTaskMessage) {
             handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
@@ -340,6 +368,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         else if (message instanceof Iv2LogFaultMessage) {
             handleIv2LogFaultMessage((Iv2LogFaultMessage)message);
         }
+        else if (message instanceof DumpMessage) {
+            handleDumpMessage();
+        }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
         }
@@ -352,7 +383,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final String procedureName = message.getStoredProcedureName();
         if (message.isSinglePartition()) {
             long newSpHandle;
-            long uniqueId;
+            long uniqueId = Long.MIN_VALUE;
             Iv2InitiateTaskMessage msg = message;
             if (m_isLeader || message.isReadOnly()) {
                 /*
@@ -368,14 +399,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 }
 
                 /*
+                 * If this is for CL replay or DR, update the unique ID generator
+                 */
+                if (message.isForReplay()) {
+                    uniqueId = message.getUniqueId();
+                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                } else if (message.isForDR()) {
+                    uniqueId = message.getStoredProcedureInvocation().getOriginalUniqueId();
+                    // @LoadSinglepartitionTable does not have a valid uid
+                    if (UniqueIdGenerator.getPartitionIdFromUniqueId(uniqueId) == m_partitionId) {
+                        m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
+                    }
+                }
+
+                /*
                  * If this is CL replay use the txnid from the CL and also
                  * update the txnid to match the one from the CL
                  */
                 if (message.isForReplay()) {
                     newSpHandle = message.getTxnId();
-                    uniqueId = message.getUniqueId();
                     setMaxSeenTxnId(newSpHandle);
-                    m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(uniqueId);
                 } else if (m_isLeader) {
                     TxnEgo ego = advanceTxnEgo();
                     newSpHandle = ego.getTxnId();
@@ -426,7 +469,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
                 //Don't replicate reads, this really assumes that DML validation
                 //is going to be integrated soonish
-                if (m_isLeader && !msg.isReadOnly() && m_sendToHSIds.size() > 0) {
+                if (m_isLeader && !msg.isReadOnly() && m_sendToHSIds.length > 0) {
                     Iv2InitiateTaskMessage replmsg =
                         new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                                 m_mailbox.getHSId(),
@@ -441,8 +484,10 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                 msg.isForReplay());
                     // Update the handle in the copy since the constructor doesn't set it
                     replmsg.setSpHandle(newSpHandle);
-                    m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
-                            replmsg);
+                    for (long hsId : m_sendToHSIds) {
+                        m_mailbox.send(hsId,
+                                replmsg);
+                    }
                     DuplicateCounter counter = new DuplicateCounter(
                             msg.getInitiatorHSId(),
                             msg.getTxnId(), m_replicaHSIds);
@@ -455,15 +500,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 uniqueId = msg.getUniqueId();
             }
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
-            final SpProcedureTask task =
-                new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
-            if (!msg.isReadOnly()) {
-                if (!m_cl.log(msg, newSpHandle, m_durabilityListener, task)) {
-                    m_pendingTasks.offer(task);
-                }
-            } else {
-                m_pendingTasks.offer(task);
-            }
+            doLocalInitiateOffer(msg);
             return;
         }
         else {
@@ -472,9 +509,48 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
+    /**
+     * Do the work necessary to turn the Iv2InitiateTaskMessage into a
+     * TransactionTask which can be queued to the TransactionTaskQueue.
+     * This is reused by both the normal message handling path and the repair
+     * path, and assumes that the caller has dealt with or ensured that the
+     * necessary ID, SpHandles, and replication issues are resolved.
+     */
+    private void doLocalInitiateOffer(Iv2InitiateTaskMessage msg)
+    {
+        final String procedureName = msg.getStoredProcedureName();
+        final SpProcedureTask task =
+            new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
+        if (!msg.isReadOnly()) {
+            if (!m_cl.log(msg, msg.getSpHandle(), m_durabilityListener, task)) {
+                m_pendingTasks.offer(task);
+            }
+        } else {
+            m_pendingTasks.offer(task);
+        }
+    }
+
     @Override
-    public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
-        final String procedureName = message.getStoredProcedureName();
+    public void handleMessageRepair(List<Long> needsRepair, VoltMessage message)
+    {
+        if (message instanceof Iv2InitiateTaskMessage) {
+            handleIv2InitiateTaskMessageRepair(needsRepair, (Iv2InitiateTaskMessage)message);
+        }
+        else if (message instanceof FragmentTaskMessage) {
+            handleFragmentTaskMessageRepair(needsRepair, (FragmentTaskMessage)message);
+        }
+        else if (message instanceof CompleteTransactionMessage) {
+            // It should be safe to just send CompleteTransactionMessages to everyone.
+            handleCompleteTransactionMessage((CompleteTransactionMessage)message);
+        }
+        else {
+            throw new RuntimeException("SpScheduler.handleMessageRepair received unexpected message type: " +
+                    message);
+        }
+    }
+
+    private void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message)
+    {
         if (!message.isSinglePartition()) {
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessageRepair " +
                     "should never receive multi-partition initiations.");
@@ -501,11 +577,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             Iv2InitiateTaskMessage localWork =
                 new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
-
-            final SpProcedureTask task = new SpProcedureTask(m_mailbox, procedureName,
-                                                             m_pendingTasks, localWork,
-                                                             m_drGateway);
-            m_pendingTasks.offer(task);
+            doLocalInitiateOffer(localWork);
         }
 
         // is remote repair necessary?
@@ -516,25 +588,68 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
     }
 
-    // InitiateResponses for single-partition initiators currently get completely handled
-    // by SpInitiatorMessageHandler.  This may change when replication is added.
+    private void handleFragmentTaskMessageRepair(List<Long> needsRepair, FragmentTaskMessage message)
+    {
+        // set up duplicate counter. expect exactly the responses corresponding
+        // to needsRepair. These may, or may not, include the local site.
+
+        List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
+        DuplicateCounter counter = new DuplicateCounter(
+                message.getCoordinatorHSId(), // Assume that the MPI's HSID hasn't changed
+                message.getTxnId(), expectedHSIds);
+        m_duplicateCounters.put(new DuplicateCounterKey(message.getTxnId(), message.getSpHandle()), counter);
+
+        // is local repair necessary?
+        if (needsRepair.contains(m_mailbox.getHSId())) {
+            // Sanity check that we really need repair.
+            if (m_outstandingTxns.get(message.getTxnId()) != null) {
+                hostLog.warn("SPI repair attempted to repair a fragment which it has already seen. " +
+                        "This shouldn't be possible.");
+                // Not sure what to do in this event.  Crash for now
+                throw new RuntimeException("Attempted to repair with a fragment we've already seen.");
+            }
+            needsRepair.remove(m_mailbox.getHSId());
+            // make a copy because handleIv2 non-repair case does?
+            FragmentTaskMessage localWork =
+                new FragmentTaskMessage(message.getInitiatorHSId(),
+                    message.getCoordinatorHSId(), message);
+            doLocalFragmentOffer(localWork);
+        }
+
+        // is remote repair necessary?
+        if (!needsRepair.isEmpty()) {
+            FragmentTaskMessage replmsg =
+                new FragmentTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(needsRepair), replmsg);
+        }
+    }
+
+    // Pass a response through the duplicate counters.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
-        // Send the message to the duplicate counter, if any
+        // All single-partition reads are short-circuit reads and will have no duplicate counter.
+        // SpScheduler will only see InitiateResponseMessages for SP transactions, so if it's
+        // read-only here, it's short-circuited.  Avoid all the lookup below.  Also, don't update
+        // the truncation handle, since it won't have meaning for anyone.
+        if (message.isReadOnly()) {
+            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+            m_mailbox.send(message.getInitiatorHSId(), message);
+            return;
+        }
+
         final long spHandle = message.getSpHandle();
-        DuplicateCounter counter = m_duplicateCounters.get(new DuplicateCounterKey(message.getTxnId(), spHandle));
+        final DuplicateCounterKey dcKey = new DuplicateCounterKey(message.getTxnId(), spHandle);
+        DuplicateCounter counter = m_duplicateCounters.get(dcKey);
         if (counter != null) {
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
-                m_duplicateCounters.remove(new DuplicateCounterKey(message.getTxnId(), spHandle));
+                m_duplicateCounters.remove(dcKey);
                 m_repairLogTruncationHandle = spHandle;
-
-                m_mailbox.send(counter.m_destinationId, message);
+                m_mailbox.send(counter.m_destinationId, counter.getLastResponse());
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
             }
-            // doing duplicate suppresion: all done.
         }
         else {
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
@@ -616,11 +731,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
              * everywhere.
              * In that case don't propagate it to avoid a determinism check and extra messaging overhead
              */
-            if (m_sendToHSIds.size() > 0 && (!msg.isReadOnly() || msg.isSysProcTask())) {
+            if (m_sendToHSIds.length > 0 && (!msg.isReadOnly() || msg.isSysProcTask())) {
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
-                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+                m_mailbox.send(m_sendToHSIds,
                         replmsg);
                 DuplicateCounter counter;
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
@@ -640,14 +755,26 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
         }
-        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
+        doLocalFragmentOffer(msg);
+    }
+
+    /**
+     * Do the work necessary to turn the FragmentTaskMessage into a
+     * TransactionTask which can be queued to the TransactionTaskQueue.
+     * This is reused by both the normal message handling path and the repair
+     * path, and assumes that the caller has dealt with or ensured that the
+     * necessary ID, SpHandles, and replication issues are resolved.
+     */
+    private void doLocalFragmentOffer(FragmentTaskMessage msg)
+    {
+        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         boolean logThis = false;
         // bit of a hack...we will probably not want to create and
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
-            txn = new ParticipantTransactionState(newSpHandle, msg);
+            txn = new ParticipantTransactionState(msg.getSpHandle(), msg);
             m_outstandingTxns.put(msg.getTxnId(), txn);
             // Only want to send things to the command log if it satisfies this predicate
             // AND we've never seen anything for this transaction before.  We can't
@@ -668,7 +795,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                                  m_pendingTasks, msg, null);
         }
         if (logThis) {
-            if (!m_cl.log(msg.getInitiateTask(), newSpHandle, m_durabilityListener, task)) {
+            if (!m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);
             }
         } else {
@@ -695,7 +822,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(counter.m_destinationId, resp);
             }
             else if (result == DuplicateCounter.MISMATCH) {
-                VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
+                VoltDB.crashLocalVoltDB("HASH MISMATCH running multi-part procedure.", true, null);
             }
             // doing duplicate suppresion: all done.
             return;
@@ -706,9 +833,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
-        if (m_sendToHSIds.size() > 0) {
+        if (m_sendToHSIds.length > 0) {
             CompleteTransactionMessage replmsg = message;
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+            m_mailbox.send(m_sendToHSIds,
                     replmsg);
         }
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
@@ -717,6 +844,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // now, fix that later.
         if (txn != null)
         {
+            Iv2Trace.logCompleteTransactionMessage(message, m_mailbox.getHSId());
             final CompleteTransactionTask task =
                 new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
             m_pendingTasks.offer(task);
@@ -733,6 +861,30 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // the provided SP handle
         writeIv2ViableReplayEntryInternal(message.getSpHandle());
         setMaxSeenTxnId(message.getSpHandle());
+    }
+
+    public void handleDumpMessage()
+    {
+        String who = CoreUtils.hsIdToString(m_mailbox.getHSId());
+        hostLog.warn("State dump for site: " + who);
+        hostLog.warn("" + who + ": partition: " + m_partitionId + ", isLeader: " + m_isLeader);
+        if (m_isLeader) {
+            hostLog.warn("" + who + ": replicas: " + CoreUtils.hsIdCollectionToString(m_replicaHSIds));
+            if (m_sendToHSIds.length > 0) {
+                m_mailbox.send(m_sendToHSIds, new DumpMessage());
+            }
+        }
+        hostLog.warn("" + who + ": most recent SP handle: " + getCurrentTxnId() + " " +
+                TxnEgo.txnIdToString(getCurrentTxnId()));
+        hostLog.warn("" + who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
+                TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
+        hostLog.warn("" + who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
+        if (m_duplicateCounters.size() > 0) {
+            hostLog.warn("" + who + ": duplicate counters: ");
+            for (Entry<DuplicateCounterKey, DuplicateCounter> e : m_duplicateCounters.entrySet()) {
+                hostLog.warn("\t" + who + ": " + e.getKey().toString() + ": " + e.getValue().toString());
+            }
+        }
     }
 
     @Override
@@ -760,7 +912,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 writeIv2ViableReplayEntryInternal(faultSpHandle);
                 // Generate Iv2LogFault message and send it to replicas
                 Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle);
-                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+                m_mailbox.send(m_sendToHSIds,
                         faultMsg);
             }
         }

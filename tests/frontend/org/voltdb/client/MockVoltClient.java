@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2012 VoltDB Inc.
+ * Copyright (C) 2008-2013 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -52,13 +52,17 @@ package org.voltdb.client;
 
 import java.io.File;
 import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.mockito.Mockito;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
+
+import static org.mockito.Mockito.doReturn;
 
 /** Hack subclass of VoltClient that fakes callProcedure. */
 public class MockVoltClient implements Client, ReplicaProcCaller{
@@ -302,7 +306,10 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
 
     @Override
     public ClientStatsContext createStatsContext() {
-        return null;
+        ClientStatsContext mock = Mockito.mock(ClientStatsContext.class);
+        doReturn(mock).when(mock).fetchAndResetBaseline();
+        doReturn(Mockito.mock(ClientStats.class)).when(mock).getStats();
+        return mock;
     }
 
     @Override
@@ -314,5 +321,11 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
         // TODO Auto-generated method stub
 
+    }
+
+    @Override
+    public List<InetSocketAddress> getConnectedHostList() {
+        // TODO Auto-generated method stub
+        return null;
     }
 }
