@@ -20,6 +20,8 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.catalog.Database;
+import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.planner.CompiledPlan;
 
 public class MicroOptimizationRunner {
@@ -29,15 +31,24 @@ public class MicroOptimizationRunner {
     static {
         optimizations.add(new PushdownLimitsIntoScans());
         optimizations.add(new ReplaceWithIndexCounter());
+        optimizations.add(new SeqScansToUniqueTreeScans());
     }
 
-    public static List<CompiledPlan> applyAll(CompiledPlan plan) {
+    public static List<CompiledPlan> applyAll(CompiledPlan plan,
+                                              Database db,
+                                              DeterminismMode detMode)
+    {
         ArrayList<CompiledPlan> input = new ArrayList<CompiledPlan>();
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
         retval.add(plan);
 
         for (MicroOptimization opt : optimizations) {
+            // skip optimizations that don't apply at this determinism level
+            if (!opt.shouldRun(detMode)) {
+                continue;
+            }
+
             // swap input and return lists
             ArrayList<CompiledPlan> temp = input;
             input = retval;
@@ -46,7 +57,7 @@ public class MicroOptimizationRunner {
             retval.clear();
 
             for (CompiledPlan inPlan : input) {
-                List<CompiledPlan> newPlans = opt.apply(inPlan);
+                List<CompiledPlan> newPlans = opt.apply(inPlan, db);
                 assert(newPlans != null);
                 assert(newPlans.size() >= 1);
                 retval.addAll(newPlans);

@@ -181,7 +181,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public void resolveColumnIndexes(){}
 
     @Override
-    public boolean computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
+    public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
         // HOW WE COST INDEX COUNTS
         // Cost out the index traversals. This is mostly a formality.
         // The point is to come up with a relatively small cost so that
@@ -193,7 +193,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         stats.incrementStatistic(0, StatsField.TUPLES_READ, 1);
         m_estimatedOutputTupleCount = 1;
-        return true;
     }
 
     @Override
