@@ -18,7 +18,7 @@ package org.voltcore.utils;
 
 import java.util.Collection;
 import java.util.NavigableSet;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ForwardingNavigableSet;
@@ -26,11 +26,13 @@ import com.google.common.collect.ImmutableSortedSet;
 
 
 public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigableSet<E> {
-
-    private final AtomicReference<ImmutableSortedSet<E>> m_set;
+    @SuppressWarnings("rawtypes")
+    private static final AtomicReferenceFieldUpdater<COWNavigableSet, ImmutableSortedSet> m_updater =
+            AtomicReferenceFieldUpdater.<COWNavigableSet, ImmutableSortedSet>newUpdater(COWNavigableSet.class, ImmutableSortedSet.class, "m_set");
+    private volatile ImmutableSortedSet<E> m_set;
 
     public COWNavigableSet() {
-        m_set = new AtomicReference<ImmutableSortedSet<E>>(ImmutableSortedSet.<E>of());
+        m_set = ImmutableSortedSet.<E>of();
     }
 
     public COWNavigableSet(Collection<E> c) {
@@ -39,18 +41,18 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
         for (E e : c) {
             builder.add(e);
         }
-        m_set = new AtomicReference<ImmutableSortedSet<E>>(builder.build());
+        m_set = builder.build();
     }
 
     @Override
     protected NavigableSet<E> delegate() {
-        return m_set.get();
+        return m_set;
     }
 
     @Override
     public E pollFirst() {
         while (true) {
-            ImmutableSortedSet<E> snapshot = m_set.get();
+            final ImmutableSortedSet<E> snapshot = m_set;
             E first = null;
             if (snapshot.size() > 0) {
                first = snapshot.first();
@@ -59,7 +61,7 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
             }
             ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
             builder.addAll(snapshot.tailSet(first, false));
-            if (m_set.compareAndSet(snapshot, builder.build())) {
+            if (m_updater.compareAndSet(this, snapshot, builder.build())) {
                 return first;
             }
         }
@@ -68,7 +70,7 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
     @Override
     public E pollLast() {
         while (true) {
-            ImmutableSortedSet<E> snapshot = m_set.get();
+            final ImmutableSortedSet<E> snapshot = m_set;
             E last = null;
             if (snapshot.size() > 0) {
                 last = snapshot.last();
@@ -77,7 +79,7 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
             }
             ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
             builder.addAll(snapshot.headSet(last, false));
-            if (m_set.compareAndSet(snapshot, builder.build())) {
+            if (m_updater.compareAndSet(this, snapshot, builder.build())) {
                 return last;
             }
         }
@@ -86,13 +88,13 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
     @Override
     public boolean add(E e) {
         while (true) {
-            ImmutableSortedSet<E> snapshot = m_set.get();
+            final ImmutableSortedSet<E> snapshot = m_set;
             if (snapshot.contains(e)) return false;
 
             ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
             builder.addAll(snapshot);
             builder.add(e);
-            if (m_set.compareAndSet(snapshot, builder.build())) {
+            if (m_updater.compareAndSet(this, snapshot, builder.build())) {
                 return true;
             }
         }
@@ -101,7 +103,7 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
     @Override
     public boolean addAll(Collection<? extends E> c) {
         while (true) {
-            ImmutableSortedSet<E> snapshot = m_set.get();
+            final ImmutableSortedSet<E> snapshot = m_set;
             ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
 
             boolean hadValues = false;
@@ -113,7 +115,7 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
             }
             if (hadValues) {
                 builder.addAll(snapshot);
-                if (m_set.compareAndSet(snapshot, builder.build())) {
+                if (m_updater.compareAndSet(this, snapshot, builder.build())) {
                     return true;
                 }
             } else {
@@ -124,13 +126,13 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
 
     @Override
     public void clear() {
-        m_set.set(ImmutableSortedSet.<E>of());
+        m_updater.set(this, ImmutableSortedSet.<E>of());
     }
 
     @Override
     public boolean remove(Object o) {
         while (true) {
-            ImmutableSortedSet<E> snapshot = m_set.get();
+            final ImmutableSortedSet<E> snapshot = m_set;
             if (!snapshot.contains(o)) return false;
 
             ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
@@ -138,7 +140,7 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
                 if (e.equals(o)) continue;
                 builder.add(e);
             }
-            if (m_set.compareAndSet(snapshot, builder.build())) {
+            if (m_updater.compareAndSet(this, snapshot, builder.build())) {
                 return true;
             }
         }
@@ -147,7 +149,7 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
     @Override
     public boolean removeAll(Collection<?> c) {
         while (true) {
-            ImmutableSortedSet<E> snapshot = m_set.get();
+            final ImmutableSortedSet<E> snapshot = m_set;
             ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
 
             boolean hadValues = false;
@@ -160,7 +162,7 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
             }
 
             if (hadValues) {
-                if (m_set.compareAndSet(snapshot, builder.build())) {
+                if (m_updater.compareAndSet(this, snapshot, builder.build())) {
                     return true;
                 }
             } else {
@@ -172,7 +174,7 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
     @Override
     public boolean retainAll(Collection<?> c) {
         while (true) {
-            ImmutableSortedSet<E> snapshot = m_set.get();
+            final ImmutableSortedSet<E> snapshot = m_set;
             ImmutableSortedSet.Builder<E> builder = ImmutableSortedSet.naturalOrder();
 
             boolean removedValues = false;
@@ -185,7 +187,7 @@ public class COWNavigableSet<E extends Comparable<E>> extends ForwardingNavigabl
             }
 
             if (removedValues) {
-                if (m_set.compareAndSet(snapshot, builder.build())) {
+                if (m_updater.compareAndSet(this, snapshot, builder.build())) {
                     return true;
                 }
             } else {

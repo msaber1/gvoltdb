@@ -18,7 +18,7 @@ package org.voltcore.utils;
 
 import java.util.Map;
 import java.util.NavigableMap;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ForwardingNavigableMap;
@@ -30,55 +30,44 @@ import com.google.common.collect.ImmutableSortedMap.Builder;
  * Otherwise behaves as you would expect.
  */
 public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigableMap<K, V> implements NavigableMap<K, V> {
-    private final AtomicReference<ImmutableSortedMap<K, V>> m_map;
+    @SuppressWarnings("rawtypes")
+    private static final AtomicReferenceFieldUpdater<COWSortedMap, ImmutableSortedMap> m_updater =
+            AtomicReferenceFieldUpdater.<COWSortedMap, ImmutableSortedMap>newUpdater(COWSortedMap.class, ImmutableSortedMap.class, "m_map");
+    private volatile ImmutableSortedMap<K, V> m_map;
 
     public COWSortedMap() {
-        m_map = new AtomicReference<ImmutableSortedMap<K, V>>(ImmutableSortedMap.<K, V>naturalOrder().build());
+        m_map = ImmutableSortedMap.<K, V>naturalOrder().build();
     }
 
     public COWSortedMap(Map<K, V> map) {
         if (map == null) {
             throw new IllegalArgumentException("Wrapped map cannot be null");
         }
-        m_map = new AtomicReference<ImmutableSortedMap<K, V>>(ImmutableSortedMap.<K, V>naturalOrder().putAll(map).build());
-    }
-
-    @Override
-    public int size() {
-        return m_map.get().size();
-    }
-
-    public Map<K, V> get() {
-        return m_map.get();
-    }
-
-    @Override
-    public boolean isEmpty() {
-        return m_map.get().isEmpty();
+        m_map = ImmutableSortedMap.<K, V>naturalOrder().putAll(map).build();
     }
 
     @Override
     public boolean containsKey(Object key) {
         Preconditions.checkNotNull(key);
-        return m_map.get().containsKey(key);
+        return m_map.containsKey(key);
     }
 
     @Override
     public boolean containsValue(Object value) {
         Preconditions.checkNotNull(value);
-        return m_map.get().containsValue(value);
+        return m_map.containsValue(value);
     }
 
     @Override
     public V get(Object key) {
         Preconditions.checkNotNull(key);
-        return m_map.get().get(key);
+        return (V) m_map.get(key);
     }
 
     @Override
     public V put(K key, V value) {
         while (true) {
-            ImmutableSortedMap<K, V> original = m_map.get();
+            ImmutableSortedMap<K, V> original = m_map;
             Builder<K, V> builder = ImmutableSortedMap.<K, V>naturalOrder();
             V oldValue = null;
             boolean replaced = false;
@@ -95,7 +84,7 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
                 builder.put(key, value);
             }
             ImmutableSortedMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original, copy)) {
+            if (m_updater.compareAndSet(this, original, copy)) {
                 return oldValue;
             }
         }
@@ -105,7 +94,7 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
     public V remove(Object key) {
         Preconditions.checkNotNull(key);
         while (true) {
-            ImmutableSortedMap<K, V> original = m_map.get();
+            ImmutableSortedMap<K, V> original = m_map;
             Builder<K, V> builder = ImmutableSortedMap.<K, V>naturalOrder();
             V oldValue = null;
             for (Map.Entry<K, V> entry : original.entrySet()) {
@@ -116,7 +105,7 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
                 }
             }
             ImmutableSortedMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original,copy)) {
+            if (m_updater.compareAndSet(this, original,copy)) {
                 return oldValue;
             }
         }
@@ -125,7 +114,7 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
     @Override
     public void putAll(Map<? extends K, ? extends V> m) {
         while (true) {
-            ImmutableSortedMap<K, V> original = m_map.get();
+            ImmutableSortedMap<K, V> original = m_map;
             Builder<K, V> builder = ImmutableSortedMap.<K, V>naturalOrder();
             for (Map.Entry<K, V> entry : original.entrySet()) {
                 if (!m.containsKey(entry.getKey())) {
@@ -134,7 +123,7 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
             }
             builder.putAll(m);
             ImmutableSortedMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original, copy)) {
+            if (m_updater.compareAndSet(this, original, copy)) {
                 return;
             }
         }
@@ -142,13 +131,13 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
 
     @Override
     public void clear() {
-        m_map.set(ImmutableSortedMap.<K, V>naturalOrder().build());
+        m_updater.set(this, ImmutableSortedMap.<K, V>naturalOrder().build());
     }
 
     @Override
     public java.util.Map.Entry<K, V> pollFirstEntry() {
         while (true) {
-            ImmutableSortedMap<K, V> original = m_map.get();
+            ImmutableSortedMap<K, V> original = m_map;
             Builder<K, V> builder = ImmutableSortedMap.<K, V>naturalOrder();
             final Map.Entry<K, V> firstEntry = original.firstEntry();
             for (Map.Entry<K, V> entry : original.entrySet()) {
@@ -157,7 +146,7 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
                 }
             }
             ImmutableSortedMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original,copy)) {
+            if (m_updater.compareAndSet(this, original,copy)) {
                 return firstEntry;
             }
         }
@@ -166,7 +155,7 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
     @Override
     public java.util.Map.Entry<K, V> pollLastEntry() {
         while (true) {
-            ImmutableSortedMap<K, V> original = m_map.get();
+            ImmutableSortedMap<K, V> original = m_map;
             Builder<K, V> builder = ImmutableSortedMap.<K, V>naturalOrder();
             final Map.Entry<K, V> lastEntry = original.lastEntry();
             for (Map.Entry<K, V> entry : original.entrySet()) {
@@ -175,7 +164,7 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
                 }
             }
             ImmutableSortedMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original,copy)) {
+            if (m_updater.compareAndSet(this, original,copy)) {
                 return lastEntry;
             }
         }
@@ -183,6 +172,6 @@ public class COWSortedMap<K extends Comparable<K>, V> extends ForwardingNavigabl
 
     @Override
     protected NavigableMap<K, V> delegate() {
-        return m_map.get();
+        return m_map;
     }
 }

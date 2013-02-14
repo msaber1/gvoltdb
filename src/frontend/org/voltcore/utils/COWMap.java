@@ -18,7 +18,7 @@ package org.voltcore.utils;
 
 import java.util.Map;
 import java.util.concurrent.ConcurrentMap;
-import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicReferenceFieldUpdater;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ForwardingMap;
@@ -30,23 +30,26 @@ import com.google.common.collect.ImmutableMap.Builder;
  * Otherwise behaves as you would expect.
  */
 public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<K, V> {
-    private final AtomicReference<ImmutableMap<K, V>> m_map;
+    @SuppressWarnings("rawtypes")
+    private static final AtomicReferenceFieldUpdater<COWMap, ImmutableMap> m_updater =
+            AtomicReferenceFieldUpdater.<COWMap, ImmutableMap>newUpdater(COWMap.class, ImmutableMap.class, "m_map");
+    private volatile ImmutableMap<K, V> m_map;
 
     public COWMap() {
-        m_map = new AtomicReference<ImmutableMap<K, V>>(new Builder<K, V>().build());
+        m_map = new Builder<K, V>().build();
     }
 
     public COWMap(Map<K, V> map) {
         if (map == null) {
             throw new IllegalArgumentException("Wrapped map cannot be null");
         }
-        m_map = new AtomicReference<ImmutableMap<K, V>>(new Builder<K, V>().putAll(map).build());
+        m_map = new Builder<K, V>().putAll(map).build();
     }
 
     @Override
     public V put(K key, V value) {
         while (true) {
-            ImmutableMap<K, V> original = m_map.get();
+            final ImmutableMap<K, V> original = m_map;
             Builder<K, V> builder = new Builder<K, V>();
             V oldValue = null;
             boolean replaced = false;
@@ -63,7 +66,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
                 builder.put(key, value);
             }
             ImmutableMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original, copy)) {
+            if (m_updater.compareAndSet(this, original, copy)) {
                 return oldValue;
             }
         }
@@ -73,7 +76,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
     public V remove(Object key) {
         Preconditions.checkNotNull(key);
         while (true) {
-            ImmutableMap<K, V> original = m_map.get();
+            final ImmutableMap<K, V> original = m_map;
             Builder<K, V> builder = new Builder<K, V>();
             V oldValue = null;
             for (Map.Entry<K, V> entry : original.entrySet()) {
@@ -84,7 +87,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
                 }
             }
             ImmutableMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original,copy)) {
+            if (m_updater.compareAndSet(this, original,copy)) {
                 return oldValue;
             }
         }
@@ -93,7 +96,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
     @Override
     public void putAll(Map<? extends K, ? extends V> m) {
         while (true) {
-            ImmutableMap<K, V> original = m_map.get();
+            final ImmutableMap<K, V> original = m_map;
             Builder<K, V> builder = new Builder<K, V>();
             for (Map.Entry<K, V> entry : original.entrySet()) {
                 if (!m.containsKey(entry.getKey())) {
@@ -102,7 +105,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
             }
             builder.putAll(m);
             ImmutableMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original, copy)) {
+            if (m_updater.compareAndSet(this, original, copy)) {
                 return;
             }
         }
@@ -110,19 +113,19 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
 
     @Override
     public void clear() {
-        m_map.set(new Builder<K, V>().build());
+        m_map = new Builder<K, V>().build();
     }
 
     @Override
     protected Map<K, V> delegate() {
-        return m_map.get();
+        return m_map;
     }
 
     @Override
     public V putIfAbsent(K key, V value) {
         V existingValue;
         while ((existingValue = get(key)) == null) {
-            ImmutableMap<K, V> original = m_map.get();
+            final ImmutableMap<K, V> original = m_map;
             if ((existingValue = original.get(key)) != null) break;
 
             Builder<K, V> builder = new Builder<K, V>();
@@ -135,7 +138,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
             }
             builder.put(key, value);
             ImmutableMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original, copy)) {
+            if (m_updater.compareAndSet(this, original, copy)) {
                 break;
             }
         }
@@ -165,7 +168,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
         Preconditions.checkNotNull(key);
         if (value == null) return false;
         while (true) {
-            ImmutableMap<K, V> original = m_map.get();
+            final ImmutableMap<K, V> original = m_map;
             V existingValue = original.get(key);
             if (existingValue == null) break;
             if (!existingValue.equals(value)) break;
@@ -179,7 +182,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
                 }
             }
             ImmutableMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original, copy)) {
+            if (m_updater.compareAndSet(this, original, copy)) {
                 return true;
             }
         }
@@ -192,7 +195,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
         Preconditions.checkNotNull(oldValue);
         Preconditions.checkNotNull(newValue);
         while (true) {
-            ImmutableMap<K, V> original = m_map.get();
+            final ImmutableMap<K, V> original = m_map;
             V existingValue = original.get(key);
             if (existingValue == null) break;
             if (!existingValue.equals(oldValue)) break;
@@ -207,7 +210,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
             }
             builder.put(key, newValue);
             ImmutableMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original, copy)) {
+            if (m_updater.compareAndSet(this, original, copy)) {
                 return true;
             }
         }
@@ -219,7 +222,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
         Preconditions.checkNotNull(key);
         Preconditions.checkNotNull(value);
         while (true) {
-            ImmutableMap<K, V> original = m_map.get();
+            final ImmutableMap<K, V> original = m_map;
             V existingValue = original.get(key);
             if (existingValue == null) break;
 
@@ -233,7 +236,7 @@ public class COWMap<K, V>  extends ForwardingMap<K, V> implements ConcurrentMap<
             }
             builder.put(key, value);
             ImmutableMap<K, V> copy = builder.build();
-            if (m_map.compareAndSet(original, copy)) {
+            if (m_updater.compareAndSet(this, original, copy)) {
                 return existingValue;
             }
         }
