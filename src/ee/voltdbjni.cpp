@@ -153,11 +153,11 @@ void signalHandler(int signum, siginfo_t *info, void *context) {
     std::string message = err_msg;
     message.append(currentEngineForCrash->debug());
 
-    JNIEnv *env;
-    if (currentVM->AttachCurrentThread((void **)&env, NULL) != 0)
+    void* env;
+    if (currentVM->AttachCurrentThread(&env, NULL) != 0)
         exit(-1);
     JNITopend *topend = static_cast<JNITopend*>(currentEngineForCrash->getTopend());
-    topend->updateJNIEnv(env);
+    topend->updateJNIEnv(static_cast<JNIEnv*>(env));
     topend->crashVoltDB(SegvException(message.c_str(), context, __FILE__, __LINE__));
     currentVM->DetachCurrentThread();
 }
