@@ -328,12 +328,12 @@ static int8_t tick(ipc_command *cmd)
     struct cmd_structure
     {
         int64_t time;
-        int64_t lastSpHandle;
+        int64_t lastTxnId;
     }__attribute__((packed));
     cmd_structure* cs = reinterpret_cast<cmd_structure*>(cmd+1);
 
     // no return code. can't fail!
-    s_engine->tick(ntoh(cs->time), ntoh(cs->lastSpHandle));
+    s_engine->tick(ntoh(cs->time), ntoh(cs->lastTxnId));
     return kErrorCode_Success;
 }
 
@@ -341,11 +341,11 @@ static int8_t quiesce(ipc_command *cmd)
 {
     struct cmd_structure
     {
-        int64_t lastSpHandle;
+        int64_t lastTxnId;
     }__attribute__((packed));
     cmd_structure* cs = reinterpret_cast<cmd_structure*>(cmd+1);
 
-    s_engine->quiesce(ntoh(cs->lastSpHandle));
+    s_engine->quiesce(ntoh(cs->lastTxnId));
     return kErrorCode_Success;
 }
 
@@ -353,9 +353,8 @@ static int8_t executePlanFragments(ipc_command *cmd)
 {
     struct cmd_structure
     {
-        int64_t spHandle;
-        int64_t lastCommittedSpHandle;
-        int64_t uniqueId;
+        int64_t txnId;
+        int64_t lastCommittedTxnId;
         int64_t undoToken;
         int32_t numFragmentIds;
         char data[0];
@@ -375,10 +374,9 @@ static int8_t executePlanFragments(ipc_command *cmd)
     int sz = static_cast<int>(ntoh(cmd->msgsize) - usedsize);
 
     if (0)
-        cout << "executepfs:"
-                  << " spHandle=" << ntoh(cs->spHandle)
-                  << " lastCommittedSphandle=" << ntoh(cs->lastCommittedSpHandle)
-                  << " uniqueId=" << ntoh(cs->uniqueId)
+        cout << "executepfs:" << " txnId=" << ntoh(cs->txnId)
+                  << " txnId=" << ntoh(cs->txnId)
+                  << " lastCommitted=" << ntoh(cs->lastCommittedTxnId)
                   << " undoToken=" << ntoh(cs->undoToken)
                   << " numFragIds=" << numFrags << endl;
 
@@ -389,9 +387,8 @@ static int8_t executePlanFragments(ipc_command *cmd)
         if (s_engine->executeQuery(ntoh(fragmentId[i]),
                                    1,
                                    (int32_t)(ntoh(inputDepId[i])), // Java sends int64 but EE wants int32
-                                   ntoh(cs->spHandle),
-                                   ntoh(cs->lastCommittedSpHandle),
-                                   ntoh(cs->uniqueId),
+                                   ntoh(cs->txnId),
+                                   ntoh(cs->lastCommittedTxnId),
                                    i == 0 ? true : false, //first
                                    i == numFrags - 1 ? true : false)) { //last
             ++errors;
@@ -439,7 +436,6 @@ static int8_t loadFragment(ipc_command *cmd)
     fragId = hton(fragId);
     int64_t wasHitLong = hton((wasHit ? (int64_t)1 : (int64_t)0));
     cacheSize = hton(cacheSize);
-
     // write the results array back across the wire
     const int8_t successResult = kErrorCode_Success;
     writeOrDie(&successResult, sizeof(int8_t));
@@ -454,25 +450,25 @@ static int8_t loadTable(ipc_command *cmd)
     struct cmd_structure
     {
         int32_t tableId;
-        int64_t spHandle;
-        int64_t lastCommittedSpHandle;
+        int64_t txnId;
+        int64_t lastCommittedTxnId;
         char data[0];
     }__attribute__((packed));
     cmd_structure* cs = reinterpret_cast<cmd_structure*>(cmd+1);
 
     const int32_t tableId = ntoh(cs->tableId);
-    const int64_t spHandle = ntoh(cs->spHandle);
-    const int64_t lastCommittedSpHandle = ntoh(cs->lastCommittedSpHandle);
+    const int64_t txnId = ntoh(cs->txnId);
+    const int64_t lastCommittedTxnId = ntoh(cs->lastCommittedTxnId);
     if (0) {
         cout << "loadTable:" << " tableId=" << tableId
-                  << " spHandle=" << spHandle << " lastCommittedSpHandle=" << lastCommittedSpHandle << endl;
+                  << " txnId=" << txnId << " lastCommittedTxnId=" << lastCommittedTxnId << endl;
     }
 
     // ...and fast serialized table last.
     const char* tableData = cs->data;
     int sz = static_cast<int>(ntoh(cmd->msgsize) - sizeof(cmd_structure));
     ReferenceSerializeInput serialize_in(tableData, sz);
-    if (s_engine->loadTable(tableId, serialize_in, spHandle, lastCommittedSpHandle)) {
+    if (s_engine->loadTable(tableId, serialize_in, txnId, lastCommittedTxnId)) {
         return kErrorCode_Success;
     }
     return kErrorCode_Error;

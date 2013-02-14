@@ -51,50 +51,44 @@ class ExecutorContext {
     // not always known at initial construction
     void setEpoch(int64_t epoch) { m_epoch = epoch; }
 
-    // Note new data available via tick() or quiesce()
-    void refreshLastCommitted(int64_t lastCommittedSpHandle) { m_lastCommittedSpHandle = lastCommittedSpHandle; }
+    // data available via tick or quiesce
+    void refreshLastCommitted(int64_t lastCommittedTxnId) { m_lastCommittedTxnId = lastCommittedTxnId; }
 
-    // helper to configure the context for a new jni call
-    void setupForPlanFragments(int64_t spHandle,
-                               int64_t lastCommittedSpHandle,
-                               int64_t uniqueId = -1)
-    {
-        m_spHandle = spHandle;
-        m_lastCommittedSpHandle = lastCommittedSpHandle;
-        m_currentTxnTimestamp = (uniqueId >> 23) + m_epoch;
-        m_uniqueId = uniqueId;
-    }
-
-    // helper to configure the context for a new jni call
+    // Helpers to configure the context for a new jni call
     void setUndoQuantum(UndoQuantum *undoQuantum) { m_undoQuantum = undoQuantum; }
 
-    static void setupForPlanFragments()
+    void setupTxnIdsForPlanFragments(int64_t txnId, int64_t lastCommittedTxnId)
+    {
+        m_txnId = txnId;
+        m_lastCommittedTxnId = lastCommittedTxnId;
+    }
+
+    static void setupTxnIdsForPlanFragmentsForTesting(int64_t txnId, int64_t lastCommittedTxnId)
     {
         ExecutorContext* singleton = getExecutorContext();
-        singleton->setupForPlanFragments(0, 0);
+        singleton->setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId);
+    }
+
+    static void defaultTxnIdsForTesting()
+    {
+        ExecutorContext* singleton = getExecutorContext();
+        singleton->setupTxnIdsForPlanFragments(0, 0);
     }
 
     static UndoQuantum *currentUndoQuantum() { return getExecutorContext()->m_undoQuantum; }
 
-    /** Current or most recently sp handle */
-    static int64_t currentSpHandle() {
-        return getExecutorContext()->m_spHandle;
-    }
+    /** Current or most recently executed transaction id. */
+    static int64_t currentTxnId() { return getExecutorContext()->m_txnId; }
 
-    /** Timestamp from unique id for this transaction */
-    static int64_t currentUniqueId() {
-        return getExecutorContext()->m_uniqueId;
-    }
-
-    /** Timestamp from unique id for this transaction */
-    static int64_t currentTxnTimestamp() {
-        return getExecutorContext()->m_currentTxnTimestamp;
+    /** Current or most recently executed transaction id. */
+    static int64_t currentTxnTimestamp()
+    {
+        ExecutorContext* singleton = getExecutorContext();
+        return (singleton->m_txnId >> 23) + singleton->m_epoch;
     }
 
     /** Last committed transaction known to this EE */
-    static int64_t lastCommittedSpHandle() {
-        return getExecutorContext()->m_lastCommittedSpHandle;
-    }
+    static int64_t lastCommittedTxnId() { return getExecutorContext()->m_lastCommittedTxnId; }
 
     static ExecutorContext* getExecutorContext();
 
@@ -137,7 +131,7 @@ class ExecutorContext {
                     std::string hostname,
                     CatalogId hostId) :
         m_topEnd(topend), m_tempStringPool(tempStringPool),
-        m_undoQuantum(undoQuantum), m_spHandle(0), m_lastCommittedSpHandle(0),
+        m_undoQuantum(undoQuantum), m_txnId(0), m_lastCommittedTxnId(0),
         m_params(params),
         m_siteId(siteId), m_partitionId(partitionId),
         m_hostname(hostname), m_hostId(hostId),
@@ -154,10 +148,8 @@ private:
     Topend * const m_topEnd;
     Pool * const m_tempStringPool;
     UndoQuantum *m_undoQuantum;
-    int64_t m_spHandle;
-    int64_t m_lastCommittedSpHandle;
-    int64_t m_uniqueId;
-    int64_t m_currentTxnTimestamp;
+    int64_t m_txnId;
+    int64_t m_lastCommittedTxnId;
     const NValueArray* const m_params;
 public:
     int64_t const m_siteId;
@@ -168,8 +160,6 @@ private:
     /** local epoch for voltdb, sometime around 2008, pulled from catalog */
     int64_t m_epoch;
     bool m_exportFeatureEnabled;
-
-
 };
 
 }

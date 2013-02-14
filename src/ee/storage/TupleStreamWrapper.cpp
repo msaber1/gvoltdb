@@ -125,14 +125,14 @@ void TupleStreamWrapper::commit(int64_t currentSpHandle)
         throwFatalException("Active transactions moving backwards");
     }
 
-    int64_t lastCommittedSpHandle = ExecutorContext::lastCommittedSpHandle();
+    int64_t lastCommittedSpHandle = ExecutorContext::lastCommittedTxnId();
     // more data for an ongoing transaction with no new committed data
     if ((currentSpHandle == m_openSpHandle) &&
         (lastCommittedSpHandle == m_committedSpHandle))
     {
         //std::cout << "Current spHandle(" << currentSpHandle << ") == m_openSpHandle(" << m_openSpHandle <<
-        //") && lastCommittedSpHandle(" << lastCommittedSpHandle << ") m_committedTransactionId(" <<
-        //m_committedTransactionId << ")" << std::endl;
+        //") && lastCommittedSpHandle(" << lastCommittedSpHandle << ") m_committedSpHandle(" <<
+        //m_committedSpHandle << ")" << std::endl;
         return;
     }
 
@@ -295,7 +295,7 @@ TupleStreamWrapper::periodicFlush(int64_t timeInMillis)
         // transaction IDs; we choose whichever of currentSpHandle or
         // m_openSpHandle here will allow commit() to continue
         // operating correctly.
-        int64_t spHandle = ExecutorContext::currentSpHandle();
+        int64_t spHandle = ExecutorContext::currentTxnId();
         if (m_openSpHandle > spHandle)
         {
             spHandle = m_openSpHandle;
@@ -320,7 +320,7 @@ size_t TupleStreamWrapper::appendTuple(int64_t seqNo,
                                        TableTuple &tuple,
                                        TupleStreamWrapper::Type type)
 {
-    int64_t spHandle = ExecutorContext::currentSpHandle();
+    int64_t spHandle = ExecutorContext::currentTxnId();
 
     // Transaction IDs for transactions applied to this tuple stream
     // should always be moving forward in time.

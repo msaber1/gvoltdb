@@ -218,7 +218,7 @@ public:
         }
         }
         m_engine->setUndoToken(++m_undoToken);
-        ExecutorContext::setupForPlanFragments();
+        ExecutorContext::defaultTxnIdsForTesting();
         m_tuplesDeletedInLastUndo = 0;
         m_tuplesInsertedInLastUndo = 0;
     }

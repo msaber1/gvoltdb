@@ -156,7 +156,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void deserializeParameterSet();
 
         int executeQuery(int64_t planfragmentId, int32_t outputDependencyId, int32_t inputDependencyId,
-                         int64_t spHandle, int64_t lastCommittedSpHandle, int64_t uniqueId, bool first, bool last);
+                         int64_t txnId, int64_t lastCommittedTxnId, bool first, bool last);
 
         // ensure a plan fragment is loaded, given a graph
         // return the fragid and cache statistics
@@ -168,7 +168,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Dependency Transfer Functions
         // -------------------------------------------------
         bool send(Table* dependency);
-        int loadNextDependencyEngine(Table* destination);
+        int loadNextDependency(Table* destination);
 
         // -------------------------------------------------
         // Catalog Functions

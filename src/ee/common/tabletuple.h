@@ -527,9 +527,9 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
         for (uint16_t ii = 0; ii < columnCount; ii++) {
             setNValueAllocateForObjectCopies(ii, source.getNValue(ii), pool);
         }
+        // copy the isActive flag
+        m_data[0] = source.m_data[0];
     }
-    // copy the isActive flag
-    m_data[0] = source.m_data[0];
 }
 
 /*

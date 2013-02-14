@@ -65,7 +65,7 @@ bool ReceiveExecutor::p_execute() {
     // todo: should pass the transaction's string pool through
     // as the underlying table loader would use it.
     do {
-        loadedDeps = m_engine->loadNextDependencyEngine(m_outputTable);
+        loadedDeps = m_engine->loadNextDependency(m_outputTable);
     } while (loadedDeps > 0);
 
     return true;

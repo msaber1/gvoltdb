@@ -387,7 +387,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable(
     JNIEnv *env, jobject obj, jlong engine_ptr,
-    jint table_id, jbyteArray serialized_table, jlong spHandle, jlong lastCommittedSpHandle)
+    jint table_id, jbyteArray serialized_table, jlong txnId, jlong lastCommittedTxnId)
 {
     VOLT_DEBUG("loading table %d in C++...", table_id);
     VoltDBEngine *engine = fixupEngine(engine_ptr, env);
@@ -403,7 +403,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadT
     try {
         try {
             bool success = engine->loadTable(table_id, serialize_in,
-                                             spHandle, lastCommittedSpHandle);
+                                             txnId, lastCommittedTxnId);
             env->ReleaseByteArrayElements(serialized_table, bytes, JNI_ABORT);
             VOLT_DEBUG("deserialized table");
 
@@ -535,9 +535,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
     jint num_fragments,
     jlongArray plan_fragment_ids,
     jlongArray input_dep_ids,
-    jlong spHandle,
-    jlong lastCommittedSpHandle,
-    jlong uniqueId,
+    jlong txnId,
+    jlong lastCommittedTxnId,
     jlong undoToken)
 {
     // VOLT_DEBUG("nativeExecutePlanFragments() start");
@@ -572,7 +571,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
             // success is 0 and error is 1.
             if (engine->executeQuery(fragment_ids_buffer[i], 1, static_cast<int32_t>(input_dep_id),
-                                     spHandle, lastCommittedSpHandle, uniqueId, i == 0, i == (batch_size - 1))) {
+                                     txnId, lastCommittedTxnId, i == 0, i == (batch_size - 1))) {
                 ++failures;
             }
         }
@@ -722,7 +721,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32C
  */
 SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTick(
     JNIEnv *env, jobject obj, jlong engine_ptr,
-    jlong timeInMillis, jlong lastCommittedSpHandle)
+    jlong timeInMillis, jlong lastCommittedTxnId)
 {
     VoltDBEngine *engine = fixupEngine(engine_ptr, env);
     if (engine == NULL) {
@@ -730,7 +729,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTick(
     }
 
     try {
-        engine->tick(timeInMillis, lastCommittedSpHandle);
+        engine->tick(timeInMillis, lastCommittedTxnId);
     } catch (FatalException e) {
         engine->getTopend()->crashVoltDB(e);
     }
@@ -745,7 +744,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeTick(
  */
 SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeQuiesce(
     JNIEnv *env, jobject obj, jlong engine_ptr,
-    jlong lastCommittedSpHandle)
+    jlong lastCommittedTxnId)
 {
     VoltDBEngine *engine = fixupEngine(engine_ptr, env);
     if (engine == NULL) {
@@ -753,7 +752,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeQuies
     }
 
     try {
-        engine->quiesce(lastCommittedSpHandle);
+        engine->quiesce(lastCommittedTxnId);
     } catch (FatalException e) {
         engine->getTopend()->crashVoltDB(e);
     }

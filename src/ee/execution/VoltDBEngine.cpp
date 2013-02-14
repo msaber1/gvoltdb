@@ -293,8 +293,7 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
 int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                int32_t outputDependencyId,
                                int32_t inputDependencyId,
-                               int64_t spHandle, int64_t lastCommittedSpHandle,
-                               int64_t uniqueId,
+                               int64_t txnId, int64_t lastCommittedTxnId,
                                bool first, bool last)
 {
     assert(planfragmentId != 0);
@@ -311,7 +310,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
      */
     if (first) {
         // configure the execution context.
-        m_executorContext->setupForPlanFragments(spHandle, lastCommittedSpHandle, uniqueId);
+        m_executorContext->setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId);
         m_startOfResultBuffer = m_resultOutput.reserveBytes(sizeof(int32_t) + sizeof(int8_t));
         m_dirtyFragmentBatch = false;
     }
@@ -476,7 +475,7 @@ bool VoltDBEngine::send(Table* dependency) {
     return true;
 }
 
-int VoltDBEngine::loadNextDependencyEngine(Table* destination) {
+int VoltDBEngine::loadNextDependency(Table* destination) {
     return m_topend->loadNextDependency(m_currentInputDepId, &m_stringPool, destination);
 }
 
@@ -842,13 +841,9 @@ VoltDBEngine::setUndoQuantum(UndoQuantum *undoQuantum)
 bool
 VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInput &serializeIn,
-                        int64_t spHandle, int64_t lastCommittedSpHandle)
+                        int64_t txnId, int64_t lastCommittedTxnId)
 {
-    //Not going to thread the unique id through.
-    //The spHandle and lastCommittedSpHandle aren't really used in load table
-    //since their only purpose as of writing this (1/2013) they are only used
-    //for export data and we don't technically support loading into an export table
-    m_executorContext->setupForPlanFragments(spHandle, lastCommittedSpHandle);
+    m_executorContext->setupTxnIdsForPlanFragments(txnId, lastCommittedTxnId);
 
     Table* ret = getTable(tableId);
     if (ret == NULL) {
@@ -1157,8 +1152,8 @@ bool VoltDBEngine::isLocalSite(const NValue& value)
 }
 
 /** Perform once per second, non-transactional work. */
-void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
-    m_executorContext->refreshLastCommitted(lastCommittedSpHandle);
+void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedTxnId) {
+    m_executorContext->refreshLastCommitted(lastCommittedTxnId);
     typedef pair<string, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(timeInMillis);
@@ -1166,8 +1161,8 @@ void VoltDBEngine::tick(int64_t timeInMillis, int64_t lastCommittedSpHandle) {
 }
 
 /** For now, bring the Export system to a steady state with no buffers with content */
-void VoltDBEngine::quiesce(int64_t lastCommittedSpHandle) {
-    m_executorContext->refreshLastCommitted(lastCommittedSpHandle);
+void VoltDBEngine::quiesce(int64_t lastCommittedTxnId) {
+    m_executorContext->refreshLastCommitted(lastCommittedTxnId);
     typedef pair<string, Table*> TablePair;
     BOOST_FOREACH (TablePair table, m_exportingTables) {
         table.second->flushOldTuples(-1L);

@@ -158,7 +158,7 @@ TEST_F(StreamedTableTest, BaseCase) {
         m_quantum = new (m_pool) UndoQuantum(i + tokenOffset, &m_pool);
         // quant, currTxnId, committedTxnId
         m_context.setUndoQuantum(m_quantum);
-        m_context.setupForPlanFragments(i, i - 1);
+        m_context.setupTxnIdsForPlanFragments(i, i - 1);
 
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {

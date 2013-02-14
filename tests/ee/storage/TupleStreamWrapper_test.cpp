@@ -129,7 +129,7 @@ public:
 
     void appendTuple(int64_t lastCommittedTxnId, int64_t currentTxnId)
     {
-        m_context.setupForPlanFragments(currentTxnId, lastCommittedTxnId);
+        m_context.setupTxnIdsForPlanFragments(currentTxnId, lastCommittedTxnId);
         // fill a tuple
         for (int col = 0; col < COLUMN_COUNT; col++) {
             int value = rand();
@@ -142,7 +142,7 @@ public:
 
     void periodicFlush(int64_t lastCommittedTxnId,
                        int64_t currentTxnId) {
-        m_context.setupForPlanFragments(currentTxnId, lastCommittedTxnId);
+        m_context.setupTxnIdsForPlanFragments(currentTxnId, lastCommittedTxnId);
         m_wrapper.periodicFlush(-1);
     }
 
