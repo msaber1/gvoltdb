@@ -38,7 +38,7 @@ bool TableCountExecutor::p_init()
     return true;
 }
 
-bool TableCountExecutor::p_execute()
+void TableCountExecutor::p_execute()
 {
 #ifndef NDEBUG
     TableCountPlanNode* node = dynamic_cast<TableCountPlanNode*>(m_abstractNode);
@@ -69,8 +69,6 @@ bool TableCountExecutor::p_execute()
     //printf("\n%s\n", m_outputTable->debug().c_str());
     VOLT_TRACE("\n%s\n", m_outputTable->debug().c_str());
     VOLT_DEBUG("Finished Table Counting");
-
-    return true;
 }
 
 TableCountExecutor::~TableCountExecutor() {

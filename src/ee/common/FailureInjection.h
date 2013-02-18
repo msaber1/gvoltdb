@@ -24,14 +24,13 @@
 #define FAILURE_INJECTION_RATE .001
 #endif
 
-#ifndef INJECT_FAILURES
 #define FAIL_IF( failureCondition ) FAIL_IFF( failureCondition, 1.0 )
+#ifndef INJECT_FAILURES
 #define FAIL_IFF( failureCondition, failureProbability ) \
     if (failureCondition)
 #else
-#define FAIL_IF( failureCondition ) FAIL_IFF( failureCondition, 1.0 )
 #define FAIL_IFF( failureCondition, failureProbability ) \
- if (::rand() > (RAND_MAX * FAILURE_INJECTION_RATE * failureProbability) || failureCondition)
+ if (::rand() > (RAND_MAX * FAILURE_INJECTION_RATE * (failureProbability)) || (failureCondition))
 #endif
 
 

@@ -99,7 +99,7 @@ bool IndexCountExecutor::p_init()
     return true;
 }
 
-bool IndexCountExecutor::p_execute()
+void IndexCountExecutor::p_execute()
 {
     IndexCountPlanNode* node = dynamic_cast<IndexCountPlanNode*>(m_abstractNode);
     assert(node);
@@ -117,7 +117,7 @@ bool IndexCountExecutor::p_execute()
     assert (m_index == m_targetTable->index(node->getTargetIndexName()));
     assert (m_index->isCountableIndex());
 
-    VOLT_DEBUG("IndexCount: %s.%s\n", m_targetTable->name().c_str(),
+    VOLT_TRACE("IndexCount: %s.%s\n", m_targetTable->name().c_str(),
                m_index->getName().c_str());
 
     int activeNumOfStartKeys = m_numOfStartKeys;
@@ -162,7 +162,7 @@ bool IndexCountExecutor::p_execute()
 
                     if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
                         output_temp_table->insertTempTuple(tmptup);
-                        return true;
+                        return;
                     } else if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                         startKeyUnderflow = true;
                         break;
@@ -172,7 +172,7 @@ bool IndexCountExecutor::p_execute()
                 }
                 // if a EQ comparision is out of range, then return no tuples
                 output_temp_table->insertTuple(tmptup);
-                return true;
+                return;
             }
         }
     }
@@ -206,7 +206,7 @@ bool IndexCountExecutor::p_execute()
                     assert (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
                     if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                         output_temp_table->insertTempTuple(tmptup);
-                        return true;
+                        return;
                     } else if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
                         endKeyOverflow = true;
                         const ValueType type = m_endKey.getSchema()->columnType(ctr);
@@ -222,7 +222,7 @@ bool IndexCountExecutor::p_execute()
                 // if a EQ comparision is out of range, then return no tuples
                 else {
                     output_temp_table->insertTempTuple(tmptup);
-                    return true;
+                    return;
                 }
                 break;
             }
@@ -235,7 +235,7 @@ bool IndexCountExecutor::p_execute()
     int leftIncluded = 0, rightIncluded = 0;
 
     // Deal with multi-map
-    VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numStartKeys(%d) key:%s",
+    VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numStartKeys(%d) key:%s",
                localStartType, activeNumOfStartKeys, m_startKey.debugNoHeader().c_str());
     if (activeNumOfStartKeys != 0) {
         if (startKeyUnderflow == false) {
@@ -274,12 +274,11 @@ bool IndexCountExecutor::p_execute()
         rightIncluded = 1;
     }
     rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
-    VOLT_DEBUG("Index Count ANSWER %ld = %ld - %ld - 1 + %d + %d\n", (long)rkRes, (long)rkEnd, (long)rkStart, leftIncluded, rightIncluded);
+    VOLT_TRACE("Index Count ANSWER %ld = %ld - %ld - 1 + %d + %d\n", (long)rkRes, (long)rkEnd, (long)rkStart, leftIncluded, rightIncluded);
     tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes ));
     output_temp_table->insertTempTuple(tmptup);
 
-    VOLT_DEBUG ("Index Count :\n %s", m_outputTable->debug().c_str());
-    return true;
+    VOLT_TRACE("Index Count :\n %s", m_outputTable->debug().c_str());
 }
 
 IndexCountExecutor::~IndexCountExecutor() { }

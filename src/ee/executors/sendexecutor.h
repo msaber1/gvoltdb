@@ -62,7 +62,7 @@ public:
 protected:
     bool initEngine(VoltDBEngine* engine) { m_engine = engine; return true; }
     bool p_init();
-    bool p_execute();
+    void p_execute();
 
 private:
     VoltDBEngine *m_engine;

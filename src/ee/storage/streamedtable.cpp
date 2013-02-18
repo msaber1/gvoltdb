@@ -68,27 +68,18 @@ void StreamedTable::nextFreeTuple(TableTuple *) {
                                   "May not use nextFreeTuple with streamed tables.");
 }
 
-bool StreamedTable::insertTuple(TableTuple &source)
+void StreamedTable::insertTuple(TableTuple &source)
 {
     if (m_wrapper) {
         appendTuple(source, false);
     }
-    return true;
 }
 
-bool StreamedTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                   const TableTuple &sourceTupleWithNewValues,
-                                                   const std::vector<TableIndex*> &indexesToUpdate)
-{
-    throwFatalException("May not update a streamed table.");
-}
-
-bool StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
+void StreamedTable::deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings)
 {
     if (m_wrapper) {
         appendTuple(tuple, true);
     }
-    return true;
 }
 
 void StreamedTable::appendTuple(TableTuple &tuple, bool forDelete)

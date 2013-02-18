@@ -64,7 +64,7 @@ public:
 
 protected:
     bool p_init();
-    bool p_execute();
+    void p_execute();
 
     int m_inputTargetSize;
     std::vector<int> m_updatedColumns;

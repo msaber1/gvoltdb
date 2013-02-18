@@ -63,7 +63,7 @@ public:
     ~MaterializeExecutor();
 private:
     bool p_init();
-    bool p_execute();
+    void p_execute();
     std::vector<AbstractExpression*> m_columnExpressions;
     std::vector<const NValue*> m_paramsOnly;
 };

@@ -86,7 +86,7 @@ bool InsertExecutor::p_init()
     return true;
 }
 
-bool InsertExecutor::p_execute() {
+void InsertExecutor::p_execute() {
     assert(m_inputTable);
     assert(m_targetTable);
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
@@ -96,9 +96,11 @@ bool InsertExecutor::p_execute() {
     // running in a distributed cluster
     //
     if (m_inputTable->activeTupleCount() == 0) {
-        VOLT_ERROR("No tuples were found in our input table '%s'",
-                   m_inputTable->name().c_str());
-        return false;
+        string message("No tuples were found to insert into table: ");
+        message += m_targetTable->name();
+        VOLT_ERROR("%s", message.c_str());
+        // caught by VoltDBEngine
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 #endif
     assert (m_inputTable->activeTupleCount() > 0);
@@ -126,8 +128,11 @@ bool InsertExecutor::p_execute() {
             // if it doesn't map to this site
             if ( ! valueHashesToTheLocalPartition(value)) {
                 if (!m_multiPartition) {
-                    VOLT_ERROR("Mispartitioned Tuple in single-partition plan.");
-                    return false;
+                    string message("Mispartitioned Tuple in single-partition insert into table: ");
+                    message += m_targetTable->name();
+                    VOLT_ERROR("%s", message.c_str());
+                    // caught by VoltDBEngine
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
                 }
 
                 // don't insert
@@ -142,17 +147,9 @@ bool InsertExecutor::p_execute() {
         }
 
         // try to put the tuple into the target table
-        if (!m_targetTable->insertTuple(m_tuple)) {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                       " target table '%s'",
-                       m_inputTable->name().c_str(),
-                       m_targetTable->name().c_str());
-            return false;
-        }
-
+        m_targetTable->insertTuple(m_tuple);
         // successfully inserted
         modifiedTuples++;
     }
-
-    return storeModifiedTupleCount(modifiedTuples);
+    storeModifiedTupleCount(modifiedTuples);
 }

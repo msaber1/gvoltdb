@@ -168,9 +168,16 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
 // OPERATIONS
 // ------------------------------------------------------------------
 
-bool Table::updateTuple(TableTuple &targetTupleToUpdate, const TableTuple &sourceTupleWithNewValues) {
+void Table::updateTuple(TableTuple &targetTupleToUpdate, const TableTuple &sourceTupleWithNewValues) {
     const std::vector<TableIndex*> indexes = allIndexes();
-    return updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, indexes);
+    updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, indexes);
+}
+
+void Table::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                           const TableTuple &sourceTupleWithNewValues,
+                                           const std::vector<TableIndex*> &indexesToUpdate)
+{
+    throwFatalException("%s", (name() + " is not an updatable table.").c_str());
 }
 
 // ------------------------------------------------------------------
@@ -241,8 +248,8 @@ int Table::getApproximateSizeToSerialize() const {
     return 1024 * 1024 * 10;
 }
 
-bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
-
+void Table::serializeColumnHeaderTo(SerializeOutput &serialize_io)
+{
     /* NOTE:
        VoltDBEngine uses a binary template to create tables of single integers.
        It's called m_templateSingleLongTable and if you are seeing a serialization
@@ -256,7 +263,7 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
     if (m_columnHeaderData) {
         assert(m_columnHeaderSize != -1);
         serialize_io.writeBytes(m_columnHeaderData, m_columnHeaderSize);
-        return true;
+        return;
     }
     assert(m_columnHeaderSize == -1);
 
@@ -301,12 +308,9 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
     // cache the results
     m_columnHeaderData = new char[m_columnHeaderSize];
     memcpy(m_columnHeaderData, static_cast<const char*>(serialize_io.data()) + start, m_columnHeaderSize);
-
-    return true;
-
 }
 
-bool Table::serializeTo(SerializeOutput &serialize_io) {
+void Table::serializeTo(SerializeOutput &serialize_io) {
     // The table is serialized as:
     // [(int) total size]
     // [(int) header size] [num columns] [column types] [column names]
@@ -322,8 +326,7 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
     std::size_t pos = serialize_io.position();
     serialize_io.writeInt(-1);
 
-    if (!serializeColumnHeaderTo(serialize_io))
-        return false;
+    serializeColumnHeaderTo(serialize_io);
 
     // active tuple counts
     serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
@@ -340,15 +343,13 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
     int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));
     assert(sz > 0);
     serialize_io.writeIntAt(pos, sz);
-
-    return true;
 }
 
 /**
  * Serialized the table, but only includes the tuples specified (columns data and all).
  * Used by the exception stuff Ariel put in.
  */
-bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *tuples, int numTuples) {
+void Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *tuples, int numTuples) {
     //assert(m_schema->equals(tuples[0].getSchema()));
 
     std::size_t pos = serialize_io.position();
@@ -356,8 +357,7 @@ bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *
 
     assert(!tuples[0].isNullTuple());
 
-    if (!serializeColumnHeaderTo(serialize_io))
-        return false;
+    serializeColumnHeaderTo(serialize_io);
 
     serialize_io.writeInt(static_cast<int32_t>(numTuples));
     for (int ii = 0; ii < numTuples; ii++) {
@@ -365,8 +365,6 @@ bool Table::serializeTupleTo(SerializeOutput &serialize_io, voltdb::TableTuple *
     }
 
     serialize_io.writeIntAt(pos, static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t)));
-
-    return true;
 }
 
 bool Table::equals(voltdb::Table *other) {

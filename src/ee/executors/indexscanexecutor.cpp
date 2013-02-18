@@ -48,7 +48,7 @@
 #include "common/debuglog.h"
 #include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
+#include "common/SerializableEEException.h"
 #include "expressions/abstractexpression.h"
 #include "indexes/tableindex.h"
 
@@ -64,6 +64,7 @@
 #include "storage/temptable.h"
 
 using namespace voltdb;
+using namespace std;
 
 void IndexScanExecutor::p_setOutputTable(TempTableLimits* limits)
 {
@@ -92,7 +93,7 @@ bool IndexScanExecutor::p_init()
     //
     // Make sure that the search keys are not null
     //
-    const std::vector<AbstractExpression*>& searchKeyArray = node->getSearchKeyExpressions();
+    const vector<AbstractExpression*>& searchKeyArray = node->getSearchKeyExpressions();
     m_numOfSearchkeys = (int)searchKeyArray.size();
 
     //printf ("<INDEX SCAN> num of search keys: %d\n", m_numOfSearchkeys);
@@ -138,7 +139,7 @@ bool IndexScanExecutor::p_init()
     return true;
 }
 
-bool IndexScanExecutor::p_execute()
+void IndexScanExecutor::p_execute()
 {
     IndexScanPlanNode* node = dynamic_cast<IndexScanPlanNode*>(m_abstractNode);
     assert(node);
@@ -176,7 +177,7 @@ bool IndexScanExecutor::p_execute()
     //
     m_searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
-    const std::vector<AbstractExpression*>& searchKeyExpressions = node->getSearchKeyExpressions();
+    const vector<AbstractExpression*>& searchKeyExpressions = node->getSearchKeyExpressions();
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
         NValue candidateValue = searchKeyExpressions[ctr]->eval();
         try {
@@ -204,7 +205,7 @@ bool IndexScanExecutor::p_execute()
                         (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
 
                         // gt or gte when key overflows returns nothing
-                        return true;
+                        return;
                     }
                     else {
                         // VoltDB should only support LT or LTE with
@@ -217,7 +218,7 @@ bool IndexScanExecutor::p_execute()
                         (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
 
                         // lt or lte when key underflows returns nothing
-                        return true;
+                        return;
                     }
                     else {
                         // don't allow GTE because it breaks null handling
@@ -235,7 +236,7 @@ bool IndexScanExecutor::p_execute()
             }
             // if a EQ comparison is out of range, then return no tuples
             else {
-                return true;
+                return;
             }
             break;
         }
@@ -291,7 +292,11 @@ bool IndexScanExecutor::p_execute()
             m_index->moveToKeyOrGreater(&m_searchKey);
         }
         else {
-            return false;
+            assert(false);
+            string message("Unexpected index scan lookup type for use with search key(s)");
+            VOLT_ERROR("%s", message.c_str());
+            // caught by VoltDBEngine
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
         }
     } else {
         bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
@@ -359,9 +364,7 @@ bool IndexScanExecutor::p_execute()
             }
         }
     }
-
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
-    return true;
 }
 
 IndexScanExecutor::~IndexScanExecutor() { }

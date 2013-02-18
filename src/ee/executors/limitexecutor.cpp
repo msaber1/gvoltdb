@@ -62,7 +62,7 @@ LimitExecutor::p_init()
     return true;
 }
 
-bool
+void
 LimitExecutor::p_execute()
 {
     LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
@@ -94,14 +94,6 @@ LimitExecutor::p_execute()
         }
         tuple_ctr++;
 
-        if ( ! output_temp_table->insertTempTuple(tuple))
-        {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into output table '%s'",
-                       m_inputTable->name().c_str(),
-                       m_outputTable->name().c_str());
-            return false;
-        }
+        output_temp_table->insertTempTuple(tuple);
     }
-
-    return true;
 }

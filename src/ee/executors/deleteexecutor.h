@@ -61,7 +61,7 @@ public:
 protected:
 
     bool p_init();
-    bool p_execute();
+    void p_execute();
 
     /** true if all tuples are deleted, truncate is the only case we
         don't need PK to delete tuples. */

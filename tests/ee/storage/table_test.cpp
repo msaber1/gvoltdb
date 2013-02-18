@@ -167,7 +167,7 @@ TEST_F(TableTest, TupleInsert) {
     // All of the values have already been inserted, we just
     // need to make sure that the data makes sense
     //
-    TableIterator iterator = this->table->iterator();
+    TableIterator iterator = table->iterator();
     TableTuple tuple(table->schema());
     while (iterator.next(tuple)) {
         //printf("%s\n", tuple->debug(this->table).c_str());
@@ -180,17 +180,17 @@ TEST_F(TableTest, TupleInsert) {
     //
     // Make sure that if we insert one tuple, we only get one tuple
     //
-    TableTuple &temp_tuple = this->table->tempTuple();
-    ASSERT_EQ(true, tableutil::setRandomTupleValues(this->table, &temp_tuple));
-    this->table->deleteAllTuples(true);
-    ASSERT_EQ(0, this->table->activeTupleCount());
-    ASSERT_EQ(true, this->table->insertTuple(temp_tuple));
-    ASSERT_EQ(1, this->table->activeTupleCount());
+    TableTuple &temp_tuple = table->tempTuple();
+    ASSERT_EQ(true, tableutil::setRandomTupleValues(table, &temp_tuple));
+    table->deleteAllTuples(true);
+    ASSERT_EQ(0, table->activeTupleCount());
+    table->insertTuple(temp_tuple);
+    ASSERT_EQ(1, table->activeTupleCount());
 
     //
     // Then check to make sure that it has the same value and type
     //
-    iterator = this->table->iterator();
+    iterator = table->iterator();
     ASSERT_EQ(true, iterator.next(tuple));
     for (int col_ctr = 0, col_cnt = NUM_OF_COLUMNS; col_ctr < col_cnt; col_ctr++) {
         EXPECT_EQ(COLUMN_TYPES[col_ctr], tuple.getType(col_ctr));
@@ -243,7 +243,7 @@ TEST_F(TableTest, TupleUpdate) {
             }
         }
         if (update) {
-            EXPECT_EQ(true, table->updateTuple(tuple, temp_tuple));
+            table->updateTuple(tuple, temp_tuple);
         }
     }
 
@@ -282,10 +282,7 @@ TEST_F(TableTest, TupleUpdate) {
 //             if (!tableutil::setRandomTupleValues(table, &tuple)) {
 //                 EXPECT_TRUE(false);
 //             }
-//             if (!table->insertTuple(tuple)) {
-//                 EXPECT_TRUE(false);
-//             }
-//
+//             table->insertTuple(tuple);
 //             /*
 //              * The insert into the table (assuming a persistent table)
 //              * will make a copy of the strings so the string
@@ -396,7 +393,7 @@ TEST_F(TableTest, TupleDelete) {
         if (update) {
             //printf("BEFORE?: %s\n", tuple->debug(this->table.get()).c_str());
             //persistent_table->setUndoLog(undos[xact_ctr]);
-            EXPECT_EQ(true, persistent_table->updateTuple(tuple, temp_tuple, true));
+            persistent_table->updateTuple(tuple, temp_tuple);
             //printf("UNDO: %s\n", undos[xact_ctr]->debug().c_str());
         }
         //printf("AFTER: %s\n", temp_tuple->debug(this->table.get()).c_str());

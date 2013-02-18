@@ -61,7 +61,7 @@ public:
 
 protected:
         bool p_init();
-        bool p_execute();
+        void p_execute();
 
         TableTuple m_tuple;
         int m_partitionColumn;

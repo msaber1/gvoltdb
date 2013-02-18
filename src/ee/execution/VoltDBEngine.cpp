@@ -352,20 +352,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
-            if (!executor->execute()) {
-                VOLT_TRACE("The Executor's execution at position '%d'"
-                           " failed for PlanFragment '%jd'",
-                           ctr, (intmax_t)planfragmentId);
-                if (cleanUpTable != NULL)
-                    cleanUpTable->deleteAllTuples(false);
-                // set these back to -1 for error handling
-                m_currentOutputDepId = -1;
-                m_currentInputDepId = -1;
-                if (last) {
-                    m_stringPool.purge();
-                }
-                return ENGINE_ERRORCODE_ERROR;
-            }
+            executor->execute();
         } catch (SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
@@ -466,13 +453,11 @@ void VoltDBEngine::resizePlanCache() {
 // -------------------------------------------------
 // RESULT FUNCTIONS
 // -------------------------------------------------
-bool VoltDBEngine::send(Table* dependency) {
+void VoltDBEngine::send(Table* dependency) {
     VOLT_DEBUG("Sending Dependency '%d' from C++", m_currentOutputDepId);
     m_resultOutput.writeInt(m_currentOutputDepId);
-    if (!dependency->serializeTo(m_resultOutput))
-        return false;
+    dependency->serializeTo(m_resultOutput);
     m_numResultDependencies++;
-    return true;
 }
 
 int VoltDBEngine::loadNextDependency(Table* destination) {

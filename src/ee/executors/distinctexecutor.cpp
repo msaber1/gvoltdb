@@ -63,7 +63,7 @@ bool DistinctExecutor::p_init()
     return (true);
 }
 
-bool DistinctExecutor::p_execute() {
+void DistinctExecutor::p_execute() {
     DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
     assert(node);
 
@@ -82,17 +82,9 @@ bool DistinctExecutor::p_execute() {
         NValue tuple_value = distinctExpression->eval(&tuple, NULL);
         if (found_values.find(tuple_value) == found_values.end()) {
             found_values.insert(tuple_value);
-            if ( ! output_temp_table->insertTempTuple(tuple)) {
-                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                           " output table '%s'",
-                           m_inputTable->name().c_str(),
-                           m_outputTable->name().c_str());
-                return false;
-            }
+            output_temp_table->insertTempTuple(tuple);
         }
     }
-
-    return true;
 }
 
 DistinctExecutor::~DistinctExecutor() {

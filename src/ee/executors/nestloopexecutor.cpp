@@ -177,7 +177,7 @@ bool NestLoopExecutor::p_init()
 }
 
 
-bool NestLoopExecutor::p_execute() {
+void NestLoopExecutor::p_execute() {
     VOLT_DEBUG("executing NestLoop...");
 
     NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
@@ -233,6 +233,4 @@ bool NestLoopExecutor::p_execute() {
             }
         }
     }
-
-    return (true);
 }

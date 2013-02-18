@@ -61,14 +61,9 @@ TempTable::~TempTable() {}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-bool TempTable::insertTuple(TableTuple &source) { return insertTempTuple(source); }
+void TempTable::insertTuple(TableTuple &source) { insertTempTuple(source); }
 
-bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                               const TableTuple &sourceTupleWithNewValues,
-                                               const std::vector<TableIndex*> &indexesToUpdate)
-{ throwFatalException("May not update a temp table."); }
-
-bool TempTable::deleteTuple(TableTuple &target, bool deleteAllocatedStrings)
+void TempTable::deleteTuple(TableTuple &target, bool deleteAllocatedStrings)
 { throwFatalException("May not delete individual tuples from a temp table."); }
 
 std::string TempTable::tableType() const { return "TempTable"; }

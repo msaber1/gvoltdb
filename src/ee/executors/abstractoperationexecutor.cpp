@@ -70,18 +70,13 @@ void AbstractOperationExecutor::p_setOutputTable(TempTableLimits* limits) {
                                                limits);
 }
 
-bool AbstractOperationExecutor::storeModifiedTupleCount(int64_t modifiedTuples) {
+void AbstractOperationExecutor::storeModifiedTupleCount(int64_t modifiedTuples) {
     TempTable* output_temp_table = dynamic_cast<TempTable*>(m_outputTable);
     TableTuple& count_tuple = output_temp_table->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(modifiedTuples));
     // try to put the count tuple into the output table
-    if (!output_temp_table->insertTempTuple(count_tuple)) {
-        VOLT_ERROR("Failed to insert tuple count (%ld) into result table", modifiedTuples);
-        return false;
-    }
-
+    output_temp_table->insertTempTuple(count_tuple);
     // add to the planfragments count of modified tuples
     getEngine()->m_tuplesModified += modifiedTuples;
     VOLT_INFO("Finished modifying table");
-    return true;
 }

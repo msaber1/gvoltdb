@@ -78,7 +78,7 @@ public:
 
 protected:
     bool p_init();
-    bool p_execute();
+    void p_execute();
 
     IndexScanPlanNode* inline_node;
     IndexLookupType m_lookupType;

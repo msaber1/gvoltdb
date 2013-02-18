@@ -97,14 +97,10 @@ bool tableutil::addRandomTuples(voltdb::Table* table, int num_of_tuples) {
     assert(num_of_tuples >= 0);
     for (int ctr = 0; ctr < num_of_tuples; ctr++) {
         voltdb::TableTuple &tuple = table->tempTuple();
-        if (!tableutil::setRandomTupleValues(table, &tuple)) {
-            return (false);
-        }
+        tableutil::setRandomTupleValues(table, &tuple);
         //std::cout << std::endl << "Creating tuple " << std::endl << tuple.debugNoHeader() << std::endl;
         //VOLT_DEBUG("Created random tuple: %s", tuple.debug().c_str());
-        if (!table->insertTuple(tuple)) {
-            return (false);
-        }
+        table->insertTuple(tuple);
 
         /*
          * The insert into the table (assuming a persistent table) will make a copy of the strings so the string allocations

@@ -74,8 +74,8 @@ struct SetOperator {
 
     virtual ~SetOperator() {}
 
-    bool processTuples() {
-        return processTuplesDo();
+    void processTuples() {
+        processTuplesDo();
     }
 
     static SetOperator* getSetOperator(UnionType unionType, const std::vector<Table*>& inputs, TempTable* output);
@@ -83,7 +83,7 @@ struct SetOperator {
     std::vector<Table*> m_input_tables;
 
     protected:
-        virtual bool processTuplesDo() = 0;
+        virtual void processTuplesDo() = 0;
 
         TempTable* m_output_table;
         bool m_is_all;
@@ -95,14 +95,14 @@ struct UnionSetOperator : public SetOperator {
        {}
 
     protected:
-        bool processTuplesDo();
+        void processTuplesDo();
 
     private:
         bool needToInsert(const TableTuple& tuple, TupleSet& tuples);
 
 };
 
-bool UnionSetOperator::processTuplesDo() {
+void UnionSetOperator::processTuplesDo() {
 
     // Set to keep candidate tuples.
     TupleSet tuples;
@@ -118,17 +118,10 @@ bool UnionSetOperator::processTuplesDo() {
         while (iterator.next(tuple)) {
             if (m_is_all || needToInsert(tuple, tuples)) {
                 // we got tuple to insert
-                if (!m_output_table->insertTuple(tuple)) {
-                    VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                               " output table '%s'",
-                               input_table->name().c_str(),
-                               m_output_table->name().c_str());
-                    return false;
-                }
+                m_output_table->insertTempTuple(tuple);
             }
         }
     }
-    return true;
 }
 
 inline
@@ -151,7 +144,7 @@ struct ExceptIntersectSetOperator : public SetOperator {
         bool is_all, bool is_except);
 
     protected:
-        bool processTuplesDo();
+        void processTuplesDo();
 
     private:
         void collectTuples(Table& input_table, TupleMap& tuple_map);
@@ -173,7 +166,7 @@ ExceptIntersectSetOperator::ExceptIntersectSetOperator(
 
 }
 
-bool ExceptIntersectSetOperator::processTuplesDo() {
+void ExceptIntersectSetOperator::processTuplesDo() {
     // Map to keep candidate tuples. The key is the tuple itself
     // The value - tuple's repeat count in the final table.
     TupleMap tuples;
@@ -204,16 +197,9 @@ bool ExceptIntersectSetOperator::processTuplesDo() {
     for (TupleMap::const_iterator mapIt = tuples.begin(); mapIt != tuples.end(); ++mapIt) {
         TableTuple tuple = mapIt->first;
         for (size_t i = 0; i < mapIt->second; ++i) {
-            if (!m_output_table->insertTuple(tuple)) {
-                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                           " output table '%s'",
-                           m_input_tables[0]->name().c_str(),
-                           m_output_table->name().c_str());
-                return false;
-            }
+            m_output_table->insertTuple(tuple);
         }
     }
-    return true;
 }
 
 void ExceptIntersectSetOperator::collectTuples(Table& input_table, TupleMap& tuple_map) {
@@ -309,9 +295,9 @@ bool UnionExecutor::p_init()
     return true;
 }
 
-bool UnionExecutor::p_execute()
+void UnionExecutor::p_execute()
 {
-    return m_setOperator->processTuples();
+    m_setOperator->processTuples();
 }
 
 }

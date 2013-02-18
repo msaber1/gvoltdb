@@ -99,15 +99,11 @@ class TempTable : public Table {
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
-    bool insertTuple(TableTuple &source);
-    bool insertTempTuple(const TableTuple &source);
-
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                const TableTuple &sourceTupleWithNewValues,
-                                                const std::vector<TableIndex*> &indexesToUpdate);
+    virtual void insertTuple(TableTuple &source);
+    void insertTempTuple(const TableTuple &source);
 
     // deleting tuple from temp table is not supported. use deleteAllTuples instead
-    bool deleteTuple(TableTuple &tuple, bool);
+    virtual void deleteTuple(TableTuple &tuple, bool);
 
     /**
      * Uses the pool to do a deep copy of the tuple including allocations
@@ -165,7 +161,7 @@ inline void TempTable::insertTempTupleWithDeepCopy(TableTuple &source, Pool *poo
     m_tmpTarget1.setActiveTrue();
 }
 
-inline bool TempTable::insertTempTuple(const TableTuple &source) {
+inline void TempTable::insertTempTuple(const TableTuple &source) {
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
@@ -184,7 +180,6 @@ inline bool TempTable::insertTempTuple(const TableTuple &source) {
     m_tmpTarget1.setActiveTrue();
     m_tmpTarget1.setPendingDeleteFalse();
     m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
-    return true;
 }
 
 inline void TempTable::deleteAllTuples(bool freeAllocatedStrings) {

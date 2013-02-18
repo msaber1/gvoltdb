@@ -75,7 +75,7 @@ class AbstractExecutor {
     bool init(TempTableLimits* limits);
 
     /** Invoke a plannode's associated executor */
-    bool execute();
+    void execute();
 
     /**
      * Returns true if the output table for the plannode must be cleaned up
@@ -110,7 +110,7 @@ protected:
     virtual bool p_init() = 0;
 
     /** Concrete executor classes impelmenet execution in p_execute() */
-    virtual bool p_execute() = 0;
+    virtual void p_execute() = 0;
 
     /**
      * Set up a multi-column temp output table for those executors that require one.
@@ -136,7 +136,7 @@ private:
     std::vector<Table*> m_inputTables;
 };
 
-inline bool AbstractExecutor::execute()
+inline void AbstractExecutor::execute()
 {
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",
@@ -149,7 +149,7 @@ inline bool AbstractExecutor::execute()
     }
 
     // run the executor
-    return p_execute();
+    p_execute();
 }
 
 }

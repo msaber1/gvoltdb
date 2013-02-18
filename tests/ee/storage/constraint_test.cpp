@@ -156,8 +156,7 @@ TEST_F(ConstraintTest, NotNull) {
                     bool expected = (ctr0 + ctr1 + ctr2 == 3);
                     bool threwException = false;
                     try {
-                        bool returned = this->table->insertTuple(tuple);
-                        EXPECT_EQ(expected, returned);
+                        table->insertTuple(tuple);
                     } catch (SerializableEEException &e) {
                         threwException = true;
                     }
@@ -196,14 +195,14 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
         //
         // This should always succeed
         //
-        EXPECT_EQ(true, this->table->insertTuple(tuple));
+        table->insertTuple(tuple);
 
         bool exceptionThrown = false;
         try {
             //
             // And this should always fail
             //
-            EXPECT_EQ(false, this->table->insertTuple(tuple));
+            table->insertTuple(tuple);
         } catch (SerializableEEException &e) {
             exceptionThrown = true;
         }
@@ -215,7 +214,7 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
             // Even if we change just one value that isn't the primary key, it should still fail!
             //
             tuple.setNValue(1, voltdb::ValueFactory::getBigIntValue(ctr + ctr));
-            EXPECT_EQ(false, this->table->insertTuple(tuple));
+            table->insertTuple(tuple);
         } catch (SerializableEEException &e) {
             exceptionThrown = true;
         }
@@ -255,7 +254,7 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
         tuple.setNValue(2, ValueFactory::getBigIntValue(value_ctr++));
         bool exceptionThrown = false;
         try {
-            EXPECT_EQ(expected_result, this->table->insertTuple(tuple));
+            table->insertTuple(tuple);
         } catch (SerializableEEException &e) {
             exceptionThrown = true;
         }
@@ -270,7 +269,7 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
         tuple2.setNValue(2, ValueFactory::getBigIntValue(value_ctr++));
         exceptionThrown = false;
         try {
-            EXPECT_EQ(expected_result, this->table->insertTuple(tuple2));
+            table->insertTuple(tuple2);
         } catch (SerializableEEException &e) {
             exceptionThrown = true;
         }
@@ -306,13 +305,13 @@ TEST_F(ConstraintTest, UniqueTwoColumnNotNull) {
         //
         // This should always succeed
         //
-        EXPECT_EQ(true, this->table->insertTuple(tuple));
+        table->insertTuple(tuple);
         bool exceptionThrown = false;
         try {
             //
             // And this should always fail
             //
-            EXPECT_EQ(false, this->table->insertTuple(tuple));
+            table->insertTuple(tuple);
         } catch (SerializableEEException &e) {
             exceptionThrown = true;
         }
@@ -352,7 +351,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnAllowNull) {
         tuple.setNValue(3, ValueFactory::getBigIntValue(INT64_C(3)));
         bool exceptionThrown = false;
         try {
-            EXPECT_EQ(expected_result, this->table->insertTuple(tuple));
+            table->insertTuple(tuple);
         } catch (SerializableEEException &e) {
             exceptionThrown = true;
         }
@@ -366,7 +365,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnAllowNull) {
         tuple2.setNValue(1, ValueFactory::getBigIntValue(value_ctr++));
         exceptionThrown = false;
         try {
-            EXPECT_EQ(expected_result, this->table->insertTuple(tuple2));
+            table->insertTuple(tuple2);
         } catch (SerializableEEException &e) {
             exceptionThrown = true;
         }

@@ -122,15 +122,17 @@ class Table {
     // OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
-    virtual bool insertTuple(TableTuple &tuple) = 0;
-    bool updateTuple(TableTuple &targetTupleToUpdate,
-                     const TableTuple &sourceTupleWithNewValues);
-    // optimized version of update that only updates specific indexes
-    // if the caller knows which indexes need to be updated
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+    virtual void insertTuple(TableTuple &tuple) = 0;
+
+    // Test-only convenience version of update that tries updating all the table's indexes
+    void updateTuple(TableTuple &targetTupleToUpdate, const TableTuple &sourceTupleWithNewValues);
+
+    // Production version of update that only updates the specific indexes
+    // that the well-planned caller knows MAY need to be updated
+    virtual void updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                 const TableTuple &sourceTupleWithNewValues,
-                                                const std::vector<TableIndex*> &indexesToUpdate) = 0;
-    virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings) = 0;
+                                                const std::vector<TableIndex*> &indexesToUpdate);
+    virtual void deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings) = 0;
 
     // ------------------------------------------------------------------
     // TUPLES AND MEMORY USAGE
@@ -242,13 +244,13 @@ class Table {
     // SERIALIZATION
     // ------------------------------------------------------------------
     int getApproximateSizeToSerialize() const;
-    bool serializeTo(SerializeOutput &serialize_out);
-    bool serializeColumnHeaderTo(SerializeOutput &serialize_io);
+    void serializeTo(SerializeOutput &serialize_out);
+    void serializeColumnHeaderTo(SerializeOutput &serialize_io);
 
     /*
      * Serialize a single tuple as a table so it can be sent to Java.
      */
-    bool serializeTupleTo(SerializeOutput &serialize_out, TableTuple *tuples, int numTuples);
+    void serializeTupleTo(SerializeOutput &serialize_out, TableTuple *tuples, int numTuples);
 
     /**
      * Loads only tuple data and assumes there is no schema present.

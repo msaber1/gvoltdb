@@ -61,7 +61,7 @@ private:
     void p_setOutputTable(TempTableLimits* limits);
 
     bool p_init();
-    bool p_execute();
+    void p_execute();
     TableTuple m_tuple;
     std::vector<AbstractExpression*> m_columnExpressions;
     std::vector<int> m_columnsOnly;

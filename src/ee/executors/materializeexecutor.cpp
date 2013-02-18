@@ -65,7 +65,7 @@ bool MaterializeExecutor::p_init()
     return (true);
 }
 
-bool MaterializeExecutor::p_execute()
+void MaterializeExecutor::p_execute()
 {
     assert(dynamic_cast<MaterializePlanNode*>(m_abstractNode));
     int paramColumnCount = (int)m_paramsOnly.size();
@@ -88,7 +88,6 @@ bool MaterializeExecutor::p_execute()
     // Add tuple to the output
     output_temp_table->insertTempTuple(temp_tuple);
     VOLT_TRACE ("Materialized :\n %s", m_outputTable->debug().c_str());
-    return true;
 }
 
 MaterializeExecutor::~MaterializeExecutor() {

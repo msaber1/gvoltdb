@@ -122,7 +122,7 @@ private:
     size_t m_keyCount;
 };
 
-bool
+void
 OrderByExecutor::p_execute()
 {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
@@ -171,14 +171,7 @@ OrderByExecutor::p_execute()
 
         VOLT_TRACE("\n***** Input Table PostSort:\n '%s'",
                    m_inputTable->debug().c_str());
-        if ( ! output_temp_table->insertTempTuple(*it))
-        {
-            VOLT_ERROR("Failed to insert order-by tuple from input table '%s'"
-                       " into output table '%s'",
-                       m_inputTable->name().c_str(),
-                       m_outputTable->name().c_str());
-            return false;
-        }
+        output_temp_table->insertTempTuple(*it);
         //
         // Check whether we have gone past our limit
         //
@@ -187,8 +180,6 @@ OrderByExecutor::p_execute()
         }
     }
     VOLT_TRACE("Result of OrderBy:\n '%s'", m_outputTable->debug().c_str());
-
-    return true;
 }
 
 OrderByExecutor::~OrderByExecutor() {

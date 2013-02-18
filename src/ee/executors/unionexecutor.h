@@ -68,7 +68,7 @@ public:
 private:
     virtual void p_setOutputTable(TempTableLimits* limits) { setPassThroughTempOutputTable(limits); }
     bool p_init();
-    bool p_execute();
+    void p_execute();
 
     boost::shared_ptr<detail::SetOperator> m_setOperator;
 };

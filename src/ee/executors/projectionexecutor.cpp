@@ -79,7 +79,7 @@ bool ProjectionExecutor::p_init()
     return true;
 }
 
-bool ProjectionExecutor::p_execute() {
+void ProjectionExecutor::p_execute() {
     assert (dynamic_cast<ProjectionPlanNode*>(m_abstractNode));
     assert ( ! m_abstractNode->isInline()); // inline projection's execute() should not be called
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
@@ -131,9 +131,7 @@ bool ProjectionExecutor::p_execute() {
             output_temp_table->insertTempTuple(temp_tuple);
         }
     }
-    //VOLT_TRACE("PROJECTED TABLE: %s\n", m_outputTable->debug().c_str());
-
-    return (true);
+    VOLT_TRACE("PROJECTED TABLE: %s\n", output_temp_table->debug().c_str());
 }
 
 std::vector<AbstractExpression*> ProjectionExecutor::outputExpressions(ProjectionPlanNode* node)

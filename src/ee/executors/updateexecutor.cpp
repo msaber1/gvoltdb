@@ -111,7 +111,7 @@ bool UpdateExecutor::p_init()
     return true;
 }
 
-bool UpdateExecutor::p_execute() {
+void UpdateExecutor::p_execute() {
     assert(m_inputTable);
     assert(m_targetTable);
     assert(m_inputTargetSize > 0);
@@ -154,19 +154,15 @@ bool UpdateExecutor::p_execute() {
             NValue value = tempTuple.getNValue(m_partitionColumn);
             // if it doesn't map to this site
             if ( ! valueHashesToTheLocalPartition(value)) {
-                VOLT_ERROR("Mispartitioned tuple in single-partition plan for"
-                           " table '%s'", m_targetTable->name().c_str());
-                return false;
+                string message("Mispartitioned tuple in single-partition update for table: ");
+                message += m_targetTable->name();
+                VOLT_ERROR("%s", message.c_str());
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message); // caught by VoltDBEngine
             }
         }
 
-        if (!m_targetTable->updateTupleWithSpecificIndexes(m_targetTuple, tempTuple,
-                                                           m_indexesToUpdate)) {
-            VOLT_INFO("Failed to update tuple from table '%s'",
-                      m_targetTable->name().c_str());
-            return false;
-        }
+        m_targetTable->updateTupleWithSpecificIndexes(m_targetTuple, tempTuple, m_indexesToUpdate);
     }
 
-    return storeModifiedTupleCount(m_inputTable->activeTupleCount());
+    storeModifiedTupleCount(m_inputTable->activeTupleCount());
 }

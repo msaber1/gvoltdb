@@ -62,7 +62,7 @@ public:
 private:
     void p_setOutputTable(TempTableLimits* limits) { setPassThroughTempOutputTable(limits); }
     bool p_init();
-    bool p_execute();
+    void p_execute();
 
     ValueType distinct_column_type;
 };

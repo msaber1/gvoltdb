@@ -352,20 +352,14 @@ TEST_F(TableAndIndexTest, BigTest) {
     TableTuple districtTuple = TableTuple(districtTempTable->schema());
     TableIterator districtIterator = districtTempTable->iterator();
     while (districtIterator.next(districtTuple)) {
-        if (!districtTable->insertTuple(districtTuple)) {
-            cout << "Failed to insert tuple from input table '"
-                 << districtTempTable->name() << "' into target table '"
-                 << districtTable->name() << "'" << endl;
-        }
+        districtTable->insertTuple(districtTuple);
     }
     districtTempTable->TempTable::deleteAllTuples(true);
 
     TableTuple warehouseTuple = TableTuple(warehouseTempTable->schema());
     TableIterator warehouseIterator = warehouseTempTable->iterator();
     while (warehouseIterator.next(warehouseTuple)) {
-        if (!warehouseTable->insertTuple(warehouseTuple)) {
-            cout << "Failed to insert tuple from input table '" << warehouseTempTable->name() << "' into target table '" << warehouseTable->name() << "'" << endl;
-        }
+        warehouseTable->insertTuple(warehouseTuple);
     }
     warehouseTempTable->TempTable::deleteAllTuples(true);
 
@@ -373,9 +367,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     TableIterator customerIterator = customerTempTable->iterator();
     while (customerIterator.next(customerTuple)) {
         //cout << "Inserting tuple '" << customerTuple.debug(customerTempTable) << "' into target table '" << customerTable->name() << "', address '" << customerTable << endl;
-        if (!customerTable->insertTuple(customerTuple)) {
-            cout << "Failed to insert tuple from input table '" << warehouseTempTable->name() << "' into target table '" << warehouseTable->name() << "'" << endl;
-        }
+        customerTable->insertTuple(customerTuple);
     }
     customerTempTable->TempTable::deleteAllTuples(true);
 
@@ -415,9 +407,7 @@ TEST_F(TableAndIndexTest, BigTest) {
     customerIterator = customerTempTable->iterator();
     while (customerIterator.next(customerTuple)) {
         //cout << "Inserting tuple '" << customerTuple.debug(customerTempTable) << "' into target table '" << customerTable->name() << "', address '" << customerTable << endl;
-        if (!customerTable->insertTuple(customerTuple)) {
-            cout << "Failed to insert tuple from input table '" << warehouseTempTable->name() << "' into target table '" << warehouseTable->name() << "'" << endl;
-        }
+        customerTable->insertTuple(customerTuple);
     }
     customerTempTable->TempTable::deleteAllTuples(true);
 

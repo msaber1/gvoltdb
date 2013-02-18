@@ -52,7 +52,7 @@ namespace voltdb {
 
 class AbstractOperationExecutor : public AbstractTableIOExecutor {
 protected:
-    bool storeModifiedTupleCount(int64_t modifiedTuples);
+    void storeModifiedTupleCount(int64_t modifiedTuples);
     void p_setOutputTable(TempTableLimits* limits);
 };
 

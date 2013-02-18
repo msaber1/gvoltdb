@@ -210,7 +210,7 @@ static char* copyTupleData(const TableTuple& tupleToCopy, UndoQuantum& undoQuant
  * Regular tuple insertion that does an allocation and copy for
  * uninlined strings and creates and registers an UndoAction.
  */
-bool PersistentTable::insertTuple(TableTuple &source) {
+void PersistentTable::insertTuple(TableTuple &source) {
 
     // not null checks at first
     FAIL_IF(!checkNulls(source)) {
@@ -274,8 +274,6 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(source);
     }
-
-    return true;
 }
 
 /*
@@ -306,7 +304,7 @@ void PersistentTable::insertTupleForUndo(char *tuple) {
  * updated strings and creates an UndoAction. Additional optimization
  * for callers that know which indexes to update.
  */
-bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                      const TableTuple &sourceTupleWithNewValues,
                                                      const std::vector<TableIndex*> &indexesToUpdate)
 {
@@ -402,8 +400,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     //DummyUndoQuantum calls destructor upon register so it can't be called
     //earlier
     undoQuantum->registerUndoAction(ptuua);
-
-    return true;
 }
 
 /*
@@ -467,7 +463,7 @@ bool PersistentTable::deletionMustDeferToCOWContext(const TableTuple& tuple) con
 }
 
 
-bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedStrings) {
+void PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedStrings) {
     // May not delete an already deleted tuple.
     assert(target.isActive());
 
@@ -496,7 +492,6 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
 
     undoQuantum->registerUndoAction(ptuda);
     undoQuantum->registerInterest(this);
-    return true;
 }
 
 /*

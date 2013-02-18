@@ -167,7 +167,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Dependency Transfer Functions
         // -------------------------------------------------
-        bool send(Table* dependency);
+        void send(Table* dependency);
         int loadNextDependency(Table* destination);
 
         // -------------------------------------------------

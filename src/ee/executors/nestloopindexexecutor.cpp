@@ -258,7 +258,7 @@ bool NestLoopIndexExecutor::p_init()
     return retval;
 }
 
-bool NestLoopIndexExecutor::p_execute()
+void NestLoopIndexExecutor::p_execute()
 {
     assert (dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
     assert (inline_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN)));
@@ -435,7 +435,11 @@ bool NestLoopIndexExecutor::p_execute()
                     index->moveToKeyOrGreater(&index_values);
                 }
                 else {
-                    return false;
+                    assert(false);
+                    string message("Unexpected index scan lookup type for use with search key(s)");
+                    VOLT_ERROR("%s", message.c_str());
+                    // caught by VoltDBEngine
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
                 }
             } else {
                 bool toStartActually = (localSortDirection != SORT_DIRECTION_TYPE_DESC);
@@ -517,13 +521,10 @@ bool NestLoopIndexExecutor::p_execute()
                 value.setNull();
                 join_tuple.setNValue(col_ctr + num_of_outer_cols, value);
             }
-                output_temp_table->insertTempTuple(join_tuple);
+            output_temp_table->insertTempTuple(join_tuple);
         }
     }
-
-    VOLT_TRACE ("result table:\n %s", m_outputTable->debug().c_str());
-    VOLT_TRACE("Finished NestLoopIndex");
-    return (true);
+    VOLT_TRACE ("Finished NestLoopIndex result table:\n %s", output_temp_table->debug().c_str());
 }
 
 NestLoopIndexExecutor::~NestLoopIndexExecutor() { }

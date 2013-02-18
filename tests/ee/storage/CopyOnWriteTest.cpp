@@ -148,11 +148,7 @@ public:
         for (int ii = 0; ii < numTuples; ii++) {
             tuple.setNValue(0, ValueFactory::getIntegerValue(m_primaryKeyIndex++));
             tuple.setNValue(1, ValueFactory::getIntegerValue(rand()));
-            bool success = m_table->insertTuple(tuple);
-            if (!success) {
-                std::cout << "Failed to add random unique tuple" << std::endl;
-                return;
-            }
+            m_table->insertTuple(tuple);
         }
     }
 

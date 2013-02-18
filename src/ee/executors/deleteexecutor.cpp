@@ -45,8 +45,8 @@
 
 #include "deleteexecutor.h"
 
-#include "common/ValueFactory.hpp"
 #include "common/debuglog.h"
+#include "common/SerializableEEException.h"
 #include "common/tabletuple.h"
 #include "indexes/tableindex.h"
 #include "plannodes/deletenode.h"
@@ -78,7 +78,7 @@ bool DeleteExecutor::p_init()
     return true;
 }
 
-bool DeleteExecutor::p_execute() {
+void DeleteExecutor::p_execute() {
     assert(m_targetTable);
     int64_t modifiedTuples = 0;
 
@@ -109,14 +109,9 @@ bool DeleteExecutor::p_execute() {
             m_targetTuple.move(targetAddress);
 
             // Delete from target table
-            if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
-                VOLT_ERROR("Failed to delete tuple from table '%s'",
-                           m_targetTable->name().c_str());
-                return false;
-            }
+            m_targetTable->deleteTuple(m_targetTuple, true);
             ++modifiedTuples;
         }
     }
-
-    return storeModifiedTupleCount(modifiedTuples);
+    storeModifiedTupleCount(modifiedTuples);
 }

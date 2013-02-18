@@ -54,11 +54,8 @@ class StreamedTable : public Table {
     virtual const TableIterator& iterator();
 
     virtual void deleteAllTuples(bool freeAllocatedStrings);
-    virtual bool insertTuple(TableTuple &source);
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                const TableTuple &sourceTupleWithNewValues,
-                                                const std::vector<TableIndex*> &indexesToUpdate);
-    virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings);
+    virtual void insertTuple(TableTuple &source);
+    virtual void deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings);
     virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);
     virtual void flushOldTuples(int64_t timeInMillis);
     virtual void setSignatureAndGeneration(std::string signature, int64_t generation);

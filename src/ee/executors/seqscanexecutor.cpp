@@ -106,7 +106,7 @@ bool SeqScanExecutor::p_init()
     return true;
 }
 
-bool SeqScanExecutor::p_execute() {
+void SeqScanExecutor::p_execute() {
     SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
     assert(m_outputTable);
@@ -128,7 +128,7 @@ bool SeqScanExecutor::p_execute() {
     if (m_outputTable == m_targetTable) {
         VOLT_TRACE("\n%s\n", m_outputTable->debug().c_str());
         VOLT_DEBUG("Finished Seq scanning");
-        return true;
+        return;
     }
 
     // INLINE PROJECTION
@@ -197,5 +197,4 @@ bool SeqScanExecutor::p_execute() {
     }
     VOLT_TRACE("\n%s\n", m_outputTable->debug().c_str());
     VOLT_DEBUG("Finished Seq scanning");
-    return true;
 }

@@ -69,19 +69,13 @@ bool SendExecutor::p_init()
     return true;
 }
 
-bool SendExecutor::p_execute() {
+void SendExecutor::p_execute() {
     VOLT_DEBUG("started SEND");
 
     assert(m_inputTable);
-    //m_inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!
-    if (!m_engine->send(m_inputTable)) {
-        VOLT_ERROR("Failed to send table '%s'", m_inputTable->name().c_str());
-        return false;
-    }
+    m_engine->send(m_inputTable);
     VOLT_DEBUG("SEND TABLE: %s", m_inputTable->debug().c_str());
-
-    return true;
 }
 
 }

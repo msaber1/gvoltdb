@@ -129,7 +129,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // OPERATIONS
     // ------------------------------------------------------------------
     void deleteAllTuples(bool freeAllocatedStrings);
-    bool insertTuple(TableTuple &source);
+    virtual void insertTuple(TableTuple &source);
 
     /*
      * Inserts a Tuple without performing an allocation for the
@@ -142,7 +142,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * targetTuple is swapped when making calls on the indexes. This
      * is just an inconsistency in the argument ordering.
      */
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+    virtual void updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                 const TableTuple &sourceTupleWithNewValues,
                                                 const std::vector<TableIndex*> &indexesToUpdate);
 
@@ -159,7 +159,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * Delete a tuple by looking it up via table scan or a primary key
      * index lookup.
      */
-    bool deleteTuple(TableTuple &tuple, bool freeAllocatedStrings);
+    virtual void deleteTuple(TableTuple &tuple, bool freeAllocatedStrings);
     void deleteTupleForUndo(const char* tupleData);
 
     /*

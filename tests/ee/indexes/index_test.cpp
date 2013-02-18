@@ -187,8 +187,7 @@ public:
         for (int64_t row = 1; row <= NUM_OF_WIDE_TUPLES; ++row)
         {
             setWideTableToRow(table->tempTuple(), row);
-            bool result = table->insertTuple(table->tempTuple());
-            assert(result || !"Insert on init wide table failed");
+            table->insertTuple(table->tempTuple());
         }
     }
 
@@ -328,7 +327,7 @@ public:
             tuple.setNValue(2, ValueFactory::getBigIntValue(i % 3));
             tuple.setNValue(3, ValueFactory::getBigIntValue(i + 20));
             tuple.setNValue(4, ValueFactory::getBigIntValue(i * 11));
-            assert(true == table->insertTuple(tuple));
+            table->insertTuple(tuple);
         }
     }
 
@@ -555,7 +554,7 @@ TEST_F(IndexTest, IntsUnique) {
         setNValue(3, ValueFactory::getBigIntValue(static_cast<int64_t>(-200)));
     tmptuple.
         setNValue(4, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
-    EXPECT_EQ(true, table->insertTuple(tmptuple));
+    table->insertTuple(tmptuple);
     tmptuple.
         setNValue(0, ValueFactory::getBigIntValue(static_cast<int16_t>(1235)));
     tmptuple.
@@ -569,7 +568,7 @@ TEST_F(IndexTest, IntsUnique) {
     bool exceptionThrown = false;
     try
     {
-        EXPECT_EQ(false, table->insertTuple(tmptuple));
+        table->insertTuple(tmptuple);
     }
     catch (SerializableEEException &e)
     {
@@ -719,7 +718,7 @@ TEST_F(IndexTest, IntsMulti) {
         setNValue(3, ValueFactory::getBigIntValue(static_cast<int64_t>(-200)));
     tmptuple.
         setNValue(4, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
-    EXPECT_EQ(true, table->insertTuple(tmptuple));
+    table->insertTuple(tmptuple);
     tmptuple.
         setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(12345)));
     tmptuple.
@@ -730,7 +729,7 @@ TEST_F(IndexTest, IntsMulti) {
         setNValue(3, ValueFactory::getBigIntValue(static_cast<int64_t>(-200)));
     tmptuple.
         setNValue(4, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
-    EXPECT_EQ(true, table->insertTuple(tmptuple));
+    table->insertTuple(tmptuple);
     TupleSchema::freeTupleSchema(keySchema);
     delete[] searchkey.address();
 }
@@ -784,8 +783,7 @@ TEST_F(IndexTest, TupleKeyUnique) {
     setWideIndexToRow(searchkey, 2);  // DELETE row 2.
     EXPECT_TRUE(index->moveToKey(&searchkey));
     tuple = index->nextValueAtKey();
-    bool deleted = table->deleteTuple(tuple, true);
-    EXPECT_TRUE(deleted);
+    table->deleteTuple(tuple, true);
 
     // and now that tuple is gone
     EXPECT_FALSE(index->moveToKey(&searchkey));
