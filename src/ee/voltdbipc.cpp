@@ -99,6 +99,8 @@ static char s_reusedResultBuffer[MAX_MSG_SZ+1];//+1 for ipc's error code prefix.
 static char s_exceptionBuffer[MAX_MSG_SZ];
 static bool s_terminate = false;
 
+static StdoutLogProxy s_stdoutLogProxy;
+
 static inline int64_t ntoh(const int64_t& datum) { return ntohll(datum); }
 static inline int32_t ntoh(const int32_t& datum) { return ntohl(datum); }
 static inline int16_t ntoh(const int16_t& datum) { return ntohs(datum); }
@@ -724,7 +726,7 @@ static void setupSigHandler(void)
 
 class VoltDBIPCTopEnd : public Topend {
 public:
-    VoltDBIPCTopEnd() : Topend(new StdoutLogProxy()) { }
+    VoltDBIPCTopEnd() : Topend(&s_stdoutLogProxy) { }
     /**
      * Retrieve a dependency from Java via the IPC connection.
      * This method returns 0 if there are no more dependency tables.

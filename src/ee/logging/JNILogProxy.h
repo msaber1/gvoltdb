@@ -69,7 +69,7 @@ private:
      * Pointer to the JavaVM object for this process. Used for debug purposes to assert that the currently
      * stored JNIEnv pointer is the correct.
      */
-    const JavaVM *m_vm;
+    JavaVM * const m_vm;
 
     /**
      * Reference to the current JNIEnv object for this thread. Must be kept up to date.

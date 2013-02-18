@@ -34,14 +34,10 @@ JNILogProxy::JNILogProxy(JNIEnv *env, JavaVM *vm, jclass eeLoggersClass, jmethod
  */
 JNILogProxy* JNILogProxy::getJNILogProxy(JNIEnv *env, JavaVM *vm) {
 #ifdef DEBUG
-    union {
-        JNIEnv* checkEnv;
-        void* env_p;
-    };
-    checkEnv = NULL;
-    jint result = vm->GetEnv( &env_p, JNI_VERSION_1_2);
+    void* checkEnv = NULL;
+    jint result = vm->GetEnv( &checkEnv, JNI_VERSION_1_2);
     assert(result == JNI_OK);
-    assert(env == checkEnv);
+    assert(checkEnv == (void*)env);
 #endif
     jclass eeLoggersClassLocal = env->FindClass("org/voltdb/jni/EELoggers");
     jclass eeLoggersClass;
@@ -75,14 +71,10 @@ JNILogProxy* JNILogProxy::getJNILogProxy(JNIEnv *env, JavaVM *vm) {
  */
 void JNILogProxy::log(LoggerId loggerId, LogLevel level, const char *statement) const {
 #ifdef DEBUG
-    union {
-        JNIEnv* checkEnv;
-        void* env_p;
-    };
-    checkEnv = NULL;
-    jint result = const_cast<JavaVM*>(m_vm)->GetEnv( &env_p, JNI_VERSION_1_2);
+    void* checkEnv = NULL;
+    jint result = m_vm->GetEnv( &checkEnv, JNI_VERSION_1_2);
     assert(result == JNI_OK);
-    assert(m_env == checkEnv);
+    assert(checkEnv == (void*)m_env);
 #endif
     jstring jStatement = m_env->NewStringUTF(statement);
     if (jStatement == NULL) {
@@ -101,14 +93,10 @@ void JNILogProxy::log(LoggerId loggerId, LogLevel level, const char *statement) 
  * Destructor that frees the GlobalReference m_eeLoggersClass.
  */
 JNILogProxy::~JNILogProxy() {
-    union {
-        JNIEnv* env;
-        void* env_p;
-    };
-    env = NULL;
-    jint result = const_cast<JavaVM*>(m_vm)->GetEnv( &env_p, JNI_VERSION_1_2);
+    void* env = NULL;
+    jint result = m_vm->GetEnv( &env, JNI_VERSION_1_2);
     if (result == JNI_OK) {
-        env->DeleteGlobalRef(m_eeLoggersClass);
+        ((JNIEnv*)env)->DeleteGlobalRef(m_eeLoggersClass);
     }
 }
 }

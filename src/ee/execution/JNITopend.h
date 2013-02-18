@@ -25,7 +25,7 @@ namespace voltdb {
 
 class JNITopend : public Topend {
 public:
-    JNITopend(JNIEnv *env, jobject caller, JavaVM *vm);
+    JNITopend(JNIEnv *env, jobject caller, JavaVM *vm, JNILogProxy* jniLogProxy);
     ~JNITopend();
 
     void updateJNIEnv(JNIEnv *env)

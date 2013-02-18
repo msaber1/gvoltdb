@@ -220,7 +220,7 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
     JNITopend *topend = NULL;
     VoltDBEngine *engine = NULL;
     try {
-        topend = new JNITopend(env, java_ee, currentVM);
+        topend = new JNITopend(env, java_ee, currentVM, JNILogProxy::getJNILogProxy(env, currentVM));
         engine = new VoltDBEngine(topend);
     } catch (FatalException e) {
         if (topend != NULL) {

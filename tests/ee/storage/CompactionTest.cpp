@@ -54,9 +54,11 @@ using namespace voltdb;
  */
 static int32_t m_primaryKeyIndex = 0;
 
+static StdoutLogProxy aStdLogProxy;
+
 class MockTopend : public Topend {
   public:
-    MockTopend() : Topend(new StdoutLogProxy()) { }
+    MockTopend() : Topend(&aStdLogProxy) { }
 
     void pushExportBuffer(int64_t generation, int32_t partitionId, const std::string &signature, voltdb::StreamBlock* block, bool sync, bool endOfStream) { }
 

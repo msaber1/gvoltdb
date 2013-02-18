@@ -79,9 +79,6 @@ class StdoutLogProxy : public LogProxy {
         }
         std::cout << loggerName << " - " << logLevel << " - " << statement << std::endl;
     }
-    virtual ~StdoutLogProxy() {
-
-    }
 };
 }
 

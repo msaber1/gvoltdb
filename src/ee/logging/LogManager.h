@@ -37,9 +37,7 @@ public:
      * Constructor that initializes all the loggers with the specified proxy
      * @param proxy The LogProxy that all the loggers should use
      */
-    LogManager(LogProxy *proxy) :
-        m_proxy(proxy), m_sqlLogger(proxy, LOGGERID_SQL), m_hostLogger(proxy, LOGGERID_HOST)
-    { }
+    LogManager(LogProxy *proxy) : m_sqlLogger(proxy, LOGGERID_SQL), m_hostLogger(proxy, LOGGERID_HOST) { }
 
     /**
      * Retrieve a logger by ID
@@ -65,26 +63,7 @@ public:
         m_hostLogger.m_level = static_cast<LogLevel>(((7 << 3) & logLevels) >> 3);
     }
 
-    /**
-     * Retrieve the log proxy used by this LogManager and its Loggers
-     * @return LogProxy Pointer to the LogProxy in use by this LogManager and its Loggers
-     */
-    inline const LogProxy* getLogProxy() {
-        return m_proxy;
-    }
-
-    /**
-     * Frees the log proxy
-     */
-    ~LogManager() {
-        delete m_proxy;
-    }
-
 private:
-    /**
-     * The log proxy in use by this LogManager and its Loggers
-     */
-    const LogProxy *m_proxy;
     Logger m_sqlLogger;
     Logger m_hostLogger;
 };

@@ -57,9 +57,11 @@ const int MAGIC_TUPLE_SIZE = 94;
 // 1k buffer
 const int BUFFER_SIZE = 1024;
 
+static StdoutLogProxy aStdLogProxy;
+
 class DummyTopend : public Topend {
 public:
-    DummyTopend() : Topend(new StdoutLogProxy()), receivedExportBuffer(false) { }
+    DummyTopend() : Topend(&aStdLogProxy), receivedExportBuffer(false) { }
 
     int loadNextDependency(int32_t dependencyId, voltdb::Pool *pool, Table* destination) { return 0; }
 

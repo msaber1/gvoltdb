@@ -69,11 +69,11 @@ class JNILocalFrameBarrier {
     }
 };
 
-JNITopend::JNITopend(JNIEnv *env, jobject caller, JavaVM *vm)
-  : Topend(JNILogProxy::getJNILogProxy(env, vm))
+JNITopend::JNITopend(JNIEnv *env, jobject caller, JavaVM *vm, JNILogProxy* jniLogProxy)
+  : Topend(jniLogProxy)
   , m_jniEnv(env)
   , m_javaExecutionEngine(caller)
-  , m_logProxy(dynamic_cast<JNILogProxy*>(const_cast<LogProxy*>(getLogManager().getLogProxy())))
+  , m_logProxy(jniLogProxy)
 {
     // Cache the method id for better performance. It is valid until the JVM unloads the class:
     // http://java.sun.com/javase/6/docs/technotes/guides/jni/spec/design.html#wp17074
@@ -257,6 +257,7 @@ void JNITopend::crashVoltDB(const FatalException& e) {
 }
 
 JNITopend::~JNITopend() {
+    delete m_logProxy;
     m_jniEnv->DeleteGlobalRef(m_javaExecutionEngine);
 }
 
