@@ -145,7 +145,7 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
     if (index < 0) {
         return getNullStringValue();
     }
-    
+
     if( ! root.isArray()) {
         return getNullStringValue();
     }
