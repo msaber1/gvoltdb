@@ -137,6 +137,19 @@ template<> inline NValue NValue::call<FUNC_VOLT_ARRAY_ELEMENT>(const std::vector
         return getNullStringValue();
     }
 
+    // Sure, root[-1].isNull() returns true just like we want it to
+    // -- but only in production with asserts turned off.
+    // Turn on asserts for debugging and you'll want this guard up front.
+    // Forcing the null return for a negative index seems more consistent than crashing in debug mode
+    // or even throwing a SQL error. It's the same handling that a too large index gets.
+    if (index < 0) {
+        return getNullStringValue();
+    }
+    
+    if( ! root.isArray()) {
+        return getNullStringValue();
+    }
+
     Json::Value fieldValue = root[index];
 
     if (fieldValue.isNull()) {
