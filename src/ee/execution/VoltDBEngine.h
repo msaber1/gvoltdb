@@ -52,13 +52,7 @@
 #include <vector>
 #include <cassert>
 
-#include <boost/ptr_container/ptr_vector.hpp>
-#include "json_spirit/json_spirit.h"
 #include "boost/shared_ptr.hpp"
-#include <boost/multi_index_container.hpp>
-#include <boost/multi_index/hashed_index.hpp>
-#include <boost/multi_index/member.hpp>
-#include <boost/multi_index/mem_fun.hpp>
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/serializeio.h"

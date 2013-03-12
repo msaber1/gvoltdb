@@ -350,28 +350,16 @@ public class PlanAssembler {
         // reset the plan column guids and pool
         //PlanColumn.resetAll();
 
-        CompiledPlan retval = new CompiledPlan();
+        CompiledPlan retval;
         AbstractParsedStmt nextStmt = null;
         if (m_parsedUnion != null) {
             nextStmt = m_parsedUnion;
             retval = getNextUnionPlan();
-            if (retval != null) {
-                retval.readOnly = true;
-            }
         } else if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
-            retval.rootPlanGraph = getNextSelectPlan();
-            retval.readOnly = true;
-            if (retval.rootPlanGraph != null)
-            {
-                // only add the output columns if we actually have a plan
-                // avoid PlanColumn resource leakage
-                addColumns(retval, m_parsedSelect);
-                boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
-                boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
-                retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
-            }
+            retval = getNextSelectPlan();
         } else {
+            retval = new CompiledPlan();
             retval.readOnly = false;
             if (m_parsedInsert != null) {
                 nextStmt = m_parsedInsert;
@@ -404,8 +392,6 @@ public class PlanAssembler {
         addParameters(retval, nextStmt);
         retval.fullWhereClause = nextStmt.where;
         retval.fullWinnerPlan = retval.rootPlanGraph;
-        // Do a final generateOutputSchema pass.
-        retval.rootPlanGraph.generateOutputSchema(m_catalogDb);
         retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
     }
@@ -476,8 +462,11 @@ public class PlanAssembler {
         return retval;
     }
 
-    private void addColumns(CompiledPlan plan, ParsedSelectStmt stmt) {
-        NodeSchema output_schema = plan.rootPlanGraph.getOutputSchema();
+    /**
+     * @param stmt
+     * @param output_schema
+     */
+    private void sanityCheckColumns(ParsedSelectStmt stmt, NodeSchema output_schema) {
         // Sanity-check the output NodeSchema columns against the display columns
         if (stmt.displayColumns.size() != output_schema.size())
         {
@@ -495,7 +484,6 @@ public class PlanAssembler {
                                                  "to parsed display columns");
             }
         }
-        plan.columns = output_schema;
     }
 
     private void addParameters(CompiledPlan plan, AbstractParsedStmt stmt) {
@@ -512,19 +500,17 @@ public class PlanAssembler {
         }
     }
 
-    private AbstractPlanNode getNextSelectPlan() {
+    /**
+     * @return
+     */
+    private CompiledPlan getNextSelectPlan() {
         assert (subAssembler != null);
 
-        AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
-        if (subSelectRoot == null)
+        AbstractPlanNode root = subAssembler.nextPlan();
+        if (root == null) {
             return null;
+        }
 
-        AbstractPlanNode root = subSelectRoot;
-
-        /*
-         * Establish the output columns for the sub select plan.
-         */
-        root.generateOutputSchema(m_catalogDb);
         root = handleAggregationOperators(root);
 
         root = handleOrderBy(root);
@@ -541,9 +527,14 @@ public class PlanAssembler {
             root = handleLimitOperator(root);
         }
 
-        root.generateOutputSchema(m_catalogDb);
+        CompiledPlan retval = new CompiledPlan();
+        retval.rootPlanGraph = root;
 
-        return root;
+        boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
+        boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
+        retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
+        retval.readOnly = true;
+        return retval;
     }
 
     private AbstractPlanNode getNextDeletePlan() {
@@ -590,21 +581,18 @@ public class PlanAssembler {
         // When we inline this projection into the scan, we're going
         // to overwrite any original projection that we might have inlined
         // in order to simply cull the columns from the persistent table.
-        // The call here to generateOutputSchema() will recurse down to
-        // the scan node and cause it to update appropriately.
         subSelectRoot.addInlinePlanNode(projectionNode);
         // connect the nodes to build the graph
         deleteNode.addAndLinkChild(subSelectRoot);
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
-            deleteNode.generateOutputSchema(m_catalogDb);
             return deleteNode;
         }
 
         // Send the local result counts to the coordinator.
         AbstractPlanNode recvNode = subAssembler.addSendReceivePair(deleteNode);
         // add a sum and send on top of the union
-        return addSumAndSendToDMLNode(recvNode);
+        return addSumToDMLNode(recvNode);
     }
 
     private AbstractPlanNode getNextUpdatePlan() {
@@ -671,8 +659,6 @@ public class PlanAssembler {
         // When we inline this projection into the scan, we're going
         // to overwrite any original projection that we might have inlined
         // in order to simply cull the columns from the persistent table.
-        // The call here to generateOutputSchema() will recurse down to
-        // the scan node and cause it to update appropriately.
         assert(subSelectRoot instanceof AbstractScanPlanNode);
         subSelectRoot.addInlinePlanNode(projectionNode);
 
@@ -680,15 +666,13 @@ public class PlanAssembler {
         updateNode.addAndLinkChild(subSelectRoot);
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
-            updateNode.generateOutputSchema(m_catalogDb);
-
             return updateNode;
         }
 
         // Send the local result counts to the coordinator.
         AbstractPlanNode recvNode = subAssembler.addSendReceivePair(updateNode);
         // add a sum and send on top of the union
-        return addSumAndSendToDMLNode(recvNode);
+        return addSumToDMLNode(recvNode);
     }
 
     /**
@@ -783,7 +767,6 @@ public class PlanAssembler {
         materializeNode.setOutputSchema(mat_schema);
         // connect the insert and the materialize nodes together
         insertNode.addAndLinkChild(materializeNode);
-        insertNode.generateOutputSchema(m_catalogDb);
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
             return insertNode;
@@ -793,21 +776,18 @@ public class PlanAssembler {
         // this will make the child plan fragment be sent to all partitions
         sendNode.isMultiPartition = true;
         sendNode.addAndLinkChild(insertNode);
-        // sendNode.generateOutputSchema(m_catalogDb);
 
         AbstractPlanNode recvNode = new ReceivePlanNode();
         recvNode.addAndLinkChild(sendNode);
-        recvNode.generateOutputSchema(m_catalogDb);
 
         // add a count and send on top of the union
-        return addSumAndSendToDMLNode(recvNode);
+        return addSumToDMLNode(recvNode);
     }
 
-    AbstractPlanNode addSumAndSendToDMLNode(AbstractPlanNode dmlRoot)
+    AbstractPlanNode addSumToDMLNode(AbstractPlanNode dmlRoot)
     {
         // create the nodes being pushed on top of dmlRoot.
         AggregatePlanNode countNode = new AggregatePlanNode();
-        SendPlanNode sendNode = new SendPlanNode();
 
         // configure the count aggregate (sum) node to produce a single
         // output column containing the result of the sum.
@@ -845,11 +825,7 @@ public class PlanAssembler {
 
         // connect the nodes to build the graph
         countNode.addAndLinkChild(dmlRoot);
-        countNode.generateOutputSchema(m_catalogDb);
-        sendNode.addAndLinkChild(countNode);
-        sendNode.generateOutputSchema(m_catalogDb);
-
-        return sendNode;
+        return countNode;
     }
 
     /**
@@ -888,7 +864,6 @@ public class PlanAssembler {
             return rootNode;
         } else {
             projectionNode.addAndLinkChild(rootNode);
-            projectionNode.generateOutputSchema(m_catalogDb);
             return projectionNode;
         }
     }
@@ -928,7 +903,6 @@ public class PlanAssembler {
                                               : SortDirectionType.DESC);
         }
         orderByNode.addAndLinkChild(root);
-        orderByNode.generateOutputSchema(m_catalogDb);
 
         // In theory, for a single-table query, there just needs to exist a uniqueness constraint (primary key or other unique index)
         // on some of the ORDER BY values regardless of whether the associated index is used in the selected plan.
@@ -1084,7 +1058,6 @@ public class PlanAssembler {
         }
 
         topLimit.addAndLinkChild(root);
-        topLimit.generateOutputSchema(m_catalogDb);
         return topLimit;
     }
 
@@ -1338,7 +1311,6 @@ public class PlanAssembler {
         }
 
         distNode.addAndLinkChild(root);
-        distNode.generateOutputSchema(m_catalogDb);
         root = distNode;
 
         // Put the send/receive pair back into place
@@ -1349,7 +1321,6 @@ public class PlanAssembler {
 
             // Add the top node
             coordNode.addAndLinkChild(root);
-            coordNode.generateOutputSchema(m_catalogDb);
             root = coordNode;
         }
         return root;
@@ -1508,7 +1479,6 @@ public class PlanAssembler {
         DistinctPlanNode distinctNode = new DistinctPlanNode();
         distinctNode.setDistinctExpression(expr);
         distinctNode.addAndLinkChild(root);
-        distinctNode.generateOutputSchema(m_catalogDb);
         return distinctNode;
     }
 

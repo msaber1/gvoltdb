@@ -91,19 +91,22 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_catalogIndex = isp.m_catalogIndex;
 
         m_estimatedOutputTupleCount = 1;
-        m_tableSchema = isp.m_tableSchema;
-        m_tableScanSchema = isp.m_tableScanSchema.clone();
-
         m_targetTableAlias = isp.m_targetTableAlias;
         m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
 
         m_lookupType = isp.m_lookupType;
         m_searchkeyExpressions = isp.m_searchkeyExpressions;
-        m_predicate = null;
         m_bindings = isp.getBindings();
 
-        m_outputSchema = apn.getOutputSchema().clone();
+        // The main point of the output schema is its type (BIGINT) and alias.
+        // The apn's originally assigned output schema is fine for that.
+        // It doesn't matter whether the internals of apn/child have been normalized via generateOutputSchema().
+        // TODO: In this context, the output schema will needlessly serialize a count expression to the EE.
+        // Cases like this in which the expression does not matter could clone the column schema
+        // and set its expression to null.
+        // That would require the EE deserializer to accept ColumnSchema with missing expressions.
+        m_outputSchema = apn.getOutputSchema();
 
         m_endType = endType;
         m_endkeyExpressions.addAll(endKeys);
@@ -144,6 +147,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             // don't get bashed by other nodes or subsequent planner runs
             try
             {
+                // It's OK that these end keys come from end expression trees that have not had their column indexes
+                // normalized by generateOutputSchema().
+                // In an aggregated index scan (vs. a joined index scan),
+                // the keys themselves do not reference columns.
                 endKeys.add((AbstractExpression)ae.getRight().clone());
             }
             catch (CloneNotSupportedException e)
@@ -193,22 +200,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db){}
-
-    @Override
-    public void resolveColumnIndexes(){}
+    public NodeSchema generateOutputSchema(Database db) { return m_outputSchema; }
 
     @Override
     public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-
-        // HOW WE COST INDEXES
-        // unique, covering index always wins
-        // otherwise, pick the index with the most columns covered otherwise
-        // count non-equality scans as -0.5 coverage
-        // prefer array to hash to tree, all else being equal
-
-        // FYI: Index scores should range between 1 and 48898 (I think)
-
         Table target = db.getTables().getIgnoreCase(m_targetTableName);
         assert(target != null);
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());

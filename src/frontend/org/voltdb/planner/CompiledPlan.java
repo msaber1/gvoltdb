@@ -29,7 +29,6 @@ import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.PlanNodeType;
 
@@ -70,9 +69,6 @@ public class CompiledPlan {
 
     /** Parameter values, if the planner pulled constants out of the plan */
     public ParameterSet extractedParamValues = ParameterSet.emptyParameterSet();
-
-    /** A list of output column ids, indexes and types */
-    public NodeSchema columns = new NodeSchema();
 
     /**
      * If true, divide the number of tuples changed

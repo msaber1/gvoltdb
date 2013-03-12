@@ -85,22 +85,11 @@ public class DistinctPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
+    public NodeSchema generateOutputSchema(Database db)
     {
-        // Need to order and resolve indexes of output columns AND
-        // the distinct column
+        // Need to resolve indexes of the distinct column
         assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
-            // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = input_schema.getIndexOfTve(tve);
-            tve.setColumnIndex(index);
-        }
-        m_outputSchema.sortByTveIndex();
+        NodeSchema input_schema = m_children.get(0).generateOutputSchema(db);
 
         // Now resolve the indexes in the distinct expression
         List<TupleValueExpression> distinct_tves =
@@ -110,6 +99,7 @@ public class DistinctPlanNode extends AbstractPlanNode {
             int index = input_schema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
+        return input_schema;
     }
 
     @Override

@@ -25,7 +25,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.planner.PlanStatistics;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class SendPlanNode extends AbstractPlanNode {
@@ -41,25 +40,6 @@ public class SendPlanNode extends AbstractPlanNode {
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.SEND;
     }
-
-    @Override
-    public void resolveColumnIndexes()
-    {
-        // Need to order and resolve indexes of output columns
-        assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
-            // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = input_schema.getIndexOfTve(tve);
-            tve.setColumnIndex(index);
-        }
-        m_outputSchema.sortByTveIndex();
-    }
-
 
     @Override
     public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {

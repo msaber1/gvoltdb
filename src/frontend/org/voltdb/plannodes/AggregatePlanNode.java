@@ -109,23 +109,13 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
 
     @Override
-    public void generateOutputSchema(Database db)
+    public NodeSchema generateOutputSchema(Database db)
     {
         assert(m_children.size() == 1);
-        m_children.get(0).generateOutputSchema(db);
-        // aggregate's output schema is pre-determined, don't touch
-        return;
-    }
+        NodeSchema input_schema = m_children.get(0).generateOutputSchema(db);
 
-    @Override
-    public void resolveColumnIndexes()
-    {
-        // Aggregates need to resolve indexes for the output schema but don't need
-        // to reorder it.  Some of the outputs may be local aggregate columns and
-        // won't have a TVE to resolve.
-        assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
+        // Aggregates need to resolve indexes for the output schema but don't need to (& BETTER NOT) reorder it
+        // Some of the outputs may be local aggregate columns and won't have a TVE to resolve.
 
         // get all the TVEs in the output columns
         List<TupleValueExpression> output_tves = new ArrayList<TupleValueExpression>();
@@ -134,50 +124,40 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
         for (TupleValueExpression tve : output_tves)
         {
-            int index = input_schema.getIndexOfTve(tve);
-            if (index == -1)
-            {
-                // check to see if this TVE is the aggregate output
-                // XXX SHOULD MODE THIS STRING TO A STATIC DEF SOMEWHERE
-                if (!tve.getTableName().equals("VOLT_TEMP_TABLE"))
-                {
-                    throw new RuntimeException("Unable to find index for column: " +
-                                               tve.getColumnName());
+            // check to see if this TVE is the aggregate output
+            // XXX SHOULD MODE THIS STRING TO A STATIC DEF SOMEWHERE
+            if (!tve.getTableName().equals("VOLT_TEMP_TABLE")) {
+                int index = input_schema.getIndexOfTve(tve);
+                if (index == -1) {
+                    throw new RuntimeException("Unable to find index for column: " + tve.getColumnName());
                 }
-            }
-            else
-            {
                 tve.setColumnIndex(index);
             }
+            // It's a bit strange that agg outputs get represented as TVEs that need no index.
+            // I THINK this relies on each aggregate "knowing where its result goes" in the output. --paul
         }
 
         // Aggregates also need to resolve indexes for aggregate inputs
-        // Find the proper index for the sort columns.  Not quite
+        // Find the proper index for the sort columns ("sort columns?" --paul).  Not quite
         // sure these should be TVEs in the long term.
-        List<TupleValueExpression> agg_tves =
-            new ArrayList<TupleValueExpression>();
+        List<TupleValueExpression> tves = new ArrayList<TupleValueExpression>();
         for (AbstractExpression agg_exp : m_aggregateExpressions)
         {
-            agg_tves.addAll(ExpressionUtil.getTupleValueExpressions(agg_exp));
+            tves.addAll(ExpressionUtil.getTupleValueExpressions(agg_exp));
         }
-        for (TupleValueExpression tve : agg_tves)
+        // Aggregates also need to resolve indexes for group_by inputs
+        for (AbstractExpression group_exp : m_groupByExpressions)
+        {
+            tves.addAll(ExpressionUtil.getTupleValueExpressions(group_exp));
+        }
+        for (TupleValueExpression tve : tves)
         {
             int index = input_schema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
 
-        // Aggregates also need to resolve indexes for group_by inputs
-        List<TupleValueExpression> group_tves =
-            new ArrayList<TupleValueExpression>();
-        for (AbstractExpression group_exp : m_groupByExpressions)
-        {
-            group_tves.addAll(ExpressionUtil.getTupleValueExpressions(group_exp));
-        }
-        for (TupleValueExpression tve : group_tves)
-        {
-            int index = input_schema.getIndexOfTve(tve);
-            tve.setColumnIndex(index);
-        }
+        // aggregate's output schema is pre-determined, don't touch
+        return m_outputSchema;
     }
 
     /**

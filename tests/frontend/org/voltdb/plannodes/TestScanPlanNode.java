@@ -28,6 +28,7 @@ import junit.framework.TestCase;
 
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
@@ -143,38 +144,38 @@ public class TestScanPlanNode extends TestCase
         // that uses some TVEs.
         NodeSchema proj_schema = new NodeSchema();
         String[] cols = new String[4];
+        AbstractExpression[] exprs = new AbstractExpression[4];
 
-        TupleAddressExpression col1_exp = new TupleAddressExpression();
-        proj_schema.addColumn(new SchemaColumn("", "tuple_address",
-                                               "tuple_address",
-                                               col1_exp));
+        TupleAddressExpression col0_exp = new TupleAddressExpression();
+        proj_schema.addColumn(new SchemaColumn("", "tuple_address", "tuple_address", col0_exp));
         cols[0] = "tuple_address";
+        exprs[0] = col0_exp;
 
         // update column 1 with a parameter value
-        ParameterValueExpression col2_exp = new ParameterValueExpression();
-        col2_exp.setParameterIndex(0);
-        col2_exp.setValueType(COLTYPES[1]);
-        col2_exp.setValueSize(COLTYPES[1].getLengthInBytesForFixedTypes());
+        ParameterValueExpression col1_exp = new ParameterValueExpression();
+        col1_exp.setParameterIndex(0);
+        col1_exp.setValueType(COLTYPES[1]);
+        col1_exp.setValueSize(COLTYPES[1].getLengthInBytesForFixedTypes());
         // XXX I'm not sure what to do with the name for the updated column yet.
         // I think it should be an alias and not the original table name/col name
-        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[1], COLS[1],
-                                               col2_exp));
+        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[1], COLS[1], col1_exp));
         cols[1] = COLS[1];
+        exprs[1] = col1_exp;
 
         // Update column 3 with a constant value
-        ConstantValueExpression col3_exp = new ConstantValueExpression();
-        col3_exp.setValueType(COLTYPES[3]);
-        col3_exp.setValueSize(COLTYPES[3].getLengthInBytesForFixedTypes());
-        col3_exp.setValue("3.14159");
-        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[3], COLS[3],
-                                               col3_exp));
+        ConstantValueExpression col2_exp = new ConstantValueExpression();
+        col2_exp.setValueType(COLTYPES[3]);
+        col2_exp.setValueSize(COLTYPES[3].getLengthInBytesForFixedTypes());
+        col2_exp.setValue("3.14159");
+        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[3], COLS[3], col2_exp));
         cols[2] = COLS[3];
+        exprs[2] = col2_exp;
 
         // update column 4 with a sum of columns 0 and 2
-        OperatorExpression col4_exp = new OperatorExpression();
-        col4_exp.setValueType(COLTYPES[4]);
-        col4_exp.setValueSize(COLTYPES[4].getLengthInBytesForFixedTypes());
-        col4_exp.setExpressionType(ExpressionType.OPERATOR_PLUS);
+        OperatorExpression col3_exp = new OperatorExpression();
+        col3_exp.setValueType(COLTYPES[4]);
+        col3_exp.setValueSize(COLTYPES[4].getLengthInBytesForFixedTypes());
+        col3_exp.setExpressionType(ExpressionType.OPERATOR_PLUS);
         TupleValueExpression left = new TupleValueExpression();
         left.setTableName(TABLE1);
         left.setColumnName(COLS[0]);
@@ -187,11 +188,11 @@ public class TestScanPlanNode extends TestCase
         right.setColumnAlias(COLS[2]);
         right.setValueType(COLTYPES[2]);
         right.setValueSize(COLTYPES[2].getLengthInBytesForFixedTypes());
-        col4_exp.setLeft(left);
-        col4_exp.setRight(right);
-        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[4], "C1",
-                                               col4_exp));
+        col3_exp.setLeft(left);
+        col3_exp.setRight(right);
+        proj_schema.addColumn(new SchemaColumn(TABLE1, COLS[4], "C1", col3_exp));
         cols[3] = COLS[4];
+        exprs[3] = col3_exp;
 
         ProjectionPlanNode proj_node = new ProjectionPlanNode();
         proj_node.setOutputSchema(proj_schema);
@@ -202,20 +203,13 @@ public class TestScanPlanNode extends TestCase
         dut.generateOutputSchema(m_voltdb.getDatabase());
         NodeSchema dut_schema = dut.getOutputSchema();
         System.out.println(dut_schema.toString());
-        for (int i = 0; i < cols.length; i++)
-        {
-            SchemaColumn col = null;
-            if (i == 0)
-            {
-                col = dut_schema.find("", cols[i], cols[i]);
-            }
-            else
-            {
-                col = dut_schema.find(TABLE1, cols[i], cols[i]);
-            }
+        SchemaColumn col = dut_schema.find("", cols[0], cols[0]);
+        assertNotNull(col);
+        assertEquals(col.getExpression(), exprs[0]);
+        for (int i = 1; i < cols.length; i++) {
+            col = dut_schema.find(TABLE1, cols[i], cols[i]);
             assertNotNull(col);
-            assertEquals(col.getExpression().getExpressionType(),
-                         ExpressionType.VALUE_TUPLE);
+            assertEquals(col.getExpression(), exprs[i]);
         }
     }
 }

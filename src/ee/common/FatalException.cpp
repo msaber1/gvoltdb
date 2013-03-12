@@ -17,6 +17,7 @@
 
 #include "common/FatalException.hpp"
 
+<<<<<<< HEAD
 #include <cxxabi.h>   // for abi
 #include <execinfo.h> // for backtrace, backtrace_symbols
 
@@ -30,6 +31,14 @@
 #define _XOPEN_SOURCE
 #endif
 #include <ucontext.h>
+=======
+#include <execinfo.h> // for backtrace, backtrace_symbols
+#include <cxxabi.h>   // for abi
+
+#include <cstdlib> // for malloc/free
+#include <cstring> // for strn*
+#include <stdio.h> // for fopen, fprintf, fclose
+>>>>>>> ENG-4389 output schema overhaul in progress. -- still needs work.
 
 namespace voltdb {
 FatalException::FatalException(std::string message,
@@ -43,6 +52,11 @@ FatalException::FatalException(std::string message,
 
     /**
      * Stack trace code from http://tombarta.wordpress.com/2008/08/01/c-stack-traces-with-gcc/
+<<<<<<< HEAD
+=======
+     *TODO: do a bake-off between this code and the stack trace code in SegvException and either standardize
+     * on the winner or combine the best features.
+>>>>>>> ENG-4389 output schema overhaul in progress. -- still needs work.
      */
     void *traces[128];
     for (int i=0; i < 128; i++) traces[i] = NULL; // silence valgrind
@@ -101,6 +115,10 @@ FatalException::FatalException(std::string message,
         }
         fclose(bt);
     }
+<<<<<<< HEAD
+=======
+
+>>>>>>> ENG-4389 output schema overhaul in progress. -- still needs work.
     ::free(traceSymbols);
 }
 
@@ -142,6 +160,7 @@ const char* FatalLogicError::what() const throw()
     return m_whatwhat.c_str();
 }
 
+<<<<<<< HEAD
 // Reset either or both of these control variables from the debugger to dynamically
 // control the error responses that depend on them.
 int control_assert_or_throw_fatal_or_crash_123 =
@@ -154,4 +173,6 @@ int control_ignore_or_throw_fatal_or_crash_123 =
     // crash on the spot  */ 3;
 
 
+=======
+>>>>>>> ENG-4389 output schema overhaul in progress. -- still needs work.
 }

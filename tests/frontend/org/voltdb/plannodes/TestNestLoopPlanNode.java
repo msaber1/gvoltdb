@@ -44,7 +44,6 @@ public class TestNestLoopPlanNode extends TestCase
         dut.addAndLinkChild(outer_child);
 
         dut.generateOutputSchema(null);
-        dut.resolveColumnIndexes();
         System.out.println(dut.getOutputSchema().toString());
     }
 }

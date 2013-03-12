@@ -91,6 +91,24 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super();
     }
 
+    // Special case constructor for seq-scan-to-index-scan promotion for determinism purposes.
+    public IndexScanPlanNode(AbstractScanPlanNode scanNode, Index indexToScan) {
+        super();
+        setTargetTableName(scanNode.getTargetTableName());
+        setTargetTableAlias(scanNode.getTargetTableAlias());
+        setEndExpression(null);
+        setScanColumns(new ArrayList<SchemaColumn>());
+        setCatalogIndex(indexToScan);
+        setKeyIterate(true);
+        setTargetIndexName(indexToScan.getTypeName());
+        setLookupType(IndexLookupType.GTE);
+        setSortDirection(SortDirectionType.ASC);
+        setPredicate(scanNode.getPredicate());
+        for (AbstractPlanNode inlineNode : scanNode.getInlinePlanNodes().values()) {
+            addInlinePlanNode(inlineNode);
+        }
+    }
+
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.INDEXSCAN;
@@ -269,16 +287,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
+    public NodeSchema generateOutputSchema(Database db)
     {
+        // now do the common scan node work
+        NodeSchema outputSchema = super.generateOutputSchema(db);
         // IndexScanPlanNode has TVEs that need index resolution in:
         // m_searchkeyExpressions
         // m_endExpression
 
         // Collect all the TVEs in the end expression and search key expressions
-        List<TupleValueExpression> index_tves =
-            new ArrayList<TupleValueExpression>();
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
+        List<TupleValueExpression> index_tves = ExpressionUtil.getTupleValueExpressions(m_endExpression);
         for (AbstractExpression search_exp : m_searchkeyExpressions)
         {
             index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
@@ -289,8 +307,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             int index = m_tableSchema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
-        // now do the common scan node work
-        super.resolveColumnIndexes();
+        return outputSchema;
     }
 
     @Override

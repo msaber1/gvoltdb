@@ -76,18 +76,7 @@ ReceivePlanNode::getPlanNodeType() const
 string
 ReceivePlanNode::debugInfo(const string& spacer) const
 {
-    ostringstream buffer;
-    buffer << spacer << "Incoming Table Columns["
-           << getOutputSchema().size() << "]:\n";
-    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++)
-    {
-        SchemaColumn* col = getOutputSchema()[ctr];
-        buffer << spacer << "  [" << ctr << "] ";
-        buffer << "name=" << col->getColumnName() << " : ";
-        buffer << "size=" << col->getSize() << " : ";
-        buffer << "type=" << col->getType() << "\n";
-    }
-    return (buffer.str());
+    return "";
 }
 
 void

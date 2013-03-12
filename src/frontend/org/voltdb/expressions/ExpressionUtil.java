@@ -143,14 +143,9 @@ public abstract class ExpressionUtil {
             tves.add((TupleValueExpression) input);
             return tves;
         }
-
-        // recursive calls
-        tves.addAll(getTupleValueExpressions(input.m_left));
-        tves.addAll(getTupleValueExpressions(input.m_right));
-        if (input.m_args != null) {
-            for (AbstractExpression argument : input.m_args) {
-                tves.addAll(getTupleValueExpressions(argument));
-            }
+        ArrayList<AbstractExpression> aes = input.findBaseTVEs();
+        for (AbstractExpression abstractExpression : aes) {
+            tves.add((TupleValueExpression)abstractExpression);
         }
         return tves;
     }

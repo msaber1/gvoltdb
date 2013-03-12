@@ -39,8 +39,6 @@ bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(dynamic_cast<TableCountPlanNode*>(abstract_node));
     assert(dynamic_cast<TableCountPlanNode*>(abstract_node)->getTargetTable());
 
-    assert(abstract_node->getOutputSchema().size() == 1);
-
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
     return true;

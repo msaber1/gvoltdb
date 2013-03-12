@@ -121,7 +121,7 @@ void TableFactory::initCommon(
 
     assert(table != NULL);
     assert(schema != NULL);
-    assert(columnNames.size() != 0);
+    // assert(columnNames.size() != 0);
 
     table->m_databaseId = databaseId;
     table->m_name = name;

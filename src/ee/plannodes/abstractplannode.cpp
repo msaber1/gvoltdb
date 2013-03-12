@@ -228,20 +228,25 @@ AbstractPlanNode::getOutputTable() const
 const vector<SchemaColumn*>&
 AbstractPlanNode::getOutputSchema() const
 {
-    return m_outputSchema;
+    if (m_outputSchema.size() > 0 || m_children.size() == 0) {
+        return m_outputSchema;
+    }
+    // An empty output schema is supposed to signify a pass-through node that uses the
+    // same output schema as its first child.
+    return m_children[0]->getOutputSchema();
 }
 
 TupleSchema*
 AbstractPlanNode::generateTupleSchema(bool allowNulls)
 {
-    int schema_size = static_cast<int>(m_outputSchema.size());
+    const vector<SchemaColumn*>& effectiveOutputSchema = getOutputSchema(); // Not always == m_outputSchema.
+    int schema_size = static_cast<int>(effectiveOutputSchema.size());
     vector<voltdb::ValueType> columnTypes;
     vector<int32_t> columnSizes;
     vector<bool> columnAllowNull(schema_size, allowNulls);
 
-    for (int i = 0; i < schema_size; i++)
-    {
-        SchemaColumn* col = m_outputSchema[i];
+    for (int i = 0; i < schema_size; i++) {
+        SchemaColumn* col = effectiveOutputSchema[i];
         columnTypes.push_back(col->getExpression()->getValueType());
         columnSizes.push_back(col->getExpression()->getValueSize());
     }
@@ -288,11 +293,13 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
         node->m_childIds.push_back(childNodeId);
     }
 
-    PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
-    for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
-        PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
-        SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue);
-        node->m_outputSchema.push_back(outputColumn);
+    if (obj.hasNonNullKey("OUTPUT_SCHEMA") {
+        PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
+        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+            PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue);
+            node->m_outputSchema.push_back(outputColumn);
+        }
     }
 
     node->loadFromJSONObject(obj);
@@ -325,9 +332,15 @@ string
 AbstractPlanNode::debug(const string& spacer) const
 {
     ostringstream buffer;
-    buffer << spacer << "* " << this->debug() << "\n";
+    buffer << spacer << "* " << debug() << "\n";
     string info_spacer = spacer + "  |";
-    buffer << this->debugInfo(info_spacer);
+    if (m_outputSchema.size() > 0) {
+        buffer << info_spacer << "Projecting:\n";
+        for (int ii = 0; ii < m_outputSchema.size(); ii++) {
+            buffer << m_outputSchema[ii]->debugInfo(info_spacer + "  ");
+        }
+    }
+    buffer << debugInfo(info_spacer);
     //
     // Inline PlanNodes
     //

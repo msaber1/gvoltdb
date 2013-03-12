@@ -69,12 +69,13 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
-    m_columnCount = static_cast<int>(node->getOutputSchema().size());
+    std::vector<AbstractExpression*>& expressions = node->getOutputColumnExpressions();
+    m_columnCount = static_cast<int>(expressions.size());
 
     // initialize local variables
-    all_tuple_array_ptr = ExpressionUtil::convertIfAllTupleValues(node->getOutputColumnExpressions());
+    all_tuple_array_ptr = ExpressionUtil::convertIfAllTupleValues(expressions);
     all_tuple_array = all_tuple_array_ptr.get();
-    all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(node->getOutputColumnExpressions());
+    all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(expressions);
     all_param_array = all_param_array_ptr.get();
 
     needs_substitute_ptr = boost::shared_array<bool>(new bool[m_columnCount]);
@@ -83,9 +84,9 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
     expression_array_ptr = boost::shared_array<ExpRawPtr>(new ExpRawPtr[m_columnCount]);
     expression_array = expression_array_ptr.get();
     for (int ctr = 0; ctr < m_columnCount; ctr++) {
-        assert (node->getOutputColumnExpressions()[ctr] != NULL);
-        expression_array_ptr[ctr] = node->getOutputColumnExpressions()[ctr];
-        needs_substitute_ptr[ctr] = node->getOutputColumnExpressions()[ctr]->hasParameter();
+        assert (expressions[ctr] != NULL);
+        expression_array_ptr[ctr] = expressions[ctr];
+        needs_substitute_ptr[ctr] = expressions[ctr]->hasParameter();
     }
 
 
@@ -117,7 +118,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     // nodes in our expression tree to be ready for the projection operations in
     // execute
     //
-    assert (m_columnCount == (int)node->getOutputColumnNames().size());
+    assert (m_columnCount == (int)node->getOutputColumnExpressions().size());
     if (all_tuple_array == NULL && all_param_array == NULL) {
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
             assert(expression_array[ctr]);

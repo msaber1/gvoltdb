@@ -18,39 +18,24 @@
 package org.voltdb.plannodes;
 
 import java.util.List;
-import java.util.TreeMap;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.JoinType;
-import org.voltdb.types.PlanNodeType;
 
 public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
-    public enum Members {
+    private enum Members {
         JOIN_TYPE,
-        PREDICATE;
     }
 
-    protected JoinType m_joinType = JoinType.INNER;
-    protected AbstractExpression m_predicate;
+    private JoinType m_joinType = JoinType.INNER;
 
     protected AbstractJoinPlanNode() {
         super();
-    }
-
-    @Override
-    public void validate() throws Exception {
-        super.validate();
-
-        if (m_predicate != null) {
-            m_predicate.validate();
-        }
     }
 
     /**
@@ -68,142 +53,41 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     /**
-     * @return the predicate
+     * @param outer_schema
+     * @param inner_schema
+     * @param predicate_tves
      */
-    public AbstractExpression getPredicate() {
-        return m_predicate;
-    }
-
-    /**
-     * @param predicate the predicate to set
-     */
-    public void setPredicate(AbstractExpression predicate)
-    {
-        if (predicate != null)
-        {
-            // PlanNodes all need private deep copies of expressions
-            // so that the resolveColumnIndexes results
-            // don't get bashed by other nodes or subsequent planner runs
-            try
-            {
-                m_predicate = (AbstractExpression) predicate.clone();
+    protected final void generateJoinSchema(NodeSchema outer_schema,
+                                            NodeSchema inner_schema,
+                                            List<TupleValueExpression> predicate_tves) {
+        for (TupleValueExpression tve : predicate_tves) {
+            int index = outer_schema.getIndexOfTve(tve);
+            if (index == -1) {
+                index = inner_schema.getIndexOfTve(tve);
+                if (index == -1) {
+                    throw new RuntimeException("Unable to find index for join TVE: " + tve);
+                }
+                tve.setIsInner();
             }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
-            }
+            tve.setColumnIndex(index);
         }
-    }
-
-    @Override
-    public void generateOutputSchema(Database db)
-    {
-        // FUTURE: At some point it would be awesome to further
-        // cull the columns out of the join to remove columns that were only
-        // used by scans/joins.  I think we can coerce HSQL into provide this
-        // info relatively easily. --izzy
-
-        // Index join will have to override this method.
-        // Assert and provide functionality for generic join
-        assert(m_children.size() == 2);
-        for (AbstractPlanNode child : m_children)
-        {
-            child.generateOutputSchema(db);
-        }
-        // Join the schema together to form the output schema
-        m_outputSchema =
-            m_children.get(0).getOutputSchema().
-            join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
-    }
-
-    // Given any non-inlined type of join, this method will resolve the column
-    // order and TVE indexes for the output SchemaColumns.
-    @Override
-    public void resolveColumnIndexes()
-    {
-        // First, assert that our topology is sane and then
-        // recursively resolve all child/inline column indexes
-        IndexScanPlanNode index_scan =
-            (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
-        assert(m_children.size() == 2 && index_scan == null);
-        for (AbstractPlanNode child : m_children)
-        {
-            child.resolveColumnIndexes();
-        }
-        // for seq scan, child Table order in the EE is in child order in the plan.
-        // order our output columns by outer table then inner table
+        // Join the schema together to form the output schema.
+        // The child Table order in the EE is in the plan child order (inline/inner child last).
+        // We make the output schema ordered: [outer table columns][inner table columns]
         // I dislike this magically implied ordering, should be fixable --izzy
-        NodeSchema outer_schema = m_children.get(0).getOutputSchema();
-        NodeSchema inner_schema = m_children.get(1).getOutputSchema();
-
-        // need to order the combined input schema coherently.  We make the
-        // output schema ordered: [outer table columns][inner table columns]
-        TreeMap<Integer, SchemaColumn> sort_cols =
-            new TreeMap<Integer, SchemaColumn>();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
-            // Right now these all need to be TVEs
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = outer_schema.getIndexOfTve(tve);
-            if (index == -1)
-            {
-                index = inner_schema.getIndexOfTve(tve);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for column: " +
-                                               col.toString());
-                }
-                sort_cols.put(index + outer_schema.size(), col);
-            }
-            else
-            {
-                sort_cols.put(index, col);
-            }
-            tve.setColumnIndex(index);
-        }
-        // rebuild the output schema from the tree-sorted columns
-        NodeSchema new_output_schema = new NodeSchema();
-        for (SchemaColumn col : sort_cols.values())
-        {
-            new_output_schema.addColumn(col);
-        }
-        m_outputSchema = new_output_schema;
-
-        // Finally, resolve m_predicate
-        List<TupleValueExpression> predicate_tves =
-            ExpressionUtil.getTupleValueExpressions(m_predicate);
-        for (TupleValueExpression tve : predicate_tves)
-        {
-            int index = outer_schema.getIndexOfTve(tve);
-            if (index == -1)
-            {
-                index = inner_schema.getIndexOfTve(tve);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for join TVE: " +
-                                               tve.toString());
-                }
-            }
-            tve.setColumnIndex(index);
-        }
+        m_outputSchema = outer_schema.joinViaTVEs(inner_schema);
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.JOIN_TYPE.name()).value(m_joinType.toString());
-        stringer.key(Members.PREDICATE.name()).value(m_predicate);
     }
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
-        if( !jobj.isNull( Members.PREDICATE.name() )) {
-            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
-        }
+        m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
     }
+
 }

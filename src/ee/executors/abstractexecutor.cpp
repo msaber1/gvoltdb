@@ -153,9 +153,15 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
 void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
     assert(limits);
     TupleSchema* schema = m_abstractNode->generateTupleSchema(true);
+    //TODO: it's conceivable that a temp table will have no columns in some edge case queries that scan
+    // a table but don't reference its columns in the select or where clauses
+    // -- possibly someday also when all where clause references are handled internally via index access?
+    // Then, column_count == 0.
+    // But is it really ever sane in that case to be asking for and generating a 0-column temptable?
+    // Maybe for consistency, to avoid the need for a null check?
     int column_count = (int)m_abstractNode->getOutputSchema().size();
+    //assert(column_count >= 1);
     std::vector<std::string> column_names(column_count);
-    assert(column_count >= 1);
     for (int ctr = 0; ctr < column_count; ctr++)
     {
         column_names[ctr] = m_abstractNode->getOutputSchema()[ctr]->getColumnName();

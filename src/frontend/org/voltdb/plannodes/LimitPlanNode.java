@@ -22,7 +22,6 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class LimitPlanNode extends AbstractPlanNode {
@@ -134,24 +133,6 @@ public class LimitPlanNode extends AbstractPlanNode {
 
     public void setOffsetParameterIndex(long offsetParameterId) {
         m_offsetParameterId = offsetParameterId;
-    }
-
-    @Override
-    public void resolveColumnIndexes()
-    {
-        // Need to order and resolve indexes of output columns
-        assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
-            // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = input_schema.getIndexOfTve(tve);
-            tve.setColumnIndex(index);
-        }
-        m_outputSchema.sortByTveIndex();
     }
 
     @Override

@@ -72,6 +72,15 @@ SchemaColumn::~SchemaColumn()
     delete m_expression;
 }
 
+std::string SchemaColumn::debugInfo(const std::string& spacer) const
+{
+    std::ostringstream buffer;
+    buffer << spacer << m_tableName << "." << m_columnName << " " << m_columnAlias
+           << " " << valueToString(m_type) << "(" << m_size << ")\n"
+           << spacer << " " << m_expression->debugInfo(spacer + "  ") << std::endl;
+    return (buffer.str());
+}
+
 string
 SchemaColumn::getTableName() const
 {

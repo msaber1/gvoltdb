@@ -21,7 +21,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class ReceivePlanNode extends AbstractPlanNode {
@@ -40,21 +39,13 @@ public class ReceivePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
+    public NodeSchema generateOutputSchema(Database db)
     {
-        // Need to order and resolve indexes of output columns
+        // Cache the child's output schema.
+        // This will be needed when the plan is fragmented and this node is at the bottom.
         assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
-            // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = input_schema.getIndexOfTve(tve);
-            tve.setColumnIndex(index);
-        }
-        m_outputSchema.sortByTveIndex();
+        m_outputSchema = m_children.get(0).generateOutputSchema(db);
+        return m_outputSchema;
     }
 
     @Override

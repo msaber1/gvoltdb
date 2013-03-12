@@ -210,18 +210,8 @@ class Table {
     // ------------------------------------------------------------------
     // COLUMNS
     // ------------------------------------------------------------------
-    int columnIndex(const std::string &name) const;
-    const std::vector<std::string>& getColumnNames() const {
-        return m_columnNames;
-    }
-
-
     inline const TupleSchema* schema() const {
         return m_schema;
-    }
-
-    inline const std::string& columnName(int index) const {
-        return m_columnNames[index];
     }
 
     inline int columnCount() const {

@@ -159,19 +159,6 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
 }
 
 // ------------------------------------------------------------------
-// COLUMNS
-// ------------------------------------------------------------------
-
-int Table::columnIndex(const std::string &name) const {
-    for (int ctr = 0, cnt = m_columnCount; ctr < cnt; ctr++) {
-        if (m_columnNames[ctr].compare(name) == 0) {
-            return ctr;
-        }
-    }
-    return -1;
-}
-
-// ------------------------------------------------------------------
 // UTILITY
 // ------------------------------------------------------------------
 
@@ -266,7 +253,7 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
     // NOTE: strings are ASCII only in metadata (UTF-8 in table storage)
     for (int i = 0; i < m_columnCount; ++i) {
         // column name: write (offset, length) for column definition, and string to string table
-        const string& name = columnName(i);
+        const string& name = m_columnNames[i];
         // column names can't be null, so length must be >= 0
         int32_t length = static_cast<int32_t>(name.size());
         assert(length >= 0);
@@ -425,7 +412,7 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
     serialize_io.readByte();
 
     int16_t colcount = serialize_io.readShort();
-    assert(colcount >= 0);
+    assert(colcount > 0);
 
     // Store the following information so that we can provide them to the user
     // on failure
@@ -444,6 +431,13 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
 
     // Check if the column count matches what the temp table is expecting
     if (colcount != m_schema->columnCount()) {
+        static const int throw_fatal_or_sqlexception_or_crash_123 = /* throw */ 1;  // OR throw softer *-/ 2; // OR crash the test. */ 3;
+        if (debug_pass_fail_or_crash_123(throw_fatal_or_sqlexception_or_crash_123)) {
+            throwFatalLogicErrorStreamed("Fallout from planner error."
+                                         " The deserialized tuple column count " << colcount
+                                         << " does not match the schema:\n" << m_schema->debug());
+        }
+
         std::stringstream message(std::stringstream::in
                                   | std::stringstream::out);
         message << "Column count mismatch. Expecting "

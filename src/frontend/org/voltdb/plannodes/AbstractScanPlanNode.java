@@ -175,17 +175,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db)
+    public NodeSchema generateOutputSchema(Database db)
     {
-        // fill in the table schema if we haven't already
-        if (m_tableSchema == null)
-        {
+        // If any columns are referenced in the query, get the catalog schema.
+        // It's rare but not impossible for a query to scan a table but not reference any of its columns.
+        if (m_tableScanSchema.size() != 0) {
             m_tableSchema = new NodeSchema();
-            CatalogMap<Column> cols =
-                db.getTables().getIgnoreCase(m_targetTableName).getColumns();
+            CatalogMap<Column> cols = db.getTables().getIgnoreCase(m_targetTableName).getColumns();
             // you don't strictly need to sort this, but it makes diff-ing easier
-            for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
-            {
+            for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index")) {
                 // must produce a tuple value expression for this column.
                 TupleValueExpression tve = new TupleValueExpression();
                 tve.setValueType(VoltType.get((byte)col.getType()));
@@ -201,122 +199,42 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             }
         }
 
-        // Until the scan has an implicit projection rather than an explicitly
-        // inlined one, the output schema generation is going to be a bit odd.
-        // It will depend on two bits of state: whether any scan columns were
-        // specified for this table and whether or not there is an inlined
-        // projection.
-        //
-        // If there is an inlined projection, then we'll just steal that
-        // output schema as our own.
-        // If there is no inlined projection, then, if there are no scan columns
-        // specified, use the entire table's schema as the output schema.
-        // Otherwise add an inline projection that projects the scan columns
-        // and then take that output schema as our own.
-        // These have the effect of repeatably generating the correct output
-        // schema if called again and again, but also allowing the planner
-        // to overwrite the inline projection and still have the right thing
-        // happen
-        ProjectionPlanNode proj =
-            (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
-        if (proj != null)
-        {
-            // Does this operation needs to change complex expressions
-            // into tuple value expressions with an column alias?
-            // Is this always true for clone?  Or do we need a new method?
-            m_outputSchema = proj.getOutputSchema().copyAndReplaceWithTVE();
-        }
-        else
-        {
-            if (m_tableScanSchema.size() != 0)
-            {
-                // Order the scan columns according to the table schema
-                // before we stick them in the projection output
-                List<TupleValueExpression> scan_tves =
-                    new ArrayList<TupleValueExpression>();
-                for (SchemaColumn col : m_tableScanSchema.getColumns())
-                {
-                    assert(col.getExpression() instanceof TupleValueExpression);
-                    scan_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
-                }
-                // and update their indexes against the table schema
-                for (TupleValueExpression tve : scan_tves)
-                {
-                    int index = m_tableSchema.getIndexOfTve(tve);
-                    tve.setColumnIndex(index);
-                }
-                m_tableScanSchema.sortByTveIndex();
-                // Create inline projection to map table outputs to scan outputs
-                ProjectionPlanNode map = new ProjectionPlanNode();
-                map.setOutputSchema(m_tableScanSchema);
-                addInlinePlanNode(map);
-                // a bit redundant but logically consistent
-                m_outputSchema = map.getOutputSchema().copyAndReplaceWithTVE();
-            }
-            else
-            {
-                // just fill m_outputSchema with the table's columns
-                m_outputSchema = m_tableSchema.clone();
-            }
-        }
-    }
+        // A scan's inline projection defines its output schema.
+        // If it lacks an inline projection, a projection can be constructed from the set of referenced columns,
+        // arranged for convenience in table-schema order.
 
-    @Override
-    public void resolveColumnIndexes()
-    {
+        ProjectionPlanNode proj = (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
+        if (proj == null) {
+            // Build an inline projection consisting of all the referenced columns.
+            // Order the scan columns according to the table schema
+            // before we stick them in the projection output
+            for (SchemaColumn col : m_tableScanSchema.getColumns()) {
+                assert(col.getExpression() instanceof TupleValueExpression);
+                TupleValueExpression tve = (TupleValueExpression)col.getExpression();
+                // and update their indexes against the table schema
+                int index = m_tableSchema.getIndexOfTve(tve);
+                tve.setColumnIndex(index);
+            }
+            m_tableScanSchema.sortByTveIndex();
+            // Create an inline projection to map table outputs to scan outputs
+            proj = new ProjectionPlanNode();
+            proj.setOutputSchema(m_tableScanSchema);
+            addInlinePlanNode(proj);
+        } else {
+            proj.resolveColumnIndexesUsingSchema(m_tableSchema);
+        }
+
         // The following applies to both seq and index scan.  Index scan has
         // some additional expressions that need to be handled as well
 
         // predicate expression
         List<TupleValueExpression> predicate_tves =
             ExpressionUtil.getTupleValueExpressions(m_predicate);
-        for (TupleValueExpression tve : predicate_tves)
-        {
+        for (TupleValueExpression tve : predicate_tves) {
             int index = m_tableSchema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
-
-        // inline projection
-        ProjectionPlanNode proj =
-            (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
-        if (proj != null)
-        {
-            proj.resolveColumnIndexesUsingSchema(m_tableSchema);
-            m_outputSchema = proj.getOutputSchema().clone();
-        }
-        else
-        {
-            // output columns
-            // if there was an inline projection we will have copied these already
-            // otherwise we need to iterate through the output schema TVEs
-            // and sort them by table schema index order.
-
-            for (SchemaColumn col : m_outputSchema.getColumns())
-            {
-                // At this point, they'd better all be TVEs.
-                assert(col.getExpression() instanceof TupleValueExpression);
-                TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-                int index = m_tableSchema.getIndexOfTve(tve);
-                tve.setColumnIndex(index);
-            }
-            m_outputSchema.sortByTveIndex();
-        }
-
-        // The outputschema of an inline limit node is completely irrelevant to the EE except that
-        // serialization will complain if it contains expressions of unresolved columns.
-        // Logically, the limited scan output has the same schema as the pre-limit scan.
-        // It's at least as easy to just re-use the known-good output schema of the scan
-        // than it would be to carefully resolve the limit node's current output schema.
-        // And this simply works regardless of whether the limit was originally applied or inlined
-        // before or after the (possibly inline) projection.
-        // There's no need to be concerned about re-adjusting the irrelevant outputschema
-        // based on the different schema of the original raw scan and the projection.
-        LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
-        if (limit != null)
-        {
-            limit.m_outputSchema = m_outputSchema.clone();
-        }
-
+        return m_outputSchema;
     }
 
     //TODO some members not in here

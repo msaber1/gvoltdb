@@ -312,7 +312,14 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
                                       "tupleValueFactory: invalid column_idx.");
     }
 
-    return new TupleValueExpression(columnIndex, tableName, columnName);
+    bool isInnerFlag = false;
+    if (obj.hasNonNullKey("COLUMN_ISINNER")) {
+        // Since the flag defaults to false, the only reason to be explicit is to set it true.
+        assert(obj.valueForKey("COLUMN_ISINNER").asBool());
+        isInnerFlag = true;
+    }
+
+    return new TupleValueExpression(columnIndex, tableName, columnName, isInnerFlag);
 }
 
 AbstractExpression *
