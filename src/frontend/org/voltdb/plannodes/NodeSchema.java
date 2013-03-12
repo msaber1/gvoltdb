@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 
 import org.voltdb.expressions.TupleValueExpression;
 
@@ -27,7 +28,7 @@ import org.voltdb.expressions.TupleValueExpression;
  * This class encapsulates the representation and common operations for
  * a PlanNode's output schema.
  */
-public class NodeSchema
+public class NodeSchema implements Iterable<SchemaColumn>
 {
     public NodeSchema()
     {
@@ -152,42 +153,32 @@ public class NodeSchema
     public NodeSchema clone()
     {
         NodeSchema copy = new NodeSchema();
-        for (int i = 0; i < m_columns.size(); ++i)
-        {
-            copy.addColumn(m_columns.get(i).clone());
+        for (SchemaColumn column : m_columns) {
+            copy.addColumn(column.clone());
         }
         return copy;
     }
 
     /**
-     * Returns a copy of this NodeSchema but with all non-TVE expressions
-     * replaced with an appropriate TVE.  This is used primarily when generating
-     * a node's output schema based on its childrens' schema; we want to
-     * carry the columns across but leave any non-TVE expressions behind.
+     * Returns a copy of this NodeSchema with the NodeSchema argument's columns appended but with all
+     * columns replaced with an appropriate TupleValueExpression (TVE).
+     * This is used when generating a join node's output schema as a way of serializing something concise to the EE.
+     * TODO: If the EE allowed a SchemaColumn expressions to be optional, null might be a better choice.
+     * In other words, the EE should not ever have to evaluate these expressions,
+     * since the actual join output is driven solely from the child output schema.
      */
-    NodeSchema copyAndReplaceWithTVE()
+    public NodeSchema joinViaTVEs(NodeSchema inner)
     {
-        NodeSchema copy = new NodeSchema();
-        for (int i = 0; i < m_columns.size(); ++i)
-        {
-            copy.addColumn(m_columns.get(i).copyAndReplaceWithTVE());
+        NodeSchema tveCopy = new NodeSchema();
+        // As an aide to debugging, the TVEs are indexed sequentially by their position in the join output.
+        int index = 0;
+        for (SchemaColumn column : m_columns) {
+            tveCopy.addColumn(column.coverWithTVE(index++));
         }
-        return copy;
-    }
-
-    /**
-     * Combine the provided schema to this schema and return the result
-     * as a new schema.
-     */
-    NodeSchema join(NodeSchema schema)
-    {
-        NodeSchema copy = null;
-        copy = schema.clone();
-        for (int i = 0; i < m_columns.size(); ++i)
-        {
-            copy.addColumn(m_columns.get(i).clone());
+        for (SchemaColumn column : inner.m_columns) {
+            tveCopy.addColumn(column.coverWithTVE(index++));
         }
-        return copy;
+        return tveCopy;
     }
 
     @Override
@@ -204,5 +195,12 @@ public class NodeSchema
     }
 
     private ArrayList<SchemaColumn> m_columns;
+
+    @Override
+    public Iterator<SchemaColumn> iterator() {
+        // TODO Auto-generated method stub
+        return m_columns.iterator();
+    }
+
 }
 

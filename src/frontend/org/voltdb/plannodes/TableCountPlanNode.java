@@ -32,11 +32,16 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
 
     public TableCountPlanNode(AbstractScanPlanNode child, AggregatePlanNode apn) {
         super();
-        m_outputSchema = apn.getOutputSchema().clone();
+        // The main point of the output schema is its type (BIGINT) and alias.
+        // The apn's originally assigned output schema is fine for that.
+        // It doesn't matter whether the internals of apn/child have been normalized via generateOutputSchema().
+        // TODO: In this context, the output schema may drag along a count expression which will get needlessly serialized to the EE.
+        // The solution would involve the EE deserializer accepting ColumnSchema with missing expressions.
+        // Then cases like this in which the expression does not matter it could be set null.
+        m_outputSchema = apn.getOutputSchema();
         m_estimatedOutputTupleCount = 1;
         m_targetTableAlias = child.getTargetTableAlias();
         m_targetTableName = child.getTargetTableName();
-        m_tableSchema = child.getTableSchema();
     }
 
     @Override
@@ -45,17 +50,10 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db){}
-
-    @Override
-    public void resolveColumnIndexes(){}
+    public NodeSchema generateOutputSchema(Database db) { return m_outputSchema; }
 
     @Override
     public void computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-//        Table target = db.getTables().getIgnoreCase(m_targetTableName);
-//        assert(target != null);
-//        DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
-//        stats.incrementStatistic(0, StatsField.TUPLES_READ, tableEstimates.maxTuples);
         m_estimatedOutputTupleCount = 1;
     }
 

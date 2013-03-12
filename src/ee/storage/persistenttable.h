@@ -187,6 +187,14 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     voltdb::TableTuple lookupTuple(TableTuple tuple);
 
     // ------------------------------------------------------------------
+    // COLUMNS
+    // ------------------------------------------------------------------
+    const std::vector<std::string>& getColumnNames() const {
+        return m_columnNames;
+    }
+
+
+    // ------------------------------------------------------------------
     // UTILITY
     // ------------------------------------------------------------------
     std::string tableType() const;

@@ -329,6 +329,9 @@ tupleValueFactory(json_spirit::Object &obj, ExpressionType et,
     json_spirit::Value valueIdxValue =
       json_spirit::find_value( obj, "COLUMN_IDX");
 
+    json_spirit::Value isInner =
+      json_spirit::find_value(obj, "COLUMN_ISINNER");
+
     json_spirit::Value tableName =
       json_spirit::find_value(obj, "TABLE_NAME");
 
@@ -357,10 +360,17 @@ tupleValueFactory(json_spirit::Object &obj, ExpressionType et,
                                       " TVE");
     }
 
+    bool isInnerFlag;
+    if (isInner == json_spirit::Value::null) {
+        isInnerFlag = false; // The value is optional, defaulting to false.
+    } else {
+        isInnerFlag = isInner.get_str() == "1";
+    }
 
     return new TupleValueExpression(valueIdxValue.get_int(),
                                     tableName.get_str(),
-                                    columnName.get_str());
+                                    columnName.get_str(),
+                                    isInnerFlag);
 }
 
 AbstractExpression *

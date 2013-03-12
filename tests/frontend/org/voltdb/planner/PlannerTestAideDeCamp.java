@@ -196,8 +196,7 @@ public class PlannerTestAideDeCamp {
 
         // Output Columns
         int index = 0;
-        for (SchemaColumn col : plan.columns.getColumns())
-        {
+        for (SchemaColumn col : plan.rootPlanGraph.getEffectiveOutputSchema()) {
             Column catColumn = catalogStmt.getOutput_columns().add(String.valueOf(index));
             catColumn.setNullable(false);
             catColumn.setIndex(index);

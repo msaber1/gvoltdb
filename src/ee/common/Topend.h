@@ -17,9 +17,9 @@
 
 #ifndef TOPEND_H_
 #define TOPEND_H_
+#include "common/FatalException.hpp"
 #include "common/ids.h"
 #include <string>
-#include "common/FatalException.hpp"
 #include "storage/StreamBlock.h"
 
 namespace voltdb {

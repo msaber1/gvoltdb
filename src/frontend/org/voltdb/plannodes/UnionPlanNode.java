@@ -20,11 +20,11 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONStringer;
 import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.PlanNodeType;
 import org.voltdb.planner.ParsedUnionStmt;
+import org.voltdb.types.PlanNodeType;
 
 public class UnionPlanNode extends AbstractPlanNode {
 
@@ -50,37 +50,26 @@ public class UnionPlanNode extends AbstractPlanNode {
         return PlanNodeType.UNION;
     }
 
-    @Override
-    public void resolveColumnIndexes()
-    {
-        // Should be at least two children in a union
-        assert(m_children.size() > 1);
-        for (AbstractPlanNode child : m_children)
-        {
-            child.resolveColumnIndexes();
-        }
-    }
-
     public ParsedUnionStmt.UnionType getUnionType() {
         return m_unionType;
     }
 
     @Override
-    public void generateOutputSchema(Database db)
+    public NodeSchema generateOutputSchema(Database db)
     {
-        // Should be at least two selects in a join
+        // Should be at least two selects in a union
         assert(m_children.size() > 1);
-        // The output schema for the union is the output schema from the first expression
-        m_children.get(0).generateOutputSchema(db);
-        m_outputSchema = m_children.get(0).getOutputSchema();
-        ArrayList<SchemaColumn> outputColumns = m_outputSchema.getColumns();
+        // The output schema for the union is the output schema from the first child select.
+        // That's the default represented by a null m_outputSchema.
+        NodeSchema top_schema = m_children.get(0).generateOutputSchema(db);
+        m_outputSchema = null;
+        ArrayList<SchemaColumn> outputColumns = top_schema.getColumns();
 
         // Then generate schemas for the remaining ones and make sure that they are identical
         for (int i = 1; i < m_children.size(); ++i)
         {
             AbstractPlanNode child = m_children.get(i);
-            child.generateOutputSchema(db);
-            NodeSchema schema = child.getOutputSchema();
+            NodeSchema schema = child.generateOutputSchema(db);
             ArrayList<SchemaColumn> columns = schema.getColumns();
             if (columns.size() != outputColumns.size()) {
                 throw new RuntimeException("Column number mismatch detected in rows of UNION");
@@ -91,8 +80,7 @@ public class UnionPlanNode extends AbstractPlanNode {
                 }
             }
         }
-        m_outputSchema = m_children.get(0).getOutputSchema();
-        // Then check that they have the same types
+        return top_schema;
    }
 
     @Override

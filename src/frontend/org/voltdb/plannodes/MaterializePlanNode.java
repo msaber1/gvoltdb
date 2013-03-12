@@ -23,7 +23,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.types.PlanNodeType;
 
-public class MaterializePlanNode extends ProjectionPlanNode {
+public class MaterializePlanNode extends AbstractPlanNode {
 
     public enum Members {
         BATCHED;
@@ -48,20 +48,22 @@ public class MaterializePlanNode extends ProjectionPlanNode {
         return m_batched;
     }
 
+    /**
+     * Set the output schema.  This schema will be treated as immutable during the planning.
+     * @param schema
+     */
+    public void setOutputSchema(NodeSchema schema)
+    {
+        m_outputSchema = schema.clone();
+    }
+
     @Override
-    public void generateOutputSchema(Database db)
+    public NodeSchema generateOutputSchema(Database db)
     {
         // MaterializePlanNodes have no children
         assert(m_children.size() == 0);
         // MaterializePlanNode's output schema is pre-determined, don't touch
-        return;
-    }
-
-    @Override
-    public void resolveColumnIndexes()
-    {
-        // MaterializePlanNodes have no children
-        assert(m_children.size() == 0);
+        return m_outputSchema;
     }
 
     @Override
@@ -72,7 +74,7 @@ public class MaterializePlanNode extends ProjectionPlanNode {
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
+        helpLoadFromJSONObject(jobj, db);
         m_batched = jobj.getBoolean( Members.BATCHED.name() );
     }
 

@@ -194,6 +194,27 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testSP() throws Exception {
+
+        /*// IFDEF-LIKE HACK: Toggle this one line's comment style
+        // between '//' and '/*' to magically switch between...
+
+        // ... this TestEnv/LocalCluster-based config...
+
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        try {
+            env.setUp();
+            m_client = env.m_client;
+            runSP();
+        }
+        finally {
+            m_client = null;
+            env.tearDown();
+        }
+
+        /*/ // (This funky comment line is the pivotal ELSE component to the IFDEF-LIKE HACK.)
+
+        // ...and this LocalServer-based config...
+
         VoltDB.Configuration config = setUpSPDB();
         ServerThread localServer = new ServerThread(config);
 
@@ -204,6 +225,24 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // do the test
             m_client = ClientFactory.createClient();
             m_client.createConnection("localhost", config.m_port);
+            runSP();
+        }
+        finally {
+            if (m_client != null) m_client.close();
+            m_client = null;
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+            localServer = null;
+            // no clue how helpful this is
+            System.gc();
+        }
+        // (This funky comment acts as the ENDIF for the IFDEF-LIKE HACK) */
+    }
+
+    public void runSP() throws Exception {
+        try {
 
             VoltTable modCount;
 
@@ -252,17 +291,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             runAllAdHocSPtests();
         }
         finally {
-            if (m_client != null) m_client.close();
-            m_client = null;
-
-            if (localServer != null) {
-                localServer.shutdown();
-                localServer.join();
-            }
-            localServer = null;
-
-            // no clue how helpful this is
-            System.gc();
         }
     }
 
@@ -790,8 +818,21 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("Failed to set up schema");
             }
 
-            m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
-                                         BackendTarget.NATIVE_EE_JNI,
+            m_cluster = new LocalCluster(pathToCatalog,
+                                         //*// IFDEF-LIKE HACK: Toggle this one funky line's comment style
+                                         // between '//' and '/*' to magically switch between...
+
+                                         // ...these NORMAL configuration arguments ...
+
+                                         siteCount, hostCount, kFactor, BackendTarget.NATIVE_EE_JNI, // NORMAL
+
+                                         /*/ // (This funky comment line is the pivotal ELSE component to the IFDEF-LIKE HACK.)
+
+                                         // ... and the DEBUG configuration arguments listed here ...
+                                         1, 1, 0, BackendTarget.NATIVE_EE_IPC, // DEBUG
+
+                                         // (This funky comment acts as the ENDIF for the IFDEF-LIKE HACK) */
+
                                          LocalCluster.FailureState.ALL_RUNNING,
                                          m_debug);
             m_cluster.setHasLocalServer(false);

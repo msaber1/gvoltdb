@@ -17,26 +17,11 @@
 
 #include "SegvException.hpp"
 
-// #include "common/debuglog.h"
-// #include "common/serializeio.h"
-// #include "common/Pool.hpp"
-// #include "common/FatalException.hpp"
-// #include "common/RecoveryProtoMessage.h"
-// #include "execution/IPCTopend.h"
-// #include "execution/VoltDBEngine.h"
-
-// #include <cassert>
-// #include <cstdlib>
-// #include <iostream>
-#include <string>
+#include <string.h>
 #include <dlfcn.h>
+#include <cxxabi.h>
+#include <cstdlib>
 
-// #include <arpa/inet.h>
-// #include <unistd.h>
-// #include <sys/types.h>
-// #include <sys/socket.h>
-// #include <netinet/in.h>
-// #include <netinet/tcp.h>
 
 using namespace std;
 using namespace voltdb;
@@ -47,6 +32,8 @@ using namespace voltdb;
  *
  * The code is modified based on the original code found at
  * http://tlug.up.ac.za/wiki/index.php/Obtaining_a_stack_trace_in_C_upon_SIGSEGV
+ *TODO: do a bake-off between this code and the stack trace code in FatalException and either standardize
+ * on the winner or combine the best features.
  *
  * This source file is used to print out a stack-trace when your program
  * segfaults. It is relatively reliable and spot-on accurate.

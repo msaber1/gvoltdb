@@ -396,6 +396,17 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
         }
+#ifndef NDEBUG
+        // These errors should be ones detected in DEBUG code and DEFINITELY caused by bugs, often planner bugs.
+        // They should NOT be due to circumstances like resource issues that could happen in production outside
+        // our control -- those should all get funneled into the first catch, above.
+        catch (FatalLogicError& unintended) {
+            // Add context to this backend's last words, useful for "external" debugging
+            // -- they DO somehow make it out to the console when thrown here.
+            appendAnnotationToFatalLogicError(unintended, "...while executing:\n" << executor->getPlanNode()->debug(true));
+            throw;
+        }
+#endif
     }
     if (cleanUpTable != NULL)
         cleanUpTable->deleteAllTuples(false);

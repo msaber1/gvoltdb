@@ -199,6 +199,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
     public void testTicketENG1232() throws Exception {
+        System.out.println("STARTING testTicketENG1232");
         Client client = getClient();
 
         client.callProcedure("@AdHoc", "insert into test_eng1232 VALUES(9);");
@@ -220,6 +221,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     public void testInsertNullPartitionString() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testInsertNullPartitonString");
         // This test is for issue ENG-697
         Client client = getClient();
         boolean caught = false;
@@ -239,12 +241,38 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertTrue(caught);
     }
 
-    public void testTicket309() throws IOException, ProcCallException
+    public void testAssortedQueryTickets() throws IOException, ProcCallException
     {
+        subtestAndExpressionComparingSameTableColumns();
+        subtestSelectExpression();
+        subtestGreaterThanOnOrderedIndex();
+        subtestTicket196();
+        subtestTicket201();
+        // subtestTicket205();
+        subtestTicket216();
+        subtestTicket194();
+        subtestTickets227And228();
+        subtestTicket220();
+        subtestTicket221();
+        subtestTicket222();
+        subtestTicket224();
+        subtestTicket226();
+        subtestTicket231();
+        subtestTicket232();
+        subtestTicket293();
+        subtestTicketEng397();
+        // subtestTicketEng490();
+        subtestTicketEng993();
+        subtestTicketEng1316();
+    }
+
+    private void subtestTicket309() throws IOException, ProcCallException
+    {
+        System.out.println("STARTING testTicket309");
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 2, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 3, "desc", 100, 14.5);
@@ -288,13 +316,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // which would return results any time TABLE.ID = value was true,
     // regardless of whether the second expression was true.
     //
-    public void testAndExpressionComparingSameTableColumns()
+    private void subtestAndExpressionComparingSameTableColumns()
     throws IOException, ProcCallException
     {
+        System.out.println("STARTING testAndExpressionComparingSameTableColumns");
         String[] tables = {"P1", "R1"};
-        for (String table : tables)
-        {
-            Client client = getClient();
+        Client client = getClient();
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 5, "desc", 10, 14.5);
             client.callProcedure("Insert", table, 15, "desc2", 10, 14.5);
             // These queries should result in no rows, but the defect in
@@ -331,13 +360,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // @throws IOException
     // @throws ProcCallException
     //
-    public void testSeqScanFailedPredicateDoesntCountAgainstLimit()
+    private void subtestSeqScanFailedPredicateDoesntCountAgainstLimit()
     throws IOException, ProcCallException
     {
+        System.out.println("STARTING testSeqScanFailedPredicateDoesntCountAgainstLimit");
         String[] tables = {"P1", "R1"};
-        for (String table : tables)
-        {
-            Client client = getClient();
+        Client client = getClient();
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             // our predicate is going to be ID < NUM.
             // Insert one row where this is false
             client.callProcedure("Insert", table, 1, "desc", -1, 14.5);
@@ -365,13 +395,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // Note: Adding 5.5 in the third test here also tests a "fix" in
     // HSQL where we coerce the type of numeric literals from NUMERIC to DOUBLE
     //
-    public void testSelectExpression()
+    private void subtestSelectExpression()
     throws IOException, ProcCallException
     {
+        System.out.println("STARTING testSelectExpression");
         String[] tables = {"P1", "R1"};
-        for (String table : tables)
-        {
-            Client client = getClient();
+        Client client = getClient();
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 1, "desc", 2, 14.5);
             String query = String.format("select %s.ID + 10 from %s",
                                          table, table);
@@ -406,10 +437,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // understand which column(s) needed to be evaluated by the TVE's
     // operators.
     //
-    public void testNestLoopJoinPredicates()
+    private void subtestNestLoopJoinPredicates()
     throws IOException, ProcCallException
     {
+        System.out.println("STARTING testNestLoopJoinPredicates");
         Client client = getClient();
+        client.callProcedure("@AdHoc", "delete from R1");
+        client.callProcedure("@AdHoc", "delete from P1");
         for (int id=0; id < 5; id++) {
             // insert id, (5-id) in to P1
             client.callProcedure("Insert", "P1", id, "desc", (5-id), 2.5);
@@ -419,30 +453,30 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // join on the (5-id), (id) columns
         String query = "select * from P1, R1 where P1.NUM = R1.NUM";
         VoltTable vts[] = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicates_verify(vts);
+        nestLoopJoinPredicates_verify(vts);
 
         // same thing using inner join syntax
         query = "select * from P1 INNER JOIN R1 on P1.NUM = R1.NUM";
         vts = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicates_verify(vts);
+        nestLoopJoinPredicates_verify(vts);
 
         // join on ID and verify NUM. (ID is indexed)
         query = "select * from P1, R1 where P1.ID = R1.ID";
         vts = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicates_verifyid(vts);
+        nestLoopJoinPredicates_verifyid(vts);
 
         // as above with inner join syntax
         query = "select * from P1 INNER JOIN R1 on P1.ID = R1.ID";
         vts = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicates_verifyid(vts);
+        nestLoopJoinPredicates_verifyid(vts);
     }
 
-    private void testNestLoopJoinPredicates_verifyid(VoltTable[] vts) {
+    private void nestLoopJoinPredicates_verifyid(VoltTable[] vts)
+    {
         assertEquals(1, vts.length);
-        System.out.println("verifyid: " + vts[0]);
         assertTrue(vts[0].getRowCount() == 5);
 
-        for (int i=0; vts[0].advanceRow(); ++i) {
+        while(vts[0].advanceRow()) {
             int p_id = ((Integer)vts[0].get(0, VoltType.INTEGER)).intValue();
             int r_id = ((Integer)vts[0].get(4, VoltType.INTEGER)).intValue();
             int p_n =  ((Integer)vts[0].get(2, VoltType.INTEGER)).intValue();
@@ -453,16 +487,15 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    private void testNestLoopJoinPredicates_verify(VoltTable[] vts)
+    private void nestLoopJoinPredicates_verify(VoltTable[] vts)
     {
         assertEquals(1, vts.length);
-        System.out.println(vts[0]);
         assertTrue(vts[0].getRowCount() == 4);
 
         // the id of the first should be (5-id) in the second
         // because of the insertion trickery done above
         // verifies trac #125
-        for (int i=0; vts[0].advanceRow(); ++i) {
+        while(vts[0].advanceRow()) {
             int id1 = ((Integer)vts[0].get(0, VoltType.INTEGER)).intValue();
             int id2 = ((Integer)vts[0].get(4, VoltType.INTEGER)).intValue();
             assertEquals(id1, (5 - id2));
@@ -480,6 +513,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     public void testNestLoopJoinPredicatesWithExpressions()
     throws IOException, ProcCallException
     {
+        System.out.println("STARTING testNestLoopJoinPredicatesWthExpressions");
         Client client = getClient();
         for (int id=0; id < 5; id++) {
             // insert id, (5-id) in to P1
@@ -490,18 +524,18 @@ public class TestFixedSQLSuite extends RegressionSuite {
         // join on the (5-id), (id) columns and select a value modified by an expression
         String query = "select (P1.ID + 20), (R1.ID + 40) from P1, R1 where P1.NUM = R1.NUM";
         VoltTable vts[] = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicatesWithExpressions_verify(vts);
+        nestLoopJoinPredicatesWithExpressions_verify(vts);
 
         // same thing using inner join syntax
         query = "select (P1.ID + 20), (R1.ID + 40) from P1 INNER JOIN R1 on P1.NUM = R1.NUM";
         vts = client.callProcedure("@AdHoc", query).getResults();
-        testNestLoopJoinPredicatesWithExpressions_verify(vts);
+        nestLoopJoinPredicatesWithExpressions_verify(vts);
     }
 
-    private void testNestLoopJoinPredicatesWithExpressions_verify(
-            VoltTable[] vts) {
+    private void nestLoopJoinPredicatesWithExpressions_verify(VoltTable[] vts)
+    {
         assertEquals(1, vts.length);
-        System.out.println(vts[0]);
+        System.out.println("STARTING testNestLoopJoinPredicatesWithExpressions_verify " + vts[0]);
         assertTrue(vts[0].getRowCount() == 4);
 
         // the id of the first should be (5-id) in the second once the addition
@@ -528,7 +562,10 @@ public class TestFixedSQLSuite extends RegressionSuite {
     public void testNestLoopJoinPredicatesWithAliases()
     throws IOException, ProcCallException
     {
+        System.out.println("STARTING testNestLoopJoinPredicatesWithAliases");
         Client client = getClient();
+        client.callProcedure("@AdHoc", "delete from P1");
+        client.callProcedure("@AdHoc", "delete from R1");
         for (int id=0; id < 5; id++) {
             // insert id, (5-id) in to P1
             client.callProcedure("Insert", "P1", id, "desc", (5-id), 2.5);
@@ -549,7 +586,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     private void testNestLoopJoinPredicatesWithAliases_verify(VoltTable[] vts) {
         assertEquals(1, vts.length);
-        System.out.println(vts[0]);
+        System.out.println("STARTING testNestLoopJoinPredicatesWithAliases_verify " + vts[0]);
         assertTrue(vts[0].getRowCount() == 4);
 
         // the id of the first should be (5-id) in the second once the addition
@@ -577,13 +614,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
     // @throws IOException
     // @throws ProcCallException
     //
-    public void testGreaterThanOnOrderedIndex()
+    private void subtestGreaterThanOnOrderedIndex()
     throws IOException, ProcCallException
     {
+        System.out.println("STARTING testGreaterThanOnOrderedIndex");
         String[] tables = {"P2", "R2"};
         Client client = getClient();
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 2, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 3, "desc", 100, 14.5);
@@ -607,12 +645,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    public void testTicket196() throws IOException, ProcCallException
+    private void subtestTicket196() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket196");
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 2, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 3, "desc", 100, 14.5);
@@ -668,12 +707,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertEquals(4, results[0].getLong(0));
     }
 
-    public void testTicket201() throws IOException, ProcCallException
+    private void subtestTicket201() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket201");
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 2, "desc", 200, 14.5);
             client.callProcedure("Insert", table, 3, "desc", 300, 14.5);
@@ -695,12 +735,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    //public void testTicket205() throws IOException, ProcCallException
+    //private void subtestTicket205() throws IOException, ProcCallException
     //{
+    //    System.out.println("STARTING testTicket205");
     //    String[] tables = {"P1", "R1", "P2", "R2"};
     //    Client client = getClient();
-    //    for (String table : tables)
-    //    {
+    //    for (String table : tables) {
+    //        client.callProcedure("@AdHoc", "delete from " + table);
     //        client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
     //        client.callProcedure("Insert", table, 2, "desc", 200, 14.5);
     //        client.callProcedure("Insert", table, 3, "desc", 300, 14.5);
@@ -718,12 +759,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
     //    }
     //}
 
-    public void testTicket216() throws IOException, ProcCallException
+    private void subtestTicket216() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket216");
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 1, "desc", 100, 100.0);
             client.callProcedure("Insert", table, 2, "desc", 200, 200.0);
             client.callProcedure("Insert", table, 3, "desc", 300, 300.0);
@@ -746,12 +788,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
 
-    public void testTicket194() throws IOException, ProcCallException
+    private void subtestTicket194() throws IOException, ProcCallException
     {
+        System.out.println("STARTING tesTicket194");
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 2, "desc", 200, 14.5);
             client.callProcedure("Insert", table, 3, "desc", 300, 14.5);
@@ -770,12 +813,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
 
-    public void testTickets227And228() throws IOException, ProcCallException
+    private void subtestTickets227And228() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTickets227And228");
         String[] tables = {"P2", "R2"};
         Client client = getClient();
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 2, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 3, "desc", 100, 14.5);
@@ -805,13 +849,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertEquals(18, results[0].getRowCount());
     }
 
-    public void testTicket220() throws IOException, ProcCallException
+    private void subtestTicket220() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket220");
         String[] tables = {"P1", "R1"};
         Client client = getClient();
         int id = 0;
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, id++, "desc", 100, 14.5);
             client.callProcedure("Insert", table, id++, "desc", 100, 14.5);
             client.callProcedure("Insert", table, id++, "desc", 100, 14.5);
@@ -834,6 +879,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
     //
     public void testForHSQLDecimalFailures() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testForHSQLDecimalFailures");
         Client client = getClient();
         String sql =
             "INSERT INTO R1_DECIMAL VALUES (26, 307473.174514, 289429.605067, 9.71903320295135486617e-01)";
@@ -845,6 +891,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     public void testTicket310() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket310");
         Client client = getClient();
         String sql =
             "INSERT INTO R1_DECIMAL VALUES (26, 307473.174514, 289429.605067, 9.71903320295135486617e-01)";
@@ -873,6 +920,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     public void testNumericExpressionConversion() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testNumericExpressionConversion");
         VoltTable[] results;
         Client client = getClient();
 
@@ -895,13 +943,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertEquals(1, results[0].asScalarLong());
     }
 
-    public void testTicket221() throws IOException, ProcCallException
+    private void subtestTicket221() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket221");
         String[] tables = {"P1", "R1"};
         Client client = getClient();
         int id = 0;
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, id++, "desc", 100, 14.5);
             client.callProcedure("Insert", table, id++, "desc", 200, 15.5);
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
@@ -917,13 +966,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    public void testTicket222() throws IOException, ProcCallException
+    private void subtestTicket222() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket222");
         String[] tables = {"P1", "R1"};
         Client client = getClient();
         int id = 0;
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, id++, "desc", 100, 14.5);
             client.callProcedure("Insert", table, id++, "desc", 200, 15.5);
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
@@ -937,13 +987,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
         System.out.println("i: " + results[0].getLong(0));
     }
 
-    public void testTicket224() throws IOException, ProcCallException
+    private void subtestTicket224() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket224");
         String[] tables = {"P1", "R1"};
         Client client = getClient();
         int id = 0;
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, id++, "desc", 100, 14.5);
             client.callProcedure("Insert", table, id++, "desc", 200, 15.5);
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
@@ -960,13 +1011,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    public void testTicket226() throws IOException, ProcCallException
+    private void subtestTicket226() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket226");
         String[] tables = {"P1", "R1"};
         Client client = getClient();
         int id = 0;
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, id++, "desc", 100, 14.5);
             client.callProcedure("Insert", table, id++, "desc", 200, 15.5);
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
@@ -987,12 +1039,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
         }
     }
 
-    public void testTicket231() throws IOException, ProcCallException
+    private void subtestTicket231() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket231");
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 2, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 3, "desc", 200, 14.5);
@@ -1017,13 +1070,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
 
-
-    public void testTicket232() throws IOException, ProcCallException
+    private void subtestTicket232() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket232");
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, 1, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 2, "desc", 100, 14.5);
             client.callProcedure("Insert", table, 3, "desc", 200, 14.5);
@@ -1039,13 +1092,14 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
 
-    public void testTicket293() throws IOException, ProcCallException
+    private void subtestTicket293() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicket293");
         String[] tables = {"P1", "R1", "P2", "R2"};
         Client client = getClient();
         int id = 0;
-        for (String table : tables)
-        {
+        for (String table : tables) {
+            client.callProcedure("@AdHoc", "delete from " + table);
             client.callProcedure("Insert", table, id++, "desc", 100, 14.5);
             client.callProcedure("Insert", table, id++, "desc", 200, 15.5);
             client.callProcedure("Insert", table, id++, "desc", 300, 16.5);
@@ -1062,9 +1116,11 @@ public class TestFixedSQLSuite extends RegressionSuite {
         assertEquals(4, results[0].getRowCount());
     }
 
-    public void testTicketEng397() throws IOException, ProcCallException
+    private void subtestTicketEng397() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicketEng397");
         Client client = getClient();
+        client.callProcedure("@AdHoc", "delete from P1");
         for (int i=0; i < 20; i++) {
             client.callProcedure("Insert", "P1", i, "desc", 100 + i, 4.5);
         }
@@ -1087,7 +1143,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
     // RE-ENABLE ONCE ENG-490 IS FIXED
-    //public void testTicketEng490() throws IOException, ProcCallException {
+    //private void subtestTicketEng490() throws IOException, ProcCallException {
+    //    System.out.println("STARTING testTicketEng490");
     //    Client client = getClient();
     //
     //    VoltTable[] results = client.callProcedure("Eng490Select");
@@ -1099,8 +1156,9 @@ public class TestFixedSQLSuite extends RegressionSuite {
     //    assertEquals(1, results.length);
     //}
 
-    public void testTicketEng993() throws IOException, ProcCallException
+    private void subtestTicketEng993() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicketEng993");
         Client client = getClient();
         // this tests some other mumbo jumbo as well like ENG-999 and ENG-1001
         ClientResponse response = client.callProcedure("Eng993Insert", 5, 5.5);
@@ -1132,12 +1190,13 @@ public class TestFixedSQLSuite extends RegressionSuite {
     }
 
     /**
-     * Verify that DML returns correctly named "modified_tuple" column name
+     * Verify that DML returns correctly named "modified_tuples" column name
      * @throws IOException
      * @throws ProcCallException
      */
-    public void testTicketEng1316() throws IOException, ProcCallException
+    private void subtestTicketEng1316() throws IOException, ProcCallException
     {
+        System.out.println("STARTING testTicketEng1316");
         // Fake HSQL. Only care about Volt column naming code.
         if (isHSQL())
         {
@@ -1187,6 +1246,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
     // make sure we can call an inner proc
     public void testTicket2423() throws NoConnectionsException, IOException, ProcCallException, InterruptedException {
+        System.out.println("STARTING testTicket2423");
         Client client = getClient();
         client.callProcedure("TestFixedSQLSuite$InnerProc");
         releaseClient(client);
@@ -1234,19 +1294,20 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addStmtProcedure("Eng1316Insert_P1", "insert into P1 values (?, ?, ?, ?);", "P1.ID: 0");
         project.addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?", "P1.ID: 0");
 
-        // CONFIG #1: JNI
+        /*// CONFIG #1: JNI
         config = new LocalCluster("fixedsql-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        //*/ config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
-        // CONFIG #2: HSQL
+        /*// CONFIG #2: HSQL
         config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
-        // no cluster tests for SQL fixes
+        //*/
 
         return builder;
     }

@@ -33,12 +33,14 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     public enum Members {
         COLUMN_IDX,
+        COLUMN_ISINNER,
         TABLE_NAME,
         COLUMN_NAME,
-        COLUMN_ALIAS
+        COLUMN_ALIAS,
     }
 
     protected int m_columnIndex = -1;
+    private boolean m_isInner = false; // Needs to be true for some TVEs used in join predicates.
     protected String m_tableName = null;
     protected String m_columnName = null;
     protected String m_columnAlias = null;
@@ -85,15 +87,19 @@ public class TupleValueExpression extends AbstractValueExpression {
     /**
      * @return the column index
      */
-    public Integer getColumnIndex() {
+    public int getColumnIndex() {
         return m_columnIndex;
     }
 
     /**
      * @param columnIndex The index of the column to set
      */
-    public void setColumnIndex(Integer columnIndex) {
+    public void setColumnIndex(int columnIndex) {
         m_columnIndex = columnIndex;
+    }
+
+    public void setIsInner() {
+        m_isInner = true;
     }
 
     /**
@@ -182,6 +188,9 @@ public class TupleValueExpression extends AbstractValueExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.COLUMN_IDX.name()).value(m_columnIndex);
+        if (m_isInner) {
+            stringer.key(Members.COLUMN_ISINNER.name()).value("1");
+        }
         stringer.key(Members.TABLE_NAME.name()).value(m_tableName);
         stringer.key(Members.COLUMN_NAME.name()).value(m_columnName);
         stringer.key(Members.COLUMN_ALIAS.name()).value(m_columnAlias);
@@ -190,6 +199,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     @Override
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
+        m_isInner = ( ! obj.isNull(Members.COLUMN_ISINNER.name()) ) &&
+                    "1".equals(obj.getString(Members.COLUMN_ISINNER.name()));
         m_tableName = obj.getString(Members.TABLE_NAME.name());
         m_columnName = obj.getString(Members.COLUMN_NAME.name());
         m_columnAlias = obj.getString(Members.COLUMN_ALIAS.name());
@@ -251,6 +262,5 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
         return false;
     }
-
 
 }

@@ -306,15 +306,13 @@ public class QueryPlanner {
             return null;
         }
 
-        if (bestPlan.readOnly == true) {
-            SendPlanNode sendNode = new SendPlanNode();
-            // connect the nodes to build the graph
-            sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
-            // this plan is final, generate schema and resolve all the column index references
-            sendNode.generateOutputSchema(m_db);
-            sendNode.resolveColumnIndexes();
-            bestPlan.rootPlanGraph = sendNode;
-        }
+        SendPlanNode sendNode = new SendPlanNode();
+        // connect the nodes to build the graph
+        sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
+        // this plan is final, generate schema and resolve all the column index references
+        sendNode.generateOutputSchema(m_db);
+        bestPlan.rootPlanGraph = sendNode;
+
         // Output the best plan debug info
         assembler.finalizeBestCostPlan();
 

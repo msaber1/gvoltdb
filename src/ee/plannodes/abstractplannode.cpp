@@ -229,20 +229,25 @@ AbstractPlanNode::getOutputTable() const
 const vector<SchemaColumn*>&
 AbstractPlanNode::getOutputSchema() const
 {
-    return m_outputSchema;
+    if (m_outputSchema.size() > 0 || m_children.size() == 0) {
+        return m_outputSchema;
+    }
+    // An empty output schema is supposed to signify a pass-through node that uses the
+    // same output schema as its first child.
+    return m_children[0]->getOutputSchema();
 }
 
 TupleSchema*
 AbstractPlanNode::generateTupleSchema(bool allowNulls)
 {
-    int schema_size = static_cast<int>(m_outputSchema.size());
+    const vector<SchemaColumn*>& effectiveOutputSchema = getOutputSchema(); // Not always == m_outputSchema.
+    int schema_size = static_cast<int>(effectiveOutputSchema.size());
     vector<voltdb::ValueType> columnTypes;
     vector<int32_t> columnSizes;
     vector<bool> columnAllowNull(schema_size, allowNulls);
 
-    for (int i = 0; i < schema_size; i++)
-    {
-        SchemaColumn* col = m_outputSchema[i];
+    for (int i = 0; i < schema_size; i++) {
+        SchemaColumn* col = effectiveOutputSchema[i];
         columnTypes.push_back(col->getExpression()->getValueType());
         columnSizes.push_back(col->getExpression()->getValueSize());
     }
@@ -340,22 +345,17 @@ AbstractPlanNode::fromJSONObject(Object &obj) {
         node->m_childIds.push_back(childNodeId);
     }
 
+    // OUTPUT_SCHEMA is optional.
+    // The default is to leave the member vector empty and use the first child node's schema.
     Value outputSchemaValue = find_value(obj, "OUTPUT_SCHEMA");
-    if (outputSchemaValue == Value::null)
-    {
-        delete node;
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AbstractPlanNode::loadFromJSONObject:"
-                                      " Can't find OUTPUT_SCHEMA value");
-    }
-    Array outputSchemaArray = outputSchemaValue.get_array();
+    if ( ! (outputSchemaValue == Value::null) ) {
+        Array outputSchemaArray = outputSchemaValue.get_array();
 
-    for (int ii = 0; ii < outputSchemaArray.size(); ii++)
-    {
-        Value outputColumnValue = outputSchemaArray[ii];
-        SchemaColumn* outputColumn =
-            new SchemaColumn(outputColumnValue.get_obj());
-        node->m_outputSchema.push_back(outputColumn);
+        for (int ii = 0; ii < outputSchemaArray.size(); ii++) {
+            Value outputColumnValue = outputSchemaArray[ii];
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue.get_obj());
+            node->m_outputSchema.push_back(outputColumn);
+        }
     }
 
     try {
@@ -390,9 +390,15 @@ string
 AbstractPlanNode::debug(const string& spacer) const
 {
     ostringstream buffer;
-    buffer << spacer << "* " << this->debug() << "\n";
+    buffer << spacer << "* " << debug() << "\n";
     string info_spacer = spacer + "  |";
-    buffer << this->debugInfo(info_spacer);
+    if (m_outputSchema.size() > 0) {
+        buffer << info_spacer << "Projecting:\n";
+        for (int ii = 0; ii < m_outputSchema.size(); ii++) {
+            buffer << m_outputSchema[ii]->debugInfo(info_spacer + "  ");
+        }
+    }
+    buffer << debugInfo(info_spacer);
     //
     // Inline PlanNodes
     //

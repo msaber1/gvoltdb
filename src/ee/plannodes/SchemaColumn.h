@@ -51,6 +51,8 @@ public:
     // the expression
     AbstractExpression* getExpression();
 
+    std::string debugInfo(const std::string& spacer) const;
+
 private:
     const json_spirit::Object& m_colObject;
 

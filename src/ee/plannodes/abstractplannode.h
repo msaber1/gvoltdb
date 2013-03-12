@@ -194,7 +194,7 @@ protected:
     //
     std::map<PlanNodeType, AbstractPlanNode*> m_inlineNodes;
     bool m_isInline;
-
+private:
     std::vector<SchemaColumn*> m_outputSchema;
 };
 

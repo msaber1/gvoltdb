@@ -19,7 +19,6 @@
 #define IPCTOPEND_H_
 #include "common/Topend.h"
 #include "common/Pool.hpp"
-#include "common/FatalException.hpp"
 
 class VoltDBIPC;
 

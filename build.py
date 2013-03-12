@@ -196,6 +196,7 @@ CTX.INPUT['structures'] = """
 CTX.INPUT['common'] = """
  CompactingStringPool.cpp
  CompactingStringStorage.cpp
+ FatalException.cpp
  ThreadLocalPool.cpp
  SegvException.cpp
  SerializableEEException.cpp

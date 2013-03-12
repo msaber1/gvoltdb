@@ -46,6 +46,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
     protected List<SortDirectionType> m_sortDirections = new ArrayList<SortDirectionType>();
 
     private boolean m_orderingByUniqueColumns = false;
+    private boolean m_orderingByAllColumns = false;
 
     public OrderByPlanNode() {
         super();
@@ -102,20 +103,11 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     private boolean orderingByAllColumns() {
-        NodeSchema schema = getOutputSchema();
-        for (SchemaColumn col : schema.getColumns()) {
-            boolean found = false;
-            for (AbstractExpression expr : m_sortExpressions) {
-                if (col.getExpression().equals(expr)) {
-                    found = true;
-                    break;
-                }
-            }
-            if (!found) {
-                return false;
-            }
-        }
-        return true;
+        return m_orderingByAllColumns = false;
+    }
+
+    private boolean setOrderingByAllColumns() {
+        return m_orderingByAllColumns = true;
     }
 
     private boolean orderingByUniqueColumns() {
@@ -159,27 +151,16 @@ public class OrderByPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void resolveColumnIndexes()
+    public NodeSchema generateOutputSchema(Database db)
     {
         // Need to order and resolve indexes of output columns AND
         // the sort columns
         assert(m_children.size() == 1);
-        m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
-            // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = input_schema.getIndexOfTve(tve);
-            tve.setColumnIndex(index);
-        }
-        m_outputSchema.sortByTveIndex();
+        NodeSchema input_schema = m_children.get(0).generateOutputSchema(db);
 
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
-        List<TupleValueExpression> sort_tves =
-            new ArrayList<TupleValueExpression>();
+        List<TupleValueExpression> sort_tves =  new ArrayList<TupleValueExpression>();
         for (AbstractExpression sort_exps : m_sortExpressions)
         {
             sort_tves.addAll(ExpressionUtil.getTupleValueExpressions(sort_exps));
@@ -189,6 +170,24 @@ public class OrderByPlanNode extends AbstractPlanNode {
             int index = input_schema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
+
+        boolean found = false;
+        for (SchemaColumn col : input_schema.getColumns()) {
+            found = false;
+            for (AbstractExpression expr : m_sortExpressions) {
+                if (col.getExpression().equals(expr)) {
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                break;
+            }
+        }
+        if (found) {
+            setOrderingByAllColumns();
+        }
+        return input_schema;
     }
 
     @Override

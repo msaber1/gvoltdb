@@ -152,9 +152,10 @@ vector<string> StatsSource::generateStatsColumnNames()
  * @return String representation
  */
 string StatsSource::toString() {
+    vector<string> columnNames = generateBaseStatsColumnNames();
     string retString = "";
     for (int ii = 0; ii < m_statsTable->columnCount(); ii++) {
-        retString += m_statsTable->columnName(ii);
+        retString += columnNames[ii];
         retString += "\t";
     }
     retString += "\n";

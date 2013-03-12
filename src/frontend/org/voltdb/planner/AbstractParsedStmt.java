@@ -656,7 +656,6 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     tableFilterList.put(table, exprs);
                 }
-                expr.m_isJoiningClause = false;
                 addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }
@@ -673,7 +672,6 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     joinSelectionList.put(pair, exprs);
                 }
-                expr.m_isJoiningClause = true;
                 addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }

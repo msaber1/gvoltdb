@@ -53,7 +53,6 @@
 #include <cassert>
 
 #include "boost/shared_ptr.hpp"
-#include "json_spirit/json_spirit.h"
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/serializeio.h"

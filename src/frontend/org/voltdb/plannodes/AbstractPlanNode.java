@@ -126,43 +126,24 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     /**
      * Generate the output schema for this node based on the
      * output schemas of its children.  The generated schema consists of
-     * the complete set of columns but is not yet ordered.
+     * the complete set of columns in order with all column indexes resolved.
      *
-     * Right now it's best to call this on every node after it gets added
-     * and linked to the top of the current plan graph.
+     * Since this is fully recursive, it can be called once from the top of the fully constructed plan.
      *
      * Many nodes will need to override this method in order to take whatever
      * action is appropriate (so, joins will combine two schemas, projections
-     * will already have schemas defined and do nothing, etc)
+     * will already have schemas defined but will need to resolve column indexes, etc)
      * @param db  A reference to the Database object from the catalog.
+     * @return the effective output schema for this node,
+     *         even if it is just the one from this node's first child node.
      */
-    public void generateOutputSchema(Database db)
+    public NodeSchema generateOutputSchema(Database db)
     {
-        // default behavior: just copy the input schema
-        // to the output schema
+        // default behavior: just use the input schema as the output schema
         assert(m_children.size() == 1);
-        m_children.get(0).generateOutputSchema(db);
-        // Replace the expressions in our children's columns with TVEs.  When
-        // we resolve the indexes in these TVEs they will point back at the
-        // correct input column, which we are assuming that the child node
-        // has filled in with whatever expression was here before the replacement.
-        m_outputSchema =
-            m_children.get(0).getOutputSchema().copyAndReplaceWithTVE();
+        m_outputSchema = null;
+        return m_children.get(0).generateOutputSchema(db);
     }
-
-    /**
-     * Recursively iterate through the plan and resolve the column_idx value for
-     * every TupleValueExpression in every AbstractExpression in every PlanNode.
-     * Few enough common cases so we force every AbstractPlanNode subclass to
-     * implement this.  After index resolution, this method also sorts
-     * the columns in the output schema appropriately, depending upon what
-     * sort of node it is, so that its parent will be able to resolve
-     * its indexes successfully.
-     *
-     * Should get called on the plan graph after any optimizations but before
-     * the plan gets fragmented.
-     */
-    public abstract void resolveColumnIndexes();
 
     public void validate() throws Exception {
         //
@@ -275,6 +256,13 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     public NodeSchema getOutputSchema()
     {
         return m_outputSchema;
+    }
+
+    public NodeSchema getEffectiveOutputSchema() {
+        if (m_outputSchema != null || m_children.isEmpty()) {
+            return m_outputSchema;
+        }
+        return m_children.get(0).getEffectiveOutputSchema();
     }
 
     /**
@@ -615,13 +603,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         stringer.endArray(); //end inlineNodes
 
-        stringer.key(Members.OUTPUT_SCHEMA.name());
-        stringer.array();
-        for (int col = 0; col < m_outputSchema.getColumns().size(); col++) {
-            SchemaColumn column = m_outputSchema.getColumns().get(col);
-            column.toJSONString(stringer);
+        if (m_outputSchema != null) {
+            stringer.key(Members.OUTPUT_SCHEMA.name());
+            stringer.array();
+            for (int col = 0; col < m_outputSchema.getColumns().size(); col++) {
+                SchemaColumn column = m_outputSchema.getColumns().get(col);
+                column.toJSONString(stringer);
+            }
+            stringer.endArray();
         }
-        stringer.endArray();
     }
 
     public String toExplainPlanString() {

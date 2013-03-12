@@ -24,15 +24,11 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SeqScanPlanNode;
-import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
-import org.voltdb.types.SortDirectionType;
 
 public class SeqScansToUniqueTreeScans extends MicroOptimization {
 
@@ -126,23 +122,7 @@ public class SeqScansToUniqueTreeScans extends MicroOptimization {
         }
 
         // make an index node from the scan node
-        IndexScanPlanNode indexScanNode = new IndexScanPlanNode();
-        indexScanNode.setTargetTableName(scanNode.getTargetTableName());
-        indexScanNode.setTargetTableAlias(scanNode.getTargetTableAlias());
-        indexScanNode.setEndExpression(null);
-        indexScanNode.setScanColumns(new ArrayList<SchemaColumn>());
-        indexScanNode.setCatalogIndex(indexToScan);
-        indexScanNode.setKeyIterate(true);
-        indexScanNode.setTargetIndexName(indexToScan.getTypeName());
-        indexScanNode.setLookupType(IndexLookupType.GTE);
-        indexScanNode.setSortDirection(SortDirectionType.ASC);
-        indexScanNode.setPredicate(scanNode.getPredicate());
-        for (AbstractPlanNode inlineNode : scanNode.getInlinePlanNodes().values()) {
-            indexScanNode.addInlinePlanNode(inlineNode);
-        }
-        indexScanNode.generateOutputSchema(db);
-        indexScanNode.setBindings(new ArrayList<AbstractExpression>());
-
+        IndexScanPlanNode indexScanNode = new IndexScanPlanNode(scanNode, indexToScan);
         return indexScanNode;
     }
 

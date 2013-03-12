@@ -44,7 +44,7 @@ public class MockPlanNode extends AbstractPlanNode
     }
 
     @Override
-    public void generateOutputSchema(Database db)
+    public NodeSchema generateOutputSchema(Database db)
     {
         m_outputSchema = new NodeSchema();
         for (int i = 0; i < m_columnNames.length; ++i)
@@ -59,18 +59,13 @@ public class MockPlanNode extends AbstractPlanNode
                                                       m_columnNames[i],
                                                       tve));
         }
+        return m_outputSchema;
     }
 
     @Override
     public PlanNodeType getPlanNodeType()
     {
         return null;
-    }
-
-    @Override
-    public void resolveColumnIndexes()
-    {
-
     }
 
     @Override

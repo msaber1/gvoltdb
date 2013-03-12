@@ -17,9 +17,7 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
 import java.util.List;
-import java.util.TreeMap;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
@@ -39,7 +37,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db)
+    public NodeSchema generateOutputSchema(Database db)
     {
         // Important safety tip regarding this inlined
         // index scan and ITS inlined projection:
@@ -48,123 +46,26 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // indexscan's target table that make it into the
         // rest of the plan.  the expressions that are
         // given to the projection are currently not ever used
-        IndexScanPlanNode inlineScan =
-            (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
-        assert(inlineScan != null);
-        inlineScan.generateOutputSchema(db);
         assert(m_children.size() == 1);
-        m_children.get(0).generateOutputSchema(db);
-        // Join the schema together to form the output schema
+        NodeSchema outer_schema = m_children.get(0).generateOutputSchema(db);
+        IndexScanPlanNode inlineScan = (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
+        assert(inlineScan != null);
+        NodeSchema inner_schema = inlineScan.generateOutputSchema(db);
         // The child subplan's output is the outer table
         // The inlined node's output is the inner table
-        m_outputSchema =
-            m_children.get(0).getOutputSchema().
-            join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
-    }
 
-    @Override
-    public void resolveColumnIndexes()
-    {
-        IndexScanPlanNode inline_scan =
-            (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
-        assert (m_children.size() == 1 && inline_scan != null);
-        for (AbstractPlanNode child : m_children)
-        {
-            child.resolveColumnIndexes();
-        }
-        for (AbstractPlanNode inline : m_inlineNodes.values())
-        {
-            // Some of this will get undone for the inlined index scan later
-            // but this will resolve any column tracking with an inlined projection
-            inline.resolveColumnIndexes();
-        }
-        // We need the schema from the target table from the inlined index
-        NodeSchema index_schema = inline_scan.getTableSchema();
-        // We need the output schema from the child node
-        NodeSchema outer_schema = m_children.get(0).getOutputSchema();
-
-        // pull every expression out of the inlined index scan
-        // and resolve all of the TVEs against our two input schema from above.
-        // The EE still uses assignTupleValueIndexes to figure out which input
-        // table to use for each of these TVEs
-        //  get the predicate (which is the inlined node's predicate,
-        //  the planner currently blithely ignores that abstractjoinnode also
-        //  has a predicate field, and so do we.
-        List<TupleValueExpression> predicate_tves =
-            ExpressionUtil.getTupleValueExpressions(inline_scan.getPredicate());
-        for (TupleValueExpression tve : predicate_tves)
-        {
-            // this double-schema search is somewhat common, maybe it
-            // can find a static home in NodeSchema or something --izzy
-            int index = outer_schema.getIndexOfTve(tve);
-            if (index == -1)
-            {
-                index = index_schema.getIndexOfTve(tve);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for nestloopindexscan TVE: " +
-                                               tve.toString());
-                }
-            }
-            tve.setColumnIndex(index);
+        // Resolve all columns in m_predicate, the end expression and the search key expressions.
+        // ALL of these are defined on the inner child node in spite of the fact that they may
+        // reference both sides of the join.
+        List<TupleValueExpression> predicate_tves = ExpressionUtil.getTupleValueExpressions(inlineScan.getPredicate());
+        predicate_tves.addAll(ExpressionUtil.getTupleValueExpressions(inlineScan.getEndExpression()));
+        for (AbstractExpression search_exp : inlineScan.getSearchKeyExpressions()) {
+            predicate_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
         }
 
-        //  get the end expression and search key expressions
-        List<TupleValueExpression> index_tves =
-            new ArrayList<TupleValueExpression>();
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getEndExpression()));
-        for (AbstractExpression search_exp : inline_scan.getSearchKeyExpressions())
-        {
-            index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
-        }
-        for (TupleValueExpression tve : index_tves)
-        {
-            int index = outer_schema.getIndexOfTve(tve);
-            if (index == -1)
-            {
-                index = index_schema.getIndexOfTve(tve);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for nestloopindexscan TVE: " +
-                                               tve.toString());
-                }
-            }
-            tve.setColumnIndex(index);
-        }
+        generateJoinSchema(outer_schema, inner_schema, predicate_tves);
 
-        // need to resolve the indexes of the output schema and
-        // order the combined output schema coherently
-        TreeMap<Integer, SchemaColumn> sort_cols =
-            new TreeMap<Integer, SchemaColumn>();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
-            // Right now these all need to be TVEs
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = outer_schema.getIndexOfTve(tve);
-            if (index == -1)
-            {
-                index = index_schema.getIndexOfTve(tve);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for column: " +
-                                               col.toString());
-                }
-                sort_cols.put(index + outer_schema.size(), col);
-            }
-            else
-            {
-                sort_cols.put(index, col);
-            }
-            tve.setColumnIndex(index);
-        }
-        // rebuild the output schema from the tree-sorted columns
-        NodeSchema new_output_schema = new NodeSchema();
-        for (SchemaColumn col : sort_cols.values())
-        {
-            new_output_schema.addColumn(col);
-        }
-        m_outputSchema = new_output_schema;
+        return m_outputSchema;
     }
 
     @Override

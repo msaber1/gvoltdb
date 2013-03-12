@@ -83,33 +83,20 @@ public class SchemaColumn
     /**
      * Return a copy of this SchemaColumn, but with the input expression
      * replaced by an appropriate TupleValueExpression.
+     * @param offset
      */
-    public SchemaColumn copyAndReplaceWithTVE()
+    SchemaColumn coverWithTVE(int index)
     {
-        TupleValueExpression new_exp = null;
-        if (m_expression instanceof TupleValueExpression)
-        {
-            try
-            {
-                new_exp = (TupleValueExpression) m_expression.clone();
-            }
-            catch (CloneNotSupportedException e)
-            {
-                throw new RuntimeException(e.getMessage());
-            }
-        }
-        else
-        {
-            new_exp = new TupleValueExpression();
-            // XXX not sure this is right
-            new_exp.setTableName(m_tableName);
-            new_exp.setColumnName(m_columnName);
-            new_exp.setColumnAlias(m_columnAlias);
-            new_exp.setValueType(m_expression.getValueType());
-            new_exp.setValueSize(m_expression.getValueSize());
-        }
-        return new SchemaColumn(m_tableName, m_columnName, m_columnAlias,
-                                new_exp);
+        TupleValueExpression new_exp = new TupleValueExpression();
+        // XXX The result of this operation can be a little confusing since the names are taken
+        // from the source table(s) but the column index is valid within the joined temp table.
+        new_exp.setTableName(m_tableName);
+        new_exp.setColumnName(m_columnName);
+        new_exp.setColumnAlias(m_columnAlias);
+        new_exp.setValueType(m_expression.getValueType());
+        new_exp.setValueSize(m_expression.getValueSize());
+        new_exp.setColumnIndex(index);
+        return new SchemaColumn(m_tableName, m_columnName, m_columnAlias, new_exp);
     }
 
     public String getTableName()
