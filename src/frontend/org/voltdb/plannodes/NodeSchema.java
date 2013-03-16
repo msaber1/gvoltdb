@@ -46,6 +46,11 @@ public class NodeSchema implements Iterable<SchemaColumn>
         m_columns.add(column);
     }
 
+    public void addColumn(TupleValueExpression tve)
+    {
+        addColumn(new SchemaColumn(tve));
+    }
+
     /**
      * @return a list of the columns in this schema.  These columns will be
      * in the order in which they will appear at the output of this node.

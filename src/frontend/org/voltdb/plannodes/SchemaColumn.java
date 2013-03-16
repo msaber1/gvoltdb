@@ -70,6 +70,11 @@ public class SchemaColumn
         }
     }
 
+    public SchemaColumn(TupleValueExpression tve)
+    {
+        this(tve.getTableName(), tve.getColumnName(), tve.getColumnAlias(), tve);
+    }
+
     /**
      * Clone a schema column
      */

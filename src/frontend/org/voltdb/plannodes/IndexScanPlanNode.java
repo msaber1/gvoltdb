@@ -94,19 +94,23 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // Special case constructor for seq-scan-to-index-scan promotion for determinism purposes.
     public IndexScanPlanNode(AbstractScanPlanNode scanNode, Index indexToScan) {
         super();
+        // transfer details from the scan node being replaced.
         setTargetTableName(scanNode.getTargetTableName());
         setTargetTableAlias(scanNode.getTargetTableAlias());
+        setScanColumns(scanNode.getScanColumns());
+        setPredicate(scanNode.getPredicate());
+        m_usedColumns = scanNode.m_usedColumns;
+        for (AbstractPlanNode inlineNode : scanNode.getInlinePlanNodes().values()) {
+            addInlinePlanNode(inlineNode);
+        }
+
+        // add index-scan specifics.
         setEndExpression(null);
-        setScanColumns(new ArrayList<SchemaColumn>());
         setCatalogIndex(indexToScan);
         setKeyIterate(true);
         setTargetIndexName(indexToScan.getTypeName());
         setLookupType(IndexLookupType.GTE);
         setSortDirection(SortDirectionType.ASC);
-        setPredicate(scanNode.getPredicate());
-        for (AbstractPlanNode inlineNode : scanNode.getInlinePlanNodes().values()) {
-            addInlinePlanNode(inlineNode);
-        }
     }
 
     @Override

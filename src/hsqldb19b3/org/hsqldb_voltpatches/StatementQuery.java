@@ -35,10 +35,7 @@ import java.util.ArrayList;
 
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
-import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
-import org.hsqldb_voltpatches.lib.HsqlArrayList;
-import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
@@ -120,47 +117,16 @@ public class StatementQuery extends StatementDMQL {
     @Override
     void getTableNamesForWrite(OrderedHashSet set) {}
 
-    private static class Pair<T, U> {
-        protected final T m_first;
-        protected final U m_second;
-
-        public Pair(T first, U second) {
-            m_first = first;
-            m_second = second;
-        }
-
-        /**
-         * @return the first
-         */
-        public T getFirst() {
-            return m_first;
-        }
-
-        /**
-         * @return the second
-         */
-        public U getSecond() {
-            return m_second;
-        }
-
-        /**
-         * Convenience class method for constructing pairs using Java's generic type
-         * inference.
-         */
-        public static <T extends Comparable<T>, U> Pair<T, U> of(T x, U y) {
-            return new Pair<T, U>(x, y);
-        }
-    }
     /**
      * Returns true if the specified exprColumn index is in the list of column indices specified by groupIndex
      * @return true/false
      */
-    boolean isGroupByColumn(QuerySpecification select, int index) {
+    private boolean isGroupByColumn(QuerySpecification select, int index) {
         if (!select.isGrouped) {
             return false;
         }
-        for (int ii = 0; ii < select.groupIndex.getColumnCount(); ii++) {
-            if (index == select.groupIndex.getColumns()[ii]) {
+        for (int ii : select.groupIndex.getColumns()) {
+            if (index == ii) {
                 return true;
             }
         }
@@ -272,66 +238,6 @@ public class StatementQuery extends StatementDMQL {
             }
         }
 
-        // columns that need to be output by the scans
-        VoltXMLElement scanCols = new VoltXMLElement("scan_columns");
-        query.children.add(scanCols);
-        assert(scanCols != null);
-
-        // Just gather a mish-mash of every possible relevant expression
-        // and uniq them later
-        HsqlList col_list = new HsqlArrayList();
-        select.collectAllExpressions(col_list, Expression.columnExpressionSet, Expression.emptyExpressionSet);
-        if (select.queryCondition != null)
-        {
-            Expression.collectAllExpressions(col_list, select.queryCondition,
-                                             Expression.columnExpressionSet,
-                                             Expression.emptyExpressionSet);
-        }
-        for (int i = 0; i < select.exprColumns.length; i++) {
-            Expression.collectAllExpressions(col_list, select.exprColumns[i],
-                                             Expression.columnExpressionSet,
-                                             Expression.emptyExpressionSet);
-        }
-        for (RangeVariable rv : select.rangeVariables)
-        {
-            if (rv.indexCondition != null)
-            {
-                Expression.collectAllExpressions(col_list, rv.indexCondition,
-                                                 Expression.columnExpressionSet,
-                                                 Expression.emptyExpressionSet);
-
-            }
-            if (rv.indexEndCondition != null)
-            {
-                Expression.collectAllExpressions(col_list, rv.indexEndCondition,
-                                                 Expression.columnExpressionSet,
-                                                 Expression.emptyExpressionSet);
-
-            }
-            if (rv.nonIndexJoinCondition != null)
-            {
-                Expression.collectAllExpressions(col_list, rv.nonIndexJoinCondition,
-                                                 Expression.columnExpressionSet,
-                                                 Expression.emptyExpressionSet);
-
-            }
-        }
-        HsqlList uniq_col_list = new HsqlArrayList();
-        for (int i = 0; i < col_list.size(); i++)
-        {
-            Expression orig = (Expression)col_list.get(i);
-            if (!uniq_col_list.contains(orig))
-            {
-                uniq_col_list.add(orig);
-            }
-        }
-        for (int i = 0; i < uniq_col_list.size(); i++)
-        {
-            VoltXMLElement xml = ((Expression)uniq_col_list.get(i)).voltGetXML(session);
-            scanCols.children.add(xml);
-            assert(xml != null);
-        }
-
         // columns
         VoltXMLElement cols = new VoltXMLElement("columns");
         query.children.add(cols);
@@ -339,10 +245,9 @@ public class StatementQuery extends StatementDMQL {
         ArrayList<Expression> orderByCols = new ArrayList<Expression>();
         ArrayList<Expression> groupByCols = new ArrayList<Expression>();
         ArrayList<Expression> displayCols = new ArrayList<Expression>();
-        ArrayList<Pair<Integer, SimpleName>> aliases = new ArrayList<Pair<Integer, SimpleName>>();
 
         /*
-         * select.exprColumn stores all of the columns needed by HSQL to
+         * select.exprColumns stores all of the columns needed by HSQL to
          * calculate the query's result set. It contains more than just the
          * columns in the output; for example, it contains columns representing
          * aliases, columns for groups, etc.
@@ -359,39 +264,21 @@ public class StatementQuery extends StatementDMQL {
          * other; for example, an OpType.SIMPLE_COLUMN type storing an alias
          * will have its columnIndex set to the offset of the expr it aliases.
          */
-        for (int i = 0; i < select.exprColumns.length; i++) {
-            final Expression expr = select.exprColumns[i];
+        for (int kk = 0; kk < select.exprColumns.length; kk++) {
+            final Expression expr = select.exprColumns[kk];
 
-            if (expr.alias != null) {
-                /*
-                 * Remember how aliases relate to columns. Will iterate again later
-                 * and mutate the exprColumn entries setting the alias string on the aliased
-                 * column entry.
-                 */
-                if (expr instanceof ExpressionColumn) {
-                    ExpressionColumn exprColumn = (ExpressionColumn)expr;
-                    if (exprColumn.alias != null && exprColumn.columnName == null) {
-                        aliases.add(Pair.of(expr.columnIndex, expr.alias));
-                    }
-                } else if (expr.columnIndex > -1) {
-                    /*
-                     * Only add it to the list of aliases that need to be
-                     * propagated to columns if the column index is valid.
-                     * ExpressionArithmetic will have an alias but not
-                     * necessarily a column index.
-                     */
-                    aliases.add(Pair.of(expr.columnIndex, expr.alias));
-                }
+            // This is a summary of the effective filtering for the source of an alias
+            // that was used in the earlier "woodchuck" version of this code --
+            // anything with an alias and a valid columnIndex that is either a column expression
+            // without a column name or a non-column expression.
+            if (expr.alias != null &&
+                expr.columnIndex > -1 &&
+                ( ( ! (expr instanceof ExpressionColumn) ) ||
+                  ( ((ExpressionColumn)expr).columnName == null ))) {
+                select.exprColumns[kk].alias = expr.alias;
             }
 
-            // If the column doesn't refer to another exprColumn entry, set its
-            // column index to itself. If all columns have a valid column index,
-            // it's easier to patch up display column ordering later.
-            if (expr.columnIndex == -1) {
-                expr.columnIndex = i;
-            }
-
-            if (isGroupByColumn(select, i)) {
+            if (isGroupByColumn(select, kk)) {
                 groupByCols.add(expr);
             } else if (expr.opType == OpTypes.ORDER_BY) {
                 orderByCols.add(expr);
@@ -400,13 +287,9 @@ public class StatementQuery extends StatementDMQL {
                 // the output schema column ordering.
                 displayCols.add(expr);
             }
-            // else, other simple columns are ignored. If others exist, maybe
-            // volt infers a display column from another column collection?
-        }
-
-        for (Pair<Integer, SimpleName> alias : aliases) {
-            // set the alias data into the expression being aliased.
-            select.exprColumns[alias.getFirst()].alias = alias.getSecond();
+            // XXX: Why are other (than "aliased aggregate") SIMPLE_COLUMNs being ignored, and why?
+            // One possibility is that they just exist to provide an alias for another column
+            // -- and that case has just been handled. Is that it? Does that cover all the cases?
         }
 
         /*
@@ -416,49 +299,46 @@ public class StatementQuery extends StatementDMQL {
          *
          * However, the correct output schema ordering was correct in exprColumns.
          * This order was maintained by adding SIMPLE_COLUMNs to displayCols.
+         * XXX: But this was only done if they were aliased aggregates?
          *
          * Now need to serialize the displayCols, serializing the non-simple-columns
          * corresponding to simple_columns for any simple_columns that woodchucks
-         * could chuck.
+         * could chuck. (aliased aggregates only, mighty particular for woodchucks)
          *
          * Serialize the display columns in the exprColumn order.
          */
         for (int jj=0; jj < displayCols.size(); ++jj) {
             Expression expr = displayCols.get(jj);
-            if (expr == null) {
-                continue;
-            }
-            else if (expr.opType == OpTypes.SIMPLE_COLUMN)
-            {
+            if (expr != null && expr.opType == OpTypes.SIMPLE_COLUMN) {
                 // simple columns are not serialized as display columns
                 // but they are place holders for another column
+                // that follows later in the displayCols list.
                 // in the output schema. Go find that corresponding column
                 // and serialize it in this place.
-                for (int ii=jj; ii < displayCols.size(); ++ii)
-                {
+                int targetIndex = expr.columnIndex;
+                expr = null; // Skip serilalizing this one if it finds no match.
+                for (int ii=jj+1; ii < displayCols.size(); ++ii) {
                     Expression otherCol = displayCols.get(ii);
-                    if (otherCol == null) {
-                        continue;
-                    }
-                    else if ((otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
-                             (otherCol.columnIndex == expr.columnIndex))
-                    {
+                    if (otherCol != null &&
+                        (otherCol.opType != OpTypes.SIMPLE_COLUMN) &&
+                        (otherCol.columnIndex == targetIndex)) {
                         // serialize the column this simple column stands-in for
-                        VoltXMLElement xml = otherCol.voltGetXML(session);
-                        cols.children.add(xml);
-                        assert(xml != null);
+                        expr = otherCol;
                         // null-out otherCol to not serialize it twice
                         displayCols.set(ii, null);
-                        // quit seeking simple_column's replacement
+                        // quit seeking the simple column's replacement
                         break;
                     }
                 }
             }
-            else {
-                VoltXMLElement xml = expr.voltGetXML(session);
-                cols.children.add(xml);
-                assert(xml != null);
+            // Skip SIMPLE_COLUMNs that match no later column
+            // or other columns that were matched by an earlier SIMPLE_COLUMN.
+            if (expr == null) {
+                continue;
             }
+            VoltXMLElement xml = expr.voltGetXML(session);
+            cols.children.add(xml);
+            assert(xml != null);
         }
 
         // parameters

@@ -1389,8 +1389,9 @@ TEST CASES
     </run_junit>
 </target>
 
-<target name='junit_sql'
-    description="Execute JUnit test suites.">
+<target
+    name="junit_sql"
+    description="Execute JUnit test suites stressing sql functionality vs. process architecture.">
     <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>

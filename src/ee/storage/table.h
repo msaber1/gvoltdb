@@ -214,6 +214,10 @@ class Table {
         return m_schema;
     }
 
+    inline const std::string& columnName(int index) const {
+        return m_columnNames[index];
+    }
+
     inline int columnCount() const {
         return m_columnCount;
     }

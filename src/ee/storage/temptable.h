@@ -218,6 +218,7 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     }
 
     m_tupleCount = 0;
+    m_usedTupleCount = 0;
     while (m_data.size() > 1) {
         m_data.pop_back();
         if (m_limits) {

@@ -814,24 +814,31 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("Failed to set up schema");
             }
 
+            /*// <-- IFDEF-LIKE HACK: Toggle this one line's comment style between
+            // 'line-style' and 'block-style' to magically switch between code blocks...
+
+            // ... from this NORMAL configuration ...
             m_cluster = new LocalCluster(pathToCatalog,
-                                         //*// IFDEF-LIKE HACK: Toggle this one funky line's comment style
-                                         // between '//' and '/*' to magically switch between...
-
-                                         // ...these NORMAL configuration arguments ...
-
-                                         siteCount, hostCount, kFactor, BackendTarget.NATIVE_EE_JNI, // NORMAL
-
-                                         /*/ // (This funky comment line is the pivotal ELSE component to the IFDEF-LIKE HACK.)
-
-                                         // ... and the DEBUG configuration arguments listed here ...
-                                         1, 1, 0, BackendTarget.NATIVE_EE_IPC, // DEBUG
-
-                                         // (This funky comment acts as the ENDIF for the IFDEF-LIKE HACK) */
-
+                                         siteCount, hostCount, kFactor, // NORMAL
+                                         BackendTarget.NATIVE_EE_JNI, // NORMAL
                                          LocalCluster.FailureState.ALL_RUNNING,
                                          m_debug);
             m_cluster.setHasLocalServer(false);
+
+            /*/ // ELSE  [Note: This line contains a structured comment. Do not break it. ]
+
+            // ... to this DEBUG configuration...
+            m_cluster = new LocalCluster(pathToCatalog,
+                                         1, 1, 0, // DEBUG
+                                         // There is almost definitely a bug in the IPC implementation
+                                         // of batch execution and/or handling of constraint failures.
+                                         BackendTarget.NATIVE_EE_JNI, // DEBUG
+                                         LocalCluster.FailureState.ALL_RUNNING,
+                                         m_debug);
+            m_cluster.setHasLocalServer(true);
+
+            // ENDIF [Note: This line contains a structured comment. Do not break it. ] */
+
             boolean success = m_cluster.compile(m_builder);
             assert(success);
 

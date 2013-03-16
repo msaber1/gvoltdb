@@ -107,6 +107,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         assert(m_inputTable);
         assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
         assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
+        printf("DEBUG To delete %jd tuples.\n", m_inputTable->activeTupleCount());
+        printf("DEBUG Of all %jd tuples.\n", m_targetTable->usedTupleCount());
         TableIterator inputIterator = m_inputTable->iterator();
         while (inputIterator.next(m_inputTuple)) {
             //
@@ -125,8 +127,12 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                            m_targetTable->name().c_str());
                 return false;
             }
+            printf("DEBUG Deleting %jd tuples.\n", m_inputTable->activeTupleCount());
+            printf("DEBUG Leaving %jd tuples.\n", m_targetTable->usedTupleCount());
         }
         modified_tuples = m_inputTable->activeTupleCount();
+        printf("DEBUG Deleted %jd tuples.\n", m_inputTable->activeTupleCount());
+        printf("DEBUG Left %jd tuples.\n", m_targetTable->usedTupleCount());
     }
 
     TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();

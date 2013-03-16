@@ -576,8 +576,9 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
     }
 }
 
-bool
-VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
+static bool
+catalogAndPersistentTableHaveTheSameSchema(catalog::Table *t1, PersistentTable *t2)
+{
     // covers column count
     if (t1->columns().size() != t2->columnCount()) {
         return false;
@@ -705,7 +706,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // indexes as we go
             //////////////////////////////////////////
 
-            if (!hasSameSchema(catalogTable, persistenttable)) {
+            if ( ! catalogAndPersistentTableHaveTheSameSchema(catalogTable, persistenttable)) {
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());

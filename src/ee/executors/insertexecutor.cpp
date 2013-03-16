@@ -167,6 +167,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
             if (!isLocal) continue;
         }
 
+        printf("DEBUG Try to insert tuple u%d =?= a%d into target table '%s'\n", (int)m_targetTable->usedTupleCount(), (int)m_targetTable->activeTupleCount(), m_targetTable->name().c_str());
+
         // try to put the tuple into the target table
         if (!m_targetTable->insertTuple(m_tuple)) {
             VOLT_ERROR("Failed to insert tuple from input table '%s' into"
@@ -175,6 +177,8 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
                        m_targetTable->name().c_str());
             return false;
         }
+
+        printf("DEBUG Insert tuple u%d =?= a%d into target table '%s'\n", (int)m_targetTable->usedTupleCount(), (int)m_targetTable->activeTupleCount(), m_targetTable->name().c_str());
 
         // successfully inserted
         modifiedTuples++;
