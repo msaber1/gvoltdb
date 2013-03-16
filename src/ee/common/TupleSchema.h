@@ -165,19 +165,13 @@ private:
 ///////////////////////////////////
 
 inline ValueType TupleSchema::columnType(int index) const {
-#ifndef NDEBUG
-    // Sometimes a throw or crash is more informative than the assert that was here originally.
-    // Using catch/throw further up allows annotating the exception message with plan fragment context
-    // which gets reported to the console (at least under eclipse/JNI), making it easier to debug the planner.
-    if (index >= m_columnCount) {
-        static const int throw_assert_or_crash_123 = /* throw *-/ 1;  // OR assert *-/ 2; // OR crash the test. */ 3;
-        if (debug_pass_fail_or_crash_123(throw_assert_or_crash_123)) {
-            throwFatalLogicErrorStreamed("Fallout from planner error. The tuple schema index " << index
-                                         << " exceeds the limit for schema:\n" << debug());
-        }
-    }
-#endif
-    assert(index < m_columnCount);
+    static const int throw_assert_or_crash_123 = /* throw             *-/ 1;
+                                                 // OR assert         *-/ 2;
+                                                 // OR crash the test. */ 3; //default
+    DEBUG_ASSERT_OR_THROW_OR_CRASH_123(throw_assert_or_crash_123,
+                                       index < m_columnCount,
+                                       "Fallout from planner error. The tuple schema index " << index
+                                       << " exceeds the limit for schema:\n" << debug());
     assert(index > -1);
     const ColumnInfo *columnInfo = getColumnInfo(index);
     return static_cast<ValueType>(columnInfo->type);

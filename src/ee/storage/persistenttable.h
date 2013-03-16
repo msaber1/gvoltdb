@@ -49,8 +49,8 @@
 #include <string>
 #include <vector>
 #include <cassert>
-#include "boost/shared_ptr.hpp"
-#include "boost/scoped_ptr.hpp"
+#include <boost/shared_ptr.hpp>
+#include <boost/scoped_ptr.hpp>
 #include "common/ids.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -72,10 +72,10 @@ class TableFactory;
 class TupleSerializer;
 class SerializeInput;
 class Topend;
-class ReferenceSerializeOutput;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
 class PersistentTableUndoDeleteAction;
+class TupleOutputStreamProcessor;
 
 /**
  * Represents a non-temporary table which permanently resides in
@@ -148,6 +148,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // ------------------------------------------------------------------
     void deleteAllTuples(bool freeAllocatedStrings);
     bool insertTuple(TableTuple &source);
+    bool insertTuple(TableTuple &source, bool createUndoQuantum);
 
     /*
      * Inserts a Tuple without performing an allocation for the
@@ -179,6 +180,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      */
     bool deleteTuple(TableTuple &tuple, bool freeAllocatedStrings);
     void deleteTupleForUndo(voltdb::TableTuple &tupleCopy);
+    void deleteTupleForSchemaChange(TableTuple &target);
 
     /*
      * Lookup the address of the tuple that is identical to the specified tuple.
@@ -193,6 +195,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         return m_columnNames;
     }
 
+    inline const std::string& columnName(int index) const {
+        return m_columnNames[index];
+    }
 
     // ------------------------------------------------------------------
     // UTILITY
@@ -211,8 +216,21 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     /**
      * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
+     * Support predicates for filtering results.
      */
-    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId);
+    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
+                             const std::vector<std::string> &predicate_strings,
+                             int32_t totalPartitions);
+
+    /**
+     * COW activation wrapper for backward compatibility with some tests.
+     * It's okay for totalPartitions to be zero because it only feeds into hashing for predicates.
+     * Total tuple count is not used when it's set to -1.
+     */
+    bool activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
+        std::vector<std::string> predicate_strings;
+        return activateCopyOnWrite(serializer, partitionId, predicate_strings, 0);
+    }
 
     /**
      * Create a recovery stream for this table. Returns true if the table already has an active recovery stream
@@ -223,7 +241,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * Serialize the next message in the stream of recovery messages. Returns true if there are
      * more messages and false otherwise.
      */
-    void nextRecoveryMessage(ReferenceSerializeOutput *out);
+    bool nextRecoveryMessage(ReferenceSerializeOutput *out);
 
     /**
      * Process the updates from a recovery message
@@ -232,10 +250,10 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     /**
      * Attempt to serialize more tuples from the table to the provided
-     * output stream.  Returns true if there are more tuples and false
-     * if there are no more tuples waiting to be serialized.
+     * output stream.
+     * Return remaining tuple count, 0 if done, or -1 on error.
      */
-    bool serializeMore(ReferenceSerializeOutput *out);
+    int64_t serializeMore(TupleOutputStreamProcessor &outputStreams);
 
     /**
      * Create a tree index on the primary key and then iterate it and hash
@@ -259,11 +277,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
         m_nonInlinedMemorySize -= bytes;
     }
 
-  private:
-
     size_t allocatedBlockCount() const {
         return m_data.size();
     }
+
+  private:
 
     void snapshotFinishedScanningBlock(TBPtr finishedBlock, TBPtr nextBlock) {
         if (nextBlock != NULL) {
@@ -319,11 +337,24 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     TBPtr allocateNextBlock();
 
+    double loadFactor() const {
+        return static_cast<double>(activeTupleCount()) /
+            static_cast<double>(allocatedTupleCount());
+    }
+
+    bool compactionPredicate() const
+    {
+        assert(m_tuplesPinnedByUndo == 0);
+        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
+    }
+
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
 
     // partition key
     const int m_partitionColumn;
+
+    uint32_t m_tuplesPinnedByUndo;
 
     // list of materialized views that are sourced from this table
     std::vector<MaterializedViewMetadata *> m_views;
@@ -342,7 +373,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     boost::scoped_ptr<RecoveryContext> m_recoveryContext;
 
 
-
     // STORAGE TRACKING
 
     // Map from load to the blocks with level of load
@@ -359,7 +389,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     // that have never been allocated
     stx::btree_set<TBPtr > m_blocksWithSpace;
 
-  private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
     int m_failedCompactionCount;

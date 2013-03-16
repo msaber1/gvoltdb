@@ -76,7 +76,6 @@ class TableFactory;
 class TableIterator;
 class CopyOnWriteIterator;
 class CopyOnWriteContext;
-class UndoLog;
 class ReadWriteSet;
 class SerializeInput;
 class SerializeOutput;
@@ -105,7 +104,6 @@ class Table {
     friend class TableStats;
     friend class StatsSource;
     friend class TupleBlock;
-    friend class PersistentTableUndoDeleteAction;
 
   private:
     Table();
@@ -360,22 +358,11 @@ protected:
     Table(int tableAllocationTargetSize);
     void resetTable();
 
-    bool compactionPredicate() {
-        assert(m_tuplesPinnedByUndo == 0);
-        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
-    }
-
     void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema);
 
     // per table-type initialization
     virtual void onSetColumns() {
     };
-
-    double loadFactor() {
-        return static_cast<double>(activeTupleCount()) /
-            static_cast<double>(allocatedTupleCount());
-    }
-
 
     // ------------------------------------------------------------------
     // DATA
@@ -396,7 +383,6 @@ protected:
 
     uint32_t m_tupleCount;
     uint32_t m_usedTupleCount;
-    uint32_t m_tuplesPinnedByUndo;
     uint32_t m_columnCount;
     uint32_t m_tuplesPerBlock;
     uint32_t m_tupleLength;

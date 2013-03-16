@@ -58,6 +58,8 @@
 #include "common/FatalException.hpp"
 #include "common/types.h"
 #include "common/RecoveryProtoMessage.h"
+#include "common/StreamPredicate.h"
+#include "common/StreamPredicateList.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "logging/LogManager.h"
@@ -211,6 +213,10 @@ void setSearchKeyFromTuple(TableTuple &source) {
  * uninlined strings and creates and registers an UndoAction.
  */
 bool PersistentTable::insertTuple(TableTuple &source) {
+    return insertTuple(source, true);
+}
+
+bool PersistentTable::insertTuple(TableTuple &source, bool createUndoQuantum) {
 
     // not null checks at first
     FAIL_IF(!checkNulls(source)) {
@@ -261,17 +267,21 @@ bool PersistentTable::insertTuple(TableTuple &source) {
     {
         increaseStringMemCount(m_tmpTarget1.getNonInlinedMemorySize());
     }
-    /*
-     * Create and register an undo action.
-     */
-    UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
-    assert(undoQuantum);
-    Pool *pool = undoQuantum->getDataPool();
-    assert(pool);
-    PersistentTableUndoInsertAction *ptuia =
-      new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
-      PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
-    undoQuantum->registerUndoAction(ptuia);
+
+    // this is skipped for schema changes for now
+    if (createUndoQuantum) {
+        /*
+         * Create and register an undo action.
+         */
+        UndoQuantum *undoQuantum = ExecutorContext::currentUndoQuantum();
+        assert(undoQuantum);
+        Pool *pool = undoQuantum->getDataPool();
+        assert(pool);
+        PersistentTableUndoInsertAction *ptuia =
+            new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
+            PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
+        undoQuantum->registerUndoAction(ptuia);
+    }
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
@@ -508,6 +518,25 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
     return true;
 }
 
+/**
+ * Assumptions:
+ *  All tuples will be deleted in storage order.
+ *  Indexes and views have been destroyed first.
+ */
+void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
+    // May not delete an already deleted tuple.
+    assert(target.isActive());
+
+    // The tempTuple is forever!
+    assert(&target != &m_tempTuple);
+
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        decreaseStringMemCount(target.getNonInlinedMemorySize());
+    }
+    target.freeObjectColumns();
+    deleteTupleStorage(target);
+}
+
 /*
  * Delete a tuple by looking it up via table scan or a primary key
  * index lookup. An undo initiated delete like deleteTupleForUndo
@@ -722,8 +751,11 @@ TableStats* PersistentTable::getTableStats() {
 /**
  * Switch the table to copy on write mode. Returns true if the table was already in copy on write mode.
  */
-bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId) {
+bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t partitionId,
+                                          const std::vector<std::string> &predicate_strings,
+                                          int32_t totalPartitions) {
     if (m_COWContext != NULL) {
+        // true => COW already active
         return true;
     }
     if (m_tupleCount == 0) {
@@ -738,26 +770,36 @@ bool PersistentTable::activateCopyOnWrite(TupleSerializer *serializer, int32_t p
         assert(m_blocksNotPendingSnapshotLoad[ii]->empty());
     }
 
-    m_COWContext.reset(new CopyOnWriteContext( this, serializer, partitionId));
+    try {
+        // Constructor can throw exception when it parses the predicates.
+        assert(serializer != NULL);
+        CopyOnWriteContext *newCOW =
+            new CopyOnWriteContext(*this, *serializer, partitionId,
+                                   predicate_strings, totalPartitions, activeTupleCount());
+        m_COWContext.reset(newCOW);
+    }
+    catch(SerializableEEException &e) {
+        VOLT_ERROR("SerializableEEException: %s", e.message().c_str());
+        return true;
+    }
     return false;
 }
 
 /**
- * Attempt to serialize more tuples from the table to the provided output stream.
- * Returns true if there are more tuples and false if there are no more tuples waiting to be
- * serialized.
+ * Attempt to serialize more tuples from the table to the provided output streams.
+ * Return remaining tuple count, 0 if done, or -1 on error.
  */
-bool PersistentTable::serializeMore(ReferenceSerializeOutput *out) {
+int64_t PersistentTable::serializeMore(TupleOutputStreamProcessor &outputStreams) {
     if (m_COWContext == NULL) {
-        return false;
+        return -1;
     }
 
-    const bool hasMore = m_COWContext->serializeMore(out);
-    if (!hasMore) {
+    int64_t remaining = m_COWContext->serializeMore(outputStreams);
+    if (remaining <= 0) {
         m_COWContext.reset(NULL);
     }
 
-    return hasMore;
+    return remaining;
 }
 
 /**
@@ -775,15 +817,16 @@ bool PersistentTable::activateRecoveryStream(int32_t tableId) {
  * Serialize the next message in the stream of recovery messages. Returns true if there are
  * more messages and false otherwise.
  */
-void PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
+bool PersistentTable::nextRecoveryMessage(ReferenceSerializeOutput *out) {
     if (m_recoveryContext == NULL) {
-        return;
+        return false;
     }
 
     const bool hasMore = m_recoveryContext->nextMessage(out);
     if (!hasMore) {
         m_recoveryContext.reset(NULL);
     }
+    return hasMore;
 }
 
 /**

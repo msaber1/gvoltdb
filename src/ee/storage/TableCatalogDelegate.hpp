@@ -31,7 +31,7 @@ namespace voltdb {
 class Table;
 class ExecutorContext;
 class TupleSchema;
-class TableIndexScheme;
+struct TableIndexScheme;
 
 /*
  * Implementation of CatalogDelgate for Table
@@ -50,6 +50,9 @@ class TableCatalogDelegate : public CatalogDelegate {
     // table specific
     int init(catalog::Database &catalogDatabase,
              catalog::Table &catalogTable);
+
+    int processSchemaChanges(catalog::Database &catalogDatabase,
+                             catalog::Table &catalogTable);
 
     static TupleSchema *createTupleSchema(catalog::Table &catalogTable);
 
@@ -79,6 +82,9 @@ class TableCatalogDelegate : public CatalogDelegate {
     }
 
   private:
+    static Table *constructTableFromCatalog(catalog::Database &catalogDatabase,
+                                            catalog::Table &catalogTable);
+
     voltdb::Table *m_table;
     bool m_exportEnabled;
     std::string m_signature;

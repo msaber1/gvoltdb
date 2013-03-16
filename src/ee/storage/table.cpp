@@ -72,7 +72,6 @@ Table::Table(int tableAllocationTargetSize) :
     m_columnHeaderSize(-1),
     m_tupleCount(0),
     m_usedTupleCount(0),
-    m_tuplesPinnedByUndo(0),
     m_columnCount(0),
     m_tuplesPerBlock(0),
     m_nonInlinedMemorySize(0),
@@ -450,12 +449,13 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
 
     // Check if the column count matches what the temp table is expecting
     if (colcount != m_schema->columnCount()) {
-        static const int throw_fatal_or_sqlexception_or_crash_123 = /* throw */ 1;  // OR throw softer *-/ 2; // OR crash the test. */ 3;
-        if (debug_pass_fail_or_crash_123(throw_fatal_or_sqlexception_or_crash_123)) {
-            throwFatalLogicErrorStreamed("Fallout from planner error."
+        static const int throw_sqlexception_or_fatal_or_crash_123 = /* throw soft        *-/ 1;
+                                                                    // OR throw harder   *-/ 2;
+                                                                    // OR crash the test. */ 3; //default
+        DEBUG_PASS_OR_THROW_OR_CRASH_123(throw_sqlexception_or_fatal_or_crash_123,
+                                         "Fallout from planner error."
                                          " The deserialized tuple column count " << colcount
                                          << " does not match the schema:\n" << m_schema->debug());
-        }
 
         std::stringstream message(std::stringstream::in
                                   | std::stringstream::out);
