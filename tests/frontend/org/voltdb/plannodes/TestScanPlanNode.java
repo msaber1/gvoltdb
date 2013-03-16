@@ -22,10 +22,12 @@
  */
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
@@ -93,20 +95,18 @@ public class TestScanPlanNode extends TestCase
         dut.setTargetTableName(TABLE1);
 
         int[] scan_col_indexes = { 1, 3 };
-        ArrayList<SchemaColumn> scanColumns = new ArrayList<SchemaColumn>();
-        for (int index : scan_col_indexes)
-        {
+        Map< Pair<String,String>, TupleValueExpression> scanColumns =
+                new HashMap< Pair<String,String>, TupleValueExpression>();
+        for (int index : scan_col_indexes) {
             TupleValueExpression tve = new TupleValueExpression();
             tve.setTableName(TABLE1);
             tve.setColumnName(COLS[index]);
             tve.setColumnAlias(COLS[index]);
             tve.setValueType(COLTYPES[index]);
             tve.setValueSize(COLTYPES[index].getLengthInBytesForFixedTypes());
-            SchemaColumn col = new SchemaColumn(TABLE1, COLS[index],
-                                                COLS[index], tve);
-            scanColumns.add(col);
+            scanColumns.put(Pair.of(tve.getColumnName(), tve.getColumnAlias()), tve);
         }
-        dut.setScanColumns(scanColumns);
+        dut.addScanColumns(scanColumns);
 
         // Should be able to do this safely and repeatably multiple times
         for (int i = 0; i < 3; i++)

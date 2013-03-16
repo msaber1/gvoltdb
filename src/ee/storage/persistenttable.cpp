@@ -231,7 +231,6 @@ bool PersistentTable::insertTuple(TableTuple &source, bool createUndoQuantum) {
     //
     nextFreeTuple(&m_tmpTarget1);
     m_tupleCount++;
-    m_usedTupleCount++;
 
     //
     // Then copy the source into the target
@@ -262,6 +261,8 @@ bool PersistentTable::insertTuple(TableTuple &source, bool createUndoQuantum) {
         throw ConstraintFailureException(this, source, TableTuple(),
                                          CONSTRAINT_TYPE_UNIQUE);
     }
+
+    m_usedTupleCount++;
 
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
@@ -571,6 +572,7 @@ void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy) {
         // Delete the strings/objects
         target.freeObjectColumns();
         deleteTupleStorage(target);
+        m_tuplesPinnedByUndo--;
         m_usedTupleCount--;
     }
 }
@@ -654,7 +656,7 @@ bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate
 bool PersistentTable::checkNulls(TableTuple &tuple) const {
     assert (m_columnCount == tuple.sizeInValues());
     for (int i = m_columnCount - 1; i >= 0; --i) {
-        if (tuple.isNull(i) && !m_allowNulls[i]) {
+        if ( ( ! m_allowNulls[i]) && tuple.isNull(i) ) {
             VOLT_TRACE ("%d th attribute was NULL. It is non-nillable attribute.", i);
             return false;
         }

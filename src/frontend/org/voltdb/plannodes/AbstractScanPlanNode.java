@@ -18,12 +18,14 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -43,9 +45,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     // Store the columns from the table as an internal NodeSchema
     // for consistency of interface
-    protected NodeSchema m_tableSchema = null;
-    // Store the columns we use from this table as an internal schema
-    protected NodeSchema m_tableScanSchema = new NodeSchema();
+    protected NodeSchema m_tableSchema = new NodeSchema();
+    // Store the columns we use from this table indexed by name and alias.
+    protected HashMap<Pair<String, String>, TupleValueExpression> m_usedColumns =
+          new HashMap<Pair<String, String>, TupleValueExpression>();
     protected AbstractExpression m_predicate;
 
     // The target table is the table that the plannode wants to perform some operation on.
@@ -73,10 +76,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_predicate.validate();
         }
         // All the schema columns better reference this table
-        for (SchemaColumn col : m_tableScanSchema.getColumns())
-        {
-            if (!m_targetTableName.equals(col.getTableName()))
-            {
+        for (TupleValueExpression col : m_usedColumns.values()) {
+            if (!m_targetTableName.equals(col.getTableName())) {
                 throw new Exception("ERROR: The scan column: " + col.getColumnName() +
                                     " in table: " + m_targetTableName + " refers to " +
                                     " table: " + col.getTableName());
@@ -158,20 +159,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
-    public void setScanColumns(ArrayList<SchemaColumn> scanColumns)
+    public void addScanColumns(Map< Pair<String, String>, TupleValueExpression > map)
     {
-        if (scanColumns != null)
-        {
-            for (SchemaColumn col : scanColumns)
-            {
-                m_tableScanSchema.addColumn(col.clone());
-            }
+        for (Pair<String, String> name_n_alias : map.keySet()) {
+            TupleValueExpression col = map.get(name_n_alias);
+            m_usedColumns.put(name_n_alias, col);
         }
-    }
-
-    NodeSchema getTableSchema()
-    {
-        return m_tableSchema;
     }
 
     @Override
@@ -179,8 +172,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     {
         // If any columns are referenced in the query, get the catalog schema.
         // It's rare but not impossible for a query to scan a table but not reference any of its columns.
-        if (m_tableScanSchema.size() != 0) {
-            m_tableSchema = new NodeSchema();
+        if (m_usedColumns.size() != 0) {
             CatalogMap<Column> cols = db.getTables().getIgnoreCase(m_targetTableName).getColumns();
             // you don't strictly need to sort this, but it makes diff-ing easier
             for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index")) {
@@ -192,10 +184,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 tve.setTableName(m_targetTableName);
                 tve.setColumnAlias(col.getTypeName());
                 tve.setColumnName(col.getTypeName());
-                m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
-                                                         col.getTypeName(),
-                                                         col.getTypeName(),
-                                                         tve));
+                m_tableSchema.addColumn(tve);
             }
         }
 
@@ -205,39 +194,64 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         ProjectionPlanNode proj = (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
         if (proj == null) {
-            // Build an inline projection consisting of all the referenced columns.
-            // Order the scan columns according to the table schema
-            // before we stick them in the projection output
-            for (SchemaColumn col : m_tableScanSchema.getColumns()) {
-                assert(col.getExpression() instanceof TupleValueExpression);
-                TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-                // and update their indexes against the table schema
-                int index = m_tableSchema.getIndexOfTve(tve);
-                tve.setColumnIndex(index);
+            // If the set of columns is essentially "select *",
+            // including the fact that the columns are not aliased,
+            // a projection would just be extra overhead (vs. operating directly on the persistent table).
+            // The table schema IS the output schema.
+            // Assuming that the parser caught any invalid column names, all that needs to be checked here
+            // is that the number of referenced unique column names matches the number of columns and there
+            // are no aliases. It seems a pity to have to do a projection just to get aliases, but the real
+            // target here is "select *" which gives no way of aliasing.
+            if (m_usedColumns.size() == m_tableSchema.size() &&  ! columnsUseAliases()) {
+                m_outputSchema = m_tableSchema;
+            } else {
+                // Build an inline projection consisting of all the referenced columns.
+                m_outputSchema = new NodeSchema();
+                for (TupleValueExpression tve : m_usedColumns.values()) {
+                    // Update all columns' indexes against the table schema
+                    int index = m_tableSchema.getIndexOfTve(tve);
+                    tve.setColumnIndex(index);
+                    m_outputSchema.addColumn(tve);
+                }
+                // Order the scan columns according to the table schema
+                // before we stick them in the projection output.
+                // It PROBABLY is OK for different aliases for the same column to "tie" on index in this sort.
+                // The result should be deterministic according to the order that the aliases come out of the hash.
+                m_outputSchema.sortByTveIndex();
+                // Create an inline projection to map table outputs to scan outputs
+                proj = new ProjectionPlanNode();
+                proj.setOutputSchema(m_outputSchema);
+                addInlinePlanNode(proj);
             }
-            m_tableScanSchema.sortByTveIndex();
-            // Create an inline projection to map table outputs to scan outputs
-            proj = new ProjectionPlanNode();
-            proj.setOutputSchema(m_tableScanSchema);
-            addInlinePlanNode(proj);
         } else {
+            // Only the pre-existing inline projections (vs. the simple one just built above)
+            // still need index resolution.
             proj.resolveColumnIndexesUsingSchema(m_tableSchema);
+            m_outputSchema = proj.getOutputSchema();
         }
 
-        // The following applies to both seq and index scan.  Index scan has
-        // some additional expressions that need to be handled as well
-
-        // predicate expression
-        List<TupleValueExpression> predicate_tves =
-            ExpressionUtil.getTupleValueExpressions(m_predicate);
-        for (TupleValueExpression tve : predicate_tves) {
+        // Resolve column indexes in the predicate expression
+        // This applies to both seq and index scan.  Though, index scan has
+        // additional expressions to resolve in its own generateOutputSchema refinement.
+        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(m_predicate)) {
             int index = m_tableSchema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
+        m_outputSchema = proj.getOutputSchema();
         return m_outputSchema;
     }
 
-    //TODO some members not in here
+    private boolean columnsUseAliases()
+    {
+        for (Pair<String, String> name_n_alias : m_usedColumns.keySet()) {
+            if (name_n_alias.getFirst().equals(name_n_alias.getSecond())) {
+                continue;
+            }
+            return true;
+        }
+        return false;
+    }
+
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);

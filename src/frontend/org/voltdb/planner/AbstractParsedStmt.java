@@ -22,10 +22,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
@@ -37,7 +39,6 @@ import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.ExpressionType;
 
 public abstract class AbstractParsedStmt {
@@ -69,31 +70,30 @@ public abstract class AbstractParsedStmt {
 
     public VoltType[] paramList = new VoltType[0];
 
-    protected HashMap<Long, Integer> m_paramsById = new HashMap<Long, Integer>();
+    protected final HashMap<Long, Integer> m_paramsById = new HashMap<Long, Integer>();
 
-    public ArrayList<Table> tableList = new ArrayList<Table>();
+    public final ArrayList<Table> tableList = new ArrayList<Table>();
 
     public AbstractExpression where = null;
 
-    public ArrayList<AbstractExpression> whereSelectionList = new ArrayList<AbstractExpression>();
+    public final ArrayList<AbstractExpression> whereSelectionList = new ArrayList<AbstractExpression>();
 
-    public ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
+    public final ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
 
-    public ArrayList<AbstractExpression> multiTableSelectionList = new ArrayList<AbstractExpression>();
+    public final ArrayList<AbstractExpression> multiTableSelectionList = new ArrayList<AbstractExpression>();
 
-    public HashMap<Table, ArrayList<AbstractExpression>> tableFilterList = new HashMap<Table, ArrayList<AbstractExpression>>();
+    public final HashMap<Table, ArrayList<AbstractExpression>> tableFilterList = new HashMap<Table, ArrayList<AbstractExpression>>();
 
-    public HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
+    public final HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
 
-    public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
+    public final HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
 
     //User specified join order, null if none is specified
     public String joinOrder = null;
 
-    // Store a table-hashed list of the columns actually used by this statement.
-    // XXX An unfortunately counter-intuitive (but hopefully temporary) meaning here:
-    // if this is null, that means ALL the columns get used.
-    public HashMap<String, ArrayList<SchemaColumn>> scanColumns = null;
+    // Store a table-hashed list of name/alias-hashed columns actually used by this statement.
+    public final HashMap< String, Map< Pair<String,String>, TupleValueExpression > > m_scanColumns =
+             new HashMap< String, Map< Pair<String,String>, TupleValueExpression > >();
 
     protected final String[] m_paramValues;
     protected final Database m_db;
@@ -199,9 +199,6 @@ public abstract class AbstractParsedStmt {
             if (node.name.equalsIgnoreCase("tablescans")) {
                 this.parseTables(node);
             }
-            if (node.name.equalsIgnoreCase("scan_columns")) {
-                this.parseScanColumns(node);
-            }
         }
     }
 
@@ -240,8 +237,8 @@ public abstract class AbstractParsedStmt {
                     cve.setValue(m_paramValues[pve.getParameterIndex()]);
                 }
             }
-
         }
+        addScanColumns(exprTree);
         return exprTree;
     }
 
@@ -530,38 +527,19 @@ public abstract class AbstractParsedStmt {
         return expr;
     }
 
-    /**
-     * Parse the scan_columns element out of the HSQL-generated XML.
-     * Fills scanColumns with a list of the columns used in the plan, hashed by
-     * table name.
-     *
-     * @param columnsNode
-     */
-    void parseScanColumns(VoltXMLElement columnsNode)
-    {
-        scanColumns = new HashMap<String, ArrayList<SchemaColumn>>();
-
-        for (VoltXMLElement child : columnsNode.children) {
-            assert(child.name.equals("columnref"));
-            AbstractExpression col_exp = parseExpressionTree(child);
-            // TupleValueExpressions are always specifically typed,
-            // so there is no need for expression type specialization, here.
-            assert(col_exp != null);
-            assert(col_exp instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col_exp;
-            SchemaColumn col = new SchemaColumn(tve.getTableName(),
-                                                tve.getColumnName(),
-                                                tve.getColumnAlias(),
-                                                col_exp);
-            ArrayList<SchemaColumn> table_cols = null;
-            if (!scanColumns.containsKey(col.getTableName()))
-            {
-                table_cols = new ArrayList<SchemaColumn>();
-                scanColumns.put(col.getTableName(), table_cols);
-            }
-            table_cols = scanColumns.get(col.getTableName());
-            table_cols.add(col);
+    private void addScanColumns(AbstractExpression exprTree) {
+        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(exprTree)) {
+            addScanColumnToTable(tve);
         }
+    }
+
+    private void addScanColumnToTable(TupleValueExpression tve) {
+        Map< Pair<String, String>, TupleValueExpression> table_cols = m_scanColumns.get(tve.getTableName());
+        if (table_cols == null) {
+            table_cols = new HashMap< Pair<String, String>, TupleValueExpression>();
+            m_scanColumns.put(tve.getTableName(), table_cols);
+        }
+        table_cols.put(Pair.of(tve.getColumnName(), tve.getColumnAlias()), tve);
     }
 
     /**
@@ -719,21 +697,12 @@ public abstract class AbstractParsedStmt {
         }
 
         retval += "\nSCAN COLUMNS:\n";
-        if (scanColumns != null)
-        {
-            for (String table : scanColumns.keySet())
-            {
-                retval += "\tTable: " + table + ":\n";
-                for (SchemaColumn col : scanColumns.get(table))
-                {
-                    retval += "\t\tColumn: " + col.getColumnName() + ": ";
-                    retval += col.getExpression().toString() + "\n";
-                }
+        for (String table : m_scanColumns.keySet()) {
+            retval += "\tTable: " + table + ":\n";
+            for (TupleValueExpression col : m_scanColumns.get(table).values()) {
+                retval += "\t\tColumn: " + col.getColumnName() + ": ";
+                retval += col.toString() + "\n";
             }
-        }
-        else
-        {
-            retval += "\tALL\n";
         }
 
         if (where != null) {

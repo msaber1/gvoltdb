@@ -246,6 +246,8 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subtestAndExpressionComparingSameTableColumns();
         subtestSelectExpression();
         subtestGreaterThanOnOrderedIndex();
+        subtestSeqScanFailedPredicateDoesntCountAgainstLimit();
+        subtestNestLoopJoinPredicates();
         subtestTicket196();
         subtestTicket201();
         // subtestTicket205();
@@ -260,6 +262,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
         subtestTicket231();
         subtestTicket232();
         subtestTicket293();
+        subtestTicket309();
         subtestTicketEng397();
         // subtestTicketEng490();
         subtestTicketEng993();
@@ -540,7 +543,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         // the id of the first should be (5-id) in the second once the addition
         // done in the select expression is un-done.
-        for (int i=0; vts[0].advanceRow(); ++i) {
+        while (vts[0].advanceRow()) {
             int p1_id = ((Integer)vts[0].get(0, VoltType.INTEGER)).intValue();
             int r1_id = ((Integer)vts[0].get(1, VoltType.INTEGER)).intValue();
             assertEquals( (p1_id - 20), (5 - (r1_id - 40)) );
@@ -591,7 +594,7 @@ public class TestFixedSQLSuite extends RegressionSuite {
 
         // the id of the first should be (5-id) in the second once the addition
         // done in the select expression is un-done.
-        for (int i=0; vts[0].advanceRow(); ++i) {
+        while (vts[0].advanceRow()) {
             int p1_id = ((Integer)vts[0].get(1, VoltType.INTEGER)).intValue();
             int r1_id = ((Integer)vts[0].get(0, VoltType.INTEGER)).intValue();
             assertEquals( (p1_id - 20), (5 - r1_id) );

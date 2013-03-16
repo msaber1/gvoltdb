@@ -20,8 +20,10 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
 
 import org.json_voltpatches.JSONException;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.ColumnRef;
@@ -632,11 +634,10 @@ public abstract class SubPlanAssembler {
         {
             scanNode = getIndexAccessPlanForTable(table, path);
         }
-        // set the scan columns for this scan node based on the parsed SQL,
-        // if any
-        if (m_parsedStmt.scanColumns != null)
-        {
-            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
+        // set the scan columns for this scan node (if any) based on the parsed SQL
+        Map<Pair<String, String>, TupleValueExpression> columns = m_parsedStmt.m_scanColumns.get(table.getTypeName());
+        if (columns != null) {
+            scanNode.addScanColumns(columns);
         }
         return scanNode;
     }

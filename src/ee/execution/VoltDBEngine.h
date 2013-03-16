@@ -96,6 +96,7 @@ namespace voltdb {
 
 class AbstractExecutor;
 class AbstractPlanNode;
+class PersistentTable;
 class SerializeInput;
 class SerializeOutput;
 class Table;

@@ -155,6 +155,7 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
 
     // set the data to be empty
     m_tupleCount = 0;
+    m_usedTupleCount = 0;
 
     m_tmpTarget1 = TableTuple(m_schema);
     m_tmpTarget2 = TableTuple(m_schema);
@@ -311,7 +312,7 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
         return false;
 
     // active tuple counts
-    serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
+    serialize_io.writeInt(static_cast<int32_t>(m_usedTupleCount));
     int64_t written_count = 0;
     TableIterator titer = iterator();
     TableTuple tuple(m_schema);
@@ -319,7 +320,19 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
         tuple.serializeTo(serialize_io);
         ++written_count;
     }
-    assert(written_count == m_tupleCount);
+#ifndef NDEBUG
+    // Sometimes a throw or crash is more informative than the assert that was here originally.
+    // Using catch/throw further up allows annotating the exception message with plan fragment context
+    // which gets reported to the console (at least under eclipse/JNI), making it easier to debug the planner.
+    if (written_count != m_usedTupleCount) {
+        static const int throw_assert_or_crash_123 = /* throw */ 1;  // OR assert *-/ 2; // OR crash the test. */ 3;
+        if (debug_pass_fail_or_crash_123(throw_assert_or_crash_123)) {
+            throwFatalLogicErrorStreamed("Fallout from error. The sent tuple count " << written_count
+                                         << " does not equal the table's count of used tuples " << m_usedTupleCount << "\n" << debug());
+        }
+    }
+#endif
+    assert(written_count == m_usedTupleCount);
 
     // length prefix is non-inclusive
     int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));

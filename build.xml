@@ -1352,6 +1352,35 @@ TEST CASES
     </run_junit>
 </target>
 
+<target
+    name="junit_sql"
+    description="Execute JUnit test suites stressing sql functionality rather than process architecture.">
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <!-- Standard junit fileset -->
+                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltdb/**/Test*.class'/>
+                <exclude name="**/*$*.class"/>
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <!-- Excluded pro tests -->
+                <exclude name="**/TestCommandLogServer.class" />
+                <exclude name="**/TestCommandLogReinitiator.class"/>
+                <exclude name="**/TestCommandLog.class"/>
+                <exclude name="**/TestLogReader.class"/>
+                <exclude name="**/TestRestoreWithReplay.class" />
+                <exclude name="**/TestPauselessRejoinFuzz.class" /> <!-- fails legacy -->
+                <!-- Exclude community tests -->
+                <!-- Recorded as ENG-4423 -->
+                <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
+                <exclude name="**/TestRejoinFuzz.class" />
+                <exclude name="**/TestRejoinFuzz2.class" />
+                <exclude name="**/TestMaliciousClientSuite.class" /> <!-- fails legacy -->
+            </fileset>
+        </tests>
+    </run_junit>
+</target>
+
 <!-- common macro to run a bynch of junit -->
 <macrodef name='run_junit'>
     <element name='tests'/>

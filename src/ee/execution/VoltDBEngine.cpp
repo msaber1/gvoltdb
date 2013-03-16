@@ -633,7 +633,7 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
 }
 
 static bool
-catalogAndPersistentTableHaveTheSameSchema(catalog::Table *t1, voltdb::PersistentTable *t2) {
+catalogAndPersistentTableHaveTheSameSchema(catalog::Table *t1, PersistentTable *t2) {
     // covers column count
     if (t1->columns().size() != t2->columnCount()) {
         return false;
@@ -757,9 +757,9 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // indexes as we go
             //////////////////////////////////////////
 
-            PersistentTable* pTable = dynamic_cast<PersistentTable*>(table);
-            assert(pTable);
-            if ( ! catalogAndPersistentTableHaveTheSameSchema(catalogTable, pTable)) {
+            PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
+            assert(persistentTable);
+            if ( ! catalogAndPersistentTableHaveTheSameSchema(catalogTable, persistentTable)) {
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Processing schema changes for %s\n",
                          catalogTable->name().c_str());
@@ -776,7 +776,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // find all of the indexes to add
             //////////////////////////////////////////
 
-            vector<TableIndex*> currentIndexes = pTable->allIndexes();
+            vector<TableIndex*> currentIndexes = persistentTable->allIndexes();
 
             // iterate over indexes for this table in the catalog
             map<string, catalog::Index*>::const_iterator indexIter;
@@ -804,7 +804,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                     TableIndexScheme scheme;
                     bool success = TableCatalogDelegate::getIndexScheme(*catalogTable,
                                                                         *indexIter->second,
-                                                                        pTable->schema(),
+                                                                        persistentTable->schema(),
                                                                         &scheme);
                     if (!success) {
                         VOLT_ERROR("Failed to initialize index '%s' from catalog",
@@ -816,11 +816,11 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                     assert(index);
 
                     // all of the data should be added here
-                    pTable->addIndex(index);
+                    persistentTable->addIndex(index);
 
                     // add the index to the stats source
                     index->getIndexStats()->configure(index->getName() + " stats",
-                                                      pTable->name(),
+                                                      persistentTable->name(),
                                                       indexIter->second->relativeIndex());
                 }
             }
@@ -852,7 +852,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                 // if the table has an index that the catalog doesn't,
                 // then remove the index
                 if (!found) {
-                    pTable->removeIndex(currentIndexes[i]);
+                    persistentTable->removeIndex(currentIndexes[i]);
                 }
             }
         }
