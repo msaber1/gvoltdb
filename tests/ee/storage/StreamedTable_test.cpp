@@ -42,6 +42,7 @@
 #include "storage/StreamBlock.h"
 
 #include "boost/smart_ptr.hpp"
+#include "boost/unordered_set.hpp"
 
 using namespace std;
 using namespace voltdb;
@@ -138,7 +139,8 @@ public:
             TupleSchema::freeTupleSchema(m_schema);
         delete m_table;
         delete m_context;
-        m_quantum->release();
+        boost::unordered_set<UndoQuantumReleaseInterest*> expect_no_interests;
+        m_quantum->release(expect_no_interests);
         delete m_pool;
         delete m_topend;
     }
@@ -167,7 +169,8 @@ TEST_F(StreamedTableTest, BaseCase) {
     for (int i = 1; i < 1000; i++) {
 
         // pretend to be a plan fragment execution
-        m_quantum->release();
+        boost::unordered_set<UndoQuantumReleaseInterest*> expect_no_interests;
+        m_quantum->release(expect_no_interests);
         m_quantum =
           new (m_pool->allocate(sizeof(UndoQuantum)))
           UndoQuantum(i + tokenOffset, m_pool);

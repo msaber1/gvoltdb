@@ -88,6 +88,7 @@ PersistentTable::PersistentTable(int partitionColumn) :
     m_iter(this, m_data.begin()),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
+    m_tuplesPinnedByUndo(0),
     stats_(this),
     m_COWContext(NULL),
     m_failedCompactionCount(0)
@@ -252,7 +253,6 @@ bool PersistentTable::insertTuple(TableTuple &source, bool createUndoQuantum) {
     } else {
         m_tmpTarget1.setDirtyFalse();
     }
-    m_tmpTarget1.isDirty();
 
     if (!tryInsertOnAllIndexes(&m_tmpTarget1)) {
         // Careful to delete allocated objects
@@ -271,6 +271,7 @@ bool PersistentTable::insertTuple(TableTuple &source, bool createUndoQuantum) {
 
     // this is skipped for schema changes for now
     if (createUndoQuantum) {
+        char *tupleData = static_cast<char*>(m_tmpTarget1.address());
         /*
          * Create and register an undo action.
          */
@@ -278,9 +279,21 @@ bool PersistentTable::insertTuple(TableTuple &source, bool createUndoQuantum) {
         assert(undoQuantum);
         Pool *pool = undoQuantum->getDataPool();
         assert(pool);
+
+        // After refactoring this copying code out of the PersistentTableUndoInsertAction ctor,
+        // mostly just to keep it stupid simple, Paul came to doubt whether this copy
+        // is really helping anything.  What is the risk in giving the UndoInsertAction
+        // the actual target tuple storage so it doesn't need to be looked up on "undo"?
+        // See the top of deleteTupleForUndo.
+        // What operations could intervene between this insert and its undo that would
+        // relocate the target tuple? If you have an answer, please leave it here.
+        void *tupleCopy = pool->allocate(m_tupleLength);
+        ::memcpy(tupleCopy, tupleData, m_tupleLength);
+        tupleData = reinterpret_cast<char*>(tupleCopy);
+
         PersistentTableUndoInsertAction *ptuia =
             new (pool->allocate(sizeof(PersistentTableUndoInsertAction)))
-            PersistentTableUndoInsertAction(m_tmpTarget1, this, pool);
+            PersistentTableUndoInsertAction(tupleData, this);
         undoQuantum->registerUndoAction(ptuia);
     }
 
@@ -301,6 +314,7 @@ void PersistentTable::insertTupleForUndo(char *tuple) {
     m_tmpTarget1.move(tuple);
     m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
     m_tuplesPinnedByUndo--;
+    //printf("DEBUG undoing delete decrementing pinnedByUndo to: %d\n", (int)m_tuplesPinnedByUndo);
     m_usedTupleCount++;
 
     /*
@@ -313,6 +327,31 @@ void PersistentTable::insertTupleForUndo(char *tuple) {
                             " unique constraint violation\n%s\n", m_name.c_str(),
                             m_tmpTarget1.debugNoHeader().c_str());
     }
+}
+
+void PersistentTable::deleteTupleRelease(char *tupleData)
+{
+    TableTuple tuple(tupleData, schema());
+    tuple.setPendingDeleteOnUndoReleaseFalse();
+    m_tuplesPinnedByUndo--;
+    //printf("DEBUG final delete decrementing pinnedByUndo to: %d\n", (int)m_tuplesPinnedByUndo);
+
+    /*
+     * Before deleting the tuple free any allocated strings.
+     * Persistent tables are responsible for managing the life of
+     * strings stored in the table.
+     */
+    if (m_COWContext && ! m_COWContext->canSafelyFreeTuple(tuple)) {
+        //Mark it pending delete and let the snapshot land the finishing blow
+        tuple.setPendingDeleteTrue();
+        return;
+    }
+    //No snapshot has an interest in the tuple. Just whack it.
+    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+        decreaseStringMemCount(tuple.getNonInlinedMemorySize());
+        tuple.freeObjectColumns();
+    }
+    deleteTupleStorage(tuple);
 }
 
 /*
@@ -498,6 +537,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool deleteAllocatedString
 
     target.setPendingDeleteOnUndoReleaseTrue();
     m_tuplesPinnedByUndo++;
+    //printf("DEBUG initial delete incrementing pinnedByUndo to: %d\n", (int)m_tuplesPinnedByUndo);
     m_usedTupleCount--;
 
     /*
@@ -533,8 +573,8 @@ void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
         decreaseStringMemCount(target.getNonInlinedMemorySize());
+        target.freeObjectColumns();
     }
-    target.freeObjectColumns();
     deleteTupleStorage(target);
 }
 
@@ -547,7 +587,13 @@ void PersistentTable::deleteTupleForSchemaChange(TableTuple &target) {
  * correct dirty setting when the tuple was originally inserted.
  * TODO remove duplication with regular delete. Also no view updates.
  */
-void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy) {
+void PersistentTable::deleteTupleForUndo(char* tupleData)
+{
+    // tupleData is just a cached shallow copy of the target tuple that gets
+    // leaked into the pool. I (--paul) am not at all sure why it is needed --
+    // vs. storing the actual target tuple in the UndoInsertAction,
+    // so we'd have it here and not have to look it up.
+    TableTuple tupleCopy(tupleData, m_schema);
     TableTuple target = lookupTuple(tupleCopy);
     if (target.isNullTuple()) {
         throwFatalException("Failed to delete tuple from table %s:"
@@ -564,15 +610,12 @@ void PersistentTable::deleteTupleForUndo(TableTuple &tupleCopy) {
         // Just like insert, we want to remove this tuple from all of our indexes
         deleteFromAllIndexes(&target);
 
-        if (m_schema->getUninlinedObjectColumnCount() != 0)
-        {
-            decreaseStringMemCount(tupleCopy.getNonInlinedMemorySize());
+        if (m_schema->getUninlinedObjectColumnCount() != 0) {
+            decreaseStringMemCount(target.getNonInlinedMemorySize());
+            // Delete the strings/objects
+            target.freeObjectColumns();
         }
-
-        // Delete the strings/objects
-        target.freeObjectColumns();
         deleteTupleStorage(target);
-        m_tuplesPinnedByUndo--;
         m_usedTupleCount--;
     }
 }
@@ -1027,7 +1070,33 @@ void PersistentTable::doIdleCompaction() {
     }
 }
 
-void PersistentTable::doForcedCompaction() {
+int persistenttable_assert_or_throw_or_crash_123 = /* throw a fatal error */ 2; //the default
+                                                   // OR crash from here  */ 3;
+                                                   // OR assert           */ 1;
+
+void PersistentTable::notifyQuantumRelease()
+{
+    DEBUG_ASSERT_OR_THROW_OR_CRASH_123(m_tuplesPinnedByUndo == 0,
+                                       persistenttable_assert_or_throw_or_crash_123,
+                                       "EE accounting error? Remaining tuples pinned by undo: " <<
+                                       m_tuplesPinnedByUndo << "\n" << debug());
+    doForcedCompaction();
+}
+
+inline bool PersistentTable::compactionPredicate() const
+{
+    // Stop (or don't start) compacting unless the potential space savings are
+    // at least 3 blocks worth AND 5% of the total allocated.
+    int64_t unusedTuples = allocatedTupleCount() - activeTupleCount();
+    return (unusedTuples > (m_tuplesPerBlock * 3) &&
+            unusedTuples > (allocatedTupleCount()/20));
+}
+
+void PersistentTable::doForcedCompaction()
+{
+    if ( ! compactionPredicate()) {
+        return;
+    }
     if (m_recoveryContext != NULL)
     {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,

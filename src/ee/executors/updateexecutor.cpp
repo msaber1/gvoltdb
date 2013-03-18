@@ -79,31 +79,27 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(m_node->getInputTables().size() == 1);
     m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
     assert(m_inputTable);
-    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
+    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target should be persistenttable
     assert(m_targetTable);
     assert(m_node->getTargetTable());
 
     setDMLCountOutputTable(limits);
 
     AbstractPlanNode *child = m_node->getChildren()[0];
-    ProjectionPlanNode *proj_node = NULL;
     if (NULL == child) {
         VOLT_ERROR("Attempted to initialize update executor with NULL child");
         return false;
     }
 
-    PlanNodeType pnt = child->getPlanNodeType();
-    if (pnt == PLAN_NODE_TYPE_PROJECTION) {
-        proj_node = dynamic_cast<ProjectionPlanNode*>(child);
-    } else if (pnt == PLAN_NODE_TYPE_SEQSCAN ||
-            pnt == PLAN_NODE_TYPE_INDEXSCAN) {
+    ProjectionPlanNode *proj_node = dynamic_cast<ProjectionPlanNode*>(child);
+    if ( ! proj_node) {
         proj_node = dynamic_cast<ProjectionPlanNode*>(child->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-        assert(NULL != proj_node);
     }
-
+    assert(proj_node);
     vector<string> output_column_names = proj_node->getOutputColumnNames();
     const vector<string> &targettable_column_names = m_targetTable->getColumnNames();
 
+    //TODO: Avoid this name game, serialize the desired map from the planner as a target column index list.
     /*
      * The first output column is the tuple address expression and it isn't part of our output so we skip
      * it when generating the map from input columns to the target table columns.

@@ -192,15 +192,14 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
-    @Test
     public void testSP() throws Exception {
 
         /*// IFDEF-LIKE HACK: Toggle this one line's comment style
-        // between '//' and '/*' to magically switch between...
+        // between '//' and '/*' to switch between ...
 
         // ... this TestEnv/LocalCluster-based config...
 
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1, BackendTarget.NATIVE_EE_JNI, false);
         try {
             env.setUp();
             m_client = env.m_client;
@@ -211,9 +210,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
             env.tearDown();
         }
 
-        /*/ // (This funky comment line is the pivotal ELSE component to the IFDEF-LIKE HACK.)
+        /*/ // ... ELSE ... [Note: this is a structured comment. Do not break it.]
 
-        // ...and this LocalServer-based config...
+        // ... and this LocalServer-based config ...
 
         VoltDB.Configuration config = setUpSPDB();
         ServerThread localServer = new ServerThread(config);
@@ -238,12 +237,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
             // no clue how helpful this is
             System.gc();
         }
-        // (This funky comment acts as the ENDIF for the IFDEF-LIKE HACK) */
+        // ... ENDIF  [Note: this is a structured comment. Do not break it.] */
     }
 
     public void runSP() throws Exception {
-        try {
-
             VoltTable modCount;
 
             // Unlike TestAdHocPlans, TestAdHocQueries runs the queries against actual (minimal) data.
@@ -289,9 +286,6 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assertEquals(1, modCount.asScalarLong());
 
             runAllAdHocSPtests();
-        }
-        finally {
-        }
     }
 
     /**
@@ -329,7 +323,17 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testSimple() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        //*// <-- IFDEF-LIKE HACK: Toggle this one line's comment style between
+        // 'line-style' and 'block-style' to debug the EE with a single IPC server
+
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1, BackendTarget.NATIVE_EE_JNI, false);
+
+        /*/ // ELSE  [Note: This line contains a structured comment. Do not break it. ]
+
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 1, 1, 0, BackendTarget.NATIVE_EE_IPC, true);
+
+        // ENDIF     [Note: This line contains a structured comment. Do not break it. ] */
+
         try {
             env.setUp();
 
@@ -403,7 +407,17 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testAdHocBatches() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        //*// <-- IFDEF-LIKE HACK: Toggle this one line's comment style between
+        // 'line-style' and 'block-style' to debug the EE with a single IPC server
+
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0, BackendTarget.NATIVE_EE_JNI, false);
+
+        /*/ // ELSE  [Note: This line contains a structured comment. Do not break it. ]
+
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 1, 1, 0, BackendTarget.NATIVE_EE_IPC, true);
+
+        // ENDIF     [Note: This line contains a structured comment. Do not break it. ] */
+
         try {
             env.setUp();
             Batcher batcher = new Batcher(env);
@@ -474,7 +488,17 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testXopenSubSelectQueries() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        //*// <-- IFDEF-LIKE HACK: Toggle this one line's comment style between
+        // 'line-style' and 'block-style' to debug the EE with a single IPC server
+
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0, BackendTarget.NATIVE_EE_JNI, false);
+
+        /*/ // ELSE  [Note: This line contains a structured comment. Do not break it. ]
+
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 1, 1, 0, BackendTarget.NATIVE_EE_IPC, true);
+
+        // ENDIF     [Note: This line contains a structured comment. Do not break it. ] */
+
         String adHocQuery;
         try {
             env.setUp();
@@ -623,7 +647,17 @@ public class TestAdHocQueries extends AdHocQueryTester {
     // instead of a timestamp. It was mis-handling the timestamp datatype during planning.
     // Testing with ad hoc because that's how it was discovered.
     public void testTimestampInsert() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 1, 1, 0);
+        //*// <-- IFDEF-LIKE HACK: Toggle this one line's comment style between
+        // 'line-style' and 'block-style' to debug the EE with a single IPC server
+
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 1, 1, 0, BackendTarget.NATIVE_EE_JNI, false);
+
+        /*/ // ELSE  [Note: This line contains a structured comment. Do not break it. ]
+
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 1, 1, 0, BackendTarget.NATIVE_EE_IPC, true);
+
+        // ENDIF     [Note: This line contains a structured comment. Do not break it. ] */
+
         try {
             env.setUp();
             // bad timestamp should result in a clean compiler error.
@@ -689,8 +723,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
         private void runAndCheck(boolean expectException) throws Exception {
             try {
-                VoltTable[] results = m_env.m_client.callProcedure("@AdHoc",
-                        StringUtils.join(m_queries, "; ")).getResults();
+                String batchedStatements = StringUtils.join(m_queries, "; ");
+                VoltTable[] results = m_env.m_client.callProcedure("@AdHoc", batchedStatements).getResults();
                 int i = 0;
                 assertEquals(m_expectedCounts.size(), results.length);
                 for (String query : m_queries) {
@@ -734,7 +768,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
         Client m_client = null;
 
         TestEnv(String pathToCatalog, String pathToDeployment,
-                     int siteCount, int hostCount, int kFactor) {
+                int siteCount, int hostCount, int kFactor,
+                BackendTarget backend, boolean localizeServer)
+        {
             m_builder = new VoltProjectBuilder();
             try {
                 m_builder.addLiteralSchema("create table BLAH (" +
@@ -818,31 +854,11 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("Failed to set up schema");
             }
 
-            /*// <-- IFDEF-LIKE HACK: Toggle this one line's comment style between
-            // 'line-style' and 'block-style' to magically switch between code blocks...
-
-            // ... from this NORMAL configuration ...
-            m_cluster = new LocalCluster(pathToCatalog,
-                                         siteCount, hostCount, kFactor, // NORMAL
-                                         BackendTarget.NATIVE_EE_JNI, // NORMAL
+            m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
+                                         backend,
                                          LocalCluster.FailureState.ALL_RUNNING,
                                          m_debug);
-            m_cluster.setHasLocalServer(false);
-
-            /*/ // ELSE  [Note: This line contains a structured comment. Do not break it. ]
-
-            // ... to this DEBUG configuration...
-            m_cluster = new LocalCluster(pathToCatalog,
-                                         1, 1, 0, // DEBUG
-                                         // There is almost definitely a bug in the IPC implementation
-                                         // of batch execution and/or handling of constraint failures.
-                                         BackendTarget.NATIVE_EE_JNI, // DEBUG
-                                         LocalCluster.FailureState.ALL_RUNNING,
-                                         m_debug);
-            m_cluster.setHasLocalServer(true);
-
-            // ENDIF [Note: This line contains a structured comment. Do not break it. ] */
-
+            m_cluster.setHasLocalServer(localizeServer);
             boolean success = m_cluster.compile(m_builder);
             assert(success);
 

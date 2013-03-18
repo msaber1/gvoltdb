@@ -19,7 +19,10 @@
 #define UNDOLOG_H_
 #include "common/Pool.hpp"
 #include "common/UndoQuantum.h"
+
+#include <boost/foreach.hpp>
 #include "boost/pool/object_pool.hpp"
+#include "boost/unordered_set.hpp"
 
 #include <vector>
 #include <deque>
@@ -125,21 +128,31 @@ namespace voltdb
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
             assert(m_lastReleaseToken < undoToken);
             m_lastReleaseToken = undoToken;
+            // De-duping is likely to be useful in a multi-quantum release,
+            // on the assumption that quanta with shared interests will often flock together.
+            // For example, a batch of deletes to the same table could try compaction once
+            // after the batch is complete, in spite of the statements falling into different quanta.
+            // If the total number N of shared interests is small enough (likely?),
+            // it may be faster to do a more explicit O(N^2) de-dupe.
+            boost::unordered_set<UndoQuantumReleaseInterest*> common_interests;
             while (m_undoQuantums.size() > 0) {
                 UndoQuantum *undoQuantum = m_undoQuantums.front();
                 const int64_t undoQuantumToken = undoQuantum->getUndoToken();
                 if (undoQuantumToken > undoToken) {
-                    return;
+                    break;
                 }
 
                 m_undoQuantums.pop_front();
                 Pool *pool = undoQuantum->getDataPool();
-                undoQuantum->release();
+                undoQuantum->release(common_interests);
                 pool->purge();
                 m_undoDataPools.push_back(pool);
                 if(undoQuantumToken == undoToken) {
-                    return;
+                    break;
                 }
+            }
+            BOOST_FOREACH(UndoQuantumReleaseInterest* interest, common_interests) {
+                interest->notifyQuantumRelease();
             }
         }
 

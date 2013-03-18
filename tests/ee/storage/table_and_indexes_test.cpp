@@ -247,7 +247,7 @@ class TableAndIndexTest : public Test {
     protected:
         int mem;
         TempTableLimits limits;
-        UndoQuantum *dummyUndo;
+        DummyUndoQuantum *dummyUndo;
         ExecutorContext *engine;
 
         TupleSchema      *districtTupleSchema;

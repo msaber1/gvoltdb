@@ -19,10 +19,7 @@
 #define PERSISTENTTABLEUNDODELETEACTION_H_
 
 #include "common/UndoAction.h"
-#include "common/TupleSchema.h"
-#include "common/Pool.hpp"
-#include "common/tabletuple.h"
-
+#include "storage/persistenttable.h"
 
 namespace voltdb {
 
@@ -35,18 +32,19 @@ public:
         : m_tuple(deletedTuple), m_table(table)
     {}
 
-    virtual ~PersistentTableUndoDeleteAction();
+    virtual ~PersistentTableUndoDeleteAction() {}
 
     /*
      * Undo whatever this undo action was created to undo. In this case reinsert the tuple into the table.
      */
-    void undo();
+    virtual void undo() { m_table->insertTupleForUndo(m_tuple); }
 
     /*
      * Release any resources held by the undo action. It will not need to be undone in the future.
      * In this case free the strings associated with the tuple.
      */
-    void release();
+    virtual void release() { m_table->deleteTupleRelease(m_tuple); }
+
 private:
     char *m_tuple;
     PersistentTable *m_table;

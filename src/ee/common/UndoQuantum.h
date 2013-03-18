@@ -31,10 +31,11 @@
 namespace voltdb {
 
 class UndoQuantum {
+protected:
+    inline virtual ~UndoQuantum() {}
 public:
     inline UndoQuantum(int64_t undoToken, Pool *dataPool)
         : m_undoToken(undoToken), m_numInterests(0), m_interestsCapacity(0), m_interests(NULL), m_dataPool(dataPool) {}
-    inline virtual ~UndoQuantum() {}
 
     virtual inline void registerUndoAction(UndoAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
         assert(undoAction);
@@ -42,6 +43,8 @@ public:
 
         if (interest != NULL) {
             if (m_interests == NULL) {
+                //printf("DEBUG: first interest in quantum %ld token %ld by %ld\n",
+                //       (long)this, (long)m_undoToken, (long)interest);
                 m_interests = reinterpret_cast<UndoQuantumReleaseInterest**>(m_dataPool->allocate(sizeof(void*) * 16));
                 m_interestsCapacity = 16;
             }
@@ -73,8 +76,9 @@ public:
     inline void undo() {
         for (std::vector<UndoAction*>::reverse_iterator i = m_undoActions.rbegin();
              i != m_undoActions.rend(); i++) {
-            (*i)->undo();
-            (*i)->~UndoAction();
+            UndoAction* next = *i;
+            next->undo();
+            next->~UndoAction();
         }
         this->~UndoQuantum();
     }
@@ -84,15 +88,18 @@ public:
      * UndoQuantum so they will release any resources they still hold.
      * Also call own destructor to ensure that the vector is released.
      */
-    inline void release() {
+    inline void release(boost::unordered_set<UndoQuantumReleaseInterest*> & interests) {
         for (std::vector<UndoAction*>::reverse_iterator i = m_undoActions.rbegin();
              i != m_undoActions.rend(); i++) {
-            (*i)->release();
-            (*i)->~UndoAction();
+            UndoAction* next = *i;
+            next->release();
+            next->~UndoAction();
         }
+        // Collect interests for later notification.
+        // This lets a batch of quanta pool their notifications when released together.
         if (m_interests != NULL) {
             for (int ii = 0; ii < m_numInterests; ii++) {
-                m_interests[ii]->notifyQuantumRelease();
+                interests.insert(m_interests[ii]);
             }
         }
         this->~UndoQuantum();

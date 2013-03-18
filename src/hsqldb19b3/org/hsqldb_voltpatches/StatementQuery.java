@@ -275,7 +275,7 @@ public class StatementQuery extends StatementDMQL {
                 expr.columnIndex > -1 &&
                 ( ( ! (expr instanceof ExpressionColumn) ) ||
                   ( ((ExpressionColumn)expr).columnName == null ))) {
-                select.exprColumns[kk].alias = expr.alias;
+                select.exprColumns[expr.columnIndex].alias = expr.alias;
             }
 
             if (isGroupByColumn(select, kk)) {

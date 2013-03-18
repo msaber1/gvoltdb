@@ -296,8 +296,6 @@ CTX.INPUT['storage'] = """
  MaterializedViewMetadata.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
- PersistentTableUndoDeleteAction.cpp
- PersistentTableUndoInsertAction.cpp
  PersistentTableUndoUpdateAction.cpp
  StreamedTableStats.cpp
  streamedtable.cpp

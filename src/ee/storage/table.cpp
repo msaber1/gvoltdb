@@ -292,6 +292,10 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
 
 }
 
+int table_assert_or_throw_or_crash_123 = /* throw a fatal error */ 2; //the default
+                                         // OR crash from here  */ 3;
+                                         // OR assert           */ 1;
+
 bool Table::serializeTo(SerializeOutput &serialize_io) {
     // The table is serialized as:
     // [(int) total size]
@@ -320,19 +324,11 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
         tuple.serializeTo(serialize_io);
         ++written_count;
     }
-#ifndef NDEBUG
-    // Sometimes a throw or crash is more informative than the assert that was here originally.
-    // Using catch/throw further up allows annotating the exception message with plan fragment context
-    // which gets reported to the console (at least under eclipse/JNI), making it easier to debug the planner.
-    if (written_count != m_usedTupleCount) {
-        static const int throw_assert_or_crash_123 = /* throw */ 1;  // OR assert *-/ 2; // OR crash the test. */ 3;
-        if (debug_pass_fail_or_crash_123(throw_assert_or_crash_123)) {
-            throwFatalLogicErrorStreamed("Fallout from error. The sent tuple count " << written_count
-                                         << " does not equal the table's count of used tuples " << m_usedTupleCount << "\n" << debug());
-        }
-    }
-#endif
-    assert(written_count == m_usedTupleCount);
+    DEBUG_ASSERT_OR_THROW_OR_CRASH_123(written_count == m_usedTupleCount,
+                                       table_assert_or_throw_or_crash_123,
+                                       "Fallout from error. The sent tuple count " << written_count
+                                        << " != the table's count of used tuples " << m_usedTupleCount
+                                        << "\n" << debug());
 
     // length prefix is non-inclusive
     int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));
@@ -420,6 +416,10 @@ void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
     m_usedTupleCount += tupleCount;
 }
 
+int table_throw_sqlexception_or_fatal_or_crash_123 = /* throw a fatal error        */ 2; //the default
+                                                     // OR crash from here         */ 3;
+                                                     // OR throw something softer *-/ 1;
+
 void Table::loadTuplesFrom(SerializeInput &serialize_io,
                            Pool *stringPool) {
     /*
@@ -462,13 +462,10 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
 
     // Check if the column count matches what the temp table is expecting
     if (colcount != m_schema->columnCount()) {
-        static const int throw_sqlexception_or_fatal_or_crash_123 = /* throw soft        *-/ 1;
-                                                                    // OR throw harder   *-/ 2;
-                                                                    // OR crash the test. */ 3; //default
-        DEBUG_PASS_OR_THROW_OR_CRASH_123(throw_sqlexception_or_fatal_or_crash_123,
-                                         "Fallout from planner error."
-                                         " The deserialized tuple column count " << colcount
-                                         << " does not match the schema:\n" << m_schema->debug());
+        DEBUG_IGNORE_OR_THROW_OR_CRASH_123(table_throw_sqlexception_or_fatal_or_crash_123,
+                                           "Fallout from planner error."
+                                           " The deserialized tuple column count " << colcount
+                                           << " does not match the schema:\n" << m_schema->debug());
 
         std::stringstream message(std::stringstream::in
                                   | std::stringstream::out);

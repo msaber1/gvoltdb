@@ -97,9 +97,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // transfer details from the scan node being replaced.
         setTargetTableName(scanNode.getTargetTableName());
         setTargetTableAlias(scanNode.getTargetTableAlias());
-        setScanColumns(scanNode.getScanColumns());
-        setPredicate(scanNode.getPredicate());
         m_usedColumns = scanNode.m_usedColumns;
+        setPredicate(scanNode.getPredicate());
         for (AbstractPlanNode inlineNode : scanNode.getInlinePlanNodes().values()) {
             addInlinePlanNode(inlineNode);
         }

@@ -243,9 +243,7 @@ VoltDBEngine::~VoltDBEngine() {
 
     // Get rid of any dummy undo quantum first so m_undoLog.clear()
     // doesn't wipe this out before we do it.
-    if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
-        delete m_currentUndoQuantum;
-    }
+    delete dynamic_cast<DummyUndoQuantum*>(m_currentUndoQuantum);
 
     // Clear the undo log before deleting the persistent tables so
     // that the persistent table schema are still around so we can
@@ -1376,6 +1374,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
 
 void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
 {
+    //printf("DEBUG new undo quantum %ld\n", (long)undoQuantum);
     m_currentUndoQuantum = undoQuantum;
     m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
 }

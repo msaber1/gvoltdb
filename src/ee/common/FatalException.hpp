@@ -119,36 +119,35 @@ private:
 };
 
 // It's probably going to be easier to just use/remember the values 1, 2, 3, but...
-const int VOLTDB_DEBUG_PASS_123 = 1;
-const int VOLTDB_DEBUG_FAIL_123 = 2;
+const int VOLTDB_DEBUG_IGNORE_123 = 1;
+const int VOLTDB_DEBUG_ASSERT_123 = 1;
+const int VOLTDB_DEBUG_THROW_123 = 2;
 const int VOLTDB_DEBUG_CRASH_123 = 3;
 // Enable configurable response to unpossibilies, choosing by convention from a menu of:
 // 1 assert/ignore in the caller vs.
 // 2 throw in the caller vs.
 // 3 crash here and now
-inline bool debug_pass_fail_or_crash_123(int one_or_two_or_three) {
-    // Get a crash (div by 0) for 3, false for 2, true for 1 (and true for anything else).
-    return ( 2 / (3 - one_or_two_or_three) ) == 1;
+inline bool debug_false_or_true_or_crash_123(int one_or_two_or_three) {
+    // Get a crash (div by 0) for 3, true for 2, false for 1 (and true for anything else).
+    return ( 2 / (3 - one_or_two_or_three) ) == 2;
 }
 #ifdef NDEBUG
-#define DEBUG_ASSERT_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, CONDITION, STREAMBLES) {}
-#define DEBUG_IGNORE_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, CONDITION, STREAMABLES) {}
+#define DEBUG_ASSERT_OR_THROW_OR_CRASH_123(CONDITION, ONE_OR_TWO_OR_THREE, STREAMBLES) {}
+#define DEBUG_IGNORE_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, STREAMABLES) {}
 #else
-#define DEBUG_ASSERT_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, CONDITION, STREAMABLES) {\
+#define DEBUG_ASSERT_OR_THROW_OR_CRASH_123(CONDITION, ONE_OR_TWO_OR_THREE, STREAMABLES) {\
     if ( ! (CONDITION) ) {                                                               \
-        if (debug_pass_fail_or_crash_123(ONE_OR_TWO_OR_THREE)) {                         \
+        if (debug_false_or_true_or_crash_123(ONE_OR_TWO_OR_THREE)) {                     \
             throwFatalLogicErrorStreamed(STREAMABLES);                                   \
         }                                                                                \
         assert(CONDITION);                                                               \
     }                                                                                    \
 }
 
-#define DEBUG_PASS_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, STREAMABLES) {\
-    if ((ONE_OR_TWO_OR_THREE) != 1) {                                       \
-        if (debug_pass_fail_or_crash_123(ONE_OR_TWO_OR_THREE)) {            \
-            throwFatalLogicErrorStreamed(STREAMABLES);                      \
-        }                                                                   \
-    }                                                                       \
+#define DEBUG_IGNORE_OR_THROW_OR_CRASH_123(ONE_OR_TWO_OR_THREE, STREAMABLES) {\
+    if (debug_false_or_true_or_crash_123(ONE_OR_TWO_OR_THREE)) {              \
+        throwFatalLogicErrorStreamed(STREAMABLES);                            \
+    }                                                                         \
 }
 
 #endif

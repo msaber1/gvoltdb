@@ -306,22 +306,21 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         inline void setUndoToken(int64_t nextUndoToken) {
             if (nextUndoToken == INT64_MAX) { return; }
-            if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
+            if (dynamic_cast<DummyUndoQuantum*>(m_currentUndoQuantum) != NULL) {
                 //std::cout << "Deleting dummy undo quantum " << std::endl;
-                delete m_currentUndoQuantum;
-                m_currentUndoQuantum = NULL;
+                delete dynamic_cast<DummyUndoQuantum*>(m_currentUndoQuantum);
             }
-            if (m_currentUndoQuantum != NULL) {
-                assert(nextUndoToken >= m_currentUndoQuantum->getUndoToken());
-                if (m_currentUndoQuantum->getUndoToken() == nextUndoToken) {
+            else if (m_currentUndoQuantum != NULL) {
+                if (nextUndoToken == m_currentUndoQuantum->getUndoToken()) {
                     return;
                 }
+                assert(nextUndoToken > m_currentUndoQuantum->getUndoToken());
             }
             setCurrentUndoQuantum(m_undoLog.generateUndoQuantum(nextUndoToken));
         }
 
         inline void releaseUndoToken(int64_t undoToken) {
-            if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
+            if (dynamic_cast<DummyUndoQuantum*>(m_currentUndoQuantum) != NULL) {
                 return;
             }
             if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->getUndoToken() == undoToken) {
@@ -329,8 +328,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             }
             m_undoLog.release(undoToken);
         }
+
         inline void undoUndoToken(int64_t undoToken) {
-            if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
+            if (dynamic_cast<DummyUndoQuantum*>(m_currentUndoQuantum) != NULL) {
                 return;
             }
             m_undoLog.undo(undoToken);

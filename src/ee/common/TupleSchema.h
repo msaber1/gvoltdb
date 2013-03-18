@@ -18,11 +18,12 @@
 #ifndef TUPLESCHEMA_H_
 #define TUPLESCHEMA_H_
 
-#include "common/types.h"
-#include "common/FatalException.hpp"
-
 #include <cassert>
 #include <cstring>
+#include <stdint.h>
+#include <string>
+#include "common/FatalException.hpp"
+#include "common/types.h"
 #include <iostream>
 #include <vector>
 
@@ -165,11 +166,11 @@ private:
 ///////////////////////////////////
 
 inline ValueType TupleSchema::columnType(int index) const {
-    static const int throw_assert_or_crash_123 = /* throw             *-/ 1;
-                                                 // OR assert         *-/ 2;
-                                                 // OR crash the test. */ 3; //default
-    DEBUG_ASSERT_OR_THROW_OR_CRASH_123(throw_assert_or_crash_123,
-                                       index < m_columnCount,
+    // In theory, this can be reset dynamically at a gdb breakpoint.
+    DEBUG_ASSERT_OR_THROW_OR_CRASH_123(index < m_columnCount,
+                                       /* throw a fatal error */ VOLTDB_DEBUG_THROW_123, // the default
+                                       // OR crash from here *-/ VOLTDB_DEBUG_CRASH_123,
+                                       // OR assert           */ VOLTDB_DEBUG_ASSERT_123,
                                        "Fallout from planner error. The tuple schema index " << index
                                        << " exceeds the limit for schema:\n" << debug());
     assert(index > -1);

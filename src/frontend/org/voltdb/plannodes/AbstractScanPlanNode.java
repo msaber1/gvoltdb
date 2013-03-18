@@ -237,7 +237,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             int index = m_tableSchema.getIndexOfTve(tve);
             tve.setColumnIndex(index);
         }
-        m_outputSchema = proj.getOutputSchema();
         return m_outputSchema;
     }
 

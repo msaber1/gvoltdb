@@ -74,7 +74,6 @@ class SerializeInput;
 class Topend;
 class MaterializedViewMetadata;
 class RecoveryProtoMsg;
-class PersistentTableUndoDeleteAction;
 class TupleOutputStreamProcessor;
 
 /**
@@ -111,7 +110,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     friend class TableIndex;
     friend class TableIterator;
     friend class PersistentTableStats;
-    friend class PersistentTableUndoDeleteAction;
     friend class ::CopyOnWriteTest_CopyOnWriteIterator;
     friend class ::CompactionTest_BasicCompaction;
     friend class ::CompactionTest_CompactionWithCopyOnWrite;
@@ -126,12 +124,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
   public:
     virtual ~PersistentTable();
-
-    void notifyQuantumRelease() {
-        if (compactionPredicate()) {
-            doForcedCompaction();
-        }
-    }
 
     // Return a table iterator by reference
     TableIterator& iterator() {
@@ -157,6 +149,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
     void insertTupleForUndo(char *tuple);
 
     /*
+     * Make an earlier deletion permanent, as its undo action is released.
+     */
+    void deleteTupleRelease(char *tuple);
+
+    /*
      * Note that inside update tuple the order of sourceTuple and
      * targetTuple is swapped when making calls on the indexes. This
      * is just an inconsistency in the argument ordering.
@@ -179,7 +176,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * index lookup.
      */
     bool deleteTuple(TableTuple &tuple, bool freeAllocatedStrings);
-    void deleteTupleForUndo(voltdb::TableTuple &tupleCopy);
+    void deleteTupleForUndo(char* tupleData);
     void deleteTupleForSchemaChange(TableTuple &target);
 
     /*
@@ -300,6 +297,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     void nextFreeTuple(TableTuple *tuple);
     bool doCompactionWithinSubset(TBBucketMap *bucketMap);
+
+    virtual void notifyQuantumRelease();
+
     void doForcedCompaction();
 
     // ------------------------------------------------------------------
@@ -337,16 +337,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     TBPtr allocateNextBlock();
 
-    double loadFactor() const {
-        return static_cast<double>(activeTupleCount()) /
-            static_cast<double>(allocatedTupleCount());
-    }
-
-    bool compactionPredicate() const
-    {
-        assert(m_tuplesPinnedByUndo == 0);
-        return allocatedTupleCount() - activeTupleCount() > (m_tuplesPerBlock * 3) && loadFactor() < .95;
-    }
+    bool compactionPredicate() const;
 
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;
@@ -400,7 +391,7 @@ inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
     return m_tempTuple;
 }
 
-
+//TODO: Move this inline code (AND findBlock) into the .cpp, the only place it is called.
 inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block) {
     tuple.setActiveFalse(); // does NOT free strings
 
