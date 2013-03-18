@@ -202,7 +202,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {
         m_columnIndex = obj.getInt(Members.COLUMN_IDX.name());
         m_isInner = ( ! obj.isNull(Members.COLUMN_ISINNER.name()) ) &&
-                    jobj.getBoolean( Members.COLUMN_ISINNER.name() );
+                    obj.getBoolean( Members.COLUMN_ISINNER.name() );
         m_tableName = obj.getString(Members.TABLE_NAME.name());
         m_columnName = obj.getString(Members.COLUMN_NAME.name());
         m_columnAlias = obj.getString(Members.COLUMN_ALIAS.name());

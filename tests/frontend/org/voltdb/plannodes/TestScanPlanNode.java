@@ -65,28 +65,6 @@ public class TestScanPlanNode extends TestCase
         m_voltdb.shutdown(null);
     }
 
-    // test that if no scan columns are specified, the output schema of
-    // a scan node is the schema of the table
-    public void testOutputSchemaNoScanColumns()
-    {
-        AbstractScanPlanNode dut = new SeqScanPlanNode();
-        dut.setTargetTableName(TABLE1);
-
-        dut.generateOutputSchema(m_voltdb.getDatabase());
-        NodeSchema dut_schema = dut.getOutputSchema();
-        System.out.println(dut_schema.toString());
-        assertEquals(COLS.length, dut_schema.size());
-        for (int i = 0; i < COLS.length; ++i)
-        {
-            SchemaColumn col = dut_schema.find(TABLE1, COLS[i], COLS[i]);
-            assertNotNull(col);
-            assertEquals(col.getExpression().getExpressionType(),
-                         ExpressionType.VALUE_TUPLE);
-            assertEquals(col.getExpression().getValueType(),
-                         COLTYPES[i]);
-        }
-    }
-
     // test that if scan columns are specified the output schema of
     // a scan node consists of those columns
     public void testOutputSchemaSomeScanColumns()

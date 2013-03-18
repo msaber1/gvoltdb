@@ -315,6 +315,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             }
             m_undoLog.release(undoToken);
         }
+
         inline void undoUndoToken(int64_t undoToken) {
             m_undoLog.undo(undoToken);
             m_currentUndoQuantum = NULL;

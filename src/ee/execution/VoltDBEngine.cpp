@@ -1351,6 +1351,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
 
 void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
 {
+    //printf("DEBUG new undo quantum %ld\n", (long)undoQuantum);
     m_currentUndoQuantum = undoQuantum;
     m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
 }

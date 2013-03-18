@@ -34,13 +34,13 @@ public:
     virtual ~PersistentTableUndoInsertAction() { }
 
     /*
-     * Undo whatever this undo action was created to undo
+     * Undo whatever this undo action was created to undo -- an insert.
      */
     virtual void undo() { m_table->deleteTupleForUndo(m_tuple); }
 
     /*
      * Release any resources held by the undo action. It will not need
-     * to be undone in the future.
+     * to be undone in the future. Except that there are none.
      */
     void release() { }
 private:

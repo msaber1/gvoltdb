@@ -18,11 +18,12 @@
 #ifndef TUPLESCHEMA_H_
 #define TUPLESCHEMA_H_
 
-#include "common/types.h"
-#include "common/FatalException.hpp"
-
 #include <cassert>
 #include <cstring>
+#include <stdint.h>
+#include <string>
+#include "common/FatalException.hpp"
+#include "common/types.h"
 #include <iostream>
 #include <vector>
 
