@@ -166,9 +166,9 @@ public class TestLiveTableSchemaMigration extends TestCase {
         migrateSchema("FOO (A:BIGINT, B:VARCHAR12, C:INTEGER)", "FOO (A:BIGINT, B:VARCHAR24, C:INTEGER)");
         migrateSchema("FOO (A:BIGINT, B:VARCHAR100, C:INTEGER)", "FOO (A:BIGINT, B:VARCHAR120, C:INTEGER)");
 
-        // can't widen across inline/out-of-line boundaries yet
-        //migrateSchema("FOO (A:BIGINT, B:VARCHAR12, C:INTEGER)", "FOO (A:BIGINT, B:VARCHAR120, C:INTEGER)");
-        //migrateSchema("FOO (VARCHAR12)", "FOO (VARCHAR120)");
+        // widen across inline/out-of-line boundaries
+        migrateSchema("FOO (A:BIGINT, B:VARCHAR12, C:INTEGER)", "FOO (A:BIGINT, B:VARCHAR120, C:INTEGER)");
+        migrateSchema("FOO (VARCHAR12)", "FOO (VARCHAR120)");
 
         // same schema with a new name for middle col
         migrateSchema("FOO (A:BIGINT, B:TINYINT, C:INTEGER)", "FOO (A:BIGINT, D:TINYINT, C:INTEGER)");

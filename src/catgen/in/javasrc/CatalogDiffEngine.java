@@ -173,14 +173,6 @@ public class CatalogDiffEngine {
     {
         // increases in size are cool; shrinks not so much
         if (oldType == newType) {
-            // don't allow inline types to be made out-of-line types
-            if ((oldType == VoltType.VARBINARY) || (oldType == VoltType.STRING)) {
-                // 64 is a magic number here that's only relevant to the EE
-                // will go away when ENG-4325 is fixed.
-                if (oldSize < 64 && newSize >= 64) {
-                    return false;
-                }
-            }
             return oldSize <= newSize;
         }
 
