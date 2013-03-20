@@ -417,6 +417,13 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
         verifyDiff(catOriginal, catUpdated, true);
 
+        // even pass when crossing the inline/out-of-line boundary
+        t1 = TableHelper.quickTable("(VARBINARY30)");
+        t2 = TableHelper.quickTable("(VARBINARY70)");
+        catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
+        catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
+        verifyDiff(catOriginal, catUpdated, true);
+
         // fail integer contraction
         t1 = TableHelper.quickTable("(BIGINT)");
         t2 = TableHelper.quickTable("(INTEGER)");
@@ -427,13 +434,6 @@ public class TestCatalogDiffs extends TestCase {
         // fail string contraction
         t1 = TableHelper.quickTable("(VARCHAR35)");
         t2 = TableHelper.quickTable("(VARCHAR34)");
-        catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
-        catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
-        verifyDiffRejected(catOriginal, catUpdated);
-
-        // fail crossing inline - out-of-line boundary
-        t1 = TableHelper.quickTable("(VARBINARY30)");
-        t2 = TableHelper.quickTable("(VARBINARY70)");
         catOriginal = getCatalogForTable("A", "modtablecolumn1", t1);
         catUpdated = getCatalogForTable("A", "modtablecolumn2", t2);
         verifyDiffRejected(catOriginal, catUpdated);

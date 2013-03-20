@@ -49,6 +49,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
     static final int SITES_PER_HOST = 2;
     static final int HOSTS = 2;
     static final int K = 1;
+    static final BackendTarget BACKEND = BackendTarget.NATIVE_EE_JNI;
 
     static String m_globalDeploymentURL = null;
 
@@ -287,7 +288,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalCluster("liveschema-base.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("liveschema-base.jar", SITES_PER_HOST, HOSTS, K, BACKEND);
         ((LocalCluster) config).setHasLocalServer(true);
 
         // build up a project builder for the workload
@@ -309,7 +310,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         // DELTA CATALOGS FOR TESTING
         /////////////////////////////////////////////////////////////
 
-        config = new LocalCluster("liveschema-newtableinmiddle.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("liveschema-newtableinmiddle.jar", SITES_PER_HOST, HOSTS, K, BACKEND);
         project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("P2", true, false, false, false));
@@ -318,7 +319,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         boolean compile = config.compile(project);
         assertTrue(compile);
 
-        config = new LocalCluster("liveschema-dropconstraint.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("liveschema-dropconstraint.jar", SITES_PER_HOST, HOSTS, K, BACKEND);
         project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, false));
         project.addLiteralSchema(makeTable("R1", true, true, false, false));
@@ -327,7 +328,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
 
-        config = new LocalCluster("liveschema-addconstraint.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("liveschema-addconstraint.jar", SITES_PER_HOST, HOSTS, K, BACKEND);
         project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("R1", true, true, false, false));
@@ -336,7 +337,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
 
-        config = new LocalCluster("liveschema-renamedindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("liveschema-renamedindex.jar", SITES_PER_HOST, HOSTS, K, BACKEND);
         project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("R1", true, true, false, true));
@@ -345,7 +346,7 @@ public class TestLiveSchemaChanges extends RegressionSuite {
         compile = config.compile(project);
         assertTrue(compile);
 
-        config = new LocalCluster("liveschema-renamedexpressionindex.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("liveschema-renamedexpressionindex.jar", SITES_PER_HOST, HOSTS, K, BACKEND);
         project = new VoltProjectBuilder();
         project.addLiteralSchema(makeTable("P1", true, false, false, true));
         project.addLiteralSchema(makeTable("R1", true, true, false, true));

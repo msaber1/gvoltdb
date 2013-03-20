@@ -435,10 +435,10 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
     // map from existing table
     int columnSourceMap[columnCount];
 
-    // indicator that object allocation is required,
+    // Indicator that object allocation is required in the column assignment,
     // to cover an explosion from an inline-sized to an out-of-line-sized string.
     bool columnExploded[columnCount];
-    
+
     vector<std::string> oldColumnNames = existingTable->getColumnNames();
 
     catalog::CatalogMap<catalog::Column>::field_map_iter colIter;
@@ -466,7 +466,7 @@ TableCatalogDelegate::processSchemaChanges(catalog::Database &catalogDatabase,
             if (oldColumnNames[oldIndex].compare(colName) == 0) {
                 columnSourceMap[newIndex] = oldIndex;
                 columnExploded[newIndex] = (m_table->schema()->columnIsInlined(oldIndex) &&
-                                            ! newTable->schema()->columnIsInlined(newIndex)); 
+                                            ! newTable->schema()->columnIsInlined(newIndex));
                 break;
             }
         }
