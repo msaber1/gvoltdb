@@ -150,7 +150,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     }
 
     /** select A1 from T1 group by A1 */
-    public void testSelectAGroubyA() throws IOException, ProcCallException {
+    public void testSelectAGroupByA() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -163,7 +163,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", "SELECT A1 from T1 group by A1").getResults()[0];
 
         // one row per unique value of A1
-        System.out.println("testSelectAGroubyA: " + vt);
+        System.out.println("testSelectAGroupByA: " + vt);
         assertTrue(vt.getRowCount() == 11);
 
         // Selecting A1 - should get values 1 through 11
@@ -181,8 +181,88 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         }
     }
 
+    /** select A1, MIN(PKEY) from T1 group by A1 */
+    public void testSelectAMinGroupByA() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        loaderNxN(client, 0);
+
+        vt = client.callProcedure("@AdHoc", "Select * from T1").getResults()[0];
+        System.out.println("T1-*:" + vt);
+
+        // execute the query
+        vt = client.callProcedure("@AdHoc", "SELECT A1, MIN(PKEY) from T1 group by A1").getResults()[0];
+
+        // one row per unique value of A1
+        System.out.println("testSelectAMinGroupByA: " + vt);
+        assertTrue(vt.getRowCount() == 11);
+
+        // Selecting A1 - should get values 1 through 11
+        // once each. These results aren't necessarily ordered.
+        int found[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        long value[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        while (vt.advanceRow()) {
+            long A1 = vt.getLong(0);
+            assertTrue(A1 <= 11);
+            assertTrue(A1 > 0);
+            found[(int)A1] += 1;
+            value[(int)A1] = vt.getLong(1);
+        }
+        // There is no row for value zero.
+        assertEquals(0, found[0]);
+        for (int ii = 1; ii <= 11; ii++) {
+            // Grouping produces one row each for the other values.
+            assertEquals(1, found[ii]);
+            // Aggregation produces values according to this formula.
+            assertEquals((ii*ii - ii) / 2, value[ii]);
+        }
+    }
+
+    /** Test the silly/stupid edge case of aggregating on the GROUPING column:
+        select A1, SUM(A1) from T1 group by A1*/
+    public void testSelectASumAGroupByA() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        loaderNxN(client, 0);
+
+        vt = client.callProcedure("@AdHoc", "Select * from T1").getResults()[0];
+        System.out.println("T1-*:" + vt);
+
+        // execute the query
+        vt = client.callProcedure("@AdHoc", "SELECT A1, SUM(A1) from T1 group by A1").getResults()[0];
+
+        // one row per unique value of A1
+        System.out.println("testSelectAMinGroupByA: " + vt);
+        assertTrue(vt.getRowCount() == 11);
+
+        // Selecting A1 - should get values 1 through 11
+        // once each. These results aren't necessarily ordered.
+        int found[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        long value[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        while (vt.advanceRow()) {
+            long A1 = vt.getLong(0);
+            assertTrue(A1 <= 11);
+            assertTrue(A1 > 0);
+            found[(int)A1] += 1;
+            value[(int)A1] = vt.getLong(1);
+        }
+        // There is no row for value zero.
+        assertEquals(0, found[0]);
+        // value 11 is special. It's 11.
+        assertEquals(1, found[11]);
+        assertEquals(11, value[11]);
+        for (int ii = 1; ii <= 10; ii++) {
+            // Grouping produces one row each for the other values.
+            assertEquals(1, found[ii]);
+            // Aggregation produces values according to this formula.
+            assertEquals(ii*ii, value[ii]);
+        }
+    }
+
     /** select B_VAL1 from B group by B_VAL1 */
-    public void testSelectGroubyVarbinary() throws IOException, ProcCallException {
+    public void testSelectGroupByVarbinary() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -195,7 +275,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         vt = client.callProcedure("@AdHoc", "SELECT B_VAL1 from B group by B_VAL1").getResults()[0];
 
         // one row per unique value of A1
-        System.out.println("testSelectGroubyVarbinary: " + vt);
+        System.out.println("testSelectGroupByVarbinary: " + vt);
         assertTrue(vt.getRowCount() == 11);
 
         // Selecting B_VAL1 - should get byte values "1,1,1,1,1,1" through "11,11,11,11,11,11"

@@ -58,7 +58,7 @@ class Config:
     def get_config(self, config_name):
         return self.__config[config_name]
 
-def run_once(name, command, statements_path, results_path, testConfigKit):
+def run_once(name, command, statements_path, results_path, testConfigKit, verbosely):
 
     print "Running \"run_once\":"
     print "  name: %s" % (name)
@@ -110,7 +110,8 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
             break
 
         try:
-            ### print "VERBOSELY SPOUTING SENDING adhoc %s" % statement["SQL"]
+            if verbosely:
+                print "VERBOSELY sending command: adhoc %s" % statement["SQL"]
             client.onecmd("adhoc " + statement["SQL"])
         except:
             print >> sys.stderr, "Error occurred while executing '%s': %s" % \
@@ -125,8 +126,8 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
             break
         tables = None
         if client.response == None:
-            print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s': %s" % \
-                (statement["SQL"], sys.exc_info()[1])
+            print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s'" % \
+                statement["SQL"]
             if(host == defaultHost):
                 killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
                 killer.communicate()
@@ -136,8 +137,11 @@ def run_once(name, command, statements_path, results_path, testConfigKit):
             break
         if client.response.tables != None:
             tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
-        # else:
-        #     print "DEBUG: but I got no table(s) from ?", statement["SQL"] ,"?"
+            if verbosely:
+                print >> sys.stderr, "VERBOSELY: Got table(s) in response from statement '%s'" % statement["SQL"]
+        else:
+            if verbosely:
+                print >> sys.stderr, "VERBOSELY diagnosing: Missing table(s) in response from statement '%s'" % statement["SQL"]
         cPickle.dump({"Status": client.response.status,
                       "Info": client.response.statusString,
                       "Result": tables,
@@ -200,7 +204,9 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
         # Claim success without running servers.
         return [0,0]
 
-    if run_once("jni", command, statements_path, jni_path, testConfigKit) != 0:
+    # For now, for simplicity, drive runtime verbosity off the existing switch for report verbosity.
+    verbosely = report_all
+    if run_once("jni", command, statements_path, jni_path, testConfigKit, verbosely) != 0:
         print >> sys.stderr, "Test with the JNI backend had errors."
         print >> sys.stderr, "  jni_path: %s" % (jni_path)
         sys.stderr.flush()
@@ -223,7 +229,7 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
         counter += 1
     statements_file.close()
 
-    if run_once("hsqldb", command, statements_path, hsql_path, testConfigKit) != 0:
+    if run_once("hsqldb", command, statements_path, hsql_path, testConfigKit, verbosely) != 0:
         print >> sys.stderr, "Test with the HSQLDB backend had errors."
         exit(1)
 
