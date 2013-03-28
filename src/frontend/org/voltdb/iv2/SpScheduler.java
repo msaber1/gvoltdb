@@ -520,6 +520,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
+        task.setTransactionState(new SpTransactionState(msg));
         if (!msg.isReadOnly()) {
             if (!m_cl.log(msg, msg.getSpHandle(), m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);
@@ -680,20 +681,19 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
 
 
+        TransactionTask task;
         if (message.getFragmentTaskMessage().isSysProcTask()) {
-            final SysprocFragmentTask task =
-                new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
-                                        m_pendingTasks, message.getFragmentTaskMessage(),
+            task =
+                new SysprocFragmentTask(m_mailbox, m_pendingTasks, message.getFragmentTaskMessage(),
                                         message.getInputDepMap());
-            m_pendingTasks.offer(task);
         }
         else {
-            final FragmentTask task =
-                new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
-                        m_pendingTasks, message.getFragmentTaskMessage(),
+            task =
+                new FragmentTask(m_mailbox, m_pendingTasks, message.getFragmentTaskMessage(),
                         message.getInputDepMap());
-            m_pendingTasks.offer(task);
         }
+        task.setTransactionState(txn);
+        m_pendingTasks.offer(task);
     }
 
     // SpSchedulers will see FragmentTaskMessage for:
@@ -793,14 +793,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         TransactionTask task;
         if (msg.isSysProcTask()) {
             task =
-                new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
-                                        m_pendingTasks, msg, null);
+                new SysprocFragmentTask(m_mailbox, m_pendingTasks, msg, null);
         }
         else {
             task =
-                new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
-                                 m_pendingTasks, msg, null);
+                new FragmentTask(m_mailbox, m_pendingTasks, msg, null);
         }
+        task.setTransactionState(txn);
         if (logThis) {
             if (!m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);
@@ -859,7 +858,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         {
             Iv2Trace.logCompleteTransactionMessage(message, m_mailbox.getHSId());
             final CompleteTransactionTask task =
-                new CompleteTransactionTask(txn, m_pendingTasks, message, m_drGateway);
+                new CompleteTransactionTask(m_pendingTasks, message, m_drGateway);
+            task.setTransactionState(txn);
             m_pendingTasks.offer(task);
             // If this is a restart, then we need to leave the transaction state around
             if (!message.isRestart()) {

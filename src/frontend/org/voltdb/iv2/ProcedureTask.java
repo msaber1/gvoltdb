@@ -30,7 +30,6 @@ import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.utils.LogKeys;
@@ -40,10 +39,9 @@ abstract public class ProcedureTask extends TransactionTask
     final Mailbox m_initiator;
     final String m_procName;
 
-    ProcedureTask(Mailbox initiator, String procName, TransactionState txn,
-                  TransactionTaskQueue queue)
+    ProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue)
     {
-        super(txn, queue);
+        super(queue);
         m_initiator = initiator;
         m_procName = procName;
     }

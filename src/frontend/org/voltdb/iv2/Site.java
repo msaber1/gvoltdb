@@ -533,6 +533,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 SpProcedureTask t = new SpProcedureTask(
                         m_initiatorMailbox, m.getStoredProcedureName(),
                         null, m, m_drGateway);
+                t.setTransactionState(new SpTransactionState(m));
                 if (!filter(tibm)) {
                     t.runFromTaskLog(this);
                 }
@@ -546,7 +547,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     VoltDB.crashLocalVoltDB("Started a MP transaction during replay before completing " +
                             " open transaction.", false, null);
                 }
-                FragmentTask t = new FragmentTask(m_initiatorMailbox, m, global_replay_mpTxn);
+                FragmentTask t = new FragmentTask(m_initiatorMailbox, m);
+                t.setTransactionState(global_replay_mpTxn);
                 if (!filter(tibm)) {
                     t.runFromTaskLog(this);
                 }
@@ -556,8 +558,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 // Only complete transactions that are open...
                 if (global_replay_mpTxn != null) {
                     CompleteTransactionMessage m = (CompleteTransactionMessage)tibm;
-                    CompleteTransactionTask t = new CompleteTransactionTask(global_replay_mpTxn,
-                            null, m, m_drGateway);
+                    CompleteTransactionTask t = new CompleteTransactionTask(null, m, m_drGateway);
+                    t.setTransactionState(global_replay_mpTxn);
                     if (!m.isRestart()) {
                         global_replay_mpTxn = null;
                     }

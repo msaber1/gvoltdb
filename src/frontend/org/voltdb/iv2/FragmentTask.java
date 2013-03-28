@@ -45,11 +45,9 @@ public class FragmentTask extends TransactionTask
 
     // This constructor is used during live rejoin log replay.
     FragmentTask(Mailbox mailbox,
-            FragmentTaskMessage message,
-            ParticipantTransactionState txnState)
+            FragmentTaskMessage message)
     {
         this(mailbox,
-            txnState,
             null,
             message,
             null);
@@ -57,12 +55,11 @@ public class FragmentTask extends TransactionTask
 
     // This constructor is used during normal operation.
     FragmentTask(Mailbox mailbox,
-                 ParticipantTransactionState txnState,
                  TransactionTaskQueue queue,
                  FragmentTaskMessage message,
                  Map<Integer, List<VoltTable>> inputDeps)
     {
-        super(txnState, queue);
+        super(queue);
         m_initiator = mailbox;
         m_fragmentMsg = message;
         m_inputDeps = inputDeps;

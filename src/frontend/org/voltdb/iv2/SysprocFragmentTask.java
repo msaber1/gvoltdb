@@ -47,12 +47,11 @@ public class SysprocFragmentTask extends TransactionTask
     Map<Integer, List<VoltTable>> m_inputDeps;
 
     SysprocFragmentTask(Mailbox mailbox,
-                 ParticipantTransactionState txnState,
                  TransactionTaskQueue queue,
                  FragmentTaskMessage message,
                  Map<Integer, List<VoltTable>> inputDeps)
     {
-        super(txnState, queue);
+        super(queue);
         m_initiator = mailbox;
         m_fragmentMsg = message;
         m_inputDeps = inputDeps;

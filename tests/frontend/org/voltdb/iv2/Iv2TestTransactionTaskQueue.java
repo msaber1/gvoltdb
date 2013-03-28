@@ -64,6 +64,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
 
         SpProcedureTask task =
             new SpProcedureTask(mbox, "TestProc", queue, init, null);
+        task.setTransactionState(new SpTransactionState(init));
         return task;
     }
 
@@ -84,7 +85,8 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         ParticipantTransactionState pft =
             new ParticipantTransactionState(localTxnId, msg);
         FragmentTask task =
-            new FragmentTask(mbox, pft, queue, msg, null);
+            new FragmentTask(mbox, queue, msg, null);
+        task.setTransactionState(pft);
         return task;
     }
 
@@ -97,7 +99,8 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         InitiatorMailbox mbox = mock(InitiatorMailbox.class);
         when(mbox.getHSId()).thenReturn(1337l);
         FragmentTask task =
-            new FragmentTask(mbox, (ParticipantTransactionState)txn, queue, msg, null);
+            new FragmentTask(mbox, queue, msg, null);
+        task.setTransactionState(txn);
         return task;
     }
 
@@ -108,7 +111,8 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         CompleteTransactionTask task =
-            new CompleteTransactionTask(txn, queue, msg, null);
+            new CompleteTransactionTask(queue, msg, null);
+        task.setTransactionState(txn);
         return task;
     }
 

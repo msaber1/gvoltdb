@@ -22,7 +22,6 @@ import java.io.IOException;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -33,12 +32,11 @@ public class CompleteTransactionTask extends TransactionTask
     final private CompleteTransactionMessage m_completeMsg;
     final private PartitionDRGateway m_drGateway;
 
-    public CompleteTransactionTask(TransactionState txnState,
-                                   TransactionTaskQueue queue,
+    public CompleteTransactionTask(TransactionTaskQueue queue,
                                    CompleteTransactionMessage msg,
                                    PartitionDRGateway drGateway)
     {
-        super(txnState, queue);
+        super(queue);
         m_completeMsg = msg;
         m_drGateway = drGateway;
     }

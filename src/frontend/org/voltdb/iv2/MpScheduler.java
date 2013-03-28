@@ -404,10 +404,7 @@ public class MpScheduler extends Scheduler
      */
     public void handleEOLMessage()
     {
-        Iv2EndOfLogMessage msg = new Iv2EndOfLogMessage(true);
-        MPIEndOfLogTransactionState txnState = new MPIEndOfLogTransactionState(msg);
-        MPIEndOfLogTask task = new MPIEndOfLogTask(m_mailbox, m_pendingTasks,
-                                                   txnState, m_iv2Masters);
+        MPIEndOfLogTask task = new MPIEndOfLogTask(m_mailbox, m_pendingTasks, m_iv2Masters);
         m_pendingTasks.offer(task);
     }
 

@@ -23,7 +23,6 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
@@ -43,8 +42,6 @@ import org.voltdb.utils.LogKeys;
  */
 public class MpProcedureTask extends ProcedureTask
 {
-    private static final VoltLogger log = new VoltLogger("HOST");
-
     final List<Long> m_initiatorHSIds = new ArrayList<Long>();
     // Need to store the new masters list so that we can update the list of masters
     // when we requeue this Task to for restart
@@ -56,10 +53,8 @@ public class MpProcedureTask extends ProcedureTask
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators,
                   long buddyHSId, boolean isRestart)
     {
-        super(mailbox, procName,
-              new MpTransactionState(mailbox, msg, pInitiators,
-                                     buddyHSId, isRestart),
-              queue);
+        super(mailbox, procName, queue);
+        setTransactionState(new MpTransactionState(mailbox, msg, pInitiators, buddyHSId, isRestart));
         m_isRestart = isRestart;
         m_msg = msg;
         m_initiatorHSIds.addAll(pInitiators);

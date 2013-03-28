@@ -23,6 +23,8 @@ import java.util.List;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
@@ -32,10 +34,13 @@ public class MPIEndOfLogTask extends TransactionTask
     final long[] m_initiatorHSIds;
     final Mailbox m_mailbox;
 
-    MPIEndOfLogTask(Mailbox mailbox, TransactionTaskQueue queue,
-                    MPIEndOfLogTransactionState txnState, List<Long> pInitiators)
+    MPIEndOfLogTask(Mailbox mailbox, TransactionTaskQueue queue, List<Long> pInitiators)
     {
-        super(txnState, queue);
+        super(queue);
+        // Just need a transaction state that behaves like a single partition txn state for
+        // transaction task queue behavior.  Pretty sure this could eventually
+        // become an SpTransactionState.
+        setTransactionState(new MPIEndOfLogTransactionState(new Iv2EndOfLogMessage(true)));
         m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
         m_mailbox = mailbox;
     }
@@ -45,7 +50,7 @@ public class MPIEndOfLogTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
-        m_mailbox.send(m_initiatorHSIds, m_txnState.getNotice());
+        m_mailbox.send(m_initiatorHSIds, new Iv2EndOfLogMessage(true));
         m_queue.flush();
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);

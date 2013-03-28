@@ -26,12 +26,12 @@ public abstract class TransactionTask extends SiteTasker
     protected static final VoltLogger execLog = new VoltLogger("EXEC");
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final protected TransactionState m_txnState;
+    protected TransactionState m_txnState;
     final protected TransactionTaskQueue m_queue;
 
-    public TransactionTask(TransactionState txnState, TransactionTaskQueue queue)
+    public TransactionTask(TransactionTaskQueue queue)
     {
-        m_txnState = txnState;
+        m_txnState = null;
         m_queue = queue;
     }
 
@@ -40,6 +40,11 @@ public abstract class TransactionTask extends SiteTasker
 
     // run from the live rejoin task log.
     abstract public void runFromTaskLog(SiteProcedureConnection siteConnection);
+
+    void setTransactionState(TransactionState txnState)
+    {
+        m_txnState = txnState;
+    }
 
     public TransactionState getTransactionState()
     {
