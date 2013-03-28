@@ -74,6 +74,14 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
     }
 
     @Override
+    public boolean isSinglePartition()
+    {
+        // BorrowTaskMessages, despite being for MP transactions,
+        // are treated as single-partition work by sites since they
+        return true;
+    }
+
+    @Override
     public int getSerializedSize()
     {
         throw new RuntimeException("Preparing to serialize BorrowTaskMessage, " +

@@ -55,6 +55,11 @@ public abstract class TransactionTask extends SiteTasker
         return m_txnState;
     }
 
+    public boolean isSinglePartition()
+    {
+        return m_msg.isSinglePartition();
+    }
+
     public long getSpHandle()
     {
         return m_msg.getSpHandle();

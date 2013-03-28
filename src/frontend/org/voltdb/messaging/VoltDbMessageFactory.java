@@ -31,6 +31,7 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte PARTICIPANT_NOTICE_ID = VOLTCORE_MESSAGE_ID_MAX + 5;
     final public static byte COMPLETE_TRANSACTION_ID = VOLTCORE_MESSAGE_ID_MAX + 6;
     final public static byte COMPLETE_TRANSACTION_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 7;
+    // THIS IS STALE BUT LEAVING THE VALUE HERE TO NOT PERTURB ID VALUES
     final public static byte COALESCED_HEARTBEAT_ID = VOLTCORE_MESSAGE_ID_MAX + 8;
     final public static byte IV2_INITIATE_TASK_ID = VOLTCORE_MESSAGE_ID_MAX + 9;
     final public static byte IV2_REPAIR_LOG_REQUEST = VOLTCORE_MESSAGE_ID_MAX + 10;
@@ -38,6 +39,7 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte REJOIN_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 12;
     final public static byte REJOIN_DATA_ID = VOLTCORE_MESSAGE_ID_MAX + 13;
     final public static byte REJOIN_DATA_ACK_ID = VOLTCORE_MESSAGE_ID_MAX + 14;
+    // THIS IS STALE BUT LEAVING THE VALUE HERE TO NOT PERTURB ID VALUES
     final public static byte FRAGMENT_TASK_LOG_ID = VOLTCORE_MESSAGE_ID_MAX + 15;
     final public static byte IV2_LOG_FAULT_ID = VOLTCORE_MESSAGE_ID_MAX + 16;
     final public static byte IV2_EOL_ID = VOLTCORE_MESSAGE_ID_MAX + 17;
@@ -70,9 +72,6 @@ public class VoltDbMessageFactory extends VoltMessageFactory
         case PARTICIPANT_NOTICE_ID:
             message = new MultiPartitionParticipantMessage();
             break;
-        case COALESCED_HEARTBEAT_ID:
-            message = new CoalescedHeartbeatMessage();
-            break;
         case COMPLETE_TRANSACTION_ID:
             message = new CompleteTransactionMessage();
             break;
@@ -96,9 +95,6 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case REJOIN_DATA_ACK_ID:
             message = new RejoinDataAckMessage();
-            break;
-        case FRAGMENT_TASK_LOG_ID:
-            message = new FragmentTaskLogMessage();
             break;
         case IV2_LOG_FAULT_ID:
             message = new Iv2LogFaultMessage();
