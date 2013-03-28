@@ -18,6 +18,8 @@
 package org.voltdb.iv2;
 
 import org.voltcore.logging.VoltLogger;
+
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.dtxn.TransactionState;
 
@@ -27,11 +29,13 @@ public abstract class TransactionTask extends SiteTasker
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
     protected TransactionState m_txnState;
+    final protected TransactionInfoBaseMessage m_msg;
     final protected TransactionTaskQueue m_queue;
 
-    public TransactionTask(TransactionTaskQueue queue)
+    public TransactionTask(TransactionTaskQueue queue, TransactionInfoBaseMessage msg)
     {
         m_txnState = null;
+        m_msg = msg;
         m_queue = queue;
     }
 
@@ -53,11 +57,11 @@ public abstract class TransactionTask extends SiteTasker
 
     public long getSpHandle()
     {
-        return m_txnState.spHandle;
+        return m_msg.getSpHandle();
     }
 
     public long getTxnId() {
-        return m_txnState.txnId;
+        return m_msg.getTxnId();
     }
 
     // Take actions common to all transactions in order to complete a transaction at an SPI

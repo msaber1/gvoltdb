@@ -53,7 +53,7 @@ public class MpProcedureTask extends ProcedureTask
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators,
                   long buddyHSId, boolean isRestart)
     {
-        super(mailbox, procName, queue);
+        super(mailbox, procName, queue, msg);
         setTransactionState(new MpTransactionState(mailbox, msg, pInitiators, buddyHSId, isRestart));
         m_isRestart = isRestart;
         m_msg = msg;

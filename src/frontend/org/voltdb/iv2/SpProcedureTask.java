@@ -44,7 +44,7 @@ public class SpProcedureTask extends ProcedureTask
                   Iv2InitiateTaskMessage msg,
                   PartitionDRGateway drGateway)
     {
-       super(initiator, procName, queue);
+       super(initiator, procName, queue, msg);
        m_drGateway = drGateway;
     }
 

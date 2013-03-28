@@ -36,7 +36,7 @@ public class CompleteTransactionTask extends TransactionTask
                                    CompleteTransactionMessage msg,
                                    PartitionDRGateway drGateway)
     {
-        super(queue);
+        super(queue, msg);
         m_completeMsg = msg;
         m_drGateway = drGateway;
     }

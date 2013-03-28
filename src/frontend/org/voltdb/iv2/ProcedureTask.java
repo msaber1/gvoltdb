@@ -23,6 +23,7 @@ import java.io.Writer;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
 import org.voltdb.ProcedureRunner;
@@ -39,9 +40,10 @@ abstract public class ProcedureTask extends TransactionTask
     final Mailbox m_initiator;
     final String m_procName;
 
-    ProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue)
+    ProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
+            TransactionInfoBaseMessage msg)
     {
-        super(queue);
+        super(queue, msg);
         m_initiator = initiator;
         m_procName = procName;
     }

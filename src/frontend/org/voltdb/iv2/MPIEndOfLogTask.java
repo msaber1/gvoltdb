@@ -36,7 +36,7 @@ public class MPIEndOfLogTask extends TransactionTask
 
     MPIEndOfLogTask(Mailbox mailbox, TransactionTaskQueue queue, List<Long> pInitiators)
     {
-        super(queue);
+        super(queue, new Iv2EndOfLogMessage(true));
         // Just need a transaction state that behaves like a single partition txn state for
         // transaction task queue behavior.  Pretty sure this could eventually
         // become an SpTransactionState.
@@ -50,7 +50,7 @@ public class MPIEndOfLogTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
-        m_mailbox.send(m_initiatorHSIds, new Iv2EndOfLogMessage(true));
+        m_mailbox.send(m_initiatorHSIds, m_msg);
         m_queue.flush();
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
