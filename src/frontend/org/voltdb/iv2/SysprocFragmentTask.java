@@ -40,21 +40,14 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
-public class SysprocFragmentTask extends TransactionTask
+public class SysprocFragmentTask extends FragmentTask
 {
-    final Mailbox m_initiator;
-    final FragmentTaskMessage m_fragmentMsg;
-    Map<Integer, List<VoltTable>> m_inputDeps;
-
     SysprocFragmentTask(Mailbox mailbox,
                  TransactionTaskQueue queue,
                  FragmentTaskMessage message,
                  Map<Integer, List<VoltTable>> inputDeps)
     {
-        super(queue, message);
-        m_initiator = mailbox;
-        m_fragmentMsg = message;
-        m_inputDeps = inputDeps;
+        super(mailbox, queue, message, inputDeps);
         if (m_inputDeps == null) {
             m_inputDeps = new HashMap<Integer, List<VoltTable>>();
         }
@@ -133,6 +126,7 @@ public class SysprocFragmentTask extends TransactionTask
 
     // Extracted the sysproc portion of ExecutionSite processFragmentTask(), then
     // modifed to work in the new world
+    @Override
     public FragmentResponseMessage processFragmentTask(SiteProcedureConnection siteConnection)
     {
         final FragmentResponseMessage currentFragResponse =

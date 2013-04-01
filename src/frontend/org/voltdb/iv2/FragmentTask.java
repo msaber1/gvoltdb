@@ -39,9 +39,10 @@ import org.voltdb.utils.LogKeys;
 
 public class FragmentTask extends TransactionTask
 {
-    final Mailbox m_initiator;
-    final FragmentTaskMessage m_fragmentMsg;
-    final Map<Integer, List<VoltTable>> m_inputDeps;
+    protected final Mailbox m_initiator;
+    protected final FragmentTaskMessage m_fragmentMsg;
+    protected Map<Integer, List<VoltTable>> m_inputDeps;
+    protected final boolean m_isBorrowTask;
 
     // This constructor is used during live rejoin log replay.
     FragmentTask(Mailbox mailbox,
@@ -62,6 +63,7 @@ public class FragmentTask extends TransactionTask
         super(queue, message);
         m_initiator = mailbox;
         m_fragmentMsg = message;
+        m_isBorrowTask = (inputDeps != null);
         m_inputDeps = inputDeps;
     }
 
@@ -94,6 +96,11 @@ public class FragmentTask extends TransactionTask
     public long getSpHandle()
     {
         return m_fragmentMsg.getSpHandle();
+    }
+
+    boolean isBorrowFragment()
+    {
+        return m_isBorrowTask;
     }
 
     /**
