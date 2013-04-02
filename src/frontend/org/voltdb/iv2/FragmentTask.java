@@ -100,9 +100,9 @@ public class FragmentTask extends TransactionTask
 
     // Really need to rename this as shouldBlock()
     @Override
-    public boolean isSinglePartition()
+    boolean shouldBlockQueue()
     {
-        return m_msg.isSinglePartition() || m_isBorrowTask;
+        return !(m_msg.isSinglePartition() || m_isBorrowTask);
     }
 
     boolean isBorrowFragment()

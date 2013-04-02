@@ -60,6 +60,11 @@ public abstract class TransactionTask extends SiteTasker
         return m_msg.isSinglePartition();
     }
 
+    boolean shouldBlockQueue()
+    {
+        return !m_msg.isSinglePartition();
+    }
+
     TransactionInfoBaseMessage getMessage()
     {
         return m_msg;
