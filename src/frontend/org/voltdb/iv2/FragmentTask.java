@@ -98,6 +98,13 @@ public class FragmentTask extends TransactionTask
         return m_fragmentMsg.getSpHandle();
     }
 
+    // Really need to rename this as shouldBlock()
+    @Override
+    public boolean isSinglePartition()
+    {
+        return m_msg.isSinglePartition() || m_isBorrowTask;
+    }
+
     boolean isBorrowFragment()
     {
         return m_isBorrowTask;

@@ -29,9 +29,9 @@ import org.voltcore.messaging.TransactionInfoBaseMessage;
  */
 public class BorrowTransactionState extends ParticipantTransactionState
 {
-    BorrowTransactionState(long txnId, TransactionInfoBaseMessage notice)
+    BorrowTransactionState(TransactionInfoBaseMessage notice)
     {
-        super(txnId, notice);
+        super(notice);
     }
 
     @Override

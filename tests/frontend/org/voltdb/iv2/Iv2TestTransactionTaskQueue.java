@@ -83,7 +83,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         InitiatorMailbox mbox = mock(InitiatorMailbox.class);
         when(mbox.getHSId()).thenReturn(1337l);
         ParticipantTransactionState pft =
-            new ParticipantTransactionState(localTxnId, msg);
+            new ParticipantTransactionState(msg);
         FragmentTask task =
             new FragmentTask(mbox, queue, msg, null);
         task.setTransactionState(pft);

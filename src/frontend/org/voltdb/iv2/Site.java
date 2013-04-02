@@ -112,6 +112,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Manages pending tasks.
     final SiteTaskerQueue m_scheduler;
 
+    // TransactionState for the in-progress transaction.
+    private TransactionState m_currentTxn = null;
+
     /*
      * There is really no legit reason to touch the initiator mailbox from the site,
      * but it turns out to be necessary at startup when restoring a snapshot. The snapshot
@@ -475,8 +478,19 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     // Normal operation blocks the site thread on the sitetasker queue.
                     SiteTasker task = m_scheduler.take();
                     if (task instanceof TransactionTask) {
-                        m_currentTxnId = ((TransactionTask)task).getTxnId();
+                        TransactionTask ttask = (TransactionTask)task;
+                        TransactionState txnState = findOrCreateTxnStateForTask(ttask);
+                        if (txnState == null) {
+                            // I think this is wrong, but do it to make progress for now
+                            // because this should only be stale Completes
+                            continue;
+                        }
+                        ttask.setTransactionState(txnState);
+                        m_currentTxnId = ttask.getTxnId();
                         m_lastTxnTime = EstTime.currentTimeMillis();
+                    }
+                    if (task instanceof TransactionTask) {
+                        hostLog.error("About to run with txn state: " + ((TransactionTask)task).getTransactionState());
                     }
                     task.run(getSiteProcedureConnection());
                 }
@@ -507,6 +521,53 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
         shutdown();
+    }
+
+    private TransactionState findOrCreateTxnStateForTask(TransactionTask task)
+    {
+        // For transactions at the MPI, just pull the TransactionState out of
+        // the task.  These are: EveryPartitionTask, MpProcedureTask,
+        // MPIEndOfLogTask.  Because the TransactionTaskQueue behavior expects
+        // EveryPartitionTask and MPIEndOfLogTask to claim that they are single
+        // partition, we can't use the isSinglePartition() result here.
+        // Consider changing the state TransactionTaskQueue depends on to
+        // shouldBlock() or something like that.  Just check for the subclasses
+        // we know about for now.
+        if (task instanceof EveryPartitionTask || task instanceof MpProcedureTask ||
+            task instanceof MPIEndOfLogTask)
+        {
+            m_currentTxn = task.getTransactionState();
+        }
+        // For transactions at SPIs, create appropriate TransactionStates
+        else if (task instanceof SpProcedureTask) {
+            // All SpProcedureTasks get a new transaction state
+            m_currentTxn = new SpTransactionState(task.getMessage());
+        }
+        else if (task instanceof FragmentTask) {
+            FragmentTask ftask = (FragmentTask)task;
+            // check to see if we got a task for a transaction in progress
+            if (m_currentTxn != null && (m_currentTxn.txnId == ftask.getTxnId())) {
+                assert(m_currentTxn instanceof ParticipantTransactionState);
+            }
+            // If this is a borrow task, do the right thing
+            else if (ftask.isBorrowFragment()) {
+                m_currentTxn = new BorrowTransactionState(ftask.getMessage());
+            }
+            // It's potentially a new MP transaction.  We'll need to
+            // check to make sure it's not an old one that we finished
+            // early that then is being restarted, but we'll add
+            // that tracking later --izzy
+            else {
+                m_currentTxn = new ParticipantTransactionState(ftask.getMessage());
+            }
+        }
+        else if (task instanceof CompleteTransactionTask) {
+            // If this is a stale CompleteTransactionTask we'll need to deal.
+            // Figure out the right behavior later
+            //assert(m_currentTxn instanceof ParticipantTransactionState);
+            //assert(task.getTxnId() == m_currentTxn.txnId);
+        }
+        return m_currentTxn;
     }
 
     ParticipantTransactionState global_replay_mpTxn = null;
@@ -541,7 +602,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             else if (tibm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage m = (FragmentTaskMessage)tibm;
                 if (global_replay_mpTxn == null) {
-                    global_replay_mpTxn = new ParticipantTransactionState(m.getTxnId(), m);
+                    global_replay_mpTxn = new ParticipantTransactionState(m);
                 }
                 else if (global_replay_mpTxn.txnId != m.getTxnId()) {
                     VoltDB.crashLocalVoltDB("Started a MP transaction during replay before completing " +

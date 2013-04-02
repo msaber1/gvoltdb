@@ -80,7 +80,7 @@ public class TransactionTaskQueue
              * will act as a barrier for single parts, queuing them for execution after the
              * multipart
              */
-            if (!task.getTransactionState().isSinglePartition()) {
+            if (!task.isSinglePartition()) {
                 m_backlog.addLast(task);
                 retval = true;
             }
@@ -161,7 +161,7 @@ public class TransactionTaskQueue
         // If we don't flush all the associated tasks now then flush won't be called again because it is waiting
         // for the complete transaction task that is languishing in the queue to do the flush post multi-part.
         // It can't be called eagerly because that would destructively flush single parts as well.
-        if (m_backlog.isEmpty() || !m_backlog.getFirst().getTransactionState().isDone()) {
+        if (m_backlog.isEmpty()) {
             return offered;
         }
         m_backlog.removeFirst();
@@ -171,7 +171,7 @@ public class TransactionTaskQueue
             long lastQueuedTxnId = task.getTxnId();
             taskQueueOffer(task);
             ++offered;
-            if (task.getTransactionState().isSinglePartition()) {
+            if (task.isSinglePartition()) {
                 // single part can be immediately removed and offered
                 iter.remove();
                 continue;

@@ -520,7 +520,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final String procedureName = msg.getStoredProcedureName();
         final SpProcedureTask task =
             new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg, m_drGateway);
-        task.setTransactionState(new SpTransactionState(msg));
         if (!msg.isReadOnly()) {
             if (!m_cl.log(msg, msg.getSpHandle(), m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);
@@ -668,18 +667,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         long newSpHandle = getCurrentTxnId();
         Iv2Trace.logFragmentTaskMessage(message.getFragmentTaskMessage(),
                 m_mailbox.getHSId(), newSpHandle, true);
-        TransactionState txn = m_outstandingTxns.get(message.getTxnId());
-
-        if (txn == null) {
-            // If the borrow is the first fragment for a transaction, run it as
-            // a single partition fragment; Must not  engage/pause this
-            // site on a MP transaction before the SP instructs to do so.
-            // Do not track the borrow task as outstanding - it completes
-            // immediately and is not a valid transaction state for
-            // full MP participation (it claims everything can run as SP).
-            txn = new BorrowTransactionState(newSpHandle, message);
-        }
-
 
         TransactionTask task;
         if (message.getFragmentTaskMessage().isSysProcTask()) {
@@ -692,7 +679,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 new FragmentTask(m_mailbox, m_pendingTasks, message.getFragmentTaskMessage(),
                         message.getInputDepMap());
         }
-        task.setTransactionState(txn);
         m_pendingTasks.offer(task);
     }
 
@@ -773,21 +759,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
-            txn = new ParticipantTransactionState(msg.getSpHandle(), msg);
+            txn = new ParticipantTransactionState(msg);
             m_outstandingTxns.put(msg.getTxnId(), txn);
             // Only want to send things to the command log if it satisfies this predicate
             // AND we've never seen anything for this transaction before.  We can't
             // actually log until we create a TransactionTask, though, so just keep track
             // of whether it needs to be done.
             logThis = (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly());
-        }
-
-        // Check to see if this is the final task for this txn, and if so, if we can close it out early
-        // Right now, this just means read-only.
-        // NOTE: this overlaps slightly with CompleteTransactionMessage handling completion.  It's so tiny
-        // that for now, meh, but if this scope grows then it should get refactored out
-        if (msg.isFinalTask() && txn.isReadOnly()) {
-            m_outstandingTxns.remove(msg.getTxnId());
         }
 
         TransactionTask task;
@@ -799,7 +777,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             task =
                 new FragmentTask(m_mailbox, m_pendingTasks, msg, null);
         }
-        task.setTransactionState(txn);
         if (logThis) {
             if (!m_cl.log(msg.getInitiateTask(), msg.getSpHandle(), m_durabilityListener, task)) {
                 m_pendingTasks.offer(task);

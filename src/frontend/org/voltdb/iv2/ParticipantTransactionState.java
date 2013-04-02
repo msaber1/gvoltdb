@@ -23,7 +23,7 @@ import org.voltdb.dtxn.TransactionState;
 
 public class ParticipantTransactionState extends TransactionState
 {
-    ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice)
+    ParticipantTransactionState(TransactionInfoBaseMessage notice)
     {
         super(null, notice);
     }
