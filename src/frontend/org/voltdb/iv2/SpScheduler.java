@@ -45,7 +45,6 @@ import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
-import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -126,8 +125,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     long m_sendToHSIds[] = new long[0];
 
-    private final Map<Long, TransactionState> m_outstandingTxns =
-        new HashMap<Long, TransactionState>();
+    private long m_lastSeenMPTxnId = -1;
     private final Map<DuplicateCounterKey, DuplicateCounter> m_duplicateCounters =
         new HashMap<DuplicateCounterKey, DuplicateCounter>();
     private CommandLog m_cl;
@@ -139,7 +137,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private final DurabilityListener m_durabilityListener;
     //Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
-
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -601,7 +598,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // is local repair necessary?
         if (needsRepair.contains(m_mailbox.getHSId())) {
             // Sanity check that we really need repair.
-            if (m_outstandingTxns.get(message.getTxnId()) != null) {
+            if (m_lastSeenMPTxnId == message.getTxnId()) {
                 hostLog.warn("SPI repair attempted to repair a fragment which it has already seen. " +
                         "This shouldn't be possible.");
                 // Not sure what to do in this event.  Crash for now
@@ -753,14 +750,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
      */
     private void doLocalFragmentOffer(FragmentTaskMessage msg)
     {
-        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
+        assert(m_lastSeenMPTxnId <= msg.getTxnId());
         boolean logThis = false;
         // bit of a hack...we will probably not want to create and
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
-        if (txn == null) {
-            txn = new ParticipantTransactionState(msg);
-            m_outstandingTxns.put(msg.getTxnId(), txn);
+        if (m_lastSeenMPTxnId < msg.getTxnId()) {
+            m_lastSeenMPTxnId = msg.getTxnId();
             // Only want to send things to the command log if it satisfies this predicate
             // AND we've never seen anything for this transaction before.  We can't
             // actually log until we create a TransactionTask, though, so just keep track
@@ -827,21 +823,15 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         } else {
             setMaxSeenTxnId(message.getSpHandle());
         }
-        TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures
         // which only use the buddy site (replicated table read).  Ignore them for
         // now, fix that later.
-        if (txn != null)
+        if (m_lastSeenMPTxnId == message.getTxnId())
         {
             Iv2Trace.logCompleteTransactionMessage(message, m_mailbox.getHSId());
             final CompleteTransactionTask task =
                 new CompleteTransactionTask(m_pendingTasks, message, m_drGateway);
-            task.setTransactionState(txn);
             m_pendingTasks.offer(task);
-            // If this is a restart, then we need to leave the transaction state around
-            if (!message.isRestart()) {
-                m_outstandingTxns.remove(message.getTxnId());
-            }
         }
     }
 
@@ -866,8 +856,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         hostLog.warn("" + who + ": most recent SP handle: " + getCurrentTxnId() + " " +
                 TxnEgo.txnIdToString(getCurrentTxnId()));
-        hostLog.warn("" + who + ": outstanding txns: " + m_outstandingTxns.keySet() + " " +
-                TxnEgo.txnIdCollectionToString(m_outstandingTxns.keySet()));
+        hostLog.warn("" + who + ": last seen MP txn ID: " + m_lastSeenMPTxnId + " " +
+                TxnEgo.txnIdToString(m_lastSeenMPTxnId));
         hostLog.warn("" + who + ": TransactionTaskQueue: " + m_pendingTasks.toString());
         if (m_duplicateCounters.size() > 0) {
             hostLog.warn("" + who + ": duplicate counters: ");
