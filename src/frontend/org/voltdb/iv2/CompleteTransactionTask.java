@@ -55,25 +55,29 @@ public class CompleteTransactionTask extends TransactionTask
 
         m_txnState.handleMessage(m_msg);
 
-        if (!m_txnState.isReadOnly()) {
-            // the truncation point token SHOULD be part of m_txn. However, the
-            // legacy interaces don't work this way and IV2 hasn't changed this
-            // ownership yet. But truncateUndoLog is written assuming the right
-            // eventual encapsulation.
-            siteConnection.truncateUndoLog(m_completeMsg.isRollback(),
-                    m_txnState.getBeginUndoToken(),
-                    m_txnState.txnId,
-                    m_txnState.spHandle);
-        }
         if (m_txnState.isDone()) {
-            doCommonSPICompleteActions();
+            doCommonSPICompleteActions(siteConnection);
 
             // Log invocation to DR
+            // This needs to go to doCommonSPICompleteActions, which means
+            // that the DR reference needs to come from the state
             logToDR();
             hostLog.debug("COMPLETE: " + this);
         }
         else
         {
+            // doCommonSPICompleteActions() takes care of undo log in non-restart path
+            // factor this code out at some point
+            if (!m_txnState.isReadOnly()) {
+                // the truncation point token SHOULD be part of m_txn. However, the
+                // legacy interaces don't work this way and IV2 hasn't changed this
+                // ownership yet. But truncateUndoLog is written assuming the right
+                // eventual encapsulation.
+                siteConnection.truncateUndoLog(m_txnState.needsRollback(),
+                        m_txnState.getBeginUndoToken(),
+                        m_txnState.txnId,
+                        m_txnState.spHandle);
+            }
             // If we're going to restart the transaction, then reset the begin undo token so the
             // first FragmentTask will set it correctly.  Otherwise, don't set the Done state or
             // flush the queue; we want the TransactionTaskQueue to stay blocked on this TXN ID
@@ -89,7 +93,7 @@ public class CompleteTransactionTask extends TransactionTask
     {
         if (!m_completeMsg.isRestart()) {
             // future: offer to siteConnection.IBS for replay.
-            doCommonSPICompleteActions();
+            doCommonSPICompleteActions(siteConnection);
         }
         // We need to log the restarting message to the task log so we'll replay the whole
         // stream faithfully
@@ -123,7 +127,7 @@ public class CompleteTransactionTask extends TransactionTask
         }
         if (!m_completeMsg.isRestart()) {
             // this call does the right thing with a null TransactionTaskQueue
-            doCommonSPICompleteActions();
+            doCommonSPICompleteActions(siteConnection);
             logToDR();
         }
         else {

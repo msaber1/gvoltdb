@@ -82,10 +82,26 @@ public abstract class TransactionTask extends SiteTasker
     // Take actions common to all transactions in order to complete a transaction at an SPI
     // Nebulously defined, I know, but replicating these two lines in a bazillion places
     // began to offend me.
-    void doCommonSPICompleteActions()
+    void doCommonSPICompleteActions(SiteProcedureConnection siteConnection)
     {
+        if (!m_txnState.isReadOnly()) {
+            assert(siteConnection.getLatestUndoToken() != Site.kInvalidUndoToken) :
+                "[SP][RW] transaction found invalid latest undo token state in Iv2ExecutionSite.";
+            assert(siteConnection.getLatestUndoToken() >= m_txnState.getBeginUndoToken()) :
+                "[SP][RW] transaction's undo log token farther advanced than latest known value.";
+            assert (m_txnState.getBeginUndoToken() != Site.kInvalidUndoToken) :
+                "[SP][RW] with invalid undo token in completeInitiateTask.";
+            // the truncation point token SHOULD be part of m_txn. However, the
+            // legacy interaces don't work this way and IV2 hasn't changed this
+            // ownership yet. But truncateUndoLog is written assuming the right
+            // eventual encapsulation.
+            siteConnection.truncateUndoLog(m_txnState.needsRollback(),
+                    m_txnState.getBeginUndoToken(),
+                    m_txnState.txnId,
+                    m_txnState.spHandle);
+        }
         // Flush us out of the head of the TransactionTaskQueue.  Null check so we're reusable
-        // for live rejoin replay
+        // for live rejoin replay.
         if (m_queue != null) {
             m_queue.flush();
         }

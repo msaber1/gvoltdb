@@ -1185,4 +1185,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         assert(frag != null);
         return frag.plan;
     }
+
+    @Override
+    public boolean isDirty()
+    {
+        return m_ee.getDirtyStatus();
+    }
 }

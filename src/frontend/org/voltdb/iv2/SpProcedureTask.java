@@ -170,7 +170,7 @@ public class SpProcedureTask extends ProcedureTask
                     m_txnState.txnId,
                     m_txnState.spHandle);
         }
-        doCommonSPICompleteActions();
+        //doCommonSPICompleteActions();
     }
 
     @Override

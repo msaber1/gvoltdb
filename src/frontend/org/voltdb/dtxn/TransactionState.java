@@ -80,6 +80,9 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_done;
     }
 
+    public void setDirty() {
+    }
+
     public boolean isReadOnly()
     {
         return m_isReadOnly;

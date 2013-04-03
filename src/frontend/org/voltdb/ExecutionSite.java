@@ -2342,7 +2342,11 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 
     @Override
     public byte[] planForFragmentId(long fragmentId) {
-        // TODO Auto-generated method stub
         return null;
+    }
+
+    @Override
+    public boolean isDirty() {
+        return false;
     }
 }

@@ -28,6 +28,10 @@ import org.voltdb.VoltDB;
 
 public class ParticipantTransactionState extends TransactionState
 {
+    // Latched.  Would like this to be tri-state (UNKNOWN) so that
+    // we don't make bad decisions
+    protected boolean m_dirty = false;
+
     ParticipantTransactionState(TransactionInfoBaseMessage notice)
     {
         super(null, notice);
@@ -46,18 +50,25 @@ public class ParticipantTransactionState extends TransactionState
     }
 
     @Override
+    public void setDirty()
+    {
+        m_dirty = true;
+    }
+
+    @Override
     public void handleMessage(TransactionInfoBaseMessage msg)
     {
         if (msg instanceof FragmentTaskMessage) {
             FragmentTaskMessage ftm = (FragmentTaskMessage)msg;
             if (ftm.isFinalTask()) {
-                if (isReadOnly()) {
+                if (isReadOnly() || !m_dirty) {
                     m_done = true;
                 }
             }
         }
         else if (msg instanceof CompleteTransactionMessage) {
             CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
+            m_needsRollback = ctm.isRollback();
             if (!ctm.isRestart()) {
                 // This is currently always true.  Might be useful to have
                 // a flag in the transaction state indicating whether it's restarting, though

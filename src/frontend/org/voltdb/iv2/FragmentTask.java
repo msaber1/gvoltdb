@@ -84,7 +84,6 @@ public class FragmentTask extends TransactionTask
                 hostLog.error("Additional FragmentTask received for a complete MP transaction: " +
                         this + ", current state: " + m_txnState);
             }
-            m_txnState.handleMessage(m_msg);
         }
 
         // Set the begin undo token if we haven't already
@@ -100,7 +99,11 @@ public class FragmentTask extends TransactionTask
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
         if (!isBorrowFragment()) {
-            completeFragment();
+            if (siteConnection.isDirty()) {
+                m_txnState.setDirty();
+            }
+            m_txnState.handleMessage(m_msg);
+            completeFragment(siteConnection);
         }
 
         if (hostLog.isDebugEnabled()) {
@@ -147,7 +150,7 @@ public class FragmentTask extends TransactionTask
         }
 
         m_initiator.deliver(response);
-        completeFragment();
+        completeFragment(siteConnection);
     }
 
     /**
@@ -166,17 +169,17 @@ public class FragmentTask extends TransactionTask
         }
         // ignore response.
         processFragmentTask(siteConnection);
-        completeFragment();
+        completeFragment(siteConnection);
     }
 
-    private void completeFragment()
+    private void completeFragment(SiteProcedureConnection siteConnection)
     {
         // Check and see if we can flush early
         // right now, this is just read-only and final task
         // This
         if (m_txnState.isDone())
         {
-            doCommonSPICompleteActions();
+            doCommonSPICompleteActions(siteConnection);
         }
     }
 
