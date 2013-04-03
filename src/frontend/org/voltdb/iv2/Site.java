@@ -810,6 +810,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
             m_lastCommittedSpHandle = spHandle;
         }
+        m_ee.resetDirtyStatus();
     }
 
     @Override
