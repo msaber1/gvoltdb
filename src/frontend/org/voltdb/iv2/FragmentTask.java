@@ -179,6 +179,8 @@ public class FragmentTask extends TransactionTask
         // This
         if (m_txnState.isDone())
         {
+            hostLog.debug("HIT FINAL TASK OPTIMIZATION: READ-ONLY: " + m_txnState.isReadOnly() + ", DIRTY: " +
+                    m_txnState.isDirty());
             doCommonSPICompleteActions(siteConnection);
         }
     }

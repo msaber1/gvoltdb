@@ -489,9 +489,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_currentTxnId = ttask.getTxnId();
                         m_lastTxnTime = EstTime.currentTimeMillis();
                     }
-                    if (task instanceof TransactionTask) {
-                        hostLog.error("About to run with txn state: " + ((TransactionTask)task).getTransactionState());
-                    }
+                    //if (task instanceof TransactionTask) {
+                    //    hostLog.error("About to run with txn state: " + ((TransactionTask)task).getTransactionState());
+                    //}
                     task.run(getSiteProcedureConnection());
                 }
                 else {

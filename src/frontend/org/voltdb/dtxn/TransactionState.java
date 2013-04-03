@@ -20,6 +20,8 @@ package org.voltdb.dtxn;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
+
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
@@ -38,6 +40,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
  */
 public abstract class TransactionState extends OrderableTransaction  {
 
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
     protected final boolean m_isReadOnly;
     protected final TransactionInfoBaseMessage m_notice;
     protected int m_nextDepId = 1;
@@ -81,6 +84,10 @@ public abstract class TransactionState extends OrderableTransaction  {
     }
 
     public void setDirty() {
+    }
+
+    public boolean isDirty() {
+        return true;
     }
 
     public boolean isReadOnly()

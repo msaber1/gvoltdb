@@ -56,6 +56,12 @@ public class ParticipantTransactionState extends TransactionState
     }
 
     @Override
+    public boolean isDirty()
+    {
+        return m_dirty;
+    }
+
+    @Override
     public void handleMessage(TransactionInfoBaseMessage msg)
     {
         if (msg instanceof FragmentTaskMessage) {

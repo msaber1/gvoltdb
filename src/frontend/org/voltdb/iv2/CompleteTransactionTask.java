@@ -61,7 +61,8 @@ public class CompleteTransactionTask extends TransactionTask
             // Log invocation to DR
             // This needs to go to doCommonSPICompleteActions, which means
             // that the DR reference needs to come from the state
-            logToDR();
+            // TODO: FIX ME!
+            //logToDR();
             hostLog.debug("COMPLETE: " + this);
         }
         else
@@ -128,7 +129,8 @@ public class CompleteTransactionTask extends TransactionTask
         if (!m_completeMsg.isRestart()) {
             // this call does the right thing with a null TransactionTaskQueue
             doCommonSPICompleteActions(siteConnection);
-            logToDR();
+            // TODO: FIX DR LOGGING --izzy
+            //logToDR();
         }
         else {
             m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
