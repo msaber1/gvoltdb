@@ -135,6 +135,10 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public abstract StoredProcedureInvocation getInvocation();
 
+    public void handleMessage(TransactionInfoBaseMessage msg)
+    {
+    }
+
     public void createFragmentWork(long[] partitions, FragmentTaskMessage task) {
         String msg = "The current transaction context of type " + this.getClass().getName();
         msg += " doesn't support creating fragment tasks.";

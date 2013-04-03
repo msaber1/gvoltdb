@@ -18,8 +18,13 @@
 package org.voltdb.iv2;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+
+import org.voltdb.messaging.CompleteTransactionMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
+
+import org.voltdb.VoltDB;
 
 public class ParticipantTransactionState extends TransactionState
 {
@@ -38,5 +43,30 @@ public class ParticipantTransactionState extends TransactionState
     public StoredProcedureInvocation getInvocation()
     {
         return null;
+    }
+
+    @Override
+    public void handleMessage(TransactionInfoBaseMessage msg)
+    {
+        if (msg instanceof FragmentTaskMessage) {
+            FragmentTaskMessage ftm = (FragmentTaskMessage)msg;
+            if (ftm.isFinalTask()) {
+                if (isReadOnly()) {
+                    m_done = true;
+                }
+            }
+        }
+        else if (msg instanceof CompleteTransactionMessage) {
+            CompleteTransactionMessage ctm = (CompleteTransactionMessage)msg;
+            if (!ctm.isRestart()) {
+                // This is currently always true.  Might be useful to have
+                // a flag in the transaction state indicating whether it's restarting, though
+                m_done = true;
+            }
+        }
+        else {
+            VoltDB.crashLocalVoltDB("Unexpected message type passed to ParticipantTransactionState: " +
+                    msg, false, null);
+        }
     }
 }

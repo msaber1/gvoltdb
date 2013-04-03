@@ -73,9 +73,23 @@ public class FragmentTask extends TransactionTask
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("STARTING: " + this);
         }
+
+        // Add a check for running a non-borrow fragment against a
+        // ParticipantTransactionState which thinks it's already done.  I think
+        // this should be impossible, but maybe some restart case could get
+        // here?  Maybe m_txnState.handleMessage could return some indication
+        // about whether this is sane instead?
+        if (!isBorrowFragment()) {
+            if (m_txnState.isDone()) {
+                hostLog.error("Additional FragmentTask received for a complete MP transaction: " +
+                        this + ", current state: " + m_txnState);
+            }
+            m_txnState.handleMessage(m_msg);
+        }
+
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
-        // and do partial rollback
+        // and do partial rollback.
         if (!m_txnState.isReadOnly()) {
             if (m_txnState.getBeginUndoToken() == Site.kInvalidUndoToken) {
                 m_txnState.setBeginUndoToken(siteConnection.getLatestUndoToken());
@@ -85,7 +99,9 @@ public class FragmentTask extends TransactionTask
         // completion?
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
-        completeFragment();
+        if (!isBorrowFragment()) {
+            completeFragment();
+        }
 
         if (hostLog.isDebugEnabled()) {
             hostLog.debug("COMPLETE: " + this);
@@ -158,7 +174,7 @@ public class FragmentTask extends TransactionTask
         // Check and see if we can flush early
         // right now, this is just read-only and final task
         // This
-        if (m_fragmentMsg.isFinalTask() && m_txnState.isReadOnly())
+        if (m_txnState.isDone())
         {
             doCommonSPICompleteActions();
         }

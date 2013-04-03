@@ -45,6 +45,16 @@ public class CompleteTransactionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
+        // Add a check for running a CompleteTransactionTask against a ParticipantTransactionState
+        // which thinks it's already done.  We send many extra CompleteTransactionMessages, so
+        // this could happen, just bail.
+        if (m_txnState.isDone()) {
+            hostLog.debug("REDUNDANT: " + this);
+            return;
+        }
+
+        m_txnState.handleMessage(m_msg);
+
         if (!m_txnState.isReadOnly()) {
             // the truncation point token SHOULD be part of m_txn. However, the
             // legacy interaces don't work this way and IV2 hasn't changed this
@@ -55,7 +65,7 @@ public class CompleteTransactionTask extends TransactionTask
                     m_txnState.txnId,
                     m_txnState.spHandle);
         }
-        if (!m_completeMsg.isRestart()) {
+        if (m_txnState.isDone()) {
             doCommonSPICompleteActions();
 
             // Log invocation to DR
@@ -90,6 +100,12 @@ public class CompleteTransactionTask extends TransactionTask
     public long getSpHandle()
     {
         return m_completeMsg.getSpHandle();
+    }
+
+    @Override
+    public boolean shouldBlockQueue()
+    {
+        return false;
     }
 
     @Override
