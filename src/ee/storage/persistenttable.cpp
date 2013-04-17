@@ -387,7 +387,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         m_views[i]->processTupleDelete(targetTupleToUpdate, fallible);
     }
 
-    if (m_schema->getUninlinedObjectColumnCount() != 0) {
+    uint16_t objectColumnCount = m_schema->getUninlinedObjectColumnCount();
+
+    if (objectColumnCount != 0) {
         decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
         increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySize());
     }
@@ -411,11 +413,12 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
 
     // Either the "before" or "after" object reference values that change will come in handy later,
     // so collect them up.
-    std::vector<char*> oldObjects;
-    std::vector<char*> newObjects;
+    char* oldObjects[objectColumnCount];
+    char* newObjects[objectColumnCount];
 
     // this is the actual write of the new values
-    targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
+    uint16_t changedObjectColumnCount =
+        targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues, oldObjects, newObjects);
 
     if (uq) {
         /*
@@ -423,15 +426,25 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
          * and the "before" and "after" object pointers for non-inlined columns that changed.
          */
         char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
+        char** pooledOldObjects = NULL;
+        char** pooledNewObjects = NULL;
+        /* Copy the changed object pointers (if any) into pool-allocated vectors */
+        if (changedObjectColumnCount > 0) {
+            std::size_t vector_size_in_bytes = changedObjectColumnCount * sizeof(char*);
+            pooledOldObjects = uq->allocatePooledCopy(oldObjects, vector_size_in_bytes);
+            pooledNewObjects = uq->allocatePooledCopy(newObjects, vector_size_in_bytes);
+        }
         uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
-                                                                         oldObjects, newObjects,
+                                                                         changedObjectColumnCount,
+                                                                         pooledOldObjects,
+                                                                         pooledNewObjects,
                                                                          this, someIndexGotUpdated));
     } else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
         // -- though maybe even that case should delegate memory management back to the PersistentTable
         // to keep the UndoAction stupid simple?
         // Anyway, there is no Undo Action in this case, so DIY.
-        NValue::freeObjectsFromTupleStorage(oldObjects);
+        NValue::freeObjectsFromTupleStorage(oldObjects, changedObjectColumnCount);
     }
 
     /**

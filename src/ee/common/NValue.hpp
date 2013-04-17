@@ -211,7 +211,7 @@ class NValue {
     void free() const;
 
     /* Release memory associated to object type tuple columns */
-    static void freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects);
+    static void freeObjectsFromTupleStorage(char** ptr_array, uint16_t count);
 
     /* Set value to the correct SQL NULL representation. */
     void setNull();
@@ -2101,11 +2101,10 @@ inline void NValue::free() const {
     }
 }
 
-inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObjects)
+inline void NValue::freeObjectsFromTupleStorage(char** ptr_array, uint16_t count)
 {
-
-    for (std::vector<char*>::const_iterator it = oldObjects.begin(); it != oldObjects.end(); ++it) {
-        StringRef* sref = reinterpret_cast<StringRef*>(*it);
+    for (uint16_t ii = 0; ii < count; ++ii) {
+        StringRef* sref = reinterpret_cast<StringRef*>(ptr_array[ii]);
         if (sref != NULL) {
             StringRef::destroy(sref);
         }

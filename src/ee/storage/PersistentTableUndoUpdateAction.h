@@ -29,10 +29,12 @@ class PersistentTableUndoUpdateAction: public UndoAction {
 public:
 
     inline PersistentTableUndoUpdateAction(char* oldTuple, char* newTuple,
-                                           std::vector<char*> const & oldObjects, std::vector<char*> const & newObjects,
+                                           uint16_t changedObjectColumnCount,
+                                           char** oldObjects, char** newObjects,
                                            PersistentTable *table, bool revertIndexes)
       : m_oldTuple(oldTuple), m_newTuple(newTuple),
         m_table(table), m_revertIndexes(revertIndexes),
+        m_changedObjectColumnCount(changedObjectColumnCount),
         m_oldUninlineableColumns(oldObjects), m_newUninlineableColumns(newObjects)
     { }
 
@@ -44,7 +46,7 @@ public:
     virtual void undo()
     {
         m_table->updateTupleForUndo(m_newTuple, m_oldTuple, m_revertIndexes);
-        NValue::freeObjectsFromTupleStorage(m_newUninlineableColumns);
+        NValue::freeObjectsFromTupleStorage(m_newUninlineableColumns, m_changedObjectColumnCount);
     }
 
     /*
@@ -52,7 +54,10 @@ public:
      * to be undone in the future. In this case the string allocations
      * of the old tuple must be released.
      */
-    virtual void release() { NValue::freeObjectsFromTupleStorage(m_oldUninlineableColumns); }
+    virtual void release()
+    {
+        NValue::freeObjectsFromTupleStorage(m_oldUninlineableColumns, m_changedObjectColumnCount);
+    }
 
     virtual ~PersistentTableUndoUpdateAction() { }
 
@@ -61,8 +66,9 @@ private:
     char* const m_newTuple;
     PersistentTable * const m_table;
     bool const m_revertIndexes;
-    std::vector<char*> const m_oldUninlineableColumns;
-    std::vector<char*> const m_newUninlineableColumns;
+    uint16_t const m_changedObjectColumnCount;
+    char** const m_oldUninlineableColumns;
+    char** const m_newUninlineableColumns;
 };
 
 }
