@@ -26,6 +26,7 @@
 #include "catalog/constraint.h"
 #include "catalog/materializedviewinfo.h"
 #include "common/CatalogUtil.h"
+#include "common/MapUtils.h"
 #include "common/types.h"
 #include "common/ValueFactory.hpp"
 #include "expressions/expressionutil.h"
@@ -436,8 +437,8 @@ void migrateViews(const catalog::CatalogMap<catalog::MaterializedViewInfo> & vie
         PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
         // Use the now-current definiton of the target table, to be updated later, if needed.
         TableCatalogDelegate* targetDelegate =
-            dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
-                                                                delegatesByName));
+            dynamic_cast<TableCatalogDelegate*>(MapUtils::getValueAtKeyOrNull(oldTargetTable->name(),
+                                                                              delegatesByName));
         PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
         if (targetDelegate) {
             PersistentTable* newTargetTable =

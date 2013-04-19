@@ -34,16 +34,6 @@ class ExecutorContext;
 class TupleSchema;
 struct TableIndexScheme;
 
-// There might be a better place for this, but current callers happen to have this header in common.
-template<typename K, typename V> V findInMapOrNull(const K& key, std::map<K, V> const &the_map)
-{
-    typename std::map<K, V>::const_iterator lookup = the_map.find(key);
-    if (lookup != the_map.end()) {
-        return lookup->second;
-    }
-    return (V)NULL;
-}
-
 /*
  * Implementation of CatalogDelgate for Table
  */

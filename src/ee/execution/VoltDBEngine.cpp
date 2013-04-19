@@ -58,6 +58,7 @@
 #include "common/FatalException.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/LegacyHashinator.h"
+#include "common/MapUtils.h"
 #include "common/ElasticHashinator.h"
 #include "catalog/catalogmap.h"
 #include "catalog/catalog.h"
@@ -274,13 +275,13 @@ catalog::Catalog *VoltDBEngine::getCatalog() const {
 Table* VoltDBEngine::getTable(int32_t tableId) const
 {
     // Caller responsible for checking null return value.
-    return findInMapOrNull(tableId, m_tables);
+    return MapUtils::getValueAtKeyOrNull(tableId, m_tables);
 }
 
 Table* VoltDBEngine::getTable(string name) const
 {
     // Caller responsible for checking null return value.
-    return findInMapOrNull(name, m_tablesByName);
+    return MapUtils::getValueAtKeyOrNull(name, m_tablesByName);
 }
 
 bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
@@ -664,7 +665,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 
             // get the delegate and bail if it's not here
             // - JHH: I'm not sure why not finding a delegate is safe to ignore
-            CatalogDelegate* delegate = findInMapOrNull(catalogTable->path(), m_catalogDelegates);
+            CatalogDelegate* delegate = MapUtils::getValueAtKeyOrNull(catalogTable->path(), m_catalogDelegates);
             TableCatalogDelegate *tcd = dynamic_cast<TableCatalogDelegate*>(delegate);
             if (!tcd) {
                 continue;
@@ -832,8 +833,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                 PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
                 // Use the now-current definiton of the target table, to be updated later, if needed.
                 TableCatalogDelegate* targetDelegate =
-                    dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
-                                                                        m_delegatesByName));
+                    dynamic_cast<TableCatalogDelegate*>(MapUtils::getValueAtKeyOrNull(oldTargetTable->name(),
+                                                                                      m_delegatesByName));
                 PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
                 if (targetDelegate) {
                     PersistentTable* newTargetTable =
@@ -1416,7 +1417,7 @@ int VoltDBEngine::tableStreamSerializeMore(
         // Java engine will always poll a fully serialized table one more
         // time (it doesn't see the hasMore return code).  Note that the
         // dynamic cast was already verified in activateCopyOnWrite.
-        PersistentTable* table = findInMapOrNull(tableId, m_snapshottingTables);
+        PersistentTable* table = MapUtils::getValueAtKeyOrNull(tableId, m_snapshottingTables);
         if ( ! table) {
             return 0;
         }
