@@ -69,23 +69,23 @@ public abstract class AbstractParsedStmt {
 
     public VoltType[] paramList = new VoltType[0];
 
-    protected HashMap<Long, Integer> m_paramsById = new HashMap<Long, Integer>();
+    protected final HashMap<Long, Integer> m_paramsById = new HashMap<Long, Integer>();
 
-    public ArrayList<Table> tableList = new ArrayList<Table>();
+    public final ArrayList<Table> tableList = new ArrayList<Table>();
 
     public AbstractExpression where = null;
 
-    public ArrayList<AbstractExpression> whereSelectionList = new ArrayList<AbstractExpression>();
+    public final ArrayList<AbstractExpression> whereSelectionList = new ArrayList<AbstractExpression>();
 
-    public ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
+    public final ArrayList<AbstractExpression> noTableSelectionList = new ArrayList<AbstractExpression>();
 
-    public ArrayList<AbstractExpression> multiTableSelectionList = new ArrayList<AbstractExpression>();
+    public final ArrayList<AbstractExpression> multiTableSelectionList = new ArrayList<AbstractExpression>();
 
-    public HashMap<Table, ArrayList<AbstractExpression>> tableFilterList = new HashMap<Table, ArrayList<AbstractExpression>>();
+    public final HashMap<Table, ArrayList<AbstractExpression>> tableFilterList = new HashMap<Table, ArrayList<AbstractExpression>>();
 
-    public HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
+    public final HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
 
-    public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
+    public final HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
 
     //User specified join order, null if none is specified
     public String joinOrder = null;
@@ -660,7 +660,6 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     tableFilterList.put(table, exprs);
                 }
-                expr.m_isJoiningClause = false;
                 addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }
@@ -677,7 +676,6 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     joinSelectionList.put(pair, exprs);
                 }
-                expr.m_isJoiningClause = true;
                 addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }

@@ -66,14 +66,14 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     batched = node->isBatched();
 
     // Construct the output table
-    m_columnCount = static_cast<int>(node->getOutputSchema().size());
-    assert(m_columnCount >= 0);
+    std::vector<AbstractExpression*>& expressions = node->getOutputColumnExpressions();
+    m_columnCount = static_cast<int>(expressions.size());
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
     // initialize local variables
-    all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(node->getOutputColumnExpressions());
+    all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(expressions);
     all_param_array = all_param_array_ptr.get();
 
     needs_substitute_ptr = boost::shared_array<bool>(new bool[m_columnCount]);
@@ -84,9 +84,9 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     expression_array = expression_array_ptr.get();
 
     for (int ctr = 0; ctr < m_columnCount; ctr++) {
-        assert (node->getOutputColumnExpressions()[ctr] != NULL);
-        expression_array_ptr[ctr] = node->getOutputColumnExpressions()[ctr];
-        needs_substitute_ptr[ctr] = node->getOutputColumnExpressions()[ctr]->hasParameter();
+        assert (expressions[ctr] != NULL);
+        expression_array_ptr[ctr] = expressions[ctr];
+        needs_substitute_ptr[ctr] = expressions[ctr]->hasParameter();
     }
 
     //output table should be temptable
@@ -101,7 +101,7 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
     assert (!node->isInline()); // inline projection's execute() should not be called
     assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
     assert (output_table);
-    assert (m_columnCount == (int)node->getOutputColumnNames().size());
+    assert (m_columnCount == (int)node->getOutputColumnExpressions().size());
 
     // batched insertion
     if (batched) {

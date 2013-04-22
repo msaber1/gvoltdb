@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
+import java.util.Iterator;
 
 import org.voltdb.expressions.TupleValueExpression;
 
@@ -27,7 +28,7 @@ import org.voltdb.expressions.TupleValueExpression;
  * This class encapsulates the representation and common operations for
  * a PlanNode's output schema.
  */
-public class NodeSchema
+public class NodeSchema implements Iterable<SchemaColumn>
 {
     public NodeSchema()
     {
@@ -43,6 +44,11 @@ public class NodeSchema
     public void addColumn(SchemaColumn column)
     {
         m_columns.add(column);
+    }
+
+    public void addColumn(TupleValueExpression tve)
+    {
+        addColumn(new SchemaColumn(tve));
     }
 
     /**
@@ -152,9 +158,8 @@ public class NodeSchema
     public NodeSchema clone()
     {
         NodeSchema copy = new NodeSchema();
-        for (int i = 0; i < m_columns.size(); ++i)
-        {
-            copy.addColumn(m_columns.get(i).clone());
+        for (SchemaColumn column : m_columns) {
+            copy.addColumn(column.clone());
         }
         return copy;
     }
@@ -204,5 +209,12 @@ public class NodeSchema
     }
 
     private ArrayList<SchemaColumn> m_columns;
+
+    @Override
+    public Iterator<SchemaColumn> iterator() {
+        // TODO Auto-generated method stub
+        return m_columns.iterator();
+    }
+
 }
 

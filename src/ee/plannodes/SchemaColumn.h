@@ -51,6 +51,8 @@ public:
     // the expression
     AbstractExpression* getExpression();
 
+    std::string debugInfo(const std::string& spacer) const;
+
 private:
     std::string m_tableName;
     std::string m_columnName;

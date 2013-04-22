@@ -91,43 +91,6 @@ ProjectionPlanNode::getOutputColumnNames() const
 }
 
 void
-ProjectionPlanNode::setOutputColumnTypes(vector<ValueType>& types)
-{
-    m_outputColumnTypes = types;
-}
-
-vector<ValueType>&
-ProjectionPlanNode::getOutputColumnTypes()
-{
-    return m_outputColumnTypes;
-}
-
-const vector<ValueType>&
-ProjectionPlanNode::getOutputColumnTypes() const
-{
-    return m_outputColumnTypes;
-}
-
-
-void ProjectionPlanNode::setOutputColumnSizes(vector<int32_t>& sizes)
-{
-    m_outputColumnSizes = sizes;
-
-}
-
-vector<int32_t>&
-ProjectionPlanNode::getOutputColumnSizes()
-{
-    return m_outputColumnSizes;
-}
-
-const vector<int32_t>&
-ProjectionPlanNode::getOutputColumnSizes() const
-{
-    return m_outputColumnSizes;
-}
-
-void
 ProjectionPlanNode::setOutputColumnExpressions(vector<AbstractExpression*>& exps)
 {
     m_outputColumnExpressions = exps;
@@ -149,22 +112,10 @@ string
 ProjectionPlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
-    buffer << spacer << "Projection Output["
-           << m_outputColumnNames.size() << "]:\n";
-    for (int ctr = 0, cnt = (int)m_outputColumnNames.size(); ctr < cnt; ctr++)
-    {
+    buffer << spacer << "Projection Output[" << m_outputColumnNames.size() << "]:\n";
+    for (int ctr = 0, cnt = (int)m_outputColumnExpressions.size(); ctr < cnt; ctr++) {
         buffer << spacer << "  [" << ctr << "] ";
-        buffer << "name=" << m_outputColumnNames[ctr] << " : ";
-        buffer << "size=" << m_outputColumnSizes[ctr] << " : ";
-        buffer << "type=" << getTypeName(m_outputColumnTypes[ctr]) << "\n";
-        if (m_outputColumnExpressions[ctr] != NULL)
-        {
-            buffer << m_outputColumnExpressions[ctr]->debug(spacer + "   ");
-        }
-        else
-        {
-            buffer << spacer << "  " << "<NULL>" << "\n";
-        }
+        buffer << m_outputColumnExpressions[ctr]->debug(spacer + "   ");
     }
     return buffer.str();
 }
@@ -178,8 +129,6 @@ ProjectionPlanNode::loadFromJSONObject(PlannerDomValue obj)
     {
         SchemaColumn* outputColumn = getOutputSchema()[ii];
         m_outputColumnNames.push_back(outputColumn->getColumnName());
-        m_outputColumnTypes.push_back(outputColumn->getType());
-        m_outputColumnSizes.push_back(outputColumn->getSize());
         m_outputColumnExpressions.push_back(outputColumn->getExpression());
     }
 }

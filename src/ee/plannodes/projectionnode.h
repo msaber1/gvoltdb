@@ -65,14 +65,6 @@ class ProjectionPlanNode : public AbstractPlanNode
     std::vector<std::string>& getOutputColumnNames();
     const std::vector<std::string>& getOutputColumnNames() const;
 
-    void setOutputColumnTypes(std::vector<ValueType>& types);
-    std::vector<ValueType>& getOutputColumnTypes();
-    const std::vector<ValueType>& getOutputColumnTypes() const;
-
-    void setOutputColumnSizes(std::vector<int32_t>& sizes);
-    std::vector<int32_t>& getOutputColumnSizes();
-    const std::vector<int32_t>& getOutputColumnSizes() const;
-
     void setOutputColumnExpressions(std::vector<AbstractExpression*>& exps);
     std::vector<AbstractExpression*>& getOutputColumnExpressions();
     const std::vector<AbstractExpression*>& getOutputColumnExpressions() const;

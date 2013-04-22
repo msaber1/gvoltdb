@@ -25,7 +25,6 @@ import java.util.HashSet;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -318,19 +317,16 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
 
     private AbstractPlanNode getSelectSubPlanForAccessPathStep(AccessPath accessPath, AbstractPlanNode subPlan, AbstractPlanNode nljAccessPlan) {
 
-        // get all the clauses that join the applicable two tables
-        ArrayList<AbstractExpression> joinClauses = accessPath.joinExprs;
-
         AbstractPlanNode retval = null;
         if (nljAccessPlan instanceof IndexScanPlanNode) {
             NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
 
             nlijNode.setJoinType(JoinType.INNER);
 
-            @SuppressWarnings("unused")
             IndexScanPlanNode innerNode = (IndexScanPlanNode) nljAccessPlan;
-
-            nlijNode.addInlinePlanNode(nljAccessPlan);
+            // All of the accessPath's joinExprs are covered in the indexscan's filters,
+            // INCLUDING those that don't involve the index.
+            nlijNode.addInlinePlanNode(innerNode);
 
             // combine the tails plan graph with the new head node
             nlijNode.addAndLinkChild(subPlan);
@@ -341,16 +337,14 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
         else {
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
-            if ((joinClauses != null) && (joinClauses.size() > 0))
-                nljNode.setPredicate(ExpressionUtil.combine(joinClauses));
+            // Add all the clauses that join the applicable two tables
+            nljNode.setPredicate(ExpressionUtil.combine(accessPath.joinExprs));
             nljNode.setJoinType(JoinType.LEFT);
 
             // combine the tails plan graph with the new head node
             nljNode.addAndLinkChild(nljAccessPlan);
 
             nljNode.addAndLinkChild(subPlan);
-            // now generate the output schema for this join
-            nljNode.generateOutputSchema(m_db);
 
             retval = nljNode;
         }

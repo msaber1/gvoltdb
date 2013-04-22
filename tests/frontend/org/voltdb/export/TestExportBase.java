@@ -111,4 +111,5 @@ public class TestExportBase extends RegressionSuite {
         super(s);
     }
 
+    public void testThatJUnitFindsSomethingToTest() {}
 }

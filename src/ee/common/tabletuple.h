@@ -260,7 +260,7 @@ public:
     inline const NValue getNValue(const int idx) const {
         assert(m_schema);
         assert(m_data);
-        assert(idx < m_schema->columnCount());
+        // Let the schema handle any idx validity assertions.
 
         //assert(isActive());
         const voltdb::ValueType columnType = m_schema->columnType(idx);

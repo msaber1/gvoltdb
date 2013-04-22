@@ -678,16 +678,22 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         project.addStmtProcedure("T1Insert", "INSERT INTO T1 VALUES (?, ?);");
         project.addStmtProcedure("BInsert", "INSERT INTO B VALUES (?, ?);");
 
-        // config = new LocalSingleProcessServer("plansgroupby-ipc.jar", 1, BackendTarget.NATIVE_EE_IPC);
-        // config.compile(project);
-        // builder.addServerConfig(config);
+        boolean success;
 
-        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        boolean success = config.compile(project);
-        assertTrue(success);
+        /*// IFDEF-LIKE HACK: Toggle this one line's comment style between '//' and '/*' to switch between...
+
+        // ... a simple single-server IPC configuration for debugging the EE ...
+
+        config = new LocalCluster("plansgroupby-ipc.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        config.compile(project);
         builder.addServerConfig(config);
 
-        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        /*/ // (This funky comment line is the pivotal ELSE component to the IFDEF-LIKE HACK.)
+
+        // ... normal JNI configurations for normal single and multi server testing ...
+
+        // Single server
+        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
@@ -696,6 +702,14 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
+        builder.addServerConfig(config);
+
+        // (This funky comment acts as the ENDIF for the IFDEF-LIKE HACK) */
+
+        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
+        builder.addServerConfig(config);
 
         return builder;
     }

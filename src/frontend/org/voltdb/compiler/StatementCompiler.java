@@ -39,6 +39,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DeletePlanNode;
 import org.voltdb.plannodes.InsertPlanNode;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.UpdatePlanNode;
@@ -128,7 +129,8 @@ public abstract class StatementCompiler {
 
         // Output Columns
         int index = 0;
-        for (SchemaColumn col : plan.columns.getColumns())
+        NodeSchema columns = plan.rootPlanGraph.getOutputSchema();
+        for (SchemaColumn col : columns)
         {
             Column catColumn = catalogStmt.getOutput_columns().add(String.valueOf(index));
             catColumn.setNullable(false);

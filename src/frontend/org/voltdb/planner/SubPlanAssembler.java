@@ -552,18 +552,6 @@ public abstract class SubPlanAssembler {
         return new IndexableExpression(normalizedExpr, binding);
     }
 
-    private boolean isOperandDependentOnTable(AbstractExpression expr, Table table) {
-        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            //TODO: This clumsy testing of table names regardless of table aliases is
-            // EXACTLY why we can't have nice things like self-joins.
-            if (table.getTypeName().equals(tve.getTableName()))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private List<AbstractExpression> bindingIfValidIndexedFilterOperand(Table table,
         AbstractExpression indexableExpr, AbstractExpression otherExpr,
         AbstractExpression coveringExpr, int coveringColId)
@@ -579,7 +567,7 @@ public abstract class SubPlanAssembler {
         }
         // Left and right operands must not be from the same table,
         // e.g. where t.a = t.b is not indexable with the current technology.
-        if (isOperandDependentOnTable(otherExpr, table)) {
+        if (TupleValueExpression.isOperandDependentOnTable(otherExpr, table)) {
            return null;
         }
 
@@ -619,9 +607,6 @@ public abstract class SubPlanAssembler {
 
         ReceivePlanNode recvNode = new ReceivePlanNode();
         recvNode.addAndLinkChild(sendNode);
-
-        // receive node requires the schema of its output table
-        recvNode.generateOutputSchema(m_db);
         return recvNode;
     }
 
@@ -653,7 +638,6 @@ public abstract class SubPlanAssembler {
         {
             scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
         }
-        scanNode.generateOutputSchema(m_db);
         return scanNode;
     }
 
