@@ -48,10 +48,9 @@ protected:
 
     inline UndoQuantum(int64_t undoToken, Pool *dataPool)
         : m_undoToken(undoToken), m_numInterests(0), m_interestsCapacity(0), m_interests(NULL), m_dataPool(dataPool) {}
-    inline virtual ~UndoQuantum() {}
 
 public:
-    virtual inline void registerUndoAction(UndoAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+    inline void registerUndoAction(UndoAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
         assert(undoAction);
         m_undoActions.push_back(undoAction);
 
@@ -128,8 +127,6 @@ public:
     inline int64_t getUndoToken() const {
         return m_undoToken;
     }
-
-    virtual bool isDummy() {return false;}
 
     inline int64_t getAllocatedMemory() const
     {
