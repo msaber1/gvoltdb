@@ -293,7 +293,7 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
         node->m_childIds.push_back(childNodeId);
     }
 
-    if (obj.hasNonNullKey("OUTPUT_SCHEMA") {
+    if (obj.hasNonNullKey("OUTPUT_SCHEMA")) {
         PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
         for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
             PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);

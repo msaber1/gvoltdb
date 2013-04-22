@@ -68,7 +68,6 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     // Construct the output table
     std::vector<AbstractExpression*>& expressions = node->getOutputColumnExpressions();
     m_columnCount = static_cast<int>(expressions.size());
-    assert(m_columnCount >= 0);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);

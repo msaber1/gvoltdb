@@ -154,7 +154,6 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::vector<string>
 
     // set the data to be empty
     m_tupleCount = 0;
-    m_usedTupleCount = 0;
 
     onSetColumns(); // for more initialization
 }
@@ -279,10 +278,6 @@ bool Table::serializeColumnHeaderTo(SerializeOutput &serialize_io) {
 
 }
 
-int table_assert_or_throw_or_crash_123 = /* throw a fatal error */ 2; //the default
-                                         // OR crash from here  */ 3;
-                                         // OR assert           */ 1;
-
 bool Table::serializeTo(SerializeOutput &serialize_io) {
     // The table is serialized as:
     // [(int) total size]
@@ -303,7 +298,7 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
         return false;
 
     // active tuple counts
-    serialize_io.writeInt(static_cast<int32_t>(m_usedTupleCount));
+    serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
     int64_t written_count = 0;
     TableIterator titer = iterator();
     TableTuple tuple(m_schema);
@@ -311,11 +306,7 @@ bool Table::serializeTo(SerializeOutput &serialize_io) {
         tuple.serializeTo(serialize_io);
         ++written_count;
     }
-    DEBUG_ASSERT_OR_THROW_OR_CRASH_123(written_count == m_usedTupleCount,
-                                       table_assert_or_throw_or_crash_123,
-                                       "Fallout from error. The sent tuple count " << written_count
-                                        << " != the table's count of used tuples " << m_usedTupleCount
-                                        << "\n" << debug());
+    assert(written_count == m_tupleCount);
 
     // length prefix is non-inclusive
     int32_t sz = static_cast<int32_t>(serialize_io.position() - pos - sizeof(int32_t));
@@ -398,10 +389,6 @@ void Table::loadTuplesFromNoHeader(SerializeInput &serialize_io,
     }
 }
 
-int table_throw_sqlexception_or_fatal_or_crash_123 = /* throw a fatal error        */ 2; //the default
-                                                     // OR crash from here         */ 3;
-                                                     // OR throw something softer *-/ 1;
-
 void Table::loadTuplesFrom(SerializeInput &serialize_io,
                            Pool *stringPool) {
     /*
@@ -425,7 +412,7 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
     serialize_io.readByte();
 
     int16_t colcount = serialize_io.readShort();
-    assert(colcount > 0);
+    assert(colcount >= 0);
 
     // Store the following information so that we can provide them to the user
     // on failure

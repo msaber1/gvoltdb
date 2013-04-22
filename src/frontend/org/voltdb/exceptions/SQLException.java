@@ -38,7 +38,6 @@ public class SQLException extends SerializableException {
         m_sqlState = new byte[5];
         buffer.get(m_sqlState);
         String state = getSQLState();
-
         assert(state.length() == 5);
     }
 
@@ -81,7 +80,7 @@ public class SQLException extends SerializableException {
      */
     @Override
     protected int p_getSerializedSize() {
-        return 5;// state bytes
+        return 5;// messageBytes
     }
 
     /**

@@ -260,8 +260,9 @@ public:
     inline const NValue getNValue(const int idx) const {
         assert(m_schema);
         assert(m_data);
-        //assert(isActive());
         // Let the schema handle any idx validity assertions.
+
+        //assert(isActive());
         const voltdb::ValueType columnType = m_schema->columnType(idx);
         const char* dataPtr = getDataPtr(idx);
         const bool isInlined = m_schema->columnIsInlined(idx);

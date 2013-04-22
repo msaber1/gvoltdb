@@ -79,7 +79,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(m_node->getInputTables().size() == 1);
     m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
     assert(m_inputTable);
-    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target should be persistenttable
+    m_targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable()); //target table should be persistenttable
     assert(m_targetTable);
     assert(m_node->getTargetTable());
 

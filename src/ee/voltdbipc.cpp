@@ -612,8 +612,10 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
 void VoltDBIPC::sendException(int8_t errorCode) {
     writeOrDie(m_fd, (unsigned char*)&errorCode, sizeof(int8_t));
 
-    const void* exceptionData = m_engine->getExceptionOutputSerializer()->data();
-    int32_t exceptionLength = static_cast<int32_t>(ntohl(*reinterpret_cast<const int32_t*>(exceptionData)));
+    const void* exceptionData =
+      m_engine->getExceptionOutputSerializer()->data();
+    int32_t exceptionLength =
+      static_cast<int32_t>(ntohl(*reinterpret_cast<const int32_t*>(exceptionData)));
     printf("Sending exception length %d\n", exceptionLength);
     fflush(stdout);
 

@@ -58,54 +58,63 @@ class SerializeInput;
 class SerializeOutput;
 
 class TupleValueExpression : public AbstractExpression {
-public:
-    TupleValueExpression(int value_idx, std::string table_name, std::string col_name, bool is_inner = false)
+  public:
+    TupleValueExpression(int value_idx, std::string tableName, std::string colName)
         : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE)
-        , m_valueIdx(value_idx)
-        , m_isInner(is_inner)
-        , m_tableName(table_name)
-        , m_columnName(col_name)
     {
-        VOLT_TRACE("TupleValueExpression %d %d %s", m_type, m_valueIdx, (m_isInner ? "inner" : "outer") );
-    }
+        VOLT_TRACE("OptimizedTupleValueExpression %d %d", m_type, value_idx);
+        this->tuple_idx = 0;
+        this->value_idx = value_idx;
+        this->table_name = tableName;
+        this->column_name = colName;
+    };
 
-    virtual voltdb::NValue eval(const TableTuple *outer_tuple, const TableTuple *inner_tuple) const
-    {
-        const TableTuple *the_tuple = outer_tuple;
-        if (m_isInner) {
-            assert(inner_tuple);
-            if ( ! inner_tuple ) {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, "TupleValueExpression::eval:"
-                                              " Couldn't find inner tuple (possible index scan planning error)");
+    virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        if (tuple_idx == 0) {
+            assert(tuple1);
+            if ( ! tuple1 ) {
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL,
+                                              "TupleValueExpression::"
+                                              "eval:"
+                                              " Couldn't find tuple 1 (possible index scan planning error)");
             }
-            the_tuple = inner_tuple;
+            return tuple1->getNValue(this->value_idx);
         }
         else {
-            assert(outer_tuple);
-            if ( ! outer_tuple ) {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, "TupleValueExpression::eval:"
-                                              " Couldn't find tuple (possible index scan planning error)");
+            assert(tuple2);
+            if ( ! tuple2 ) {
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL,
+                                              "TupleValueExpression::"
+                                              "eval:"
+                                              " Couldn't find tuple 2 (possible index scan planning error)");
             }
+            return tuple2->getNValue(this->value_idx);
         }
-        return the_tuple->getNValue(m_valueIdx);
     }
 
-    std::string debugInfo(const std::string &spacer) const
-    {
+    std::string debugInfo(const std::string &spacer) const {
         std::ostringstream buffer;
-        buffer << spacer << "Column Reference[" << m_valueIdx
-               << (m_isInner ? " of inner" : " of outer" ) << " tuple] "
-               << m_tableName << "." << m_columnName << std::endl;
+        buffer << spacer << "Optimized Column Reference[" << this->value_idx << "]\n";
         return (buffer.str());
     }
 
-    int getColumnId() const {return m_valueIdx;}
+    int getColumnId() const {return this->value_idx;}
 
-private:
-    const int m_valueIdx;           // which (offset) column of the tuple
-    const int m_isInner;            // which tuple. defaults to the outer (or only) one
-    const std::string m_tableName;
-    const std::string m_columnName;
+    std::string getTableName() {
+        return table_name;
+    }
+
+    // Don't know this index until the executor examines the expression.
+    void setTupleIndex(int idx) {
+        tuple_idx = idx;
+    }
+
+  protected:
+
+    int tuple_idx;           // which tuple. defaults to tuple1
+    int value_idx;           // which (offset) column of the tuple
+    std::string table_name;
+    std::string column_name;
 };
 
 }

@@ -67,7 +67,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
                 if (index == -1) {
                     throw new RuntimeException("Unable to find index for join TVE: " + tve);
                 }
-                tve.setIsInner();
+                //TODO: tve.setIsInner();
             }
             tve.setColumnIndex(index);
         }

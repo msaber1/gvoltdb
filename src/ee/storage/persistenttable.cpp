@@ -88,7 +88,6 @@ PersistentTable::PersistentTable(int partitionColumn) :
     m_iter(this, m_data.begin()),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
-    m_tuplesPinnedByUndo(0),
     stats_(this),
     m_COWContext(NULL),
     m_failedCompactionCount(0),
@@ -310,31 +309,6 @@ void PersistentTable::insertTupleForUndo(char *tuple)
                             " unique constraint violation\n%s\n", m_name.c_str(),
                             target.debugNoHeader().c_str());
     }
-}
-
-void PersistentTable::deleteTupleRelease(char *tupleData)
-{
-    TableTuple tuple(tupleData, schema());
-    tuple.setPendingDeleteOnUndoReleaseFalse();
-    m_tuplesPinnedByUndo--;
-    //printf("DEBUG final delete decrementing pinnedByUndo to: %d\n", (int)m_tuplesPinnedByUndo);
-
-    /*
-     * Before deleting the tuple free any allocated strings.
-     * Persistent tables are responsible for managing the life of
-     * strings stored in the table.
-     */
-    if (m_COWContext && ! m_COWContext->canSafelyFreeTuple(tuple)) {
-        //Mark it pending delete and let the snapshot land the finishing blow
-        tuple.setPendingDeleteTrue();
-        return;
-    }
-    //No snapshot has an interest in the tuple. Just whack it.
-    if (m_schema->getUninlinedObjectColumnCount() != 0) {
-        decreaseStringMemCount(tuple.getNonInlinedMemorySize());
-        tuple.freeObjectColumns();
-    }
-    deleteTupleStorage(tuple);
 }
 
 /*
@@ -1176,33 +1150,7 @@ void PersistentTable::doIdleCompaction() {
     }
 }
 
-int persistenttable_assert_or_throw_or_crash_123 = /* throw a fatal error */ 2; //the default
-                                                   // OR crash from here  */ 3;
-                                                   // OR assert           */ 1;
-
-void PersistentTable::notifyQuantumRelease()
-{
-    DEBUG_ASSERT_OR_THROW_OR_CRASH_123(m_tuplesPinnedByUndo == 0,
-                                       persistenttable_assert_or_throw_or_crash_123,
-                                       "EE accounting error? Remaining tuples pinned by undo: " <<
-                                       m_tuplesPinnedByUndo << "\n" << debug());
-    doForcedCompaction();
-}
-
-inline bool PersistentTable::compactionPredicate() const
-{
-    // Stop (or don't start) compacting unless the potential space savings are
-    // at least 3 blocks worth AND 5% of the total allocated.
-    int64_t unusedTuples = allocatedTupleCount() - activeTupleCount();
-    return (unusedTuples > (m_tuplesPerBlock * 3) &&
-            unusedTuples > (allocatedTupleCount()/20));
-}
-
-void PersistentTable::doForcedCompaction()
-{
-    if ( ! compactionPredicate()) {
-        return;
-    }
+void PersistentTable::doForcedCompaction() {
     if (m_recoveryContext != NULL)
     {
         LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO,

@@ -576,9 +576,8 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
     }
 }
 
-static bool
-catalogAndPersistentTableHaveTheSameSchema(catalog::Table *t1, PersistentTable *t2)
-{
+bool
+VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
     // covers column count
     if (t1->columns().size() != t2->columnCount()) {
         return false;
@@ -706,7 +705,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // indexes as we go
             //////////////////////////////////////////
 
-            if ( ! catalogAndPersistentTableHaveTheSameSchema(catalogTable, persistenttable)) {
+            if (!hasSameSchema(catalogTable, persistenttable)) {
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());
@@ -1351,7 +1350,6 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
 
 void VoltDBEngine::setCurrentUndoQuantum(voltdb::UndoQuantum* undoQuantum)
 {
-    //printf("DEBUG new undo quantum %ld\n", (long)undoQuantum);
     m_currentUndoQuantum = undoQuantum;
     m_executorContext->setupForPlanFragments(m_currentUndoQuantum);
 }

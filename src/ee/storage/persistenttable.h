@@ -135,6 +135,12 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
   public:
     virtual ~PersistentTable();
 
+    void notifyQuantumRelease() {
+        if (compactionPredicate()) {
+            doForcedCompaction();
+        }
+    }
+
     // Return a table iterator by reference
     TableIterator& iterator() {
         m_iter.reset(m_data.begin());
@@ -297,9 +303,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
 
     void nextFreeTuple(TableTuple *tuple);
     bool doCompactionWithinSubset(TBBucketMap *bucketMap);
-
-    virtual void notifyQuantumRelease();
-
     void doForcedCompaction();
 
     void insertIntoAllIndexes(TableTuple *tuple);
