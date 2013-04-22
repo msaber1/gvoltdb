@@ -501,7 +501,7 @@ public class PlanAssembler {
     }
 
     /**
-     * @return
+     * @return a new compiled plan.
      */
     private CompiledPlan getNextSelectPlan() {
         assert (subAssembler != null);

@@ -138,11 +138,6 @@ public abstract class ExpressionUtil {
         {
             return tves;
         }
-        if (input instanceof TupleValueExpression)
-        {
-            tves.add((TupleValueExpression) input);
-            return tves;
-        }
         ArrayList<AbstractExpression> aes = input.findBaseTVEs();
         for (AbstractExpression abstractExpression : aes) {
             tves.add((TupleValueExpression)abstractExpression);

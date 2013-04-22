@@ -150,7 +150,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     }
 
     /** select A1 from T1 group by A1 */
-    public void SKIPtestSelectAGroubyA() throws IOException, ProcCallException {
+    public void testSelectAGroubyA() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -182,7 +182,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     }
 
     /** select B_VAL1 from B group by B_VAL1 */
-    public void SKIPtestSelectGroubyVarbinary() throws IOException, ProcCallException {
+    public void testSelectGroubyVarbinary() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -217,7 +217,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     }
 
     /** select count(A1) from T1 group by A1 */
-    public void SKIPtestSelectCountAGroupbyA() throws IOException,
+    public void testSelectCountAGroupbyA() throws IOException,
     ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
@@ -247,7 +247,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     }
 
     /** select A1, sum(A1) from T1 group by A1 */
-    public void SKIPtestSelectSumAGroupbyA() throws IOException, ProcCallException {
+    public void testSelectSumAGroupbyA() throws IOException, ProcCallException {
         VoltTable vt;
         Client client = this.getClient();
         loaderNxN(client, 0);
@@ -276,7 +276,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     }
 
     /** select count(distinct A1) from T1 */
-    public void SKIPtestSelectCountDistinct() throws IOException, ProcCallException {
+    public void testSelectCountDistinct() throws IOException, ProcCallException {
         VoltTable vt;
         Client client = getClient();
         loaderNxN(client, 0);
@@ -292,7 +292,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     }
 
     /** select count(A1) from T1 */
-    public void SKIPtestSelectCount() throws IOException, ProcCallException {
+    public void testSelectCount() throws IOException, ProcCallException {
         VoltTable vt;
         Client client = getClient();
         loaderNxN(client, 0);
@@ -308,7 +308,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
     }
 
     /** select distinct a1 from t1 */
-    public void SKIPtestSelectDistinctA() throws IOException, ProcCallException {
+    public void testSelectDistinctA() throws IOException, ProcCallException {
         Client client = this.getClient();
         VoltTable vt;
 
@@ -339,7 +339,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * select sum(F_VAL1), sum(F_VAL2), sum(F_VAL3) from F
      * @throws InterruptedException
      */
-    public void SKIPtestDistributedSum() throws IOException, ProcCallException, InterruptedException {
+    public void testDistributedSum() throws IOException, ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
         loadF(client, 0);
@@ -364,7 +364,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * select sum(V.SUM_V1), sum(V.SUM_V2), sum(V.SUM_V3) from V
      * @throws InterruptedException
      */
-    public void SKIPtestDistributedSum_View() throws IOException, ProcCallException, InterruptedException {
+    public void testDistributedSum_View() throws IOException, ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
         loadF(client, 0);
@@ -390,7 +390,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * from V group by V.V_D1_PKEY
      * @throws InterruptedException
      */
-    public void SKIPtestDistributedSumAndGroup() throws NoConnectionsException,
+    public void testDistributedSumAndGroup() throws NoConnectionsException,
     ProcCallException, IOException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
@@ -473,7 +473,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * group by D1_NAME
      * @throws InterruptedException
      */
-    public void SKIPtestDistributedSumGroupSingleJoinOneDim() throws IOException,
+    public void testDistributedSumGroupSingleJoinOneDim() throws IOException,
     ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
@@ -508,7 +508,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * group by D1_NAME, D2_NAME
      * @throws InterruptedException
      */
-    public void SKIPtestDistributedSumGroupMultiJoin() throws IOException,
+    public void testDistributedSumGroupMultiJoin() throws IOException,
     ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
@@ -566,7 +566,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * group by D1_NAME, D2_NAME
      * @throws InterruptedException
      */
-    public void SKIPtestDistributedSumGroupMultiJoinOneDim() throws IOException,
+    public void testDistributedSumGroupMultiJoinOneDim() throws IOException,
     ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
@@ -619,7 +619,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
      * and D1.D1_PKEY = ? and D2.D2_PKEY = ? group by D1_NAME, D2_NAME
      * @throws InterruptedException
      */
-    public void SKIPtestDistributedSumGroupMultiJoinTwoDims() throws IOException, ProcCallException, InterruptedException {
+    public void testDistributedSumGroupMultiJoinTwoDims() throws IOException, ProcCallException, InterruptedException {
         VoltTable vt;
         Client client = getClient();
         loadF(client, 0);

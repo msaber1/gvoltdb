@@ -70,7 +70,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param root
      * @param db
      */
-    @Override
     void parseTablesAndParams(VoltXMLElement stmtNode) {
 
         assert(stmtNode.children.size() > 1);
@@ -84,9 +83,9 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                 // So far T UNION T (as well as T JOIN T) are not handled properly
                 // by the fragmentizer. Need to give an error if any table is mentioned
                 // in the UNION TREE more than once.
-                //if (childStmt.m_scanColumns != null)
+                if (childStmt.scanColumns != null)
                 {
-                    Set<String> tableNames = childStmt.m_scanColumns.keySet();
+                    Set<String> tableNames = childStmt.scanColumns.keySet();
 
                     Iterator<Table> it = childStmt.tableList.iterator();
                     // When HSQLInterface.getXMLCompiledStatement() parses the union statement
@@ -105,6 +104,8 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
                             m_uniqueTables.add(tableName);
                         }
                     }
+                } else {
+                    throw new PlanningErrorException("Scan columns are NULL the UNION statement");
                 }
                 // Add statement's tables to the consolidated list
                 tableList.addAll(childStmt.tableList);
@@ -130,7 +131,6 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      * @param db
      * @param joinOrder
      */
-    @Override
     void postParse(String sql, String joinOrder) {
 
         for (AbstractParsedStmt selectStmt : m_children) {

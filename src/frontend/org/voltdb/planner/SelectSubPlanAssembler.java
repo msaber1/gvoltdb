@@ -319,12 +319,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         AbstractPlanNode retval = null;
         if (nljAccessPlan instanceof IndexScanPlanNode) {
             NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
-            // All of the accessPath's joinExprs are covered in the indexscan's filters,
-            // INCLUDING those that don't involve the index.
 
             nlijNode.setJoinType(JoinType.INNER);
 
             IndexScanPlanNode innerNode = (IndexScanPlanNode) nljAccessPlan;
+            // All of the accessPath's joinExprs are covered in the indexscan's filters,
+            // INCLUDING those that don't involve the index.
             nlijNode.addInlinePlanNode(innerNode);
 
             // combine the tails plan graph with the new head node

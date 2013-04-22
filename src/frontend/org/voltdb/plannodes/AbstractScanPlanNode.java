@@ -20,7 +20,6 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Map;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -46,6 +45,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     // Store the columns from the table as an internal NodeSchema
     // for consistency of interface
     protected NodeSchema m_tableSchema = new NodeSchema();
+    // Store the columns we use from this table as an internal schema
+    protected NodeSchema m_tableScanSchema = new NodeSchema();
+
     // Store the columns we use from this table indexed by name and alias.
     protected HashMap<Pair<String, String>, TupleValueExpression> m_usedColumns =
           new HashMap<Pair<String, String>, TupleValueExpression>();
@@ -76,8 +78,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             m_predicate.validate();
         }
         // All the schema columns better reference this table
-        for (TupleValueExpression col : m_usedColumns.values()) {
-            if (!m_targetTableName.equals(col.getTableName())) {
+        for (SchemaColumn col : m_tableScanSchema.getColumns())
+        {
+            if (!m_targetTableName.equals(col.getTableName()))
+            {
                 throw new Exception("ERROR: The scan column: " + col.getColumnName() +
                                     " in table: " + m_targetTableName + " refers to " +
                                     " table: " + col.getTableName());
@@ -159,11 +163,22 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
-    public void addScanColumns(Map< Pair<String, String>, TupleValueExpression > map)
+    public void setScanColumns(ArrayList<SchemaColumn> scanColumns)
     {
-        for (Pair<String, String> name_n_alias : map.keySet()) {
-            TupleValueExpression col = map.get(name_n_alias);
-            m_usedColumns.put(name_n_alias, col);
+        if (scanColumns != null)
+        {
+            for (SchemaColumn col : scanColumns)
+            {
+                m_tableScanSchema.addColumn(col.clone());
+                Pair<String, String> name_n_alias = new Pair<String, String>(col.getColumnName(), col.getColumnAlias());
+                TupleValueExpression tve = new TupleValueExpression();
+                tve.setValueType(col.getType());
+                tve.setValueSize(col.getSize());
+                tve.setTableName(m_targetTableName);
+                tve.setColumnAlias(col.getColumnAlias());
+                tve.setColumnName(col.getColumnName());
+                m_usedColumns.put(name_n_alias, tve);
+            }
         }
     }
 

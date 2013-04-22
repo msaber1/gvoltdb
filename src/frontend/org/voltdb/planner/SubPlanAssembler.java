@@ -634,10 +634,11 @@ public abstract class SubPlanAssembler {
         {
             scanNode = getIndexAccessPlanForTable(table, path);
         }
-        // set the scan columns for this scan node (if any) based on the parsed SQL
-        Map<Pair<String, String>, TupleValueExpression> columns = m_parsedStmt.m_scanColumns.get(table.getTypeName());
-        if (columns != null) {
-            scanNode.addScanColumns(columns);
+        // set the scan columns for this scan node based on the parsed SQL,
+        // if any
+        if (m_parsedStmt.scanColumns != null)
+        {
+            scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
         }
         return scanNode;
     }

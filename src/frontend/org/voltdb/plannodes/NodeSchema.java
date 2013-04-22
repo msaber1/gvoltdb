@@ -168,7 +168,7 @@ public class NodeSchema implements Iterable<SchemaColumn>
      * Returns a copy of this NodeSchema with the NodeSchema argument's columns appended but with all
      * columns replaced with an appropriate TupleValueExpression (TVE).
      * This is used when generating a join node's output schema as a way of serializing something concise to the EE.
-     * TODO: If the EE allowed a SchemaColumn expressions to be optional, null might be a better choice.
+     * TODO: If the EE allowed SchemaColumn expressions to be optional, null might be a better choice.
      * In other words, the EE should not ever have to evaluate these expressions,
      * since the actual join output is driven solely from the child output schema.
      */
