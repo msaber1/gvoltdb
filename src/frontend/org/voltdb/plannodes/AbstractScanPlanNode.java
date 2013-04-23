@@ -56,6 +56,18 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         super();
     }
 
+    // Special case constructor for seq-scan-to-index-scan promotion for determinism purposes.
+    public AbstractScanPlanNode(AbstractScanPlanNode scanNode) {
+        // transfer details from the scan node being replaced.
+        m_tableScanSchema = scanNode.m_tableScanSchema;
+        setTargetTableName(scanNode.getTargetTableName());
+        setTargetTableAlias(scanNode.getTargetTableAlias());
+        setPredicate(scanNode.getPredicate());
+        for (AbstractPlanNode inlineNode : scanNode.getInlinePlanNodes().values()) {
+            addInlinePlanNode(inlineNode);
+        }
+    }
+
     @Override
     public void validate() throws Exception {
         super.validate();

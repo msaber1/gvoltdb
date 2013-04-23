@@ -91,6 +91,16 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super();
     }
 
+    public IndexScanPlanNode(AbstractScanPlanNode scanNode, Index indexToScan) {
+        super(scanNode);
+        setCatalogIndex(indexToScan);
+        setKeyIterate(true);
+        setTargetIndexName(indexToScan.getTypeName());
+        setLookupType(IndexLookupType.GTE);
+        setSortDirection(SortDirectionType.ASC);
+        setBindings(new ArrayList<AbstractExpression>());
+    }
+
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.INDEXSCAN;
