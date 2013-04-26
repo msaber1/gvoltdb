@@ -444,14 +444,7 @@ public class AuthSystem {
             }
             byte passwordHash[] = md.digest(password);
 
-            /*
-             * A n00bs attempt at constant time comparison
-             */
-            for (int ii = 0; ii < passwordHash.length; ii++) {
-                if (passwordHash[ii] != user.m_sha1ShadowPassword[ii]){
-                    matched = false;
-                }
-            }
+            matched = MessageDigest.isEqual(passwordHash, user.m_sha1ShadowPassword);
         } else {
             matched = BCrypt.checkpw(Encoder.hexEncode(password), user.m_bcryptShadowPassword);
         }

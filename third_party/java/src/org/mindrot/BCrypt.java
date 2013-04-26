@@ -14,8 +14,10 @@
 package org.mindrot;
 
 import java.io.UnsupportedEncodingException;
-
+import java.security.MessageDigest;
 import java.security.SecureRandom;
+
+import com.google.common.base.Charsets;
 
 /**
  * BCrypt implements OpenBSD-style Blowfish password hashing using
@@ -746,19 +748,10 @@ public class BCrypt {
      * @return	true if the passwords match, false otherwise
      */
     public static boolean checkpw(String plaintext, String hashed) {
-        /*
-         * A n00bs attempt at constant time comparison
-         */
         try {
             byte hashedBytes[] = hashed.getBytes("UTF-8");
-            byte plaintextBytes[] = hashpw(plaintext, hashed).getBytes("UTF-8");
-            boolean matched = true;
-            for (int ii = 0; ii < hashedBytes.length; ii++) {
-                if (hashedBytes[ii] != plaintextBytes[ii]) {
-                    matched = false;
-                }
-            }
-            return matched;
+            byte plaintextBytes[] = hashpw(plaintext, hashed).getBytes(Charsets.UTF_8);
+            return MessageDigest.isEqual(hashedBytes, plaintextBytes);
         } catch (UnsupportedEncodingException e) {
             throw new AssertionError(e);
         }
