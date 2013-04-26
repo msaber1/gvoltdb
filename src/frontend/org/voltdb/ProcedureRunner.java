@@ -143,18 +143,34 @@ public class ProcedureRunner {
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
 
+        // load non-sysproc single-partition procedures lazily
+        if (m_isSysProc || !m_catProc.getSinglepartition()) {
+            ensureInitialized();
+        }
+    }
+
+    boolean m_initialized = false;
+    /**
+     * Allow for some initialization work to be done lazily.
+     */
+    protected void ensureInitialized() {
+        if (m_initialized) return;
+
         m_procedure.init(this);
 
         m_statsCollector = new ProcedureStatsCollector(
                 m_site.getCorrespondingSiteId(),
                 m_site.getCorrespondingPartitionId(),
                 m_catProc);
+
         VoltDB.instance().getStatsAgent().registerStatsSource(
                 SysProcSelector.PROCEDURE,
-                site.getCorrespondingSiteId(),
+                m_site.getCorrespondingSiteId(),
                 m_statsCollector);
 
         reflect();
+
+        m_initialized = true;
     }
 
     public boolean isSystemProcedure() {
@@ -190,6 +206,9 @@ public class ProcedureRunner {
     }
 
     public ClientResponseImpl call(Object... paramListIn) {
+        // verify the procedure has been initialized
+        ensureInitialized();
+
         // verify per-txn state has been reset
         assert(m_statusCode == ClientResponse.SUCCESS);
         assert(m_statusString == null);
