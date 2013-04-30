@@ -948,7 +948,7 @@ public class VoltCompiler {
                 continue;
             }
 
-            // select, delete and updarte here (insert generated above)
+            // select, delete and update here (insert generated above)
             crudprocs.add(generateCrudSelect(table, partitioncolumn, pkey));
             crudprocs.add(generateCrudDelete(table, partitioncolumn, pkey));
             crudprocs.add(generateCrudUpdate(table, partitioncolumn, pkey));
