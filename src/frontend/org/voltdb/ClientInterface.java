@@ -1647,6 +1647,32 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     /**
+     * Embark upon a disconcerting journey: return the catalog bytes
+     * as a client response string. VoltTable has no way
+     * to respond with a large-ish binary payload.
+     */
+    ClientResponseImpl dispatchGetApplicationCatalog(StoredProcedureInvocation task,
+            ClientInputHandler handler, Connection ccxn)
+    {
+        try {
+            String hexCatalog = Encoder.hexEncode(
+                    m_catalogContext.get().getCatalogJarBytes());
+            return new ClientResponseImpl(
+                    ClientResponseImpl.SUCCESS,
+                    Byte.valueOf((byte)0),                        // appStatus
+                    hexCatalog,                                   // appStatusString
+                    new VoltTable[0],                             // "results"
+                    "The user status string contains a catalog.", // statusString
+                    task.clientHandle,
+                    null);
+        } catch (IOException e) {
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0], "Failed to process GetApplicationCatalog request.",
+                    task.clientHandle);
+        }
+    }
+
+    /**
      * Coward way out of the legacy hashinator hell. LoadSinglepartitionTable gets the
      * partitioning parameter as a byte array. Legacy hashinator hashes numbers and byte arrays
      * differently, so have to convert it back to long if it's a number. UGLY!!!
@@ -1904,6 +1930,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchAdHoc(task, handler, ccxn, false);
             } else if (task.procName.equals("@UpdateApplicationCatalog")) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
+            } else if (task.procName.equals("@GetApplicationCatalog")) {
+                return dispatchGetApplicationCatalog(task, handler, ccxn);
             } else if (task.procName.equals("@LoadMultipartitionTable")) {
                 /*
                  * For IV2 DR: This will generate a sentinel for each partition,
