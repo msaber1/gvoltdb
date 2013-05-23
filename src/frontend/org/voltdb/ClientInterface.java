@@ -1655,8 +1655,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             ClientInputHandler handler, Connection ccxn)
     {
         try {
-            String hexCatalog = Encoder.hexEncode(
-                    m_catalogContext.get().getCatalogJarBytes());
+            String hexCatalog = Encoder.base64Encode(m_catalogContext.get().getCatalogJarBytes());
             return new ClientResponseImpl(
                     ClientResponseImpl.SUCCESS,
                     Byte.valueOf((byte)0),                        // appStatus
