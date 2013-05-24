@@ -1,7 +1,27 @@
 <?xml version="1.0"?>
 <deployment>
     <cluster hostcount="1" sitesperhost="2" kfactor="0" />
+ <paths>
+        <voltdbroot path="/opt/voltdb"/>
+        <snapshots path="snapshots"/>
+        <exportoverflow path="export_overflow"/>
+        <commandlog path="command_log"/>
+        <commandlogsnapshot path="command_log_snapshot"/>
+    </paths>
+    <partition-detection enabled="true">
+        <snapshot prefix="voltdb_partition_detection"/>
+    </partition-detection>
+    <admin-mode adminstartup="false" port="21211"/>
+    <heartbeat timeout="90"/>
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
+    <commandlog logsize="1024" enabled="true" synchronous="false">
+        <frequency transactions="2147483647" time="200"/>
+    </commandlog>
+    <systemsettings>
+        <temptables maxsize="100"/>
+        <snapshot priority="6"/>
+    </systemsettings>
+
 </deployment>
