@@ -555,12 +555,12 @@ public class CommandLine extends VoltDB.Configuration
         {
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
         }
-
+/*
         if (m_enableIV2)
         {
             cmdline.add("enableiv2");
         }
-
+*/
         if (m_isEnterprise) {
             cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
