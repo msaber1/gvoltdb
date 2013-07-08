@@ -20,11 +20,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 //
 // Get Counter Value provided a counter_id
 //
-
 package voltcounter.procedures;
 
 import org.voltdb.ProcInfo;
@@ -33,13 +31,12 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
-@ProcInfo (
-    partitionInfo = "counter_rollups.rollup_id:0",
-    singlePartition = true
-)
-public class GetCounterStdDev extends VoltProcedure
-{
+@ProcInfo(
+        partitionInfo = "counter_rollups.rollup_id:0",
+        singlePartition = true)
+public class GetCounterStdDev extends VoltProcedure {
     // Inserts a counter
+
     public final SQLStmt selectAvgStmt = new SQLStmt("SELECT AVG(rollup_value) from counter_rollups where rollup_id = ? ORDER BY rollup_value DESC;");
     public final SQLStmt selectStmt = new SQLStmt("SELECT rollup_value from counter_rollups where rollup_id = ? ORDER BY rollup_value DESC;");
 
@@ -49,32 +46,32 @@ public class GetCounterStdDev extends VoltProcedure
         voltQueueSQL(selectAvgStmt, srollup_id);
         voltQueueSQL(selectStmt, srollup_id);
         VoltTable retresult = new VoltTable(
-                new VoltTable.ColumnInfo("std-dev",VoltType.BIGINT));
+                new VoltTable.ColumnInfo("std-dev", VoltType.BIGINT));
 
-        
+
         VoltTable results[] = voltExecuteSQL();
         if (results[0].getRowCount() != 1) {
-            retresult.addRow(new Object[] { 0 });
+            retresult.addRow(new Object[]{0});
             return retresult;
         }
         results[0].advanceRow();
         double avg = results[0].getLong(0);
         if (results[1].getRowCount() <= 0) {
-            retresult.addRow(new Object[] { 0 });
+            retresult.addRow(new Object[]{0});
             return retresult;
         }
         VoltTable result = results[1];
         double sqtotal = 0.0;
-        for (int i = 0; i < result.getRowCount();i++) {
+        for (int i = 0; i < result.getRowCount(); i++) {
             if (result.advanceRow()) {
-                double val = (double )result.getLong(0);
-                double sqval = Math.pow( (val - avg), 2 );
+                double val = (double) result.getLong(0);
+                double sqval = Math.pow((val - avg), 2);
                 sqtotal += sqval;
-            }            
+            }
         }
-        double stddev = Math.sqrt(sqtotal/result.getRowCount());
+        double stddev = Math.sqrt(sqtotal / result.getRowCount());
 
-        retresult.addRow(new Object[] { stddev });
+        retresult.addRow(new Object[]{stddev});
         return retresult;
     }
 }

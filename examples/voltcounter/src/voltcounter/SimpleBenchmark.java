@@ -34,7 +34,7 @@ public class SimpleBenchmark {
 
     private final static int TXNS = 5000;
     private final static int THREADS = 50;
-    
+
     public static void main(String[] args) {
         System.out.println("Running Simple Benchmark");
         try {
@@ -138,7 +138,7 @@ public class SimpleBenchmark {
         }
     }
 
-    public void runIncrements(Client client, int maxCounters, int maxCountersPerClass) throws IOException, NoConnectionsException, ProcCallException {        
+    public void runIncrements(Client client, int maxCounters, int maxCountersPerClass) throws IOException, NoConnectionsException, ProcCallException {
         for (int i = 0; i < SimpleBenchmark.THREADS; i++) {
             new Thread(new IncrementRunner(client, maxCounters, maxCountersPerClass)).run();
             try {
@@ -146,6 +146,6 @@ public class SimpleBenchmark {
             } catch (InterruptedException ex) {
                 Logger.getLogger(SimpleBenchmark.class.getName()).log(Level.SEVERE, null, ex);
             }
-        }        
+        }
     }
 }

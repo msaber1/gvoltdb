@@ -20,11 +20,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 //
 // Add New Counter
 //
-
 package voltcounter.procedures;
 
 import org.voltdb.ProcInfo;
@@ -33,12 +31,10 @@ import org.voltdb.VoltProcedure;
 import static org.voltdb.VoltProcedure.EXPECT_SCALAR_MATCH;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "counters.counter_class_id:0",
-    singlePartition = true
-)
-public class AddCounter extends VoltProcedure
-{
+@ProcInfo(
+        partitionInfo = "counters.counter_class_id:0",
+        singlePartition = true)
+public class AddCounter extends VoltProcedure {
 
     // Inserts a counter
     public final SQLStmt insertCounter = new SQLStmt("INSERT INTO counters "
@@ -52,6 +48,7 @@ public class AddCounter extends VoltProcedure
 
     /**
      * Add a new counter and return counter_id if add was successful.
+     *
      * @param counter_class
      * @param counter_id
      * @param counter_description
@@ -60,7 +57,7 @@ public class AddCounter extends VoltProcedure
     public long run(long counter_class, long counter_id, String counter_description, int rollup_seconds) {
 
         // add the counter
-        voltQueueSQL(insertCounter, EXPECT_SCALAR_MATCH(1), counter_class, 
+        voltQueueSQL(insertCounter, EXPECT_SCALAR_MATCH(1), counter_class,
                 counter_id, counter_description, rollup_seconds, this.getTransactionTime());
         voltQueueSQL(insertMapping, counter_class, counter_id);
 

@@ -20,11 +20,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 //
 // Get Counter Value provided a counter_id
 //
-
 package voltcounter.procedures;
 
 import org.voltdb.ProcInfo;
@@ -32,13 +30,12 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-@ProcInfo (
-    partitionInfo = "counters.counter_class_id:0",        
-    singlePartition = true
-)
-public class GetCounter extends VoltProcedure
-{
+@ProcInfo(
+        partitionInfo = "counters.counter_class_id:0",
+        singlePartition = true)
+public class GetCounter extends VoltProcedure {
     // Inserts a counter
+
     public final SQLStmt selectStmt = new SQLStmt("SELECT "
             + "counter_class_id,counter_id,description,counter_value,rollup_seconds,last_update_time "
             + "FROM counters where counter_class_id = ? AND counter_id = ?;");

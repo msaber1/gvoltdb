@@ -20,11 +20,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 //
 // Increment a counter value and return
 //
-
 package voltcounter.procedures;
 
 import org.voltdb.ProcInfo;
@@ -33,12 +31,11 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 
-@ProcInfo (
-    partitionInfo = "counters.counter_class_id:0",
-    singlePartition = true
-)
-public class Increment extends VoltProcedure
-{
+@ProcInfo(
+        partitionInfo = "counters.counter_class_id:0",
+        singlePartition = true)
+public class Increment extends VoltProcedure {
+
     public final SQLStmt selectStmt = new SQLStmt("SELECT c.counter_id "
             + "FROM counters c where c.counter_class_id = ? "
             + "ORDER BY c.counter_id;");
@@ -50,10 +47,10 @@ public class Increment extends VoltProcedure
 
         voltQueueSQL(selectStmt, counter_class);
         VoltTable ret[] = voltExecuteSQL();
-        for (int i = 0; i < ret.length;i++) {
+        for (int i = 0; i < ret.length; i++) {
             VoltTable val = ret[i];
             for (int j = 0; j < val.getRowCount(); j++) {
-                VoltTableRow row = val.fetchRow(j);                
+                VoltTableRow row = val.fetchRow(j);
                 long newval = row.getLong(0);
                 voltQueueSQL(incrStmt, this.getTransactionTime(), newval);
                 voltExecuteSQL();

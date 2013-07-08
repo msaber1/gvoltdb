@@ -20,11 +20,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 //
 // Get Counter Value provided a counter_id
 //
-
 package voltcounter.procedures;
 
 import java.util.Date;
@@ -32,13 +30,12 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    partitionInfo = "counter_rollups.rollup_id:0",
-    singlePartition = true
-)
-public class InitializeRollup extends VoltProcedure
-{
+@ProcInfo(
+        partitionInfo = "counter_rollups.rollup_id:0",
+        singlePartition = true)
+public class InitializeRollup extends VoltProcedure {
     // Inserts a counter
+
     public final SQLStmt insertStmt = new SQLStmt("INSERT INTO counter_rollups "
             + "(rollup_id, rollup_value, rollup_time) "
             + "VALUES "
@@ -48,8 +45,8 @@ public class InitializeRollup extends VoltProcedure
 
         // get rollup values
         Date ctime = this.getTransactionTime();
-        
-        voltQueueSQL(insertStmt, srollup_id, 0, ctime); 
+
+        voltQueueSQL(insertStmt, srollup_id, 0, ctime);
         voltExecuteSQL();
         return 0L;
     }
