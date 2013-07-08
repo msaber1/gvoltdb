@@ -1,0 +1,21 @@
+VoltCounter application
+===========================
+
+This example demonstrates fast counters functionality. Similar to rainbird (Tweeter) which uses cassandra for counting or tracking verious counters.
+
+Many attributes of the application are customizable through arguments passed to the client, including:
+
+  - Numbers of counters
+  - How deep the group of counters be.
+  - How long the sample client runs
+  - The maximum number of transactions the client will attempt per second
+  - When to start recording performance statistics
+  - How frequently to report those statistics
+
+These attributes can be adjusted by modifying the arguments to the "client" target in run.sh.
+
+Additional arguments allow the client to automatically tune itself for optimal performance
+
+  - Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
+  - Target average stored procedure call (SPC) latency (in ms)
+
