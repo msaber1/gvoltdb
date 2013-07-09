@@ -39,3 +39,6 @@ doc/tutorials/auction/csvloader_*.csv
 /.idea
 *.iml
 /examples/voltcounter/build/
+private/
+dist/
+build/

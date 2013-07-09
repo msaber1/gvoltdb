@@ -102,7 +102,7 @@ function async-benchmark() {
 function simple-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltcounter.SimpleBenchmark localhost
+        voltcounter.SimpleBenchmark --servers=localhost
 }
 
 # Multi-threaded synchronous benchmark sample

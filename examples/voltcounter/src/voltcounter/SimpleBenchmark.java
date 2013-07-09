@@ -25,6 +25,7 @@ package voltcounter;
 import java.io.IOException;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 
 import org.voltdb.client.*;
@@ -40,26 +41,53 @@ public class SimpleBenchmark {
     private final static int THREADS = 5;
 
     /**
+     * Uses included {@link CLIConfig} class to
+     * declaratively state command line options with defaults
+     * and validation.
+     */
+    static class CounterConfig extends CLIConfig {
+        @CLIConfig.Option(desc = "Comma separated list of the form server[:port] to connect to.")
+        String servers = "localhost";
+
+        @CLIConfig.Option(desc = "Max Counter Classes")
+        int maxCounterClass = 10;
+
+        @CLIConfig.Option(desc = "Max Counter Per Counter Classe")
+        int maxCounterPerClass = 100;
+
+        @CLIConfig.Option(desc = "Max Counter Levels in a Class")
+        int maxLevels = 100;
+
+        @CLIConfig.Option(desc = "Max Counter Rollup Time")
+        int rollupTime = 2; // 2 Seconds;
+
+        @Override
+        public void validate() {
+        }
+    }
+
+    /**
      *
      * @param args
      */
     public static void main(String[] args) {
         System.out.println("Running Simple Benchmark");
         try {
+            CounterConfig config = new CounterConfig();
+            config.parse(SimpleBenchmark.class.getName(), args);
+
             ClientConfig cconfig = new ClientConfig();
             cconfig.setClientAffinity(true);
             final Client client = ClientFactory.createClient(cconfig);
 
-            for (String s : args) {
-                client.createConnection(s, Client.VOLTDB_SERVER_PORT);
-            }
+            client.createConnection(config.servers, Client.VOLTDB_SERVER_PORT);
 
-            int maxCounterClass = 10;
-            int maxCounterPerClass = 100;
-            int maxLevels = 100;
+            int maxCounterClass = config.maxCounterClass;
+            int maxCounterPerClass = config.maxCounterPerClass;
+            int maxLevels = config.maxLevels;
+            int rollupTime = config.rollupTime;
 
             int maxCounters = maxCounterClass * maxCounterPerClass;
-            int rollupTime = 2; // 2 Seconds;
             ClientResponse cresponse =
                     client.callProcedure("CleanCounters");
             if (cresponse.getStatus() != ClientResponse.SUCCESS) {
