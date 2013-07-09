@@ -52,7 +52,7 @@ public class SimpleBenchmark {
             int maxCounterClass = 2;
             int maxCounterPerClass = 2;
             int maxLevels = 2;
-            
+
             int maxCounters = maxCounterClass * maxCounterPerClass;
             int rollupTime = 2; // 2 Seconds;
             ClientResponse cresponse =
@@ -71,8 +71,10 @@ public class SimpleBenchmark {
             for (int i = 0, level = 0; i < maxCounters; i++) {
                 long cc = (i / maxCounterPerClass);
                 cresponse =
-                        client.callProcedure("AddCounter",cc , i, "Counter-" + i, rollupTime, level++);
-                if (level > maxLevels) level = 0;
+                        client.callProcedure("AddCounter", cc, i, "Counter-" + i, rollupTime, level++);
+                if (level > maxLevels) {
+                    level = 0;
+                }
             }
             SimpleBenchmark bmrk = new SimpleBenchmark();
             bmrk.runIncrements(client, maxCounters, maxCounterPerClass, maxLevels);
@@ -105,8 +107,10 @@ public class SimpleBenchmark {
                         long incstart = System.currentTimeMillis();
                         long counter_class_id = (i / maxCounterPerClass);
                         ClientResponse response =
-                                client.callProcedure("GetCounter", counter_class_id, i );
-                        if (level > maxLevels) level = 0;
+                                client.callProcedure("GetCounter", counter_class_id, i);
+                        if (level > maxLevels) {
+                            level = 0;
+                        }
                         if (response.getStatus() != ClientResponse.SUCCESS) {
                             throw new RuntimeException(response.getStatusString());
                         }
@@ -117,14 +121,14 @@ public class SimpleBenchmark {
                             continue;
                         }
                         //System.out.println("Found Counter: " + i + " Class: " + counter_class_id);
-                        
+
                         VoltTable result = results[0];
                         result.advanceRow();
                         long value = result.getLong(3);
                         long rollup_seconds = result.getLong(4);
                         long last_update_time = result.getTimestampAsLong(5);
                         response =
-                                client.callProcedure("Increment", counter_class_id,  i, level++);
+                                client.callProcedure("Increment", counter_class_id, i, level++);
 
                         if (response.getStatus() != ClientResponse.SUCCESS) {
                             throw new RuntimeException(response.getStatusString());
