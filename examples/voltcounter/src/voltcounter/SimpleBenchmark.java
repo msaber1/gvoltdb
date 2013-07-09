@@ -36,8 +36,8 @@ import org.voltdb.client.Client;
  */
 public class SimpleBenchmark {
 
-    private final static int TXNS = 10;
-    private final static int THREADS = 1;
+    private final static int TXNS = 10000;
+    private final static int THREADS = 5;
 
     /**
      *
@@ -57,9 +57,9 @@ public class SimpleBenchmark {
                     client.createConnection(s, Client.VOLTDB_SERVER_PORT);
                 }
             }
-            int maxCounterClass = 2;
-            int maxCounterPerClass = 2;
-            int maxLevels = 2;
+            int maxCounterClass = 100;
+            int maxCounterPerClass = 1000;
+            int maxLevels = 10;
 
             int maxCounters = maxCounterClass * maxCounterPerClass;
             int rollupTime = 2; // 2 Seconds;

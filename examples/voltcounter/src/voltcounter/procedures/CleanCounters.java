@@ -38,10 +38,6 @@ public class CleanCounters extends VoltProcedure
     /**
      *
      */
-    public final SQLStmt cleanMapStmt = new SQLStmt("DELETE FROM counter_maps;");
-    /**
-     *
-     */
     public final SQLStmt cleanStmt = new SQLStmt("DELETE FROM counters;");
     /**
      *
@@ -59,7 +55,6 @@ public class CleanCounters extends VoltProcedure
     public long run()
     {
         voltQueueSQL(cleanRollups);
-        voltQueueSQL(cleanMapStmt);
         voltQueueSQL(cleanStmt);
         voltQueueSQL(cleanStmtClass);
         voltExecuteSQL(true);
