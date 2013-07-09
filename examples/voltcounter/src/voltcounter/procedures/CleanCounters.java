@@ -52,12 +52,11 @@ public class CleanCounters extends VoltProcedure
      *
      * @return
      */
-    public long run()
+    public VoltTable[] run()
     {
         voltQueueSQL(cleanRollups);
         voltQueueSQL(cleanStmt);
         voltQueueSQL(cleanStmtClass);
-        voltExecuteSQL(true);
-        return 0;
+        return voltExecuteSQL(true);
     }
 }
