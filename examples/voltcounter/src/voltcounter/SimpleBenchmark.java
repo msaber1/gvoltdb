@@ -32,13 +32,15 @@ import org.voltdb.client.Client;
 
 public class SimpleBenchmark {
 
-    private final static int TXNS = 5000;
-    private final static int THREADS = 50;
+    private final static int TXNS = 10;
+    private final static int THREADS = 1;
 
     public static void main(String[] args) {
         System.out.println("Running Simple Benchmark");
         try {
-            final Client client = ClientFactory.createClient();
+            ClientConfig cconfig = new ClientConfig();
+            cconfig.setClientAffinity(true);
+            final Client client = ClientFactory.createClient(cconfig);
 
             if (args.length == 0) {
                 client.createConnection("localhost", Client.VOLTDB_SERVER_PORT);
@@ -47,8 +49,10 @@ public class SimpleBenchmark {
                     client.createConnection(s, Client.VOLTDB_SERVER_PORT);
                 }
             }
-            int maxCounterClass = 40;
-            int maxCounterPerClass = 400;
+            int maxCounterClass = 2;
+            int maxCounterPerClass = 2;
+            int maxLevels = 2;
+            
             int maxCounters = maxCounterClass * maxCounterPerClass;
             int rollupTime = 2; // 2 Seconds;
             ClientResponse cresponse =
@@ -64,19 +68,19 @@ public class SimpleBenchmark {
                 }
             }
             // Add counters.
-            for (int i = 0; i < maxCounters; i++) {
+            for (int i = 0, level = 0; i < maxCounters; i++) {
+                long cc = (i / maxCounterPerClass);
                 cresponse =
-                        client.callProcedure("AddCounter", (i % maxCounterPerClass), i, "Counter-" + i, rollupTime);
+                        client.callProcedure("AddCounter",cc , i, "Counter-" + i, rollupTime, level++);
+                if (level > maxLevels) level = 0;
             }
             SimpleBenchmark bmrk = new SimpleBenchmark();
-            bmrk.runIncrements(client, maxCounters, maxCounterPerClass);
+            bmrk.runIncrements(client, maxCounters, maxCounterPerClass, maxLevels);
         } catch (IOException e) {
             throw new RuntimeException(e);
         } catch (ProcCallException e) {
             throw new RuntimeException(e);
         }
-
-        System.out.println(" completed " + SimpleBenchmark.TXNS * 2 + " transactions.");
     }
 
     class IncrementRunner implements Runnable {
@@ -84,38 +88,43 @@ public class SimpleBenchmark {
         private Client client;
         private int maxCounters;
         private int maxCounterPerClass;
+        private int maxLevels;
 
-        public IncrementRunner(Client iclient, int max_counters, int max_counters_per_class) {
+        public IncrementRunner(Client iclient, int max_counters, int max_counters_per_class, int mlevel) {
             client = iclient;
             maxCounters = max_counters;
             maxCounterPerClass = max_counters_per_class;
+            maxLevels = mlevel;
         }
 
         @Override
         public void run() {
-            for (int i = 0; i < maxCounters; i++) {
+            for (int i = 0, level = 0; i < maxCounters; i++) {
                 for (int j = 0; j < SimpleBenchmark.TXNS; j++) {
                     try {
                         long incstart = System.currentTimeMillis();
-                        long counter_class_id = (i % maxCounterPerClass);
+                        long counter_class_id = (i / maxCounterPerClass);
                         ClientResponse response =
-                                client.callProcedure("GetCounter", i, counter_class_id);
+                                client.callProcedure("GetCounter", counter_class_id, i );
+                        if (level > maxLevels) level = 0;
                         if (response.getStatus() != ClientResponse.SUCCESS) {
                             throw new RuntimeException(response.getStatusString());
                         }
                         VoltTable results[] = response.getResults();
                         if (results[0].getRowCount() != 1) {
                             //Bad results.
+                            System.out.println("Didnt find Counter: " + i + " Class: " + counter_class_id);
                             continue;
                         }
+                        //System.out.println("Found Counter: " + i + " Class: " + counter_class_id);
+                        
                         VoltTable result = results[0];
                         result.advanceRow();
                         long value = result.getLong(3);
                         long rollup_seconds = result.getLong(4);
                         long last_update_time = result.getTimestampAsLong(5);
-
                         response =
-                                client.callProcedure("Increment", counter_class_id);
+                                client.callProcedure("Increment", counter_class_id,  i, level++);
 
                         if (response.getStatus() != ClientResponse.SUCCESS) {
                             throw new RuntimeException(response.getStatusString());
@@ -138,9 +147,9 @@ public class SimpleBenchmark {
         }
     }
 
-    public void runIncrements(Client client, int maxCounters, int maxCountersPerClass) throws IOException, NoConnectionsException, ProcCallException {
+    public void runIncrements(Client client, int maxCounters, int maxCountersPerClass, int maxLevels) throws IOException, NoConnectionsException, ProcCallException {
         for (int i = 0; i < SimpleBenchmark.THREADS; i++) {
-            new Thread(new IncrementRunner(client, maxCounters, maxCountersPerClass)).run();
+            new Thread(new IncrementRunner(client, maxCounters, maxCountersPerClass, maxLevels)).run();
             try {
                 Thread.sleep(500);
             } catch (InterruptedException ex) {

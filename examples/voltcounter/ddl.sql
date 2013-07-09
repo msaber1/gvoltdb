@@ -11,6 +11,7 @@ CREATE TABLE counters
 (
   counter_class_id BIGINT NOT NULL
 , counter_id   BIGINT NOT NULL
+, level BIGINT default 0
 , description  varchar(1024) 
 , counter_value BIGINT default 0
 , rollup_seconds INTEGER default 0

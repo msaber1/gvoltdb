@@ -37,15 +37,15 @@ import org.voltdb.VoltTableRow;
 public class Increment extends VoltProcedure {
 
     public final SQLStmt selectStmt = new SQLStmt("SELECT c.counter_id "
-            + "FROM counters c where c.counter_class_id = ? "
+            + "FROM counters c where c.counter_class_id = ? AND c.level < ? OR c.counter_id = ?"
             + "ORDER BY c.counter_id;");
     public final SQLStmt incrStmt = new SQLStmt("UPDATE counters "
             + "SET counter_value = counter_value+1, last_update_time = ? "
             + "WHERE counter_id = ?;");
 
-    public long run(long counter_class) {
+    public long run(long counter_class, long counter_id, long level) {
 
-        voltQueueSQL(selectStmt, counter_class);
+        voltQueueSQL(selectStmt, counter_class, level, counter_id);
         VoltTable ret[] = voltExecuteSQL();
         for (int i = 0; i < ret.length; i++) {
             VoltTable val = ret[i];

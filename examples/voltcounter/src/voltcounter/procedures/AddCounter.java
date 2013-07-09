@@ -38,13 +38,9 @@ public class AddCounter extends VoltProcedure {
 
     // Inserts a counter
     public final SQLStmt insertCounter = new SQLStmt("INSERT INTO counters "
-            + "(counter_class_id, counter_id, description, rollup_seconds, last_update_time) "
+            + "(counter_class_id, counter_id, description, rollup_seconds, last_update_time, level) "
             + "VALUES "
-            + "(?, ?, ?, ?, ?);");
-    public final SQLStmt insertMapping = new SQLStmt("INSERT INTO counter_maps "
-            + "(counter_class_id, counter_id) "
-            + "VALUES "
-            + "(?, ?);");
+            + "(?, ?, ?, ?, ?, ?);");
 
     /**
      * Add a new counter and return counter_id if add was successful.
@@ -54,12 +50,11 @@ public class AddCounter extends VoltProcedure {
      * @param counter_description
      * @return counter_id or -1 if counter already exists.
      */
-    public long run(long counter_class, long counter_id, String counter_description, int rollup_seconds) {
+    public long run(long counter_class, long counter_id, String counter_description, int rollup_seconds, int level) {
 
         // add the counter
         voltQueueSQL(insertCounter, EXPECT_SCALAR_MATCH(1), counter_class,
-                counter_id, counter_description, rollup_seconds, this.getTransactionTime());
-        voltQueueSQL(insertMapping, counter_class, counter_id);
+                counter_id, counter_description, rollup_seconds, this.getTransactionTime(), level);
 
         VoltTable[] result = voltExecuteSQL();
         if (result != null && result.length == 1) {
