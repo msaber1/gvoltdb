@@ -36,7 +36,7 @@ import org.voltdb.client.Client;
  */
 public class SimpleBenchmark {
 
-    private final static int TXNS = 10000;
+    private final static int TXNS = 100;
     private final static int THREADS = 5;
 
     /**
@@ -50,16 +50,13 @@ public class SimpleBenchmark {
             cconfig.setClientAffinity(true);
             final Client client = ClientFactory.createClient(cconfig);
 
-            if (args.length == 0) {
-                client.createConnection("localhost", Client.VOLTDB_SERVER_PORT);
-            } else {
-                for (String s : args) {
-                    client.createConnection(s, Client.VOLTDB_SERVER_PORT);
-                }
+            for (String s : args) {
+                client.createConnection(s, Client.VOLTDB_SERVER_PORT);
             }
-            int maxCounterClass = 100;
-            int maxCounterPerClass = 1000;
-            int maxLevels = 10;
+
+            int maxCounterClass = 10;
+            int maxCounterPerClass = 100;
+            int maxLevels = 100;
 
             int maxCounters = maxCounterClass * maxCounterPerClass;
             int rollupTime = 2; // 2 Seconds;
@@ -112,7 +109,6 @@ public class SimpleBenchmark {
             for (int i = 0, level = 0; i < maxCounters; i++) {
                 for (int j = 0; j < SimpleBenchmark.TXNS; j++) {
                     try {
-                        long incstart = System.currentTimeMillis();
                         long counter_class_id = (i / maxCounterPerClass);
                         ClientResponse response =
                                 client.callProcedure("GetCounter", counter_class_id, i);
@@ -125,10 +121,9 @@ public class SimpleBenchmark {
                         VoltTable results[] = response.getResults();
                         if (results[0].getRowCount() != 1) {
                             //Bad results.
-                            System.out.println("Didnt find Counter: " + i + " Class: " + counter_class_id);
+                            System.out.println("Did not find Counter: " + i + " Class: " + counter_class_id);
                             continue;
                         }
-                        //System.out.println("Found Counter: " + i + " Class: " + counter_class_id);
 
                         VoltTable result = results[0];
                         result.advanceRow();
@@ -141,7 +136,6 @@ public class SimpleBenchmark {
                         if (response.getStatus() != ClientResponse.SUCCESS) {
                             throw new RuntimeException(response.getStatusString());
                         }
-                        long incend = System.currentTimeMillis();
                         String srollup_id = Long.toString(counter_class_id) + "-" + Long.toString(i);
                         response =
                                 client.callProcedure("UpdateRollups", srollup_id, rollup_seconds, value, last_update_time);
