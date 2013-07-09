@@ -99,10 +99,16 @@ function async-benchmark() {
 #        --ratelimit=100000
 }
 
+function load-counters() {
+    srccompile
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltcounter.SimpleBenchmark --servers=localhost 
+}
+
 function simple-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltcounter.SimpleBenchmark --servers=localhost
+        voltcounter.SimpleBenchmark --servers=localhost --init=false
 }
 
 # Multi-threaded synchronous benchmark sample
