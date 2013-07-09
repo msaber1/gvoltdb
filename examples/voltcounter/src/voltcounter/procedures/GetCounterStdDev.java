@@ -31,15 +31,30 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
+/**
+ *
+ * @author akhanzode
+ */
 @ProcInfo(
         partitionInfo = "counter_rollups.rollup_id:0",
         singlePartition = true)
 public class GetCounterStdDev extends VoltProcedure {
     // Inserts a counter
 
+    /**
+     *
+     */
     public final SQLStmt selectAvgStmt = new SQLStmt("SELECT AVG(rollup_value) from counter_rollups where rollup_id = ? ORDER BY rollup_value DESC;");
+    /**
+     *
+     */
     public final SQLStmt selectStmt = new SQLStmt("SELECT rollup_value from counter_rollups where rollup_id = ? ORDER BY rollup_value DESC;");
 
+    /**
+     *
+     * @param srollup_id
+     * @return
+     */
     public VoltTable run(String srollup_id) {
 
         // get rollup values

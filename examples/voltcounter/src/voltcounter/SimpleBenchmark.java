@@ -30,11 +30,19 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.*;
 import org.voltdb.client.Client;
 
+/**
+ *
+ * @author akhanzode
+ */
 public class SimpleBenchmark {
 
     private final static int TXNS = 10;
     private final static int THREADS = 1;
 
+    /**
+     *
+     * @param args
+     */
     public static void main(String[] args) {
         System.out.println("Running Simple Benchmark");
         try {
@@ -151,6 +159,16 @@ public class SimpleBenchmark {
         }
     }
 
+    /**
+     *
+     * @param client
+     * @param maxCounters
+     * @param maxCountersPerClass
+     * @param maxLevels
+     * @throws IOException
+     * @throws NoConnectionsException
+     * @throws ProcCallException
+     */
     public void runIncrements(Client client, int maxCounters, int maxCountersPerClass, int maxLevels) throws IOException, NoConnectionsException, ProcCallException {
         for (int i = 0; i < SimpleBenchmark.THREADS; i++) {
             new Thread(new IncrementRunner(client, maxCounters, maxCountersPerClass, maxLevels)).run();

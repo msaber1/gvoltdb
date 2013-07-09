@@ -31,6 +31,10 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 
+/**
+ *
+ * @author akhanzode
+ */
 @ProcInfo (
     partitionInfo = "counter_maps.counter_id:0",
     singlePartition = true
@@ -38,8 +42,16 @@ import org.voltdb.VoltProcedure;
 public class GetCounterClass extends VoltProcedure
 {
     // Inserts a counter
+    /**
+     *
+     */
     public final SQLStmt selectStmt = new SQLStmt("SELECT counter_class_id from counter_maps where counter_id = ?;");
 
+    /**
+     *
+     * @param counter_id
+     * @return
+     */
     public long run(long counter_id) {
 
         // get counter class

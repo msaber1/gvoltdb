@@ -31,18 +31,35 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 
+/**
+ *
+ * @author akhanzode
+ */
 @ProcInfo(
         partitionInfo = "counters.counter_class_id:0",
         singlePartition = true)
 public class Increment extends VoltProcedure {
 
+    /**
+     *
+     */
     public final SQLStmt selectStmt = new SQLStmt("SELECT c.counter_id "
             + "FROM counters c where c.counter_class_id = ? AND c.level < ? OR c.counter_id = ?"
             + "ORDER BY c.counter_id;");
+    /**
+     *
+     */
     public final SQLStmt incrStmt = new SQLStmt("UPDATE counters "
             + "SET counter_value = counter_value+1, last_update_time = ? "
             + "WHERE counter_id = ?;");
 
+    /**
+     *
+     * @param counter_class
+     * @param counter_id
+     * @param level
+     * @return
+     */
     public long run(long counter_class, long counter_id, long level) {
 
         voltQueueSQL(selectStmt, counter_class, level, counter_id);

@@ -30,16 +30,29 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
+/**
+ *
+ * @author akhanzode
+ */
 @ProcInfo(
         partitionInfo = "counters.counter_class_id:0",
         singlePartition = true)
 public class GetCounter extends VoltProcedure {
     // Inserts a counter
 
+    /**
+     *
+     */
     public final SQLStmt selectStmt = new SQLStmt("SELECT "
             + "counter_class_id,counter_id,description,counter_value,rollup_seconds,last_update_time "
             + "FROM counters where counter_class_id = ? AND counter_id = ?;");
 
+    /**
+     *
+     * @param class_id
+     * @param counter_id
+     * @return
+     */
     public VoltTable[] run(long class_id, long counter_id) {
 
         // get counter class

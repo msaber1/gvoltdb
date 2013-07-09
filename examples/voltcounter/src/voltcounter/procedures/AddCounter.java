@@ -31,12 +31,19 @@ import org.voltdb.VoltProcedure;
 import static org.voltdb.VoltProcedure.EXPECT_SCALAR_MATCH;
 import org.voltdb.VoltTable;
 
+/**
+ *
+ * @author akhanzode
+ */
 @ProcInfo(
         partitionInfo = "counters.counter_class_id:0",
         singlePartition = true)
 public class AddCounter extends VoltProcedure {
 
     // Inserts a counter
+    /**
+     *
+     */
     public final SQLStmt insertCounter = new SQLStmt("INSERT INTO counters "
             + "(counter_class_id, counter_id, description, rollup_seconds, last_update_time, level) "
             + "VALUES "
@@ -48,7 +55,9 @@ public class AddCounter extends VoltProcedure {
      * @param counter_class
      * @param counter_id
      * @param counter_description
-     * @return counter_id or -1 if counter already exists.
+     * @param rollup_seconds
+     * @param level
+     * @return counter_id
      */
     public long run(long counter_class, long counter_id, String counter_description, int rollup_seconds, int level) {
 

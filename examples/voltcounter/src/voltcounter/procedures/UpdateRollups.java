@@ -30,18 +30,36 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
+/**
+ *
+ * @author akhanzode
+ */
 @ProcInfo(
         partitionInfo = "counter_rollups.rollup_id:0",
         singlePartition = true)
 public class UpdateRollups extends VoltProcedure {
     // Inserts a counter
 
+    /**
+     *
+     */
     public final SQLStmt selectRollupStmt = new SQLStmt("SELECT TOP 1 rollup_time from counter_rollups where rollup_id = ? ORDER BY rollup_time DESC;");
+    /**
+     *
+     */
     public final SQLStmt insertStmt = new SQLStmt("INSERT INTO counter_rollups "
             + "(rollup_id, rollup_value, rollup_time) "
             + "VALUES "
             + "(?, ?, ?);");
 
+    /**
+     *
+     * @param srollup_id
+     * @param rollup_ttl
+     * @param counter_value
+     * @param lastupdatetime
+     * @return
+     */
     public long run(String srollup_id, long rollup_ttl, long counter_value, long lastupdatetime) {
 
         // get rollup values
