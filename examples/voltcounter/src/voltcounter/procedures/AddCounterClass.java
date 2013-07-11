@@ -33,7 +33,7 @@ import org.voltdb.*;
   partitionInfo = "counter_class.counter_class_id:0",
   singlePartition = true
 )
-public class InitializeClass extends CleanCounters
+public class AddCounterClass extends CleanCounters
 {
     /**
      *

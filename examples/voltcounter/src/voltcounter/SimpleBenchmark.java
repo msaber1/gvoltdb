@@ -41,33 +41,25 @@ public class SimpleBenchmark {
     // Reference to the database connection we will use
     final Client client;
     final CounterConfig config;
+
     /**
-     * Uses included {@link CLIConfig} class to
-     * declaratively state command line options with defaults
-     * and validation.
+     * Uses included {@link CLIConfig} class to declaratively state command line
+     * options with defaults and validation.
      */
     static class CounterConfig extends CLIConfig {
+
         @CLIConfig.Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
-
         @CLIConfig.Option(desc = "Max Counter Classes")
-        int maxCounterClass = 10;
-
+        int maxcounterclass = 10;
         @CLIConfig.Option(desc = "Max Counter Per Counter Classe")
-        int maxCounterPerClass = 100;
-
+        int maxcounterperclass = 10;
         @CLIConfig.Option(desc = "Max Counter Levels in a Class")
-        int maxLevels = 100;
-
-        @CLIConfig.Option(desc = "Max Counter Rollup Time")
-        int rollupTime = 2; // 2 Seconds;
-
+        int rolluptime = 2; // 2 Seconds;
         @CLIConfig.Option(desc = "Number of Threads")
         int numthreads = 5;
-
         @CLIConfig.Option(desc = "Total Increment Transaction Per Thread")
         int incrementtimes = 100;
-
         @CLIConfig.Option(desc = "Initialize Data?")
         boolean init = true;
 
@@ -105,9 +97,9 @@ public class SimpleBenchmark {
     }
 
     /**
-     * Connect to a single server with retry. Limited exponential backoff.
-     * No timeout. This will run until the process is killed if it's not
-     * able to connect.
+     * Connect to a single server with retry. Limited exponential backoff. No
+     * timeout. This will run until the process is killed if it's not able to
+     * connect.
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
@@ -117,11 +109,15 @@ public class SimpleBenchmark {
             try {
                 client.createConnection(server);
                 break;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
-                try { Thread.sleep(sleep); } catch (Exception interruted) {}
-                if (sleep < 8000) sleep += sleep;
+                try {
+                    Thread.sleep(sleep);
+                } catch (Exception interruted) {
+                }
+                if (sleep < 8000) {
+                    sleep += sleep;
+                }
             }
         }
         System.out.printf("Connected to VoltDB node at: %s.\n", server);
@@ -136,34 +132,45 @@ public class SimpleBenchmark {
 
     /**
      * Load up data
+     *
      * @throws IOException
      * @throws NoConnectionsException
      * @throws ProcCallException
      */
     public void InitializeData() throws IOException, NoConnectionsException, ProcCallException {
-            int maxCounters = config.maxCounterClass * config.maxCounterPerClass;
-            ClientResponse cresponse =
-                    client.callProcedure("CleanCounters");
+        int maxCounters = config.maxcounterclass * config.maxcounterperclass;
+        ClientResponse cresponse =
+                client.callProcedure("CleanCounters");
+        if (cresponse.getStatus() != ClientResponse.SUCCESS) {
+            throw new RuntimeException(cresponse.getStatusString());
+        }
+        for (int i = 0; i < config.maxcounterclass; i++) {
+            cresponse =
+                    client.callProcedure("AddCounterClass", i);
             if (cresponse.getStatus() != ClientResponse.SUCCESS) {
                 throw new RuntimeException(cresponse.getStatusString());
             }
-            for (int i = 0; i < config.maxCounterClass; i++) {
-                cresponse =
-                        client.callProcedure("InitializeClass", i);
-                if (cresponse.getStatus() != ClientResponse.SUCCESS) {
-                    throw new RuntimeException(cresponse.getStatusString());
-                }
+        }
+        // Add counters.
+        long prev_cc = 0;
+        for (int i = 0, par_idx = 0; i < maxCounters; i++, par_idx++) {
+            long cc = (i / config.maxcounterperclass);
+            boolean treeShift = false;
+            if (prev_cc != cc) {
+                par_idx = 0;
+                prev_cc = cc;
+                treeShift = true;
+            } else {
+                par_idx = i;
             }
-            // Add counters.
-            for (int i = 0, level = 0; i < maxCounters; i++) {
-                long cc = (i / config.maxCounterPerClass);
-                cresponse =
-                        client.callProcedure("AddCounter", cc, i, "Counter-" + i, config.rollupTime, level++);
-                if (level > config.maxLevels) {
-                    level = 0;
-                }
+            cresponse =
+                    client.callProcedure("AddCounter", cc, i, "Counter-" + i, config.rolluptime, treeShift ? (par_idx - 1) : (i -1));
+            if (treeShift) {
+                par_idx = i;
             }
+        }
     }
+
     /**
      *
      * @param args
@@ -195,50 +202,27 @@ public class SimpleBenchmark {
         private Client client;
         private int maxCounters;
         private int maxCounterPerClass;
-        private int maxLevels;
 
-        public IncrementRunner(Client iclient, int max_counters, int max_counters_per_class, int mlevel) {
+        public IncrementRunner(Client iclient, int max_counters, int max_counters_per_class) {
             client = iclient;
             maxCounters = max_counters;
             maxCounterPerClass = max_counters_per_class;
-            maxLevels = mlevel;
         }
 
         @Override
         public void run() {
-            for (int i = 0, level = 0; i < maxCounters; i++) {
+            for (int i = 0; i < maxCounters * maxCounterPerClass; i++) {
                 for (int j = 0; j < config.incrementtimes; j++) {
                     try {
                         long counter_class_id = (i / maxCounterPerClass);
                         ClientResponse response =
-                                client.callProcedure("GetCounter", counter_class_id, i);
-                        if (level > maxLevels) {
-                            level = 0;
-                        }
-                        if (response.getStatus() != ClientResponse.SUCCESS) {
-                            throw new RuntimeException(response.getStatusString());
-                        }
-                        VoltTable results[] = response.getResults();
-                        if (results[0].getRowCount() != 1) {
-                            //Bad results.
-                            System.out.println("Did not find Counter: " + i + " Class: " + counter_class_id);
-                            continue;
-                        }
-
-                        VoltTable result = results[0];
-                        result.advanceRow();
-                        long value = result.getLong(3);
-                        long rollup_seconds = result.getLong(4);
-                        long last_update_time = result.getTimestampAsLong(5);
-                        response =
-                                client.callProcedure("Increment", counter_class_id, i, level++);
+                                client.callProcedure("Increment", counter_class_id, i);
 
                         if (response.getStatus() != ClientResponse.SUCCESS) {
                             throw new RuntimeException(response.getStatusString());
                         }
-                        String srollup_id = Long.toString(counter_class_id) + "-" + Long.toString(i);
-                        response =
-                                client.callProcedure("UpdateRollups", srollup_id, rollup_seconds, value, last_update_time);
+//                        response =
+//                                client.callProcedure("UpdateRollups", counter_class_id,i);
                         if (j % 1000 == 0) {
                             System.out.printf(".");
                         }
@@ -264,7 +248,7 @@ public class SimpleBenchmark {
      */
     public void runIncrements() throws IOException, NoConnectionsException, ProcCallException, InterruptedException {
         for (int i = 0; i < config.numthreads; i++) {
-            new Thread(new IncrementRunner(client, config.maxCounterClass, config.maxCounterPerClass, config.maxLevels)).run();
+            new Thread(new IncrementRunner(client, config.maxcounterclass, config.maxcounterperclass)).run();
             try {
                 Thread.sleep(500);
             } catch (InterruptedException ex) {

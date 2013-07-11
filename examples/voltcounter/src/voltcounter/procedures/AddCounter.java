@@ -30,11 +30,8 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import static org.voltdb.VoltProcedure.EXPECT_SCALAR_MATCH;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 
-/**
- *
- * @author akhanzode
- */
 @ProcInfo(
         partitionInfo = "counters.counter_class_id:0",
         singlePartition = true)
@@ -45,9 +42,16 @@ public class AddCounter extends VoltProcedure {
      *
      */
     public final SQLStmt insertCounter = new SQLStmt("INSERT INTO counters "
-            + "(counter_class_id, counter_id, description, rollup_seconds, last_update_time, level) "
+            + "(counter_class_id, counter_id, description, rollup_seconds, last_update_time, parent_id) "
             + "VALUES "
             + "(?, ?, ?, ?, ?, ?);");
+    public final SQLStmt findParent = new SQLStmt("SELECT counter_class_id,parent_id FROM counter_map "
+            + "WHERE counter_class_id = ? AND counter_id = ?");
+
+    public final SQLStmt insertCounterMap = new SQLStmt("INSERT INTO counter_map "
+            + "(counter_class_id, counter_id, parent_id, map_id) "
+            + "VALUES "
+            + "(?, ?, ?, ?);");
 
     /**
      * Add a new counter and return counter_id if add was successful.
@@ -59,15 +63,29 @@ public class AddCounter extends VoltProcedure {
      * @param level
      * @return counter_id
      */
-    public long run(long counter_class, long counter_id, String counter_description, int rollup_seconds, int level) {
+    public long run(long counter_class_id, long counter_id, String counter_description, int rollup_seconds, long parent) {
 
         // add the counter
-        voltQueueSQL(insertCounter, EXPECT_SCALAR_MATCH(1), counter_class,
-                counter_id, counter_description, rollup_seconds, this.getTransactionTime(), level);
+        voltQueueSQL(insertCounter, EXPECT_SCALAR_MATCH(1), counter_class_id,
+                counter_id, counter_description, rollup_seconds, this.getTransactionTime(), parent);
 
         VoltTable[] result = voltExecuteSQL();
-        if (result != null && result.length == 1) {
-            return counter_id;
+        if (result != null && result.length == 1 && parent != -1) {
+            voltQueueSQL(findParent, counter_class_id, parent);
+            result = voltExecuteSQL();
+            for (int i = 0; i < result.length; i++) {
+                VoltTable val = result[i];
+                for (int j = 0; j < val.getRowCount(); j++) {
+                    VoltTableRow row = val.fetchRow(j);
+                    long found_parent = row.getLong(1);
+                    String map_id = found_parent + "-" + counter_id;
+                    voltQueueSQL(insertCounterMap, counter_class_id, counter_id, found_parent, map_id);
+                    voltExecuteSQL();
+                }
+            }
+            String map_id = parent + "-" + counter_id;
+            voltQueueSQL(insertCounterMap, counter_class_id, counter_id, parent, map_id);
+            voltExecuteSQL();
         }
         return counter_id;
     }

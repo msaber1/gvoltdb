@@ -36,7 +36,7 @@ import org.voltdb.VoltType;
  * @author akhanzode
  */
 @ProcInfo(
-        partitionInfo = "counter_rollups.rollup_id:0",
+        partitionInfo = "counter_rollups.counter_class_id:0",
         singlePartition = true)
 public class GetCounterStdDev extends VoltProcedure {
     // Inserts a counter
@@ -44,22 +44,30 @@ public class GetCounterStdDev extends VoltProcedure {
     /**
      *
      */
-    public final SQLStmt selectAvgStmt = new SQLStmt("SELECT AVG(rollup_value) from counter_rollups where rollup_id = ? ORDER BY rollup_value DESC;");
+    public final SQLStmt selectAvgStmt = new SQLStmt("SELECT AVG(rollup_value) "
+            + "FROM counter_rollups "
+            + "WHERE counter_class_id = ? "
+            + "AND counter_id = ? "
+            + "ORDER BY rollup_value DESC;");
     /**
      *
      */
-    public final SQLStmt selectStmt = new SQLStmt("SELECT rollup_value from counter_rollups where rollup_id = ? ORDER BY rollup_value DESC;");
+    public final SQLStmt selectStmt = new SQLStmt("SELECT rollup_value "
+            + "FROM counter_rollups "
+            + "WHERE counter_class_id = ? "
+            + "AND counter_id = ? "
+            + "ORDER BY rollup_value DESC;");
 
     /**
      *
      * @param srollup_id
      * @return
      */
-    public VoltTable run(String srollup_id) {
+    public VoltTable run(long counter_class_id, long counter_id) {
 
         // get rollup values
-        voltQueueSQL(selectAvgStmt, srollup_id);
-        voltQueueSQL(selectStmt, srollup_id);
+        voltQueueSQL(selectAvgStmt, counter_class_id, counter_id);
+        voltQueueSQL(selectStmt, counter_class_id, counter_id);
         VoltTable retresult = new VoltTable(
                 new VoltTable.ColumnInfo("std-dev", VoltType.BIGINT));
 

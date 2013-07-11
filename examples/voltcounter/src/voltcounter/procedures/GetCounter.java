@@ -53,10 +53,10 @@ public class GetCounter extends VoltProcedure {
      * @param counter_id
      * @return
      */
-    public VoltTable[] run(long class_id, long counter_id) {
+    public VoltTable[] run(long counter_class_id, long counter_id) {
 
         // get counter class
-        voltQueueSQL(selectStmt, class_id, counter_id);
+        voltQueueSQL(selectStmt, counter_class_id, counter_id);
 
         return voltExecuteSQL();
     }

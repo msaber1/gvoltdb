@@ -24,10 +24,6 @@ package voltcounter.procedures;
 
 import org.voltdb.*;
 
-/**
- *
- * @author akhanzode
- */
 @ProcInfo
 (
   singlePartition = false
@@ -47,6 +43,10 @@ public class CleanCounters extends VoltProcedure
      *
      */
     public final SQLStmt cleanRollups = new SQLStmt("DELETE FROM counter_rollups;");
+    /**
+     *
+     */
+    public final SQLStmt cleanMaps = new SQLStmt("DELETE FROM counter_map;");
 
     /**
      *
@@ -55,6 +55,7 @@ public class CleanCounters extends VoltProcedure
     public VoltTable[] run()
     {
         voltQueueSQL(cleanRollups);
+        voltQueueSQL(cleanMaps);
         voltQueueSQL(cleanStmt);
         voltQueueSQL(cleanStmtClass);
         return voltExecuteSQL(true);

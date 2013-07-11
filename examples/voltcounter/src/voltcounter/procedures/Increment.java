@@ -43,9 +43,10 @@ public class Increment extends VoltProcedure {
     /**
      *
      */
-    public final SQLStmt selectStmt = new SQLStmt("SELECT c.counter_id "
-            + "FROM counters c where c.counter_class_id = ? AND c.level < ? OR c.counter_id = ?"
-            + "ORDER BY c.counter_id;");
+    public final SQLStmt selectStmt = new SQLStmt("SELECT c.parent_id "
+            + "FROM counter_map c "
+            + "WHERE c.counter_id = ? "
+            + "ORDER BY c.parent_id;");
     /**
      *
      */
@@ -55,24 +56,92 @@ public class Increment extends VoltProcedure {
 
     /**
      *
+     */
+    public final SQLStmt selectRollupStmt = new SQLStmt("SELECT TOP 1 rollup_time "
+            + "FROM counter_rollups "
+            + "WHERE rollup_id = ? "
+            + "ORDER BY rollup_time DESC;");
+    public final SQLStmt selectCounter = new SQLStmt("SELECT counter_class_id, "
+            + "rollup_seconds, counter_value, last_update_time, parent_id "
+            + "FROM counters "
+            + "WHERE counter_id = ? ");
+    /**
+     *
+     */
+    public final SQLStmt insertRollupStmt = new SQLStmt("INSERT INTO counter_rollups "
+            + "(rollup_id, rollup_value, rollup_time, counter_class_id, counter_id) "
+            + "VALUES "
+            + "(?, ?, ?, ?, ?);");
+
+    /**
+     *
      * @param counter_class
      * @param counter_id
-     * @param level
      * @return
      */
-    public long run(long counter_class, long counter_id, long level) {
+    public long run(long counter_class_id, long counter_id) {
 
-        voltQueueSQL(selectStmt, counter_class, level, counter_id);
+        voltQueueSQL(incrStmt, this.getTransactionTime(), counter_id);
+        voltExecuteSQL();
+        updateRollup(counter_class_id, counter_id);
+
+        voltQueueSQL(selectStmt, counter_id );
         VoltTable ret[] = voltExecuteSQL();
         for (int i = 0; i < ret.length; i++) {
             VoltTable val = ret[i];
             for (int j = 0; j < val.getRowCount(); j++) {
                 VoltTableRow row = val.fetchRow(j);
-                long newval = row.getLong(0);
-                voltQueueSQL(incrStmt, this.getTransactionTime(), newval);
+                long found_parent = row.getLong(0);
+                voltQueueSQL(incrStmt, this.getTransactionTime(), found_parent);
                 voltExecuteSQL();
+                updateRollup(counter_class_id, found_parent);
             }
         }
         return 0;
     }
+
+    /**
+     * Update a specific counter rollup
+     * @param counter_class_id
+     * @param counter_id
+     * @return
+     */
+    public long updateRollup(long counter_class_id, long counter_id) {
+        voltQueueSQL(selectCounter, counter_id);
+        VoltTable result[] = voltExecuteSQL();
+        if (result == null || result.length != 1) {
+            return 1L;
+        }
+        result[0].advanceRow();
+        counter_class_id = result[0].getLong(0);
+        long rollup_ttl = result[0].getLong(1);
+        long counter_value = result[0].getLong(2);
+        long lastupdatetime = result[0].getTimestampAsLong(3);
+        long parent = result[0].getLong(4);
+
+        String srollup_id = counter_class_id + "-" + counter_id;
+
+        voltQueueSQL(selectRollupStmt, srollup_id);
+
+        result = voltExecuteSQL();
+        int rcnt = result[0].getRowCount();
+        if (rcnt == 0) {
+            voltQueueSQL(insertRollupStmt, srollup_id, counter_value, this.getTransactionTime(), counter_class_id, counter_id);
+            voltExecuteSQL();
+            voltQueueSQL(selectRollupStmt, srollup_id);
+            result = voltExecuteSQL();
+        }
+        result[0].advanceRow();
+        long lastrolluptime = result[0].getTimestampAsLong(0);
+        long tdiff = lastupdatetime - lastrolluptime;
+        if (tdiff != 0) {
+            tdiff = (tdiff / 1000) / 1000;
+        }
+        if (tdiff >= (rollup_ttl)) {
+            voltQueueSQL(insertRollupStmt, srollup_id, counter_value, this.getTransactionTime(), counter_class_id, counter_id);
+            voltExecuteSQL();
+        }
+        return 0L;
+    }
+
 }
