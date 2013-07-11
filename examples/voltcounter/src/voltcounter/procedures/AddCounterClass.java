@@ -24,10 +24,6 @@ package voltcounter.procedures;
 
 import org.voltdb.*;
 
-/**
- *
- * @author akhanzode
- */
 @ProcInfo
 (
   partitionInfo = "counter_class.counter_class_id:0",
@@ -36,7 +32,7 @@ import org.voltdb.*;
 public class AddCounterClass extends CleanCounters
 {
     /**
-     *
+     * Insert counter class.
      */
     public final SQLStmt insertStmtClass = new SQLStmt("INSERT INTO counter_class "
             + "(counter_class_id, counter_class_desc) "
@@ -45,13 +41,13 @@ public class AddCounterClass extends CleanCounters
 
     /**
      *
-     * @param classId
+     * @param counter_class_id
      * @return
      */
-    public long run(long classId)
+    public long run(long counter_class_id)
     {
-        voltQueueSQL(insertStmtClass, classId , "Click-" + classId + "-Class");
+        voltQueueSQL(insertStmtClass, counter_class_id , "Click-" + counter_class_id + "-Class");
         voltExecuteSQL();
-        return classId;
+        return counter_class_id;
     }
 }

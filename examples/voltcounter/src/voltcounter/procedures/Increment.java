@@ -21,7 +21,8 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 //
-// Increment a counter value and return
+// Increment a counter value this will also increment any parent values.
+// Additionally based on rollup_seconds given rollups are updated for given counter and all ancestors.
 //
 package voltcounter.procedures;
 
@@ -31,10 +32,6 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 
-/**
- *
- * @author akhanzode
- */
 @ProcInfo(
         partitionInfo = "counters.counter_class_id:0",
         singlePartition = true)
@@ -77,12 +74,14 @@ public class Increment extends VoltProcedure {
      *
      * @param counter_class
      * @param counter_id
-     * @return
+     * @return number of counters incremented.
      */
     public long run(long counter_class_id, long counter_id) {
 
+        long incCount = 0;
         voltQueueSQL(incrStmt, this.getTransactionTime(), counter_id);
         voltExecuteSQL();
+        incCount++;
         updateRollup(counter_class_id, counter_id);
 
         voltQueueSQL(selectStmt, counter_id );
@@ -94,10 +93,11 @@ public class Increment extends VoltProcedure {
                 long found_parent = row.getLong(0);
                 voltQueueSQL(incrStmt, this.getTransactionTime(), found_parent);
                 voltExecuteSQL();
+                incCount++;
                 updateRollup(counter_class_id, found_parent);
             }
         }
-        return 0;
+        return incCount;
     }
 
     /**

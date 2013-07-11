@@ -37,9 +37,8 @@ import org.voltdb.VoltTableRow;
         singlePartition = true)
 public class AddCounter extends VoltProcedure {
 
-    // Inserts a counter
     /**
-     *
+     * Inserts a counter
      */
     public final SQLStmt insertCounter = new SQLStmt("INSERT INTO counters "
             + "(counter_class_id, counter_id, description, rollup_seconds, last_update_time, parent_id) "
@@ -60,19 +59,21 @@ public class AddCounter extends VoltProcedure {
      * @param counter_id
      * @param counter_description
      * @param rollup_seconds
-     * @param level
+     * @param parent
      * @return counter_id
      */
     public long run(long counter_class_id, long counter_id, String counter_description, int rollup_seconds, long parent) {
 
-        // add the counter
+        // add the counter itself
         voltQueueSQL(insertCounter, EXPECT_SCALAR_MATCH(1), counter_class_id,
                 counter_id, counter_description, rollup_seconds, this.getTransactionTime(), parent);
 
         VoltTable[] result = voltExecuteSQL();
+        // Root nodes have -1 parent
         if (result != null && result.length == 1 && parent != -1) {
             voltQueueSQL(findParent, counter_class_id, parent);
             result = voltExecuteSQL();
+            // For each ancestors add me-ancestor mapping
             for (int i = 0; i < result.length; i++) {
                 VoltTable val = result[i];
                 for (int j = 0; j < val.getRowCount(); j++) {
@@ -83,6 +84,7 @@ public class AddCounter extends VoltProcedure {
                     voltExecuteSQL();
                 }
             }
+            // Add me-parent mapping
             String map_id = parent + "-" + counter_id;
             voltQueueSQL(insertCounterMap, counter_class_id, counter_id, parent, map_id);
             voltExecuteSQL();

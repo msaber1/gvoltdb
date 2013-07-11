@@ -30,10 +30,6 @@ import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
-/**
- *
- * @author akhanzode
- */
 @ProcInfo(
         partitionInfo = "counters.counter_class_id:0",
         singlePartition = true)

@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 //
-// Get Counter Value provided a counter_id
+// Get Counter Standard Dev Value provided a counter_id and counter_class_id
 //
 package voltcounter.procedures;
 
@@ -31,10 +31,6 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 
-/**
- *
- * @author akhanzode
- */
 @ProcInfo(
         partitionInfo = "counter_rollups.counter_class_id:0",
         singlePartition = true)

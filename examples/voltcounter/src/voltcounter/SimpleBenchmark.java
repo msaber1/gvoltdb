@@ -27,15 +27,10 @@ import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.voltdb.CLIConfig;
-import org.voltdb.VoltTable;
 
 import org.voltdb.client.*;
 import org.voltdb.client.Client;
 
-/**
- *
- * @author akhanzode
- */
 public class SimpleBenchmark {
 
     // Reference to the database connection we will use
@@ -164,7 +159,8 @@ public class SimpleBenchmark {
                 par_idx = i;
             }
             cresponse =
-                    client.callProcedure("AddCounter", cc, i, "Counter-" + i, config.rolluptime, treeShift ? (par_idx - 1) : (i -1));
+                    client.callProcedure("AddCounter", cc, i,
+                    "Counter-" + i, config.rolluptime, treeShift ? (par_idx - 1) : (i -1));
             if (treeShift) {
                 par_idx = i;
             }
@@ -221,8 +217,6 @@ public class SimpleBenchmark {
                         if (response.getStatus() != ClientResponse.SUCCESS) {
                             throw new RuntimeException(response.getStatusString());
                         }
-//                        response =
-//                                client.callProcedure("UpdateRollups", counter_class_id,i);
                         if (j % 1000 == 0) {
                             System.out.printf(".");
                         }
