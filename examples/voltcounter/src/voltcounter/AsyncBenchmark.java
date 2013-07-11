@@ -127,6 +127,9 @@ public class AsyncBenchmark {
         @Option(desc = "Password for connection.")
         String password = "";
 
+        @CLIConfig.Option(desc = "Initialize Data?")
+        boolean init = true;
+
         @Override
         public void validate() {
         }
@@ -346,6 +349,10 @@ public class AsyncBenchmark {
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
+        if (config.init) {
+            InitializeData();
+        }
+
         // Run the benchmark loop for the requested warmup time
         // The throughput may be throttled depending on client configuration
         System.out.println("Warming up...");
@@ -375,22 +382,17 @@ public class AsyncBenchmark {
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
 
-
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
         while (benchmarkEndTime > System.currentTimeMillis()) {
-            InitializeData();
             for (int i = 0; i < config.maxcounterclass * config.maxcounterperclass; i++) {
                 for (int j = 0; j < config.incrementtimes; j++) {
                     try {
                         long counter_class_id = (i / config.maxcounterclass);
                         client.callProcedure(new CounterIncrementCallback(), "Increment", counter_class_id, i);
 
-                        if (j % 1000 == 0) {
-                            System.out.printf(".");
-                        }
                     } catch (IOException ex) {
                         Logger.getLogger(AsyncBenchmark.class.getName()).log(Level.SEVERE, null, ex);
                     }

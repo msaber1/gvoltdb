@@ -90,11 +90,12 @@ function async-benchmark() {
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltcounter.AsyncBenchmark \
         --displayinterval=5 \
+        --maxcounterclass=1000 \
+        --maxcounterperclass=100000 \
+        --incrementtimes=10000 \
         --warmup=5 \
         --duration=120 \
         --servers=localhost:21212 \
-        --contestants=6 \
-        --maxvotes=2
 #        --latencyreport=true \
 #        --ratelimit=100000
 }
@@ -102,57 +103,23 @@ function async-benchmark() {
 function load-counters() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltcounter.SimpleBenchmark --servers=localhost 
+        voltcounter.SimpleBenchmark 
+}
+
+function simple-benchmark-help() {
+    srccompile
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltcounter.SimpleBenchmark --help
 }
 
 function simple-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltcounter.SimpleBenchmark --servers=localhost --init=false
-}
-
-# Multi-threaded synchronous benchmark sample
-# Use this target for argument help
-function sync-benchmark-help() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj voltcounter.SyncBenchmark --help
-}
-
-function sync-benchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltcounter.SyncBenchmark \
-        --displayinterval=5 \
-        --warmup=5 \
-        --duration=120 \
-        --servers=localhost:21212 \
-        --contestants=6 \
-        --maxvotes=2 \
-        --threads=40
-}
-
-# JDBC benchmark sample
-# Use this target for argument help
-function jdbc-benchmark-help() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj voltcounter.JDBCBenchmark --help
-}
-
-function jdbc-benchmark() {
-    srccompile
-    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
-        voltcounter.JDBCBenchmark \
-        --displayinterval=5 \
-        --duration=120 \
-        --maxvotes=2 \
-        --servers=localhost:21212 \
-        --contestants=6 \
-        --threads=40
+        voltcounter.SimpleBenchmark
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "Usage: ./run.sh {clean|catalog|server|simple-benchmark|simple-benchmark-help|aysnc-benchmark-help|...}"
 }
 
 # Run the target passed as the first arg on the command line

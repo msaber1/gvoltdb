@@ -57,6 +57,8 @@ public class SimpleBenchmark {
         int incrementtimes = 100;
         @CLIConfig.Option(desc = "Initialize Data?")
         boolean init = true;
+        @CLIConfig.Option(desc = "Initialize Data And Quit?")
+        boolean initonly = false;
 
         @Override
         public void validate() {
@@ -182,7 +184,9 @@ public class SimpleBenchmark {
             if (config.init) {
                 bmrk.InitializeData();
             }
-            bmrk.runIncrements();
+            if (!config.initonly) {
+                bmrk.runIncrements();
+            }
 
         } catch (IOException e) {
             throw new RuntimeException(e);
