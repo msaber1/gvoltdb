@@ -50,13 +50,13 @@ public class LeafBenchmark {
         @CLIConfig.Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
         @CLIConfig.Option(desc = "Max Counter Classes")
-        int maxcounterclass = 100;
+        int maxcounterclass = 50;
         @CLIConfig.Option(desc = "Max Depth of Counter Hierarchy")
-        int depth = 10;
+        int depth = 4;
         @CLIConfig.Option(desc = "Max Leaf Nodes per Counter class")
-        int leaves = 10;
+        int leaves = 10000;
         @CLIConfig.Option(desc = "Max Counter Levels in a Class")
-        int rolluptime = 2; // 2 Seconds;
+        int rolluptime = 60; // 2 Seconds;
         @CLIConfig.Option(desc = "Number of Threads")
         int numthreads = 1;
         @CLIConfig.Option(desc = "Total Increment Transaction Per Thread")

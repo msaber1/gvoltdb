@@ -57,6 +57,7 @@ import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.NullCallback;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 
@@ -112,6 +113,7 @@ public class AsyncBenchmark {
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;
+        
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
 
@@ -428,11 +430,7 @@ public class AsyncBenchmark {
             throw new RuntimeException(cresponse.getStatusString());
         }
         for (int i = 0; i < config.maxcounterclass; i++) {
-            cresponse =
-                    client.callProcedure("AddCounterClass", i);
-            if (cresponse.getStatus() != ClientResponse.SUCCESS) {
-                throw new RuntimeException(cresponse.getStatusString());
-            }
+            client.callProcedure(new NullCallback(), "AddCounterClass", i);
         }
         // Add counters.
         long prev_cc = 0;
@@ -446,8 +444,7 @@ public class AsyncBenchmark {
             } else {
                 par_idx = i;
             }
-            cresponse =
-                    client.callProcedure("AddCounter", cc, i,
+            client.callProcedure(new NullCallback(), "AddCounter", cc, i,
                     "Counter-" + i, config.rolluptime, treeShift ? (par_idx - 1) : (i -1));
             if (treeShift) {
                 par_idx = i;
