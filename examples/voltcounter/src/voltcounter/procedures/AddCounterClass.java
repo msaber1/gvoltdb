@@ -29,8 +29,7 @@ import org.voltdb.*;
   partitionInfo = "counter_class.counter_class_id:0",
   singlePartition = true
 )
-public class AddCounterClass extends CleanCounters
-{
+public class AddCounterClass extends VoltProcedure {
     /**
      * Insert counter class.
      */
@@ -44,9 +43,9 @@ public class AddCounterClass extends CleanCounters
      * @param counter_class_id
      * @return
      */
-    public long run(long counter_class_id)
+    public long run(long counter_class_id, String desc)
     {
-        voltQueueSQL(insertStmtClass, counter_class_id , "Click-" + counter_class_id + "-Class");
+        voltQueueSQL(insertStmtClass, counter_class_id , desc);
         voltExecuteSQL();
         return counter_class_id;
     }

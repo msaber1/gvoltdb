@@ -75,6 +75,28 @@ function client() {
     async-benchmark
 }
 
+# Leaf benchmark sample
+# Use this target for argument help
+function leaf-benchmark-help() {
+    srccompile
+    java -classpath obj:$APPCLASSPATH:obj voltcounter.LeafBenchmark --help
+}
+
+# latencyreport: default is OFF
+# ratelimit: must be a reasonable value if lantencyreport is ON
+# Disable the comments to get latency report
+function leaf-benchmark() {
+    srccompile
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltcounter.LeafBenchmark \
+        --maxcounterclass=1000 \
+        --depth=4 \
+        --leaves=10000 \
+        --incrementtimes=10000 \
+        --servers=localhost:21212 \
+#        --latencyreport=true \
+}
+
 # Asynchronous benchmark sample
 # Use this target for argument help
 function async-benchmark-help() {
@@ -119,7 +141,7 @@ function simple-benchmark() {
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|simple-benchmark|simple-benchmark-help|aysnc-benchmark-help|...}"
+    echo "Usage: ./run.sh {clean|catalog|server|simple-benchmark|simple-benchmark-help|aysnc-benchmark|leaf-benchmark|...}"
 }
 
 # Run the target passed as the first arg on the command line

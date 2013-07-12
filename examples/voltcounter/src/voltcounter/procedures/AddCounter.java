@@ -81,14 +81,14 @@ public class AddCounter extends VoltProcedure {
                     long found_parent = row.getLong(1);
                     String map_id = found_parent + "-" + counter_id;
                     voltQueueSQL(insertCounterMap, counter_class_id, counter_id, found_parent, map_id);
-                    voltExecuteSQL();
                 }
             }
             // Add me-parent mapping
             String map_id = parent + "-" + counter_id;
             voltQueueSQL(insertCounterMap, counter_class_id, counter_id, parent, map_id);
             voltExecuteSQL();
+            return counter_id;
         }
-        return counter_id;
+        return -1;
     }
 }

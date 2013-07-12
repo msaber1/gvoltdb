@@ -19,6 +19,9 @@ json
   This example shows how to use flexible schema and JSON within
   a VoltDB application.
 
+voltcounter
+  This sample shows hierarchical counters for counting events.
+
 Examining the run.sh will show the available targets for each example.
 The targets "client" and "server" let you run a client and server for each example.
 

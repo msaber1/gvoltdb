@@ -92,8 +92,12 @@ public class Increment extends VoltProcedure {
                 VoltTableRow row = val.fetchRow(j);
                 long found_parent = row.getLong(0);
                 voltQueueSQL(incrStmt, this.getTransactionTime(), found_parent);
-                voltExecuteSQL();
                 incCount++;
+            }
+            voltExecuteSQL();
+            for (int j = 0; j < val.getRowCount(); j++) {
+                VoltTableRow row = val.fetchRow(j);
+                long found_parent = row.getLong(0);
                 updateRollup(counter_class_id, found_parent);
             }
         }

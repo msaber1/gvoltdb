@@ -143,7 +143,7 @@ public class SimpleBenchmark {
         }
         for (int i = 0; i < config.maxcounterclass; i++) {
             cresponse =
-                    client.callProcedure("AddCounterClass", i);
+                    client.callProcedure("AddCounterClass", i, "Class-" + i);
             if (cresponse.getStatus() != ClientResponse.SUCCESS) {
                 throw new RuntimeException(cresponse.getStatusString());
             }

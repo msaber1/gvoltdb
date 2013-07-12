@@ -94,10 +94,10 @@ public class AsyncBenchmark {
         String servers = "localhost";
 
         @CLIConfig.Option(desc = "Max Counter Classes")
-        int maxcounterclass = 100;
+        int maxcounterclass = 10;
 
         @CLIConfig.Option(desc = "Max Counter Per Counter Classe")
-        int maxcounterperclass = 1000;
+        int maxcounterperclass = 100;
 
         @CLIConfig.Option(desc = "Max Counter Levels in a Class")
         int rolluptime = 30; // 30 Seconds;
@@ -113,7 +113,7 @@ public class AsyncBenchmark {
 
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;
-        
+
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
 
@@ -430,7 +430,7 @@ public class AsyncBenchmark {
             throw new RuntimeException(cresponse.getStatusString());
         }
         for (int i = 0; i < config.maxcounterclass; i++) {
-            client.callProcedure(new NullCallback(), "AddCounterClass", i);
+            client.callProcedure(new NullCallback(), "AddCounterClass", i, "Class-" + i);
         }
         // Add counters.
         long prev_cc = 0;

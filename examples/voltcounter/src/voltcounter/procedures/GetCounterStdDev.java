@@ -35,24 +35,21 @@ import org.voltdb.VoltType;
         partitionInfo = "counter_rollups.counter_class_id:0",
         singlePartition = true)
 public class GetCounterStdDev extends VoltProcedure {
-    // Inserts a counter
 
     /**
-     *
+     * Get AVG
      */
     public final SQLStmt selectAvgStmt = new SQLStmt("SELECT AVG(rollup_value) "
             + "FROM counter_rollups "
             + "WHERE counter_class_id = ? "
-            + "AND counter_id = ? "
-            + "ORDER BY rollup_value DESC;");
+            + "AND counter_id = ?");
     /**
-     *
+     * Get Rollup Value
      */
     public final SQLStmt selectStmt = new SQLStmt("SELECT rollup_value "
             + "FROM counter_rollups "
             + "WHERE counter_class_id = ? "
-            + "AND counter_id = ? "
-            + "ORDER BY rollup_value DESC;");
+            + "AND counter_id = ?");
 
     /**
      *
@@ -65,8 +62,7 @@ public class GetCounterStdDev extends VoltProcedure {
         voltQueueSQL(selectAvgStmt, counter_class_id, counter_id);
         voltQueueSQL(selectStmt, counter_class_id, counter_id);
         VoltTable retresult = new VoltTable(
-                new VoltTable.ColumnInfo("std-dev", VoltType.BIGINT));
-
+                new VoltTable.ColumnInfo("sigma", VoltType.BIGINT));
 
         VoltTable results[] = voltExecuteSQL();
         if (results[0].getRowCount() != 1) {

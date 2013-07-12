@@ -24,7 +24,6 @@ package voltcounter;
 
 import java.io.IOException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
 import java.util.logging.Level;
@@ -50,11 +49,11 @@ public class LeafBenchmark {
         @CLIConfig.Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
         @CLIConfig.Option(desc = "Max Counter Classes")
-        int maxcounterclass = 50;
+        int maxcounterclass = 5;
         @CLIConfig.Option(desc = "Max Depth of Counter Hierarchy")
         int depth = 4;
         @CLIConfig.Option(desc = "Max Leaf Nodes per Counter class")
-        int leaves = 10000;
+        int leaves = 10;
         @CLIConfig.Option(desc = "Max Counter Levels in a Class")
         int rolluptime = 60; // 2 Seconds;
         @CLIConfig.Option(desc = "Number of Threads")
@@ -149,7 +148,7 @@ public class LeafBenchmark {
         long counter_id = 0;
         for (long i = 0; i < config.maxcounterclass; i++) {
             cresponse =
-                    client.callProcedure("AddCounterClass", i);
+                    client.callProcedure("AddCounterClass", i, "Class-" + i);
             if (cresponse.getStatus() != ClientResponse.SUCCESS) {
                 throw new RuntimeException(cresponse.getStatusString());
             }

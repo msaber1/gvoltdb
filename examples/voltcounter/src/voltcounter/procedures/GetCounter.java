@@ -34,13 +34,12 @@ import org.voltdb.VoltTable;
         partitionInfo = "counters.counter_class_id:0",
         singlePartition = true)
 public class GetCounter extends VoltProcedure {
-    // Inserts a counter
 
     /**
-     *
+     * Get a counter
      */
     public final SQLStmt selectStmt = new SQLStmt("SELECT "
-            + "counter_class_id,counter_id,description,counter_value,rollup_seconds,last_update_time "
+            + "counter_class_id,counter_id,description,counter_value,rollup_seconds,parent_id,last_update_time "
             + "FROM counters where counter_class_id = ? AND counter_id = ?;");
 
     /**
