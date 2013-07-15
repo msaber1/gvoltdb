@@ -226,12 +226,14 @@ public class LeafBenchmark {
                 counterToClass.put(counter_id, i);
                 counter_id++;
             }
-            for (int k = 0; k < config.leaves; k++) {
-                client.callProcedure(new NullCallback(), "AddCounter", i, counter_id+k,
-                        "Counter-" + (counter_id+k), config.rolluptime, counter_id-1);
-                counterToClass.put(counter_id+k, i);
+            if (config.depth > 0) {
+                for (int k = 0; k < config.leaves; k++) {
+                    client.callProcedure(new NullCallback(), "AddCounter", i, counter_id+k,
+                            "Counter-" + (counter_id+k), config.rolluptime, counter_id-1);
+                    counterToClass.put(counter_id+k, i);
+                }
+                counter_id += config.leaves;
             }
-            counter_id += config.leaves;
         }
         return counter_id;
     }

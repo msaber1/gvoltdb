@@ -48,19 +48,19 @@ public class Increment extends VoltProcedure {
      */
     public final SQLStmt incrStmt = new SQLStmt("UPDATE counters "
             + "SET counter_value = counter_value+1, last_update_time = ? "
-            + "WHERE counter_id = ?;");
+            + "WHERE counter_id = ? AND counter_class_id = ?;");
 
     /**
      *
      */
     public final SQLStmt selectRollupStmt = new SQLStmt("SELECT TOP 1 rollup_time "
             + "FROM counter_rollups "
-            + "WHERE rollup_id = ? "
+            + "WHERE rollup_id = ? AND counter_class_id = ?"
             + "ORDER BY rollup_time DESC;");
     public final SQLStmt selectCounter = new SQLStmt("SELECT counter_class_id, "
             + "rollup_seconds, counter_value, last_update_time, parent_id "
             + "FROM counters "
-            + "WHERE counter_id = ? ");
+            + "WHERE counter_id = ? AND counter_class_id = ?");
     /**
      *
      */
@@ -78,7 +78,7 @@ public class Increment extends VoltProcedure {
     public long run(long counter_class_id, long counter_id) {
 
         long incCount = 0;
-        voltQueueSQL(incrStmt, this.getTransactionTime(), counter_id);
+        voltQueueSQL(incrStmt, this.getTransactionTime(), counter_id, counter_class_id);
         voltExecuteSQL();
         incCount++;
         updateRollup(counter_class_id, counter_id);
@@ -90,7 +90,7 @@ public class Increment extends VoltProcedure {
             for (int j = 0; j < val.getRowCount(); j++) {
                 VoltTableRow row = val.fetchRow(j);
                 long found_parent = row.getLong(0);
-                voltQueueSQL(incrStmt, this.getTransactionTime(), found_parent);
+                voltQueueSQL(incrStmt, this.getTransactionTime(), found_parent, counter_class_id);
                 incCount++;
             }
             voltExecuteSQL();
@@ -110,7 +110,7 @@ public class Increment extends VoltProcedure {
      * @return
      */
     public long updateRollup(long counter_class_id, long counter_id) {
-        voltQueueSQL(selectCounter, counter_id);
+        voltQueueSQL(selectCounter, counter_id, counter_class_id);
         VoltTable result[] = voltExecuteSQL();
         if (result == null || result.length != 1) {
             return 1L;
@@ -121,24 +121,27 @@ public class Increment extends VoltProcedure {
         long counter_value = result[0].getLong(2);
         long lastupdatetime = result[0].getTimestampAsLong(3);
         long parent = result[0].getLong(4);
+        if (rollup_ttl <= 0) {
+            return 0L;
+        }
 
         String srollup_id = counter_class_id + "-" + counter_id;
 
-        voltQueueSQL(selectRollupStmt, srollup_id);
+        voltQueueSQL(selectRollupStmt, srollup_id, counter_class_id);
 
         result = voltExecuteSQL();
         int rcnt = result[0].getRowCount();
         if (rcnt == 0) {
             voltQueueSQL(insertRollupStmt, srollup_id, counter_value, this.getTransactionTime(), counter_class_id, counter_id);
             voltExecuteSQL();
-            voltQueueSQL(selectRollupStmt, srollup_id);
+            voltQueueSQL(selectRollupStmt, srollup_id, counter_class_id);
             result = voltExecuteSQL();
         }
         result[0].advanceRow();
         long lastrolluptime = result[0].getTimestampAsLong(0);
         long tdiff = lastupdatetime - lastrolluptime;
         if (tdiff != 0) {
-            tdiff = (tdiff / 1000) / 1000;
+            tdiff = tdiff / 1000000;
         }
         if (tdiff >= (rollup_ttl)) {
             voltQueueSQL(insertRollupStmt, srollup_id, counter_value, this.getTransactionTime(), counter_class_id, counter_id);
