@@ -40,10 +40,9 @@ public class Increment extends VoltProcedure {
     /**
      *
      */
-    public final SQLStmt selectStmt = new SQLStmt("SELECT c.parent_id "
-            + "FROM counter_map c "
-            + "WHERE c.counter_id = ? "
-            + "ORDER BY c.parent_id;");
+    public final SQLStmt selectStmt = new SQLStmt("SELECT parent_id "
+            + "FROM counter_map "
+            + "WHERE counter_id = ? AND counter_class_id = ?");
     /**
      *
      */
@@ -84,7 +83,7 @@ public class Increment extends VoltProcedure {
         incCount++;
         updateRollup(counter_class_id, counter_id);
 
-        voltQueueSQL(selectStmt, counter_id );
+        voltQueueSQL(selectStmt, counter_id, counter_class_id);
         VoltTable ret[] = voltExecuteSQL();
         for (int i = 0; i < ret.length; i++) {
             VoltTable val = ret[i];

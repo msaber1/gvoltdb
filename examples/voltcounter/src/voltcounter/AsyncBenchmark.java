@@ -37,7 +37,6 @@
  * part of your pre-launch evaluation so you can adequately provision your
  * VoltDB cluster with the number of servers required for your needs.
  */
-
 package voltcounter;
 
 import java.io.IOException;
@@ -65,9 +64,8 @@ public class AsyncBenchmark {
 
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
-            "----------" + "----------" + "----------" + "----------" +
-            "----------" + "----------" + "----------" + "----------" + "\n";
-
+            "----------" + "----------" + "----------" + "----------"
+            + "----------" + "----------" + "----------" + "----------" + "\n";
     // validated command line configuration
     final CounterConfig config;
     // Reference to the database connection we will use
@@ -79,8 +77,6 @@ public class AsyncBenchmark {
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
-
-    // voter benchmark state
     AtomicLong countersIncremented = new AtomicLong(0);
     AtomicLong failedCountersIncremented = new AtomicLong(0);
 
@@ -92,43 +88,30 @@ public class AsyncBenchmark {
 
         @CLIConfig.Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
-
         @CLIConfig.Option(desc = "Max Counter Classes")
         int maxcounterclass = 10;
-
         @CLIConfig.Option(desc = "Max Counter Per Counter Classe")
         int maxcounterperclass = 100;
-
         @CLIConfig.Option(desc = "Max Counter Levels in a Class")
         int rolluptime = 30; // 30 Seconds;
-
         @CLIConfig.Option(desc = "Total Increment Transaction Per Thread")
         int incrementtimes = 1000;
-
         @Option(desc = "Interval for performance feedback, in seconds.")
         long displayinterval = 5;
-
         @Option(desc = "Benchmark duration, in seconds.")
         int duration = 20;
-
         @Option(desc = "Warmup duration in seconds.")
         int warmup = 2;
-
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
-
         @Option(desc = "Report latency for async benchmark run.")
         boolean latencyreport = true;
-
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
-
         @Option(desc = "User name for connection.")
         String user = "";
-
         @Option(desc = "Password for connection.")
         String password = "";
-
         @CLIConfig.Option(desc = "Initialize Data?")
         boolean init = true;
 
@@ -138,10 +121,11 @@ public class AsyncBenchmark {
     }
 
     /**
-     * Provides a callback to be notified on node failure.
-     * This example only logs the event.
+     * Provides a callback to be notified on node failure. This example only
+     * logs the event.
      */
     class StatusListener extends ClientStatusListenerExt {
+
         @Override
         public void connectionLost(String hostname, int port, int connectionsLeft, DisconnectCause cause) {
             // if the benchmark is still active
@@ -152,8 +136,8 @@ public class AsyncBenchmark {
     }
 
     /**
-     * Constructor for benchmark instance.
-     * Configures VoltDB client and prints configuration.
+     * Constructor for benchmark instance. Configures VoltDB client and prints
+     * configuration.
      *
      * @param config Parsed & validated CLI options.
      */
@@ -172,15 +156,15 @@ public class AsyncBenchmark {
         System.out.println(" Command Line Configuration");
         System.out.println(HORIZONTAL_RULE);
         System.out.println(config.getConfigDumpString());
-        if(config.latencyreport) {
+        if (config.latencyreport) {
             System.out.println("NOTICE: Option latencyreport is ON for async run, please set a reasonable ratelimit.\n");
         }
     }
 
     /**
-     * Connect to a single server with retry. Limited exponential backoff.
-     * No timeout. This will run until the process is killed if it's not
-     * able to connect.
+     * Connect to a single server with retry. Limited exponential backoff. No
+     * timeout. This will run until the process is killed if it's not able to
+     * connect.
      *
      * @param server hostname:port or just hostname (hostname can be ip).
      */
@@ -190,11 +174,15 @@ public class AsyncBenchmark {
             try {
                 client.createConnection(server);
                 break;
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
-                try { Thread.sleep(sleep); } catch (Exception interruted) {}
-                if (sleep < 8000) sleep += sleep;
+                try {
+                    Thread.sleep(sleep);
+                } catch (Exception interruted) {
+                }
+                if (sleep < 8000) {
+                    sleep += sleep;
+                }
             }
         }
         System.out.printf("Connected to VoltDB node at: %s.\n", server);
@@ -229,23 +217,25 @@ public class AsyncBenchmark {
     }
 
     /**
-     * Create a Timer task to display performance data on the Increment procedure
-     * It calls printStatistics() every displayInterval seconds
+     * Create a Timer task to display performance data on the Increment
+     * procedure It calls printStatistics() every displayInterval seconds
      */
     public void schedulePeriodicStats() {
         timer = new Timer();
         TimerTask statsPrinting = new TimerTask() {
             @Override
-            public void run() { printStatistics(); }
+            public void run() {
+                printStatistics();
+            }
         };
         timer.scheduleAtFixedRate(statsPrinting,
-                                  config.displayinterval * 1000,
-                                  config.displayinterval * 1000);
+                config.displayinterval * 1000,
+                config.displayinterval * 1000);
     }
 
     /**
-     * Prints a one line update on performance that can be printed
-     * periodically during a benchmark.
+     * Prints a one line update on performance that can be printed periodically
+     * during a benchmark.
      */
     public synchronized void printStatistics() {
         ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
@@ -255,16 +245,16 @@ public class AsyncBenchmark {
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d",
                 stats.getInvocationAborts(), stats.getInvocationErrors());
-        if(this.config.latencyreport) {
+        if (this.config.latencyreport) {
             System.out.printf(", Avg/95%% Latency %.2f/%dms", stats.getAverageLatency(),
-                stats.kPercentileLatency(0.95));
+                    stats.kPercentileLatency(0.95));
         }
         System.out.printf("\n");
     }
 
     /**
-     * Prints the results of the voting simulation and statistics
-     * about performance.
+     * Prints the results of the voting simulation and statistics about
+     * performance.
      *
      * @throws Exception if anything unexpected happens.
      */
@@ -272,13 +262,13 @@ public class AsyncBenchmark {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
         // 1. Voting Board statistics, Voting results and performance statistics
-        String display = "\n" +
-                         HORIZONTAL_RULE +
-                         " Counter Results\n" +
-                         HORIZONTAL_RULE +
-                         "\nA total of %d counters...\n" +
-                         " - %,9d Incremented\n" +
-                         " - %,9d Failed to Increment\n\n";
+        String display = "\n"
+                + HORIZONTAL_RULE
+                + " Counter Results\n"
+                + HORIZONTAL_RULE
+                + "\nA total of %d counters...\n"
+                + " - %,9d Incremented\n"
+                + " - %,9d Failed to Increment\n\n";
         System.out.printf(display, config.maxcounterclass * config.maxcounterperclass,
                 countersIncremented.get(), failedCountersIncremented.get());
 
@@ -289,7 +279,7 @@ public class AsyncBenchmark {
         System.out.println(HORIZONTAL_RULE);
 
         System.out.printf("Average throughput:            %,9d txns/sec\n", stats.getTxnThroughput());
-        if(this.config.latencyreport) {
+        if (this.config.latencyreport) {
             System.out.printf("Average latency:               %,9.2f ms\n", stats.getAverageLatency());
             System.out.printf("10th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.1));
             System.out.printf("25th percentile latency:       %,9d ms\n", stats.kPercentileLatency(.25));
@@ -316,26 +306,26 @@ public class AsyncBenchmark {
     }
 
     /**
-     * Callback to handle the response to a stored procedure call.
-     * Tracks response types.
+     * Callback to handle the response to a stored procedure call. Tracks
+     * response types.
      *
      */
     class CounterIncrementCallback implements ProcedureCallback {
+
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() == ClientResponse.SUCCESS) {
                 long cnt = response.getResults()[0].asScalarLong();
                 countersIncremented.addAndGet(cnt);
-            }
-            else {
+            } else {
                 countersIncremented.incrementAndGet();
             }
         }
     }
 
     /**
-     * Core benchmark code.
-     * Connect. Initialize. Run the loop. Cleanup. Print Results.
+     * Core benchmark code. Connect. Initialize. Run the loop. Cleanup. Print
+     * Results.
      *
      * @throws Exception if anything unexpected happens.
      */
@@ -351,31 +341,6 @@ public class AsyncBenchmark {
         System.out.println(" Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
-        if (config.init) {
-            InitializeData();
-        }
-
-        // Run the benchmark loop for the requested warmup time
-        // The throughput may be throttled depending on client configuration
-        System.out.println("Warming up...");
-        final long warmupEndTime = System.currentTimeMillis() + (1000l * config.warmup);
-        while (warmupEndTime > System.currentTimeMillis()) {
-            for (int i = 0; i < config.maxcounterclass * config.maxcounterperclass; i++) {
-                for (int j = 0; j < config.incrementtimes; j++) {
-                    try {
-                        long counter_class_id = (i / config.maxcounterclass);
-                        client.callProcedure(new CounterIncrementCallback(), "Increment", counter_class_id, i);
-
-                        if (j % 1000 == 0) {
-                            System.out.printf(".");
-                        }
-                    } catch (IOException ex) {
-                        Logger.getLogger(AsyncBenchmark.class.getName()).log(Level.SEVERE, null, ex);
-                    }
-                }
-            }
-        }
-
         // reset the stats after warmup
         fullStatsContext.fetchAndResetBaseline();
         periodicStatsContext.fetchAndResetBaseline();
@@ -383,6 +348,10 @@ public class AsyncBenchmark {
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();
         schedulePeriodicStats();
+
+        if (config.init) {
+            InitializeData();
+        }
 
         // Run the benchmark loop for the requested duration
         // The throughput may be throttled depending on client configuration
@@ -445,7 +414,7 @@ public class AsyncBenchmark {
                 par_idx = i;
             }
             client.callProcedure(new NullCallback(), "AddCounter", cc, i,
-                    "Counter-" + i, config.rolluptime, treeShift ? (par_idx - 1) : (i -1));
+                    "Counter-" + i, config.rolluptime, treeShift ? (par_idx - 1) : (i - 1));
             if (treeShift) {
                 par_idx = i;
             }

@@ -45,7 +45,7 @@ public class AddCounter extends VoltProcedure {
             + "VALUES "
             + "(?, ?, ?, ?, ?, ?);");
     public final SQLStmt findParent = new SQLStmt("SELECT counter_class_id,parent_id FROM counter_map "
-            + "WHERE counter_class_id = ? AND counter_id = ?");
+            + "WHERE counter_id = ? AND counter_class_id = ?");
 
     public final SQLStmt insertCounterMap = new SQLStmt("INSERT INTO counter_map "
             + "(counter_class_id, counter_id, parent_id, map_id) "
@@ -71,7 +71,7 @@ public class AddCounter extends VoltProcedure {
         VoltTable[] result = voltExecuteSQL();
         // Root nodes have -1 parent
         if (result != null && result.length == 1 && parent != -1) {
-            voltQueueSQL(findParent, counter_class_id, parent);
+            voltQueueSQL(findParent, parent, counter_class_id );
             result = voltExecuteSQL();
             // For each ancestors add me-ancestor mapping
             for (int i = 0; i < result.length; i++) {
@@ -86,7 +86,7 @@ public class AddCounter extends VoltProcedure {
             // Add me-parent mapping
             String map_id = parent + "-" + counter_id;
             voltQueueSQL(insertCounterMap, counter_class_id, counter_id, parent, map_id);
-            voltExecuteSQL();
+            voltExecuteSQL(true);
             return counter_id;
         }
         return -1;

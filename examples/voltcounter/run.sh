@@ -89,11 +89,12 @@ function leaf-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltcounter.LeafBenchmark \
-        --maxcounterclass=1000 \
+        --maxcounterclass=10000 \
         --depth=4 \
-        --leaves=10000 \
-        --incrementtimes=10000 \
-        --servers=localhost:21212 \
+        --leaves=4 \
+        --numthreads=10 \
+        --incrementtimes=100 \
+        --servers=localhost:21212 
 #        --latencyreport=true \
 }
 
@@ -112,14 +113,14 @@ function async-benchmark() {
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltcounter.AsyncBenchmark \
         --displayinterval=5 \
-        --maxcounterclass=1000 \
-        --maxcounterperclass=100000 \
+        --maxcounterclass=10000 \
+        --maxcounterperclass=10 \
         --incrementtimes=10000 \
         --warmup=5 \
         --duration=120 \
         --servers=localhost:21212 \
-#        --latencyreport=true \
-#        --ratelimit=100000
+        --ratelimit=100000
+        #--latencyreport=true 
 }
 
 function load-counters() {

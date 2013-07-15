@@ -40,6 +40,10 @@ CREATE TABLE counter_rollups
 , counter_class_id BIGINT NOT NULL
 );
 
+CREATE UNIQUE INDEX counter_map_idx ON counter_map (parent_id, counter_id, counter_class_id);
+CREATE INDEX counter_rollup_cid_idx ON counter_rollups (counter_id);
+CREATE INDEX counter_rollup_idx ON counter_rollups (rollup_id, rollup_time);
+
 PARTITION TABLE counter_class ON COLUMN counter_class_id;
 PARTITION TABLE counters ON COLUMN counter_class_id;
 PARTITION TABLE counter_rollups ON COLUMN counter_class_id;
