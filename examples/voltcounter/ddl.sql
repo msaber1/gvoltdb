@@ -40,7 +40,29 @@ CREATE TABLE counter_rollups
 , counter_class_id BIGINT NOT NULL
 );
 
-CREATE UNIQUE INDEX counter_map_idx ON counter_map (parent_id, counter_id, counter_class_id);
+CREATE VIEW v_counter_rollups
+(
+  rollup_id
+, counter_class_id
+, counter_id
+, rollup_time
+, rollup_count
+)
+AS
+  SELECT rollup_id
+       , counter_class_id
+       , counter_id
+       , rollup_time
+       , COUNT(*)
+  FROM counter_rollups
+  GROUP BY rollup_id
+         , counter_class_id
+         , counter_id
+         , rollup_time
+; 
+
+CREATE INDEX counter_map_idx ON counter_map (counter_id, counter_class_id);
+CREATE UNIQUE INDEX counter_map_uidx ON counter_map (parent_id, counter_id, counter_class_id);
 CREATE INDEX counter_rollup_cid_idx ON counter_rollups (counter_id);
 CREATE INDEX counter_rollup_idx ON counter_rollups (rollup_id, rollup_time);
 CREATE INDEX counter_id_idx ON counters (counter_id);

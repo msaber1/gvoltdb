@@ -54,7 +54,7 @@ public class Increment extends VoltProcedure {
      *
      */
     public final SQLStmt selectRollupStmt = new SQLStmt("SELECT TOP 1 rollup_time "
-            + "FROM counter_rollups "
+            + "FROM v_counter_rollups "
             + "WHERE rollup_id = ? AND counter_class_id = ?"
             + "ORDER BY rollup_time DESC;");
     public final SQLStmt selectCounter = new SQLStmt("SELECT counter_class_id, "

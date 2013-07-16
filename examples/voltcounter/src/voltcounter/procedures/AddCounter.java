@@ -44,8 +44,9 @@ public class AddCounter extends VoltProcedure {
             + "(counter_class_id, counter_id, description, rollup_seconds, last_update_time, parent_id) "
             + "VALUES "
             + "(?, ?, ?, ?, ?, ?);");
-    public final SQLStmt findParent = new SQLStmt("SELECT counter_class_id,parent_id FROM counter_map "
-            + "WHERE counter_id = ? AND counter_class_id = ?");
+    public final SQLStmt findParent = new SQLStmt("SELECT counter_class_id,parent_id,counter_id FROM counter_map "
+            + "WHERE counter_id = ? AND counter_class_id = ?"
+            + "ORDER BY counter_class_id, counter_id, parent_id");
 
     public final SQLStmt insertCounterMap = new SQLStmt("INSERT INTO counter_map "
             + "(counter_class_id, counter_id, parent_id, map_id) "
