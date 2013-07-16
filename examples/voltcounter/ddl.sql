@@ -42,23 +42,24 @@ CREATE TABLE counter_rollups
 
 CREATE VIEW v_counter_rollups
 (
-  rollup_id
-, counter_class_id
+  counter_class_id
 , counter_id
 , rollup_time
+, rollup_id
 , rollup_count
 )
 AS
-  SELECT rollup_id
-       , counter_class_id
+  SELECT TOP 1 counter_class_id 
        , counter_id
        , rollup_time
+       , rollup_id
        , COUNT(*)
   FROM counter_rollups
-  GROUP BY rollup_id
-         , counter_class_id
+  GROUP BY counter_class_id
          , counter_id
          , rollup_time
+         , rollup_id
+  ORDER BY rollup_time DESC
 ; 
 
 CREATE INDEX counter_map_idx ON counter_map (counter_id, counter_class_id);

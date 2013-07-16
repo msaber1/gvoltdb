@@ -243,7 +243,7 @@ public class LeafBenchmark {
      * @param args
      */
     public static void main(String[] args) {
-        System.out.println("Running Simple Benchmark");
+        System.out.println("Running Leaf Benchmark");
         try {
             CounterConfig config = new CounterConfig();
             config.parse(LeafBenchmark.class.getName(), args);
