@@ -231,8 +231,12 @@ public class SimpleBenchmark {
                     }
                 }
             }
+            System.out.printf("\n");
+            cdLatch.countDown();
         }
     }
+
+    CountDownLatch cdLatch = null;
 
     /**
      *
@@ -245,6 +249,7 @@ public class SimpleBenchmark {
      * @throws ProcCallException
      */
     public void runIncrements() throws IOException, NoConnectionsException, ProcCallException, InterruptedException {
+        cdLatch = new CountDownLatch(config.numthreads);
         for (int i = 0; i < config.numthreads; i++) {
             new Thread(new IncrementRunner(client, config.maxcounterclass, config.maxcounterperclass)).run();
             try {
@@ -253,5 +258,6 @@ public class SimpleBenchmark {
                 Logger.getLogger(SimpleBenchmark.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
+        cdLatch.await();
     }
 }

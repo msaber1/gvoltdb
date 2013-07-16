@@ -12,7 +12,7 @@ CREATE TABLE counters
   counter_class_id BIGINT NOT NULL
 , counter_id   BIGINT NOT NULL
 , parent_id BIGINT NOT NULL
-, description  varchar(1024) 
+, description  varchar(1024)
 , counter_value BIGINT default 0
 , rollup_seconds INTEGER default 0
 , last_update_time TIMESTAMP NOT NULL
@@ -43,6 +43,8 @@ CREATE TABLE counter_rollups
 CREATE UNIQUE INDEX counter_map_idx ON counter_map (parent_id, counter_id, counter_class_id);
 CREATE INDEX counter_rollup_cid_idx ON counter_rollups (counter_id);
 CREATE INDEX counter_rollup_idx ON counter_rollups (rollup_id, rollup_time);
+CREATE INDEX counter_id_idx ON counters (counter_id);
+CREATE UNIQUE INDEX counter_id_uidx ON counters (counter_class_id, counter_id);
 
 PARTITION TABLE counter_class ON COLUMN counter_class_id;
 PARTITION TABLE counters ON COLUMN counter_class_id;
