@@ -85,6 +85,21 @@ function leaf-benchmark-help() {
 # latencyreport: default is OFF
 # ratelimit: must be a reasonable value if lantencyreport is ON
 # Disable the comments to get latency report
+function leaf-benchmark-init() {
+    srccompile
+    java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voltcounter.LeafBenchmark \
+        --maxcounterclass=10000 \
+        --depth=4 \
+        --leaves=4 \
+        --init=true \
+        --initonly=true \
+        --numthreads=10 \
+        --incrementtimes=100 \
+        --servers=localhost:21212 
+#        --latencyreport=true \
+}
+
 function leaf-benchmark() {
     srccompile
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
@@ -92,6 +107,8 @@ function leaf-benchmark() {
         --maxcounterclass=10000 \
         --depth=4 \
         --leaves=4 \
+        --init=false \
+        --initonly=false \
         --numthreads=10 \
         --incrementtimes=100 \
         --servers=localhost:21212 

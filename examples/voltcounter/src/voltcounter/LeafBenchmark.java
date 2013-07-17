@@ -64,11 +64,11 @@ public class LeafBenchmark {
         @CLIConfig.Option(desc = "Comma separated list of the form server[:port] to connect to.")
         String servers = "localhost";
         @CLIConfig.Option(desc = "Max Counter Classes")
-        int maxcounterclass = 5;
+        int maxcounterclass = 500;
         @CLIConfig.Option(desc = "Max Depth of Counter Hierarchy")
         int depth = 4;
         @CLIConfig.Option(desc = "Max Leaf Nodes per Counter class")
-        int leaves = 4;
+        int leaves = 40;
         @CLIConfig.Option(desc = "Max Counter Levels in a Class")
         int rolluptime = 60;
         @CLIConfig.Option(desc = "Number of Threads")
@@ -206,30 +206,38 @@ public class LeafBenchmark {
      * @throws ProcCallException
      */
     public long InitializeData() throws IOException, NoConnectionsException, ProcCallException {
-        ClientResponse cresponse =
-                client.callProcedure("CleanCounters");
-        if (cresponse.getStatus() != ClientResponse.SUCCESS) {
-            throw new RuntimeException(cresponse.getStatusString());
+        if (config.init) {
+            ClientResponse cresponse =
+                    client.callProcedure("CleanCounters");
+            if (cresponse.getStatus() != ClientResponse.SUCCESS) {
+                throw new RuntimeException(cresponse.getStatusString());
+            }
         }
         long counter_id = 0;
         for (long i = 0; i < config.maxcounterclass; i++) {
-            client.callProcedure(new NullCallback(), "AddCounterClass", i, "Class-" + i);
-            // Add root counter in new class
-            client.callProcedure(new NullCallback(), "AddCounter", i, counter_id,
-                    "Counter-" + counter_id, config.rolluptime, -1);
+            if (config.init) {
+                client.callProcedure(new NullCallback(), "AddCounterClass", i, "Class-" + i);
+                // Add root counter in new class
+                client.callProcedure(new NullCallback(), "AddCounter", i, counter_id,
+                        "Counter-" + counter_id, config.rolluptime, -1);
+            }
             counterToClass.put(counter_id, i);
 
             counter_id++;
             for (int j = 0; j < config.depth-1; j++) {
-                client.callProcedure(new NullCallback(), "AddCounter", i, counter_id,
-                        "Counter-" + counter_id, config.rolluptime, counter_id-1);
+                if (config.init) {
+                    client.callProcedure(new NullCallback(), "AddCounter", i, counter_id,
+                            "Counter-" + counter_id, config.rolluptime, counter_id-1);
+                }
                 counterToClass.put(counter_id, i);
                 counter_id++;
             }
             if (config.depth > 0) {
                 for (int k = 0; k < config.leaves; k++) {
-                    client.callProcedure(new NullCallback(), "AddCounter", i, counter_id+k,
-                            "Counter-" + (counter_id+k), config.rolluptime, counter_id-1);
+                    if (config.init) {
+                        client.callProcedure(new NullCallback(), "AddCounter", i, counter_id+k,
+                                "Counter-" + (counter_id+k), config.rolluptime, counter_id-1);
+                    }
                     counterToClass.put(counter_id+k, i);
                 }
                 counter_id += config.leaves;
@@ -250,9 +258,7 @@ public class LeafBenchmark {
 
             LeafBenchmark bmrk = new LeafBenchmark(config);
             bmrk.connect(config.servers);
-            if (config.init) {
-                bmrk.InitializeData();
-            }
+            bmrk.InitializeData();
             if (!config.initonly) {
                 bmrk.runIncrements();
             }
@@ -418,7 +424,7 @@ public class LeafBenchmark {
      * @throws ProcCallException
      */
     public void runIncrements() throws IOException, NoConnectionsException, ProcCallException, InterruptedException {
-        System.out.println("Staring Incrementing Counters.");
+        System.out.println("Starting Incrementing Counters.");
         cdLatch = new CountDownLatch(config.numthreads);
         for (int i = 0; i < config.numthreads; i++) {
             Thread th = new Thread(new IncrementRunner(client));
