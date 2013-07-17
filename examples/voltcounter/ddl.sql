@@ -83,4 +83,5 @@ CREATE PROCEDURE FROM CLASS voltcounter.procedures.AddCounterClass;
 -- Counter stored procedures.
 CREATE PROCEDURE FROM CLASS voltcounter.procedures.AddCounter;
 CREATE PROCEDURE FROM CLASS voltcounter.procedures.Increment;
+CREATE PROCEDURE FROM CLASS voltcounter.procedures.IncrementAsync;
 CREATE PROCEDURE FROM CLASS voltcounter.procedures.GetCounterStdDev;

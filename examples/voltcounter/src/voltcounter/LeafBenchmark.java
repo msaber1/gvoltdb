@@ -427,8 +427,7 @@ public class LeafBenchmark {
         System.out.println("Starting Incrementing Counters.");
         cdLatch = new CountDownLatch(config.numthreads);
         for (int i = 0; i < config.numthreads; i++) {
-            Thread th = new Thread(new IncrementRunner(client));
-            th.run();
+            (new Thread(new IncrementRunner(client))).start();
         }
         cdLatch.await();
     }
