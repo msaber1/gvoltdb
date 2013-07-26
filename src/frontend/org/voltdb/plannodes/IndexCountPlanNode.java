@@ -28,6 +28,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
@@ -36,7 +37,7 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
@@ -139,6 +140,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     {
         boolean needPadding = false;
 
+        // add support for reverse scan
+        // for ASC scan, check endExpression; for DESC scan, need to check searchkeys
         List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
         // Initially assume that there will be an equality filter on all key components.
         IndexLookupType endType = IndexLookupType.EQ;
@@ -164,15 +167,32 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         // decide whether to pad last endKey to solve
         // SELECT COUNT(*) FROM T WHERE C1 = ? AND C2 > / >= ?
-        if (endType == IndexLookupType.EQ &&
+        if (isp.getSortDirection() != SortDirectionType.DESC &&
+                endType == IndexLookupType.EQ &&
+                endKeys.size() > 0 &&
                 endKeys.size() == isp.getCatalogIndex().getColumns().size() - 1 &&
                 isp.getSearchKeyExpressions().size() == isp.getCatalogIndex().getColumns().size()) {
+
+            // need to check the filter we are missing is the last indexable expr
+            // and find out missingKeyType
             Index index = isp.getCatalogIndex();
             String jsonstring = index.getExpressionsjson();
             VoltType missingKeyType = VoltType.INVALID;
+            needPadding = true;
+
             if (jsonstring.isEmpty()) {
                 List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(index.getColumns(), "index");
-                missingKeyType = VoltType.get((byte)(indexedColRefs.get(indexedColRefs.size() - 1).getColumn().getType()));
+                Column lastIndexableCol = indexedColRefs.get(indexedColRefs.size() - 1).getColumn();
+                int lastIndex = lastIndexableCol.getIndex();
+                for (AbstractExpression expr : endComparisons) {
+                    if (((TupleValueExpression)(expr.getLeft())).getColumnIndex() == lastIndex) {
+                        needPadding = false;
+                        break;
+                    }
+                }
+                if (needPadding) {
+                    missingKeyType = VoltType.get((byte)(indexedColRefs.get(indexedColRefs.size() - 1).getColumn().getType()));
+                }
             } else {
                 List<AbstractExpression> exprs = null;
                 try {
@@ -181,15 +201,25 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
                 }
-                missingKeyType = exprs.get(exprs.size() - 1).getLeft().getValueType();
+                AbstractExpression lastIndexableExpr = exprs.get(exprs.size() - 1);
+                for (AbstractExpression expr : endComparisons) {
+                    if (expr.getLeft().bindingToIndexedExpression(lastIndexableExpr) != null) {
+                        needPadding = false;
+                        break;
+                    }
+                }
+                if (needPadding) {
+                    missingKeyType = lastIndexableExpr.getValueType();
+                }
             }
-            if (missingKeyType.isInteger()) {
+            if (needPadding && missingKeyType.isMaxValuePaddable()) {
                 ConstantValueExpression missingKey = new ConstantValueExpression();
                 missingKey.setValueType(missingKeyType);
                 missingKey.setValue(String.valueOf(VoltType.getMaxIntegralTypeValue(missingKeyType)));
                 endType = IndexLookupType.LTE;
                 endKeys.add(missingKey);
-                needPadding = true;
+            } else {
+                needPadding = false;
             }
         }
 
