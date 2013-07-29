@@ -203,7 +203,7 @@ public class TestReplaceWithIndexCounter extends PlannerTestCase {
 
     public void testCountStar24() {
         List<AbstractPlanNode> pn = compileToFragments("SELECT count(*) from T2 WHERE ID = 1 AND USERNAME > 'JOHN' ");
-        checkIndexCounter(pn, true);
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar25() {
