@@ -72,29 +72,22 @@ public class Catalog extends CatalogType {
     void executeOne(String stmt) {
         stmt = stmt.trim();
 
-        // command comes before the first space (add or set)
-        int pos = stmt.indexOf(' ');
-        assert pos != -1;
-        String cmd = stmt.substring(0, pos);
-        stmt = stmt.substring(pos + 1);
-
-        // ref to a catalog node between first two spaces
-        pos = stmt.indexOf(' ');
-        assert pos != -1;
-        String ref = stmt.substring(0, pos);
-        stmt = stmt.substring(pos + 1);
-
-        // spaces 2 & 3 separate the two arguments
-        pos = stmt.indexOf(' ');
-        assert pos != -1;
-        String arg1 = stmt.substring(0, pos);
-        String arg2 = stmt.substring(pos + 1);
+        String word[] = stmt.split(" ");
+        assert word.length > 2;
+        String cmd = word[0];
+        String ref = word[1];
+        String arg1 = word[2];
+        String arg2 = "";
+        if (word.length > 3) {
+            assert word.length == 4;
+            arg2 = word[3];
+        }
 
         // resolve the ref to a node in the catalog
         CatalogType resolved = null;
-        if (ref.equals("$PREV")) {
+        if (ref.equals(".")) {
             if (m_prevUsedPath == null)
-                throw new CatalogException("$PREV reference was not preceded by a cached reference.");
+                throw new CatalogException("'.' reference was not preceded by a cached reference.");
             resolved = m_prevUsedPath;
         }
         else {
@@ -106,10 +99,10 @@ public class Catalog extends CatalogType {
         }
 
         // run either command
-        if (cmd.equals("add")) {
-            resolved.addChild(arg1, arg2);
+        if (cmd.equals("+")) {
+            m_prevUsedPath = resolved.addChild(arg1, arg2);
         }
-        else if (cmd.equals("delete")) {
+        else if (cmd.equals("-")) {
             resolved.delete(arg1, arg2);
             String toDelete = ref + "/" + arg1 + "[" + arg2 + "]";
             CatalogType thing = m_pathCache.remove(toDelete);
@@ -117,9 +110,26 @@ public class Catalog extends CatalogType {
                 throw new CatalogException("Unable to find reference to delete: " + toDelete);
             }
         }
-        else if (cmd.equals("set")) {
+        else if (cmd.equals("=")) {
             resolved.set(arg1, arg2);
         }
+    }
+
+    /**
+     * Run one explicit add command while building an original catalog.
+     * @param ref a full path to the parent catalog object.
+     * @param arg1 an existing child collection name
+     * @param arg2 a new child value for the collection
+     */
+    public void executeAdd(String ref, String collectionName, String childName)
+    {
+        // resolve the ref to a node in the catalog
+        CatalogType resolved = getItemForRef(ref);
+        if (resolved == null) {
+        	assert false;
+            throw new CatalogException("Unable to find reference for catalog item '" + ref + "'");
+        }
+        m_prevUsedPath = resolved.addChild(collectionName, childName);
     }
 
     CatalogType getItemForRef(final String ref) {

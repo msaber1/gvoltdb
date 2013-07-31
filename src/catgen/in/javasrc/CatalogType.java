@@ -235,12 +235,16 @@ public abstract class CatalogType implements Comparable<CatalogType> {
 
     void delete(String collectionName, String childName) {
         if ((collectionName == null) || (childName == null)) {
+            assert collectionName != null;
+            assert childName != null;
             throw new CatalogException("Null value where it shouldn't be.");
         }
 
-        if (m_childCollections.containsKey(collectionName) == false)
-            throw new CatalogException("Unexpected collection name '" + collectionName + "' for " + this);
         CatalogMap<? extends CatalogType> collection = m_childCollections.get(collectionName);
+        if (collection == null) {
+            assert false;
+            throw new CatalogException("Unexpected collection name '" + collectionName + "' for " + this);
+        }
 
         collection.delete(childName);
     }
@@ -259,16 +263,16 @@ public abstract class CatalogType implements Comparable<CatalogType> {
         parts[1] = parts[1].substring(0, parts[1].length() - 1);
         parts[1] = parts[1].trim();
 
-        sb.append("add ").append(newPath).append(" ");
+        sb.append("+ ").append(newPath).append(" ");
         sb.append(parts[0]).append(" ").append(parts[1]);
         sb.append("\n");
     }
 
     void writeCommandForField(StringBuilder sb, String field, boolean printFullPath) {
         String path = m_path;
-        if (!printFullPath) path = "$PREV"; // use cacheing to shrink output + speed parsing
+        if (!printFullPath) path = "."; // use cacheing to shrink output + speed parsing
 
-        sb.append("set ").append(path).append(" ");
+        sb.append("= ").append(path).append(" ");
         sb.append(field).append(" ");
         Object value = m_fields.get(field);
         if (value == null) {
