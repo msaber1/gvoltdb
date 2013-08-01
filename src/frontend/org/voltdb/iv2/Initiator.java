@@ -47,7 +47,8 @@ public interface Initiator
                           MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway,
-                          String coreBindIds)
+                          String coreBindIds,
+                          int timeout)
         throws KeeperException, InterruptedException, ExecutionException;
 
     /** Shutdown an Initiator and its sub-components. */

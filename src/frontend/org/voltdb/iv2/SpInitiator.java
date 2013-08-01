@@ -33,8 +33,8 @@ import org.voltdb.MemoryStats;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.Promotable;
-import org.voltdb.StartAction;
 import org.voltdb.SnapshotCompletionMonitor;
+import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -91,7 +91,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           MemoryStats memStats,
                           CommandLog cl,
                           NodeDRGateway nodeDRGateway,
-                          String coreBindIds)
+                          String coreBindIds,
+                          int timeout)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -109,7 +110,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
                 startAction,
-                agent, memStats, cl, coreBindIds, drGateway);
+                agent, memStats, cl, coreBindIds, drGateway, timeout);
 
         m_tickProducer.start();
 

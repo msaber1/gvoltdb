@@ -149,6 +149,64 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //LOG.info("Initialized Execution Engine");
     }
 
+    public ExecutionEngineJNI(
+            final int clusterIndex,
+            final long siteId,
+            final int partitionId,
+            final int hostId,
+            final String hostname,
+            final int tempTableMemory,
+            final TheHashinator.HashinatorType hashinatorType,
+            final byte hashinatorConfig[],
+            final FragmentPlanSource planSource,
+            int timeout)
+    {
+        // base class loads the volt shared library.
+        super(siteId, partitionId, planSource, timeout);
+
+        //exceptionBuffer.order(ByteOrder.nativeOrder());
+        LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
+                + ", site_id = " + siteId + "...");
+        /*
+         * (Ning): The reason I'm testing if we're running in Sun's JVM is that
+         * EE needs this info in order to decide whether it's safe to install
+         * the signal handler or not.
+         */
+        pointer = nativeCreate(System.getProperty("java.vm.vendor")
+                               .toLowerCase().contains("sun microsystems"));
+        nativeSetLogLevels(pointer, EELoggers.getLogLevels());
+        int errorCode =
+            nativeInitialize(
+                    pointer,
+                    clusterIndex,
+                    siteId,
+                    partitionId,
+                    hostId,
+                    getStringBytes(hostname),
+                    tempTableMemory * 1024 * 1024,
+                    hashinatorType.typeId(), hashinatorConfig);
+        checkErrorCode(errorCode);
+        fsForParameterSet = new FastSerializer(true, new BufferGrowCallback() {
+            @Override
+            public void onBufferGrow(final FastSerializer obj) {
+                LOG.trace("Parameter buffer has grown. re-setting to EE..");
+                final int code = nativeSetBuffers(pointer,
+                        fsForParameterSet.getContainerNoFlip().b,
+                        fsForParameterSet.getContainerNoFlip().b.capacity(),
+                        deserializer.buffer(), deserializer.buffer().capacity(),
+                        exceptionBuffer, exceptionBuffer.capacity());
+                checkErrorCode(code);
+            }
+        });
+
+        errorCode = nativeSetBuffers(pointer, fsForParameterSet.getContainerNoFlip().b,
+                fsForParameterSet.getContainerNoFlip().b.capacity(),
+                deserializer.buffer(), deserializer.buffer().capacity(),
+                exceptionBuffer, exceptionBuffer.capacity());
+        checkErrorCode(errorCode);
+        //LOG.info("Initialized Execution Engine");
+    }
+
     /** Utility method to throw a Runtime exception based on the error code and serialized exception **/
     @Override
     final protected void throwExceptionForError(final int errorCode) throws RuntimeException {

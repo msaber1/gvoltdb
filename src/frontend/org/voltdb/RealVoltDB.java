@@ -620,7 +620,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                             m_memoryStats,
                             m_commandLog,
                             m_nodeDRGateway,
-                            m_config.m_executionCoreBindings.poll());
+                            m_config.m_executionCoreBindings.poll(),
+                            m_deployment.getCluster().getTimeout());
                 }
             } catch (Exception e) {
                 Throwable toLog = e;

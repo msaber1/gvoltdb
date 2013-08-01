@@ -551,6 +551,48 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 config);
     }
 
+    public ExecutionEngineIPC(
+            final int clusterIndex,
+            final long siteId,
+            final int partitionId,
+            final int hostId,
+            final String hostname,
+            final int tempTableMemory,
+            final BackendTarget target,
+            final int port,
+            final HashinatorType type,
+            final byte config[],
+            FragmentPlanSource planSource,
+            final int timeout) {
+        super(siteId, partitionId, planSource, timeout);
+
+        // m_counter = 0;
+        m_clusterIndex = clusterIndex;
+        m_siteId = siteId;
+        m_partitionId = partitionId;
+        m_hostId = hostId;
+        m_hostname = hostname;
+        // m_fser = new FastSerializer(false, false);
+        m_connection = new Connection(target, port);
+
+        // voltdbipc assumes host byte order everywhere
+        // Arbitrarily set to 20MB when 10MB crashed for an arbitrarily scaled unit test.
+        m_dataNetworkOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 20);
+        m_dataNetwork = m_dataNetworkOrigin.b;
+        m_dataNetwork.position(4);
+        m_data = m_dataNetwork.slice();
+
+        initialize(
+                m_clusterIndex,
+                m_siteId,
+                m_partitionId,
+                m_hostId,
+                m_hostname,
+                1024 * 1024 * tempTableMemory,
+                type,
+                config);
+    }
+
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
     @Override
     protected void throwExceptionForError(final int errorCode) {

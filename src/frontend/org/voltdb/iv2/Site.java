@@ -148,6 +148,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // the task log
     private final PartitionDRGateway m_drGateway;
 
+    private int m_timeout;
+
     // Current topology
     int m_partitionId;
 
@@ -343,7 +345,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             MemoryStats memStats,
             String coreBindIds,
             TaskLog rejoinTaskLog,
-            PartitionDRGateway drGateway)
+            PartitionDRGateway drGateway,
+            int timeout)
     {
         m_siteId = siteId;
         m_context = context;
@@ -364,6 +367,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_coreBindIds = coreBindIds;
         m_rejoinTaskLog = rejoinTaskLog;
         m_drGateway = drGateway;
+        m_timeout = timeout;
 
         if (agent != null) {
             m_tableStats = new TableStats(m_siteId);
@@ -434,7 +438,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                         TheHashinator.getConfiguredHashinatorType(),
                         TheHashinator.getConfigureBytes(m_numberOfPartitions),
-                        this);
+                        this,
+                        m_timeout);
                 eeTemp.loadCatalog( timestamp, serializedCatalog);
             }
             else {

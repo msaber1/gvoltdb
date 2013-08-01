@@ -75,6 +75,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** For now sync this value with the value in the EE C++ code to get good stats. */
     public static final int EE_PLAN_CACHE_SIZE = 1000;
 
+    public static final int LONG_OP_LOG_INTERVAL = 1000;
+
     /** Partition ID */
     protected final int m_partitionId;
 
@@ -91,6 +93,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private long m_logDuration;
 
     protected FragmentPlanSource m_planSource;
+
+    private int m_timeout;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -131,6 +135,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             statsAgent.registerStatsSource(StatsSelector.PLANNER, siteId, m_plannerStats);
         }
         m_planSource = planSource;
+    }
+
+    public ExecutionEngine(long siteId, int partitionId, FragmentPlanSource planSource, int timeout) {
+        m_partitionId = partitionId;
+        org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
+        // In mock test environments there may be no stats agent.
+        final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
+        if (statsAgent != null) {
+            m_plannerStats = new PlannerStatsCollector(siteId);
+            statsAgent.registerStatsSource(StatsSelector.PLANNER, siteId, m_plannerStats);
+        }
+        m_planSource = planSource;
+        m_timeout = timeout;
     }
 
     /** Alternate constructor without planner statistics tracking. */
@@ -322,21 +339,26 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         long duration = currentTime - m_startTime;
         if(duration > m_logDuration) {
             VoltLogger log = new VoltLogger("CONSOLE");
-            log.info("Long running operation");
-            log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
-                    +"["+"Executor:"+planNodeName+"]"
-                    +"["+"Target table(size):"+targetTableName+"("+targetTableSize+")"+"]"
-                    +"["+"Tuples processed:"+tuplesFound+"]"
-                    +"["+"Index:"+indexName+"]"
-                    +"["+"Batch index:"+batchIndex+"]"
+            log.warn("[Long Running Op]"
+                    +"[Proc: "+m_rProcContext.m_procedureName+"]"
+                    +"[Executor: "+planNodeName+"]"
+                    +"[Target Table(Size): "+targetTableName+"("+targetTableSize+")"+"]"
+                    +"[Tuples Processed: "+tuplesFound+"]"
+                    +"[Index: "+indexName+"]"
+                    +"[Batch Index: "+batchIndex+"]"
+                    +"[Running Time: "+duration+"ms]"
                     );
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
         }
         //Set timer and time out read only queries.
-        //        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
-        //            return true;
-        //        else
-        return false;
+        if(m_readOnly && duration > m_timeout)
+        {
+            VoltLogger log = new VoltLogger("CONSOLE");
+            log.warn("RO query from "+m_rProcContext.m_procedureName+" has been running for "+duration+" milliseconds, going to time out it.");
+            return true;
+        }
+        else
+            return false;
     }
 
     /**
@@ -393,7 +415,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
             //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
-            m_logDuration = 1000;
+            m_logDuration = LONG_OP_LOG_INTERVAL;
             m_startTime = System.currentTimeMillis();
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
@@ -425,7 +447,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
             //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
-            m_logDuration = 1000;
+            m_logDuration = LONG_OP_LOG_INTERVAL;
             m_startTime = System.currentTimeMillis();
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
