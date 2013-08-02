@@ -203,7 +203,8 @@ inline bool TableIterator::next(TableTuple &out) {
                                     m_foundTuples,
                                     m_engine->getIndex() ? m_engine->getIndex()->getName() : "None")){
                 VOLT_ERROR("Time out read only query.");
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+                throw TimeOutException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
+                //throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
             }
         }
     }
