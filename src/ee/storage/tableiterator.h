@@ -83,7 +83,6 @@ public:
      * @return true if succeeded. false if no more active tuple is there.
     */
     bool next(TableTuple &out);
-    bool next(TableTuple &out, VoltDBEngine* engine);
     void setEngine(VoltDBEngine* engine);
     bool hasNext();
     int getLocation() const;
