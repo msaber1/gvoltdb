@@ -75,7 +75,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** For now sync this value with the value in the EE C++ code to get good stats. */
     public static final int EE_PLAN_CACHE_SIZE = 1000;
 
-    public static final int LONG_OP_LOG_INTERVAL = 1000;
+    public static final int LONG_OP_LOG_INTERVAL = 0;//1000;
 
     /** Partition ID */
     protected final int m_partitionId;
@@ -348,6 +348,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                     +"[Batch Index: "+batchIndex+"]"
                     +"[Running Time: "+duration+"ms]"
                     );
+            //Exponential back off log capped at 30 seconds.
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
         }
         //Set timer and time out read only queries.
