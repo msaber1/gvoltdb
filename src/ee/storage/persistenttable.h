@@ -61,6 +61,7 @@
 #include "storage/RecoveryContext.h"
 #include "common/UndoQuantumReleaseInterest.h"
 #include "common/ThreadLocalPool.h"
+#include "storage/BigMemoryAllocator.h"
 
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
@@ -485,7 +486,7 @@ inline TBPtr PersistentTable::findBlock(char *tuple) {
 }
 
 inline TBPtr PersistentTable::allocateNextBlock() {
-    TBPtr block(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    TBPtr block(new (BigMemoryAllocator::alloc(sizeof(TupleBlock))) TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
     m_data.insert( block->address(), block);
     m_blocksNotPendingSnapshot.insert(block);
     return block;

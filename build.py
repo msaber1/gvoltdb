@@ -312,6 +312,7 @@ CTX.INPUT['storage'] = """
  TupleStreamWrapper.cpp
  RecoveryContext.cpp
  TupleBlock.cpp
+ BigMemoryAllocator.cpp
 """
 
 CTX.INPUT['stats'] = """
@@ -397,6 +398,7 @@ if whichtests in ("${eetestsuite}", "indexes"):
 
 if whichtests in ("${eetestsuite}", "storage"):
     CTX.TESTS['storage'] = """
+     BigMemoryAllocatorTest
      CompactionTest
      constraint_test
      CopyOnWriteTest

@@ -32,6 +32,7 @@
 #include "boost_ext/FastAllocator.hpp"
 #include "common/ThreadLocalPool.h"
 #include "common/tabletuple.h"
+#include "storage/BigMemoryAllocator.h"
 #include <deque>
 
 namespace voltdb {
@@ -272,7 +273,8 @@ inline void intrusive_ptr_release(voltdb::TupleBlock * p)
 {
     if (--(p->m_references) == 0) {
         p->~TupleBlock();
-        voltdb::ThreadLocalPool::getExact(sizeof(voltdb::TupleBlock))->free(p);
+        voltdb::BigMemoryAllocator::free(p);
+        //voltdb::ThreadLocalPool::getExact(sizeof(voltdb::TupleBlock))->free(p);
     }
 }
 

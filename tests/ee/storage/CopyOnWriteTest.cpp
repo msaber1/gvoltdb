@@ -62,7 +62,7 @@ static int32_t m_primaryKeyIndex = 0;
 // Remember to comment out before checking in.
 //#define EXTRA_SMALL
 
-#if defined(EXTRA_SMALL)
+//#if defined(EXTRA_SMALL)
 
 // Extra small quantities for quick debugging runs.
 const size_t TUPLE_COUNT = 10;
@@ -70,7 +70,7 @@ const size_t BUFFER_SIZE = 1024;
 const size_t NUM_REPETITIONS = 2;
 const size_t NUM_MUTATIONS = 5;
 
-#elif defined(MEMCHECK)
+/*#elif defined(MEMCHECK)
 
 // The smaller quantity is used for memcheck runs.
 const size_t TUPLE_COUNT = 1000;
@@ -86,7 +86,7 @@ const size_t BUFFER_SIZE = 131072;
 const size_t NUM_REPETITIONS = 10;
 const size_t NUM_MUTATIONS = 10;
 
-#endif
+#endif*/
 
 // Maximum quantity for detailed error display.
 const size_t MAX_DETAIL_COUNT = 50;
