@@ -327,6 +327,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                     +"["+"Target table(size):"+lastAccessedTable+"("+lastAccessedTableSize+")"+"]"
                     +"["+"Tuples processed:"+tuplesFound+"]"
                     +"["+"Batch index:"+batchIndex+"]"
+                    +"["+"SQL STMT:"+this.m_rProcContext.m_batchSQLStmt[batchIndex]+"]"
                     );
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
         }

@@ -1124,9 +1124,11 @@ public class ProcedureRunner {
 
        BatchState state = new BatchState(batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
 
+       String[] batchStmts = new String[batch.size()];
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
            QueuedSQL queuedSQL = batch.get(i);
+           batchStmts[i] = queuedSQL.stmt.getText();
 
            assert(queuedSQL.stmt != null);
 
@@ -1180,6 +1182,7 @@ public class ProcedureRunner {
 
        if (!state.m_distributedTask.isEmpty()) {
            state.m_distributedTask.setProcName(m_procedureName);
+           state.m_distributedTask.setBatchSQLStmts(batchStmts);
            m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
        }
 
@@ -1208,6 +1211,7 @@ public class ProcedureRunner {
        Object[] params = new Object[batchSize];
        long[] fragmentIds = new long[batchSize];
 
+       String[] batchStmts = new String[batchSize];
        int i = 0;
        for (final QueuedSQL qs : batch) {
            assert(qs.stmt.collector == null);
@@ -1219,8 +1223,10 @@ public class ProcedureRunner {
            else {
                params[i] = qs.params;
            }
+           batchStmts[i] = qs.stmt.getText();
            i++;
        }
+       m_rProcContext.m_batchSQLStmt = batchStmts;
        return m_site.executePlanFragments(
            batchSize,
            fragmentIds,

@@ -19,7 +19,7 @@ package org.voltdb;
 
 public class RunningProcedureContext {
     public String m_procedureName;
-    //public List<QueuedSQL> m_batch;
+    public String[] m_batchSQLStmt;
 
     public RunningProcedureContext() {
     }

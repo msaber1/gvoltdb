@@ -133,6 +133,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return m_procNameInBytes;
     }
 
+    String[] m_batchSQLStmts;
+    public void setBatchSQLStmts(String[] batchSQLStmts) {
+        m_batchSQLStmts = batchSQLStmts;
+    }
+    public String[] getBatchSQLStmts() {
+        return m_batchSQLStmts;
+    }
+
     /** Empty constructor for de-serialization */
     FragmentTaskMessage() {
         m_subject = Subject.DEFAULT.getId();
@@ -180,6 +188,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_initiateTask = ftask.m_initiateTask;
         m_emptyForRestart = ftask.m_emptyForRestart;
         m_procNameInBytes = ftask.m_procNameInBytes;
+        m_batchSQLStmts = ftask.m_batchSQLStmts;
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -455,6 +464,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if(m_procNameInBytes.length != 0)
             msgsize += m_procNameInBytes.length;
 
+        // BatchSQLStmts get a length (4) and length (4) and content of each SQL stmt
+        msgsize += 4;
+        if(m_batchSQLStmts.length != 0) {
+            for(String stmt: this.m_batchSQLStmts) {
+                msgsize += 4 + stmt.length();
+            }
+        }
+
         //nested initiate task message length prefix
         msgsize += 4;
         if (m_initiateTaskBuffer != null) {
@@ -584,6 +601,21 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
            buf.putInt(0);
         }
 
+        // batchSQLStmts
+        if (m_batchSQLStmts.length != 0) {
+            int len = 0;
+            for(String stmt: m_batchSQLStmts) {
+                len += stmt.length();
+            }
+            buf.putInt(len);
+            for(String stmt: m_batchSQLStmts) {
+                buf.putInt(stmt.length());
+                buf.put(stmt.getBytes());
+            }
+        } else {
+           buf.putInt(0);
+        }
+
         if (m_initiateTaskBuffer != null) {
             ByteBuffer dup = m_initiateTaskBuffer.duplicate();
             buf.putInt(dup.remaining());
@@ -679,6 +711,20 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if(procNameLen > 0) {
             m_procNameInBytes = new byte[procNameLen];
             buf.get(m_procNameInBytes);
+        }
+
+        // BatchSQLStmts
+        int batchSize = buf.getInt();
+        if(batchSize > 0) {
+            m_batchSQLStmts = new String[batchSize];
+            int len;
+            byte[] temp;
+            for(int i = 0; i < batchSize; i++) {
+                len = buf.getInt();
+                temp = new byte[len];
+                buf.get(temp);
+                m_batchSQLStmts[i] = new String(temp);
+            }
         }
 
         int initiateTaskMessageLength = buf.getInt();
