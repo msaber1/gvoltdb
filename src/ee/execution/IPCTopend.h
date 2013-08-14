@@ -31,10 +31,10 @@ class IPCTopend : public Topend {
 public:
     IPCTopend( VoltDBIPC *vdbipc);
     int loadNextDependency(int32_t dependencyId, Pool *stringPool, Table* destination);
-    bool updateStats(int32_t batchIndex,
+    bool fragmentProgressUpdate(int32_t batchIndex,
             std::string planNodeName,
-            std::string targetTableName,
-            int64_t targetTableSize,
+            std::string lastAccessedTable,
+            int64_t lastAccessedTableSize,
             int64_t tuplesFound);
     std::string planForFragmentId(int64_t fragmentId);
     void crashVoltDB(FatalException e);

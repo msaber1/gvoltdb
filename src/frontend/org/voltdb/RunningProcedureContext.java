@@ -21,6 +21,4 @@ public class RunningProcedureContext {
     public String m_procedureName;
     public String[] m_batchSQLStmt;
 
-    public RunningProcedureContext() {
-    }
 }
