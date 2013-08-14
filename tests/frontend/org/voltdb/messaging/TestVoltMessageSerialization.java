@@ -157,6 +157,9 @@ public class TestVoltMessageSerialization extends TestCase {
         ft.addFragment(new byte[20], 12, ByteBuffer.allocate(0));
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
         ft.setProcName("AdHoc");
+//        String[] batchStmts = {"select * from votes limit 100"};
+//        ft.setBatchSQLStmts(batchStmts);
+//        System.out.println(ft.getBatchSQLStmts()[0]);
 
         FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
 
@@ -172,6 +175,11 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(ft.isFinalTask(), ft2.isFinalTask());
         assertEquals(ft.isSysProcTask(), ft2.isSysProcTask());
         assertEquals(new String(ft.getProcNameInBytes()), new String(ft.getProcNameInBytes()));
+//        for(int i = 0; i < batchStmts.length; i++) {
+//            System.out.println(ft.getBatchSQLStmts()[i]);
+//            System.out.println(ft2.getBatchSQLStmts()[i]);
+//            assertEquals(ft.getBatchSQLStmts()[i], ft2.getBatchSQLStmts()[i]);
+//        }
     }
 
     public void testFragmentTaskWithTwoFrags() throws IOException {

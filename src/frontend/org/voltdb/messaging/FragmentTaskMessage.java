@@ -466,7 +466,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         // BatchSQLStmts get a length (4) and length (4) and content of each SQL stmt
         msgsize += 4;
-        if(m_batchSQLStmts.length != 0) {
+        if(m_batchSQLStmts != null) {
             for(String stmt: this.m_batchSQLStmts) {
                 msgsize += 4 + stmt.length();
             }
@@ -602,7 +602,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         }
 
         // batchSQLStmts
-        if (m_batchSQLStmts.length != 0) {
+        if (m_batchSQLStmts != null) {
             int len = 0;
             for(String stmt: m_batchSQLStmts) {
                 len += stmt.length();
