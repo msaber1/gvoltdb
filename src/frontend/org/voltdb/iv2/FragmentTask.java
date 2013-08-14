@@ -217,6 +217,7 @@ public class FragmentTask extends TransactionTask
                 if(m_fragmentMsg.getProcNameInBytes().length != 0) {
                     m_procContext = new RunningProcedureContext();
                     m_procContext.m_procedureName = new String(m_fragmentMsg.getProcNameInBytes());
+                    m_procContext.m_batchSQLStmt = m_fragmentMsg.getBatchSQLStmts();
                 }
                 dependency = siteConnection.executePlanFragments(
                         1,
