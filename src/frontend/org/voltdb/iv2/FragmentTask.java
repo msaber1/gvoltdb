@@ -34,6 +34,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
@@ -207,16 +208,18 @@ public class FragmentTask extends TransactionTask
 
                 // if custom fragment, load the plan and get local fragment id
                 if (fragmentPlan != null) {
-                    fragmentId = siteConnection.loadOrAddRefPlanFragment(planHash, fragmentPlan);
+                    fragmentId = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, fragmentPlan);
                 }
                 // otherwise ask the plan source for a local fragment id
                 else {
-                    fragmentId = siteConnection.getFragmentIdForPlanHash(planHash);
+                    fragmentId = ActivePlanRepository.getFragmentIdForPlanHash(planHash);
                 }
 
                 if(m_fragmentMsg.getProcNameInBytes().length != 0) {
                     m_procContext = new RunningProcedureContext();
                     m_procContext.m_procedureName = new String(m_fragmentMsg.getProcNameInBytes());
+                    m_procContext.m_voltExecuteSQLIndex = m_fragmentMsg.getVoltExecuteSQLIndex();
+                    m_procContext.m_batchIndexBase = m_fragmentMsg.getBatchIndexBase();
                     m_procContext.m_batchSQLStmt = m_fragmentMsg.getBatchSQLStmts();
                 }
                 dependency = siteConnection.executePlanFragments(
@@ -247,7 +250,7 @@ public class FragmentTask extends TransactionTask
             finally {
                 // ensure adhoc plans are unloaded
                 if (fragmentPlan != null) {
-                    siteConnection.decrefPlanFragmentById(fragmentId);
+                    ActivePlanRepository.decrefPlanFragmentById(fragmentId);
                 }
             }
         }

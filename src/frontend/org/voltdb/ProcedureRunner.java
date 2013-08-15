@@ -53,6 +53,7 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.iv2.UniqueIdGenerator;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
@@ -114,7 +115,7 @@ public class ProcedureRunner {
     protected final PureJavaCrc32C m_inputCRC = new PureJavaCrc32C();
 
     // running procedure info
-    RunningProcedureContext m_rProcContext = new RunningProcedureContext();
+    protected RunningProcedureContext m_rProcContext;
 
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
@@ -142,6 +143,7 @@ public class ProcedureRunner {
         m_site = site;
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
+        m_rProcContext = new RunningProcedureContext();
 
         m_procedure.init(this);
 
@@ -206,6 +208,7 @@ public class ProcedureRunner {
         ClientResponseImpl retval = null;
         // assert no sql is queued
         assert(m_batch.size() == 0);
+        assert(m_rProcContext.m_voltExecuteSQLIndex == 0);
 
         try {
             m_statsCollector.beginProcedure();
@@ -347,6 +350,7 @@ public class ProcedureRunner {
             m_cachedSingleStmt.params = null;
             m_cachedSingleStmt.expectation = null;
             m_seenFinalBatch = false;
+            m_rProcContext = new RunningProcedureContext();
         }
 
         return retval;
@@ -502,11 +506,11 @@ public class ProcedureRunner {
             QueuedSQL queuedSQL = new QueuedSQL();
             AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
 
-            long aggFragId = m_site.loadOrAddRefPlanFragment(
+            long aggFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                     plannedStatement.core.aggregatorHash, plannedStatement.core.aggregatorFragment);
             long collectorFragId = 0;
             if (plannedStatement.core.collectorFragment != null) {
-                collectorFragId = m_site.loadOrAddRefPlanFragment(
+                collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                         plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment);
             }
 
@@ -570,6 +574,7 @@ public class ProcedureRunner {
 
             // memo-ize the original batch size here
             int batchSize = m_batch.size();
+            m_rProcContext.m_voltExecuteSQLIndex++;
 
             m_rProcContext.m_procedureName = this.m_procedureName;
 
@@ -598,6 +603,7 @@ public class ProcedureRunner {
                     //  this means subBatch will be empty after running and since subBatch is a
                     //  view on the larger batch, it removes subBatch.size() elements from m_batch.
                     results.add(executeQueriesInABatch(subBatch, finalSubBatch));
+                    m_rProcContext.m_batchIndexBase += subSize;
                 }
 
                 // merge the list of lists into something returnable
@@ -660,7 +666,7 @@ public class ProcedureRunner {
         try {
             return m_site.loadTable(m_txnState.txnId,
                              clusterName, databaseName,
-                             tableName, data, returnUniqueViolations);
+                             tableName, data, returnUniqueViolations, Long.MAX_VALUE);
         }
         catch (EEException e) {
             throw new VoltAbortException("Failed to load table: " + tableName);
@@ -727,7 +733,7 @@ public class ProcedureRunner {
         for (PlanFragment frag : catStmt.getFragments()) {
             byte[] planHash = Encoder.hexDecode(frag.getPlanhash());
             byte[] plan = Encoder.base64Decode(frag.getPlannodetree());
-            long id = m_site.loadOrAddRefPlanFragment(planHash, plan);
+            long id = ActivePlanRepository.loadOrAddRefPlanFragment(planHash, plan);
             boolean transactional = frag.getNontransactional() == false;
 
             SQLStmt.Frag stmtFrag = new SQLStmt.Frag(id, planHash, transactional);
@@ -1092,7 +1098,7 @@ public class ProcedureRunner {
                    m_localTask.addFragment(stmt.aggregator.planHash, m_depsToResume[index], params);
                }
                else {
-                   byte[] planBytes = site.planForFragmentId(stmt.aggregator.id);
+                   byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
                    m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
                }
            }
@@ -1107,9 +1113,9 @@ public class ProcedureRunner {
                    m_distributedTask.addFragment(stmt.collector.planHash, outputDepId, params);
                }
                else {
-                   byte[] planBytes = site.planForFragmentId(stmt.aggregator.id);
+                   byte[] planBytes = ActivePlanRepository.planForFragmentId(stmt.aggregator.id);
                    m_localTask.addCustomFragment(stmt.aggregator.planHash, m_depsToResume[index], params, planBytes);
-                   planBytes = site.planForFragmentId(stmt.collector.id);
+                   planBytes = ActivePlanRepository.planForFragmentId(stmt.collector.id);
                    m_distributedTask.addCustomFragment(stmt.collector.planHash, outputDepId, params, planBytes);
                }
            }
@@ -1180,8 +1186,12 @@ public class ProcedureRunner {
                                           state.m_localFragsAreNonTransactional && finalTask);
 
        if (!state.m_distributedTask.isEmpty()) {
+<<<<<<< HEAD
            state.m_distributedTask.setProcName(m_procedureName);
            state.m_distributedTask.setBatchSQLStmts(batchStmts);
+=======
+           state.m_distributedTask.setRunningProcedureContext(m_procedureName, m_rProcContext.m_voltExecuteSQLIndex, m_rProcContext.m_batchIndexBase);
+>>>>>>> ENG-4939-Index
            m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
        }
 

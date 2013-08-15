@@ -126,11 +126,21 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     ByteBuffer m_initiateTaskBuffer;
 
     byte[] m_procNameInBytes = "".getBytes();
-    public void setProcName(String procName) {
+    short m_voltExecuteSQLIndex;
+    short m_batchIndexBase;
+    public void setRunningProcedureContext(String procName, short voltExecuteSQLIndex, short batchIndexBase) {
         m_procNameInBytes = procName.getBytes();
+        m_voltExecuteSQLIndex = voltExecuteSQLIndex;
+        m_batchIndexBase = batchIndexBase;
     }
     public byte[] getProcNameInBytes() {
         return m_procNameInBytes;
+    }
+    public short getVoltExecuteSQLIndex() {
+        return m_voltExecuteSQLIndex;
+    }
+    public short getBatchIndexBase() {
+        return m_batchIndexBase;
     }
 
     String[] m_batchSQLStmts;
@@ -189,6 +199,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_emptyForRestart = ftask.m_emptyForRestart;
         m_procNameInBytes = ftask.m_procNameInBytes;
         m_batchSQLStmts = ftask.m_batchSQLStmts;
+        m_voltExecuteSQLIndex = ftask.m_voltExecuteSQLIndex;
+        m_batchIndexBase = ftask.m_batchIndexBase;
+
         if (ftask.m_initiateTaskBuffer != null) {
             m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
         }
@@ -427,6 +440,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      *
      * Porcedure name: byte: length of the name string.
      *
+     * voltExecuteIndex: short: 2
+     *
+     * batchIndexBase: short: 2
+     *
      * Parameter set block (1 per item):
      *     parameter buffer size: int: 4 * nitems
      *     parameter buffer: bytes: ? * nitems
@@ -463,6 +480,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         msgsize += 2;
         if(m_procNameInBytes.length != 0)
             msgsize += m_procNameInBytes.length;
+
+        // voltDBExecuteSQLIndex gets an length (2)
+        msgsize += 2;
+
+        // batchIndexBase gets an length (2)
+        msgsize += 2;
 
         // BatchSQLStmts get a length (4) and length (4) and content of each SQL stmt
         msgsize += 4;
@@ -601,6 +624,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
            buf.putShort((short)0);
         }
 
+        // voltExecuteIndex
+        buf.putShort(m_voltExecuteSQLIndex);
+
+        // batchIndexBase
+        buf.putShort(m_batchIndexBase);
+
         // batchSQLStmts
         if (m_batchSQLStmts != null) {
             int len = 0;
@@ -712,6 +741,12 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             m_procNameInBytes = new byte[procNameLen];
             buf.get(m_procNameInBytes);
         }
+
+        // votExecuteSQLIndex
+        m_voltExecuteSQLIndex = buf.getShort();
+
+        // batchIndexBase
+        m_batchIndexBase = buf.getShort();
 
         // BatchSQLStmts
         int batchSize = buf.getInt();

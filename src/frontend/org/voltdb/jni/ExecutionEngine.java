@@ -27,9 +27,9 @@ import java.util.Map.Entry;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltdb.ExecutionSite;
-import org.voltdb.FragmentPlanSource;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.RunningProcedureContext;
@@ -43,6 +43,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -78,6 +79,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Partition ID */
     protected final int m_partitionId;
 
+    /** Site ID */
+    protected final int m_hostId;
+
     /** Statistics collector (provided later) */
     private PlannerStatsCollector m_plannerStats = null;
 
@@ -89,8 +93,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private boolean m_readOnly;
     private long m_startTime;
     private long m_logDuration;
-
-    protected FragmentPlanSource m_planSource;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -121,8 +123,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine(long siteId, int partitionId, FragmentPlanSource planSource) {
+    public ExecutionEngine(long siteId, int partitionId) {
         m_partitionId = partitionId;
+        m_hostId = CoreUtils.getHostIdFromHSId(siteId);
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
         // In mock test environments there may be no stats agent.
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
@@ -130,14 +133,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_plannerStats = new PlannerStatsCollector(siteId);
             statsAgent.registerStatsSource(StatsSelector.PLANNER, siteId, m_plannerStats);
         }
-        m_planSource = planSource;
     }
 
     /** Alternate constructor without planner statistics tracking. */
-    public ExecutionEngine(FragmentPlanSource planSource) {
+    public ExecutionEngine() {
         m_partitionId = 0;  // not used
+        m_hostId = 0; // not used
         m_plannerStats = null;
-        m_planSource = planSource;
     }
 
     /*
@@ -321,21 +323,30 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         long duration = currentTime - m_startTime;
         if(duration > 0) {//m_logDuration) {
             VoltLogger log = new VoltLogger("CONSOLE");
-            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute. Current statistics:");
+
+//            log.info("Long Running Procedure Status: "+m_rProcContext.m_procedureName+" procedure on site "+m_hostId+" has spent "+duration/1000.0
+//                    +"s, has processed "+tuplesFound+" tuples. Current executor is "+planNodeName+" Last accessed table was "+lastAccessedTable+" containing "+
+//                    lastAccessedTableSize+" tuples. Current stmt is the "+m_rProcContext.m_voltExecuteSQLIndex+
+//                    "'th call to voltExecuteSQL, batch index "+(m_rProcContext.m_batchIndexBase+batchIndex+1));
+
+            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute on site "+m_hostId+". Current statistics:");
             log.info("SQL statement: "+m_rProcContext.m_batchSQLStmt[batchIndex]);
             log.info("Execution time: "+duration/1000.0+"s");
-            log.info("Current statement being executed: Statement {sub-index} in Queue {index}");
+            log.info("Current statement being executed: Statement "+(m_rProcContext.m_batchIndexBase+batchIndex+1)+" of "+m_rProcContext.m_voltExecuteSQLIndex+"'th call to VoltExecuteSQL");
             log.info("Current plan fragment: "+planNodeName);
             log.info("Last table accessed: "+lastAccessedTable+", "+lastAccessedTableSize+" tuples");
             log.info("Total tuples accessed: "+tuplesFound);
 
-//            log.info("Long running operation");
+//            log.info("Long running operation on site "+m_hostId);
 //            log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
+//                    +"["+"Execution time:"+duration/1000.0+"s]"
 //                    +"["+"Executor:"+planNodeName+"]"
 //                    +"["+"Target table(size):"+lastAccessedTable+"("+lastAccessedTableSize+")"+"]"
 //                    +"["+"Tuples processed:"+tuplesFound+"]"
-//                    +"["+"Batch index:"+batchIndex+"]"
+//                    +"["+"VoltExecuteSQL index:"+m_rProcContext.m_voltExecuteSQLIndex+"]"
+//                    +"["+"Batch index:"+(m_rProcContext.m_batchIndexBase+batchIndex+1)+"]"
 //                    );
+
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
         }
         //Set timer and time out read only queries.
@@ -355,7 +366,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         // estimate the cache size by the number of misses
         m_eeCacheSize = Math.max(EE_PLAN_CACHE_SIZE, m_eeCacheSize + 1);
         // get the plan for realz
-        return m_planSource.planForFragmentId(fragmentId);
+        return ActivePlanRepository.planForFragmentId(fragmentId);
     }
 
     /*
@@ -463,7 +474,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public byte[] loadTable(
         int tableId, VoltTable table, long spHandle,
-        long lastCommittedSpHandle, boolean returnUniqueViolations) throws EEException;
+        long lastCommittedSpHandle, boolean returnUniqueViolations,
+        long undoToken) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -658,9 +670,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param Length of the serialized table
      * @param undoToken token for undo quantum where changes should be logged.
      * @param returnUniqueViolations If true unique violations won't cause a fatal error and will be returned instead
+     * @param undoToken The undo token to release
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations);
+            long spHandle, long lastCommittedSpHandle, boolean returnUniqueViolations, long undoToken);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
