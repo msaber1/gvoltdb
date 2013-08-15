@@ -1186,12 +1186,8 @@ public class ProcedureRunner {
                                           state.m_localFragsAreNonTransactional && finalTask);
 
        if (!state.m_distributedTask.isEmpty()) {
-<<<<<<< HEAD
-           state.m_distributedTask.setProcName(m_procedureName);
-           state.m_distributedTask.setBatchSQLStmts(batchStmts);
-=======
            state.m_distributedTask.setRunningProcedureContext(m_procedureName, m_rProcContext.m_voltExecuteSQLIndex, m_rProcContext.m_batchIndexBase);
->>>>>>> ENG-4939-Index
+           state.m_distributedTask.setBatchSQLStmts(batchStmts);
            m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
        }
 
