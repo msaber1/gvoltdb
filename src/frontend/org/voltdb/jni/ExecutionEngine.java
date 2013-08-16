@@ -33,6 +33,7 @@ import org.voltdb.ExecutionSite;
 import org.voltdb.PlannerStatsCollector;
 import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.RunningProcedureContext;
+import org.voltdb.RunningProcedureStatsCollector;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
@@ -84,6 +85,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /** Statistics collector (provided later) */
     private PlannerStatsCollector m_plannerStats = null;
+    private RunningProcedureStatsCollector m_rProcStats = null;
 
     // used for tracking statistics about the plan cache in the EE
     private int m_cacheMisses = 0;
@@ -93,6 +95,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private boolean m_readOnly;
     private long m_startTime;
     private long m_logDuration;
+    private long m_currentUniqueId;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -133,6 +136,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_plannerStats = new PlannerStatsCollector(siteId);
             statsAgent.registerStatsSource(StatsSelector.PLANNER, siteId, m_plannerStats);
         }
+        m_rProcStats = new RunningProcedureStatsCollector(siteId);
+        statsAgent.registerStatsSource(StatsSelector.LONGPROC, siteId, m_rProcStats);
     }
 
     /** Alternate constructor without planner statistics tracking. */
@@ -321,12 +326,23 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long tuplesFound) {
         long currentTime = System.currentTimeMillis();
         long duration = currentTime - m_startTime;
-        if(duration > m_logDuration) {
+        if(duration > 0) {//m_logDuration) {
             VoltLogger log = new VoltLogger("CONSOLE");
-
+            short realBatchIndex = (short)(m_rProcContext.m_batchIndexBase+batchIndex+1);
             log.info("Procedure "+m_rProcContext.m_procedureName+" is taking  a long time to execute -- "+duration/1000.0+" seconds spent accessing "
-                    +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+(m_rProcContext.m_batchIndexBase+batchIndex+1)
+                    +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+realBatchIndex
                     +" of batch "+m_rProcContext.m_voltExecuteSQLIndex+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
+            log.info("Unique Id "+m_currentUniqueId);
+
+            this.m_rProcStats.beginProcedure(m_currentUniqueId,
+                    m_rProcContext.m_procedureName,
+                    duration,
+                    realBatchIndex,
+                    m_rProcContext.m_voltExecuteSQLIndex,
+                    planNodeName,
+                    lastAccessedTable,
+                    lastAccessedTableSize,
+                    tuplesFound);
 
 //            log.info("Long Running Procedure Status: "+m_rProcContext.m_procedureName+" procedure on site "+m_hostId+" has spent "+duration/1000.0
 //                    +"s, has processed "+tuplesFound+" tuples. Current executor is "+planNodeName+" Last accessed table was "+lastAccessedTable+" containing "+
@@ -415,6 +431,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
             m_logDuration = 1000;
             m_startTime = System.currentTimeMillis();
+            m_currentUniqueId = uniqueId;
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
@@ -447,10 +464,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
             m_logDuration = 1000;
             m_startTime = System.currentTimeMillis();
+            m_currentUniqueId = uniqueId;
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
                     m_cacheMisses, m_partitionId);
+            m_rProcStats.endProcedure();
             return results;
         }
         finally {

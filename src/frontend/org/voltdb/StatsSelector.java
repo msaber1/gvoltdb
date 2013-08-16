@@ -20,6 +20,7 @@ public enum StatsSelector {
     TABLE,            // invoked as @stat table
     INDEX,            // invoked as @stat index
     PROCEDURE,        // invoked as @stat procedure
+    LONGPROC,     // invoked as @stat RUNNINGPROC
     STARVATION,
     INITIATOR,        // invoked as @stat initiator
     LATENCY,          // invoked as @stat latency
