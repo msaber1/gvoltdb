@@ -1809,6 +1809,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
+    ClientResponseImpl dispatchCancel(OpsSelector selector, StoredProcedureInvocation task, Connection ccxn)
+    {
+        try {
+            OpsAgent agent = VoltDB.instance().getOpsAgent(selector);
+            if (agent != null) {
+                agent.performOpsAction(ccxn, task.clientHandle, selector, task.getParams());
+            }
+            else {
+                return errorResponse(ccxn, task.clientHandle, ClientResponse.GRACEFUL_FAILURE,
+                        "Unknown OPS selector", null, true);
+            }
+
+            return null;
+        } catch (Exception e) {
+            return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
+        }
+    }
+
     ClientResponseImpl dispatchPromote(Procedure sysProc,
                                        ByteBuffer buf,
                                        StoredProcedureInvocation task,
@@ -1973,6 +1991,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             } else if (task.procName.equals("@SnapshotRestore")) {
                 ClientResponseImpl retval = SnapshotRestore.transformRestoreParamsToJSON(task);
                 if (retval != null) return retval;
+            } else if(task.procName.equals("@Cancel")) {
+                return dispatchCancel(OpsSelector.INTERRUPT, task, ccxn);
             }
 
 

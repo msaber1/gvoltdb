@@ -275,7 +275,7 @@ public class StatsAgent extends OpsAgent
                 stats = collectProcedureStats(interval);
                 break;
             case LONGPROC:
-                stats = collectRuntimeStats(interval);
+                stats = collectLongProcStats(interval);
                 break;
             case STARVATION:
                 stats = collectStarvationStats(interval);
@@ -434,7 +434,7 @@ public class StatsAgent extends OpsAgent
         return stats;
     }
 
-    private VoltTable[] collectRuntimeStats(boolean interval)
+    private VoltTable[] collectLongProcStats(boolean interval)
     {
         Long now = System.currentTimeMillis();
         VoltTable[] stats = null;

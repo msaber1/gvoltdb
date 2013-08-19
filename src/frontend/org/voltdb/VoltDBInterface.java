@@ -207,4 +207,8 @@ public interface VoltDBInterface
      public LicenseApi getLicenseApi();
 
      public boolean isIV2Enabled();
+
+     public void setUniqueIdToInterrupt(long uniqueId);
+
+     public long getUniqueIdToInterrupt();
 }

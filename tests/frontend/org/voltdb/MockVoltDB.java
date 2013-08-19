@@ -348,6 +348,15 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public void setUniqueIdToInterrupt(long uniqueId) {
+    }
+
+    @Override
+    public long getUniqueIdToInterrupt() {
+        return 0;
+    }
+
+    @Override
     public void readBuildInfo(String editionTag)
     {
     }

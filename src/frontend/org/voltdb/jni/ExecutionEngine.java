@@ -344,6 +344,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                     lastAccessedTableSize,
                     tuplesFound);
 
+            System.err.println("getUniqueIdToInterrupt: "+VoltDB.instance().getUniqueIdToInterrupt());
+            if(VoltDB.instance().getUniqueIdToInterrupt() == m_currentUniqueId) {
+                return true;
+            }
+
 //            log.info("Long Running Procedure Status: "+m_rProcContext.m_procedureName+" procedure on site "+m_hostId+" has spent "+duration/1000.0
 //                    +"s, has processed "+tuplesFound+" tuples. Current executor is "+planNodeName+" Last accessed table was "+lastAccessedTable+" containing "+
 //                    lastAccessedTableSize+" tuples. Current stmt is the "+m_rProcContext.m_voltExecuteSQLIndex+
