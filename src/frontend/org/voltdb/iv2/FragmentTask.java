@@ -31,6 +31,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.exceptions.InterruptException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -227,7 +228,7 @@ public class FragmentTask extends TransactionTask
                         new long[] { fragmentId },
                         new long [] { inputDepId },
                         new ParameterSet[] { params },
-                        m_txnState.spHandle,
+                        m_txnState.m_spHandle,
                         m_txnState.uniqueId,
                         m_txnState.isReadOnly(),
                         m_procContext)[0];
@@ -243,6 +244,11 @@ public class FragmentTask extends TransactionTask
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
             } catch (final SQLException e) {
+                hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
+                currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                break;
+            }
+            catch (final InterruptException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                 break;
