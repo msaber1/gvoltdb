@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -671,6 +672,18 @@ public abstract class AbstractParsedStmt {
         if (joinNode == null) {
             return;
         }
+
+        if (joinNode.isInnerJoinTree()) {
+            analyzeInnerJoinExpressions(joinNode);
+        } else {
+            analyzeOuterJoinExpressions(joinNode);
+        }
+    }
+
+    /**
+     * Analyze outer join expressions
+     */
+    void analyzeOuterJoinExpressions(JoinNode joinNode) {
         if (joinNode.m_table != null) {
             // Leaf node. Simply un-combine expressions and move them to the inner lists
             // The expressions will be classified later at the join node level.
@@ -682,8 +695,8 @@ public abstract class AbstractParsedStmt {
         }
 
         assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
-        analyzeJoinExpressions(joinNode.m_leftNode);
-        analyzeJoinExpressions(joinNode.m_rightNode);
+        analyzeOuterJoinExpressions(joinNode.m_leftNode);
+        analyzeOuterJoinExpressions(joinNode.m_rightNode);
 
         // At this moment all RIGHT joins are already converted to the LEFT ones
         assert (joinNode.m_joinType == JoinType.LEFT || joinNode.m_joinType == JoinType.INNER);
@@ -897,6 +910,106 @@ public abstract class AbstractParsedStmt {
         pushDownExprList.clear();
         // Descend to the inner child
         pushDownExpressions(joinNode);
+    }
+
+    /**
+     * Analyze inner join expressions. The inner join expressions need to be analyzed only once.
+     * During the analysis, the map is built to associate the table combinations with the expressions
+     * this combination is involved with. Once expressions are analyzed, they need to be properly
+     * assigned to the lowest possible node for each join order.
+     */
+    void analyzeInnerJoinExpressions(JoinNode joinNode) {
+        if (joinTree.m_analyzedInnerExpr == null) {
+            joinTree.m_analyzedInnerExpr = new HashMap<Set<Table>, List<AbstractExpression>>();
+
+            // Collect all expressions
+            Collection<AbstractExpression> exprList = joinNode.getUnombinedFilterExpression();
+            // This next bit of code identifies which tables get classified how
+            for (AbstractExpression expr : exprList) {
+                HashSet<Table> tableSet = new HashSet<Table>();
+                getTablesForExpression(expr, tableSet);
+                if (tableSet.size() == 0) {
+                    noTableSelectionList.add(expr);
+                }
+                else {
+                    if (joinTree.m_analyzedInnerExpr.containsKey(tableSet)) {
+                        joinTree.m_analyzedInnerExpr.get(tableSet).add(expr);
+                    } else {
+                        List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+                        exprs.add(expr);
+                        joinTree.m_analyzedInnerExpr.put(tableSet, exprs);
+                    }
+                }
+            }
+        }
+        // Assign expressions to the lowest possible node
+        assignInnerJoinExpressions(joinNode);
+    }
+
+    /**
+     * Assign expressions on a given join order to the most specific child join
+     * or table the expression applies to.
+     */
+    private void assignInnerJoinExpressions(JoinNode joinNode) {
+        Map<Set<Table>, List<AbstractExpression>> exprMap = new HashMap<Set<Table>, List<AbstractExpression>>(joinTree.m_analyzedInnerExpr);
+        assignInnerJoinExpressionsRecursively(joinNode, exprMap, new ArrayList<Table>());
+        // Multi-table expressions if any
+        if (!exprMap.isEmpty()) {
+            List<AbstractExpression> multiTableExpr = new ArrayList<AbstractExpression>();
+            for (List<AbstractExpression> exprs : exprMap.values()) {
+                multiTableExpr.addAll(exprs);
+            }
+            pushDownExpressionsRecursively(joinNode, multiTableExpr);
+        }
+    }
+
+    private void assignInnerJoinExpressionsRecursively(
+            JoinNode joinNode, Map<Set<Table>, List<AbstractExpression>> exprMap, List<Table> joinedTables) {
+        if (joinNode.m_table != null) {
+            // Leaf node.
+            assert(joinNode.m_leftNode == null && joinNode.m_rightNode == null);
+            // add single table expressions
+            Set<Table> tableSet = new HashSet<Table>();
+            tableSet.add(joinNode.m_table);
+            if (exprMap.containsKey(tableSet)) {
+                joinNode.m_whereInnerList.addAll(exprMap.get(tableSet));
+                exprMap.remove(tableSet);
+            }
+            joinedTables.add(joinNode.m_table);
+            return;
+        }
+        assert(joinNode.m_leftNode != null && joinNode.m_rightNode != null);
+        assignInnerJoinExpressionsRecursively(joinNode.m_leftNode, exprMap, joinedTables);
+        assignInnerJoinExpressionsRecursively(joinNode.m_rightNode, exprMap, joinedTables);
+        // add two table expressions
+        if (joinedTables.size() > 1) {
+            Set<Table> tableSet = new HashSet<Table>();
+            Table lastTable = joinedTables.get(joinedTables.size() -1);
+            for (int i = 0; i < joinedTables.size() -1; ++i) {
+                tableSet.clear();
+                tableSet.add(joinedTables.get(i));
+                tableSet.add(lastTable);
+                if (exprMap.containsKey(tableSet)) {
+                    joinNode.m_whereInnerOuterList.addAll(exprMap.get(tableSet));
+                    exprMap.remove(tableSet);
+                }
+            }
+        }
+        // Collect children expressions only if a child is a leaf.
+        if (joinNode.m_leftNode.m_table != null) {
+            joinNode.m_joinOuterList.addAll(joinNode.m_leftNode.m_joinInnerList);
+            joinNode.m_leftNode.m_joinInnerList.clear();
+            joinNode.m_whereOuterList.addAll(joinNode.m_leftNode.m_whereInnerList);
+            joinNode.m_leftNode.m_whereInnerList.clear();
+        }
+        if (joinNode.m_rightNode.m_table != null) {
+            joinNode.m_joinInnerList.addAll(joinNode.m_rightNode.m_joinInnerList);
+            joinNode.m_rightNode.m_joinInnerList.clear();
+            joinNode.m_whereInnerList.addAll(joinNode.m_rightNode.m_whereInnerList);
+            joinNode.m_rightNode.m_whereInnerList.clear();
+        }
+
+        joinedTables.add(joinNode.m_table);
     }
 
     /**

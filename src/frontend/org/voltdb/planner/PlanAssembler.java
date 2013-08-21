@@ -276,7 +276,7 @@ public class PlanAssembler {
      * @param parsedStmt Current SQL statement to generate plan for
      * @return The best cost plan or null.
      */
-    public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
+    private CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
 
         // set up the plan assembler for this statement
         setupForNewPlans(parsedStmt);
@@ -296,6 +296,48 @@ public class PlanAssembler {
         }
         return m_planSelector.m_bestPlan;
     }
+
+    /**
+     * Generate the best cost plan for the current SQL statement context and finalize it.
+     *
+     * @param parsedStmt Current SQL statement to generate plan for
+     * @return The best cost plan or null.
+     */
+    public CompiledPlan getBestCostPlanFinal(AbstractParsedStmt parsedStmt) {
+        getBestCostPlan(parsedStmt);
+        return completeBestCostPlan();
+    }
+
+    /**
+     * Complete the best plan - generate output schema, resolve column indexes,
+     * and add the send node and output columns if necessary.
+     *
+     * @return The best cost plan or null.
+     */
+    private CompiledPlan completeBestCostPlan() {
+        if (m_planSelector.m_bestPlan == null) {
+            return null;
+        }
+
+        if (m_planSelector.m_bestPlan.readOnly == true) {
+            SendPlanNode sendNode = new SendPlanNode();
+            // connect the nodes to build the graph
+            sendNode.addAndLinkChild(m_planSelector.m_bestPlan.rootPlanGraph);
+            m_planSelector.m_bestPlan.rootPlanGraph = sendNode;
+        }
+        // this plan is final, generate schema and resolve all the column index references
+        m_planSelector.m_bestPlan.rootPlanGraph.generateOutputSchema(m_catalogDb);
+        m_planSelector.m_bestPlan.rootPlanGraph.resolveColumnIndexes();
+
+        // For a select statement add output columns sinse we do have a plan to avoid
+        // PlanColumn resource leakage
+        if (m_parsedSelect != null) {
+            addColumns(m_planSelector.m_bestPlan, m_parsedSelect);
+        }
+
+        return m_planSelector.m_bestPlan;
+    }
+
 
     /**
      * Output the best cost plan.
@@ -328,9 +370,6 @@ public class PlanAssembler {
             retval.readOnly = true;
             if (retval.rootPlanGraph != null)
             {
-                // only add the output columns if we actually have a plan
-                // avoid PlanColumn resource leakage
-                addColumns(retval, m_parsedSelect);
                 boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
                 boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
                 retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
@@ -366,8 +405,6 @@ public class PlanAssembler {
 
         assert (nextStmt != null);
         retval.parameters = nextStmt.getParameters();
-        // Do a final generateOutputSchema pass.
-        retval.rootPlanGraph.generateOutputSchema(m_catalogDb);
         retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
     }
@@ -588,7 +625,6 @@ public class PlanAssembler {
         {
             root = handleLimitOperator(root);
         }
-        root.generateOutputSchema(m_catalogDb);
 
         return root;
     }

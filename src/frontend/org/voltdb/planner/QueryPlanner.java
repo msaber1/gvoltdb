@@ -296,7 +296,7 @@ public class QueryPlanner {
         // to keep track of the best plan
         PlanAssembler assembler = new PlanAssembler(m_cluster, m_db, m_partitioning, (PlanSelector) m_planSelector.clone());
         // find the plan with minimal cost
-        CompiledPlan bestPlan = assembler.getBestCostPlan(parsedStmt);
+        CompiledPlan bestPlan = assembler.getBestCostPlanFinal(parsedStmt);
 
         // make sure we got a winner
         if (bestPlan == null) {
@@ -307,15 +307,6 @@ public class QueryPlanner {
             return null;
         }
 
-        if (bestPlan.readOnly == true) {
-            SendPlanNode sendNode = new SendPlanNode();
-            // connect the nodes to build the graph
-            sendNode.addAndLinkChild(bestPlan.rootPlanGraph);
-            // this plan is final, generate schema and resolve all the column index references
-            sendNode.generateOutputSchema(m_db);
-            sendNode.resolveColumnIndexes();
-            bestPlan.rootPlanGraph = sendNode;
-        }
         // Output the best plan debug info
         assembler.finalizeBestCostPlan();
 
