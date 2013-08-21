@@ -66,6 +66,9 @@ public class JoinNode implements Cloneable {
     // Access path under the evaluation
     AccessPath m_currentAccessPath = null;
 
+    // Analyzed expressions for an inner join
+    HashMap<Set<Table>, List<AbstractExpression>> m_analyzedInnerExpr = null;
+
     /**
      * Construct a leaf node
      * @param id - node unique id
@@ -244,14 +247,40 @@ public class JoinNode implements Cloneable {
     }
 
     /**
+     * Returns TRUE if all joins in this join tree are INNER. False otherwise.
+     */
+    public boolean isInnerJoinTree() {
+        if (JoinType.INNER != m_joinType) {
+            return false;
+        }
+        else if (m_leftNode != null) {
+            if (!m_leftNode.isInnerJoinTree()) {
+                return false;
+            }
+        } else if (m_rightNode != null) {
+            if (!m_rightNode.isInnerJoinTree()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
      * Collect all JOIN and WHERE expressions combined with AND for the entire tree.
      */
-    AbstractExpression getAllInnerJoinFilters() {
-        assert(m_joinType == JoinType.INNER);
+    AbstractExpression getCombinedFilterExpression() {
+        return ExpressionUtil.combine(getUnombinedFilterExpression());
+    }
+
+    /**
+     * Collect all JOIN and WHERE expressions.
+     */
+    Collection<AbstractExpression> getUnombinedFilterExpression() {
         ArrayDeque<JoinNode> joinNodes = new ArrayDeque<JoinNode>();
         ArrayDeque<AbstractExpression> in = new ArrayDeque<AbstractExpression>();
         ArrayDeque<AbstractExpression> out = new ArrayDeque<AbstractExpression>();
-        // Iterate over the join nodes to collect their join and where expressions
+        // Iterate over the join nodes to collect their join and where
+        // expressions
         joinNodes.add(this);
         while (!joinNodes.isEmpty()) {
             JoinNode joinNode = joinNodes.poll();
@@ -281,7 +310,7 @@ public class JoinNode implements Cloneable {
                 out.add(inExpr);
             }
         }
-        return ExpressionUtil.combine(out);
+        return out;
     }
 
     /**
