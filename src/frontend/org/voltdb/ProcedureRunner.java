@@ -144,6 +144,7 @@ public class ProcedureRunner {
         m_systemProcedureContext = sysprocContext;
         m_csp = csp;
         m_rProcContext = new RunningProcedureContext();
+        m_rProcContext.m_procedureName = this.m_procedureName;
 
         m_procedure.init(this);
 
@@ -576,8 +577,6 @@ public class ProcedureRunner {
             int batchSize = m_batch.size();
             m_rProcContext.m_voltExecuteSQLIndex++;
 
-            m_rProcContext.m_procedureName = this.m_procedureName;
-
             // if batch is small (or reasonable size), do it in one go
             if (batchSize <= MAX_BATCH_SIZE) {
                 return executeQueriesInABatch(m_batch, isFinalSQL);
@@ -597,7 +596,6 @@ public class ProcedureRunner {
                     // decide if this sub-batch should be marked final
                     boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
 
-                    //m_rProcContext.m_batch = subBatch;
                     // run the sub-batch and copy the sub-results into the list of lists of results
                     // note: executeQueriesInABatch removes items from the batch as it runs.
                     //  this means subBatch will be empty after running and since subBatch is a
@@ -877,6 +875,11 @@ public class ProcedureRunner {
        else if (e.getClass() == org.voltdb.exceptions.SQLException.class) {
            status = ClientResponse.GRACEFUL_FAILURE;
            msg.append("SQL ERROR\n");
+       }
+       // Interrupt exception will be thrown when @Cancel uniqueId is called.
+       else if (e.getClass() == org.voltdb.exceptions.InterruptException.class) {
+           status = ClientResponse.GRACEFUL_FAILURE;
+           msg.append("Transaction Interrupted\n");
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
            msg.append("HSQL-BACKEND ERROR\n");

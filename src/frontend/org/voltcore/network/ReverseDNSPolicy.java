@@ -14,25 +14,22 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.voltcore.network;
 
-#ifndef TIMEOUTEXCEPTION_H_
-#define TIMEOUTEXCEPTION_H_
-
-#include "common/SerializableEEException.h"
-
-namespace voltdb {
-class ReferenceSerializeOutput;
-
-class TimeOutException : public SerializableEEException {
-public:
-
-    TimeOutException(std::string message);
-    virtual ~TimeOutException() {}
-
-protected:
-    void p_serialize(ReferenceSerializeOutput *output) const;
-private:
-};
+/*
+ * Enum for specifying how DNS should be handled
+ */
+public enum ReverseDNSPolicy {
+    /*
+     * Don't do a reverse DNS lookup
+     */
+    NONE,
+    /*
+     * Do the lookup synchronously
+     */
+    SYNCHRONOUS,
+    /*
+     * Do it in the background, it may fail or be rejected and never occur
+     */
+    ASYNCHRONOUS
 }
-
-#endif /* TIMEOUTEXCEPTION_H_ */
