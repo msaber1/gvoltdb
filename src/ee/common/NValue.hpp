@@ -898,10 +898,14 @@ class NValue {
     static std::size_t getAllocationSizeForObject(int32_t length);
 
     static void throwCastSQLException(const ValueType origType,
-                                      const ValueType newType)
+                                      const ValueType newType,
+                                      bool forComparison = false)
     {
         char msg[1024];
-        snprintf(msg, 1024, "Type %s can't be cast as %s",
+        snprintf(msg, 1024, 
+                 (forComparison ?
+                  "Type %s cannot be cast for comparison to type %s" :
+                  "Type %s can't be cast as %s"),
                  valueToString(origType).c_str(),
                  valueToString(newType).c_str());
         throw SQLException(SQLException::
@@ -998,7 +1002,7 @@ class NValue {
         }
     }
 
-    double castAsDoubleAndGetValue() const {
+    double castAsDoubleAndGetValue(bool forComparison = false) const {
         const ValueType type = getValueType();
         if (isNull()) {
             return DOUBLE_MIN;
@@ -1036,7 +1040,7 @@ class NValue {
           case VALUE_TYPE_VARCHAR:
           case VALUE_TYPE_VARBINARY:
           default:
-            throwCastSQLException(type, VALUE_TYPE_DOUBLE);
+            throwCastSQLException(type, VALUE_TYPE_DOUBLE, forComparison);
             return 0; // NOT REACHED
         }
     }
@@ -1527,98 +1531,34 @@ class NValue {
 
     }
 
-    int compareAnyIntegerValue (const NValue rhs) const {
-        int64_t lhsValue, rhsValue;
-
-        // get the right hand side as a bigint
-        if (rhs.getValueType() != VALUE_TYPE_BIGINT) rhsValue = rhs.castAsBigIntAndGetValue();
-        else rhsValue = rhs.getBigInt();
-
-        // convert the left hand side
-        switch(getValueType()) {
-        case VALUE_TYPE_TINYINT:
-        case VALUE_TYPE_SMALLINT:
-        case VALUE_TYPE_INTEGER:
-        case VALUE_TYPE_TIMESTAMP:
-            lhsValue = castAsBigIntAndGetValue(); break;
-        case VALUE_TYPE_BIGINT:
-            lhsValue = getBigInt(); break;
-        default: {
-            throwDynamicSQLException(
-                    "non comparable types lhs '%s' rhs '%s'",
-                    getValueTypeString().c_str(),
-                    rhs.getValueTypeString().c_str());
-        }
-        }
-
-        // do the comparison
-        if (lhsValue == rhsValue) {
-            return VALUE_COMPARE_EQUAL;
-        } else if (lhsValue > rhsValue) {
-            return VALUE_COMPARE_GREATERTHAN;
-        } else {
-            return VALUE_COMPARE_LESSTHAN;
-        }
-    }
-
-    int compareDoubleValue (const NValue rhs) const {
-        const double lhsValue = getDouble();
-        double rhsValue;
-
-        switch (rhs.getValueType()) {
-            case VALUE_TYPE_DOUBLE:
-                rhsValue = rhs.getDouble();
-                break;
-            case VALUE_TYPE_TINYINT:
-            case VALUE_TYPE_SMALLINT:
-            case VALUE_TYPE_INTEGER:
-            case VALUE_TYPE_BIGINT:
-            case VALUE_TYPE_TIMESTAMP:
-                rhsValue = rhs.castAsDouble().getDouble();
-                break;
-            case VALUE_TYPE_DECIMAL:
-                rhsValue = rhs.castAsDoubleAndGetValue();
-                if (rhs.isNegative()) {
-                    rhsValue *= -1;
-                }
-                break;
-            default:
-                char message[128];
-                snprintf(message, 128,
-                         "Type %s cannot be cast for comparison to type %s",
-                         valueToString(rhs.getValueType()).c_str(),
-                         valueToString(getValueType()).c_str());
-                throw SQLException(SQLException::
-                                   data_exception_most_specific_type_mismatch,
-                                   message);
-                // Not reached
-                return 0;
-        }
+    int compareDoubleValue (const NValue rhs) const
+    {
+        const double rhsValue = rhs.castAsDoubleAndGetValue(true);
 
         // Add null type comparison
         if (isNull()) {
             return rhs.isNull() ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
         }
-        else if (rhs.isNull()) {
+        if (rhs.isNull()) {
             return VALUE_COMPARE_GREATERTHAN;
         }
+
+        const double lhsValue = getDouble();
         // Treat NaN values as equals and also make them smaller than neagtive infinity.
         // This breaks IEEE754 for expressions slightly.
-        else if (std::isnan(lhsValue)) {
+        if (std::isnan(lhsValue)) {
             return std::isnan(rhsValue) ? VALUE_COMPARE_EQUAL : VALUE_COMPARE_LESSTHAN;
         }
-        else if (std::isnan(rhsValue)) {
+        if (std::isnan(rhsValue)) {
             return VALUE_COMPARE_GREATERTHAN;
         }
-        else if (lhsValue > rhsValue) {
+        if (lhsValue > rhsValue) {
             return VALUE_COMPARE_GREATERTHAN;
         }
-        else if (lhsValue < rhsValue) {
+        if (lhsValue < rhsValue) {
             return VALUE_COMPARE_LESSTHAN;
         }
-        else {
-            return VALUE_COMPARE_EQUAL;
-        }
+        return VALUE_COMPARE_EQUAL;
     }
 
     int compareStringValue (const NValue rhs) const {
@@ -2230,39 +2170,47 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
  * succeed if the values are incompatible.  Avoid use of
  * comparison in favor of op_*.
  */
-inline int NValue::compare(const NValue rhs) const {
+inline int NValue::compare(const NValue rhs) const
+{
     switch (getValueType()) {
-      case VALUE_TYPE_TINYINT:
-      case VALUE_TYPE_SMALLINT:
-      case VALUE_TYPE_INTEGER:
-      case VALUE_TYPE_BIGINT:
-        if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
-            return castAsDouble().compareDoubleValue(rhs);
-        } else if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
+    case VALUE_TYPE_TINYINT:
+    case VALUE_TYPE_SMALLINT:
+    case VALUE_TYPE_INTEGER:
+    case VALUE_TYPE_BIGINT:
+        if (rhs.getValueType() == VALUE_TYPE_DECIMAL) {
             return -1 * rhs.compareDecimalValue(*this);
-        } else {
-            return compareAnyIntegerValue(rhs);
         }
-      case VALUE_TYPE_TIMESTAMP:
+        // fall through
+    case VALUE_TYPE_TIMESTAMP:
+    {
         if (rhs.getValueType() == VALUE_TYPE_DOUBLE) {
             return castAsDouble().compareDoubleValue(rhs);
-        } else {
-            return compareAnyIntegerValue(rhs);
         }
-      case VALUE_TYPE_DOUBLE:
+        int64_t lhsValue = castAsBigIntAndGetValue();
+        int64_t rhsValue = rhs.castAsBigIntAndGetValue();
+        // do the comparison
+        if (lhsValue == rhsValue) {
+            return VALUE_COMPARE_EQUAL;
+        } else if (lhsValue > rhsValue) {
+            return VALUE_COMPARE_GREATERTHAN;
+        } else {
+            return VALUE_COMPARE_LESSTHAN;
+        }
+    }
+    case VALUE_TYPE_DOUBLE:
         return compareDoubleValue(rhs);
-      case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARCHAR:
         return compareStringValue(rhs);
-      case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_VARBINARY:
         return compareBinaryValue(rhs);
-      case VALUE_TYPE_DECIMAL:
+    case VALUE_TYPE_DECIMAL:
         return compareDecimalValue(rhs);
-      default: {
+    default: {
           throwDynamicSQLException(
                   "non comparable types lhs '%s' rhs '%s'",
                   getValueTypeString().c_str(),
                   rhs.getValueTypeString().c_str());
-      }
+    }
     }
 }
 

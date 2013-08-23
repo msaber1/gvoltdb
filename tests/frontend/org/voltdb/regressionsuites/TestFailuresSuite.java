@@ -75,32 +75,16 @@ public class TestFailuresSuite extends RegressionSuite {
     {
         System.out.println("STARTING testBadVarcharToAnyCompare");
         Client client = getClient();
-
-        boolean threw = false;
-        try
-        {
+        try {
             client.callProcedure("BadVarcharCompare", 1).getResults();
+            fail("BadVarcharCompare should not have succeeded");
         }
-        catch (ProcCallException e)
-        {
-            if (!isHSQL())
-            {
-                if ((e.getMessage().contains("SQL ERROR")) &&
-                        (e.getMessage().contains("cannot be cast for comparison to type VARCHAR")))
-                {
-                    threw = true;
-                }
-                else
-                {
-                    e.printStackTrace();
-                }
-            }
-            else
-            {
-                threw = true;
+        catch (ProcCallException e) {
+            if (!isHSQL()) {
+                assertTrue(e.getMessage().contains("SQL ERROR"));
+                assertTrue(e.getMessage().contains("cannot be cast for comparison to type VARCHAR"));
             }
         }
-        assertTrue(threw);
     }
 
     // Subcase of ENG-800
@@ -108,32 +92,16 @@ public class TestFailuresSuite extends RegressionSuite {
     {
         System.out.println("STARTING testBadFloatToVarcharCompare");
         Client client = getClient();
-
-        boolean threw = false;
-        try
-        {
+        try {
             client.callProcedure("BadFloatToVarcharCompare", 1).getResults();
+            fail("BadFloatToVarcharCompare should not have succeeded");
         }
-        catch (ProcCallException e)
-        {
-            if (!isHSQL())
-            {
-                if ((e.getMessage().contains("SQL ERROR")) &&
-                        (e.getMessage().contains("VARCHAR cannot be cast for comparison to type FLOAT")))
-                {
-                    threw = true;
-                }
-                else
-                {
-                    e.printStackTrace();
-                }
-            }
-            else
-            {
-                threw = true;
+        catch (ProcCallException e) {
+            if (!isHSQL()) {
+                assertTrue(e.getMessage().contains("SQL ERROR"));
+                assertTrue(e.getMessage().contains("VARCHAR cannot be cast for comparison to type FLOAT"));
             }
         }
-        assertTrue(threw);
     }
 
     // Subcase of ENG-800
@@ -141,32 +109,16 @@ public class TestFailuresSuite extends RegressionSuite {
     {
         System.out.println("STARTING testBadDecimalToVarcharCompare");
         Client client = getClient();
-
-        boolean threw = false;
-        try
-        {
+        try {
             client.callProcedure("BadDecimalToVarcharCompare", 1).getResults();
+            fail("BadDecimalToVarcharCompare should not have succeeded");
         }
-        catch (ProcCallException e)
-        {
-            if (!isHSQL())
-            {
-                if ((e.getMessage().contains("SQL ERROR")) &&
-                        (e.getMessage().contains("VARCHAR cannot be cast for comparison to type DECIMAL")))
-                {
-                    threw = true;
-                }
-                else
-                {
-                    e.printStackTrace();
-                }
-            }
-            else
-            {
-                threw = true;
+        catch (ProcCallException e) {
+            if (!isHSQL()) {
+                assertTrue(e.getMessage().contains("SQL ERROR"));
+                assertTrue(e.getMessage().contains("VARCHAR cannot be cast for comparison to type DECIMAL"));
             }
         }
-        assertTrue(threw);
     }
 
     public void testViolateUniqueness() throws IOException {
@@ -241,11 +193,10 @@ public class TestFailuresSuite extends RegressionSuite {
         client.callProcedure("InsertBigString", 0, new String(stringData, "UTF-8"));
 
         java.util.Arrays.fill(stringData, (byte)'b');
-        boolean threwException = false;
         try {
             client.callProcedure("InsertBigString", 0, new String(stringData, "UTF-8"));
+            fail("InsertBigString should not have succeeded.");
         } catch (ProcCallException e) {
-            threwException = true;
             assertTrue(e.getMessage().contains("CONSTRAINT VIOLATION"));
             assertTrue(e.getCause().getMessage().toUpperCase().contains("UNIQUE"));
             if (!isHSQL()) {
@@ -255,10 +206,8 @@ public class TestFailuresSuite extends RegressionSuite {
                 assertTrue(java.util.Arrays.equals(stringData, table.getStringAsBytes(2)));
                 ConstraintFailureException cfe = (ConstraintFailureException)e.getCause();
                 assertTrue(cfe.getTableName().equalsIgnoreCase("FIVEK_STRING"));
-
             }
         }
-        assertTrue(threwException);
     }
 
     public void testDivideByZero() throws IOException {
@@ -339,7 +288,7 @@ public class TestFailuresSuite extends RegressionSuite {
         //System.out.flush();
         try {
             results = client.callProcedure("WorkWithBigString", expectedRows++, longString).getResults();
-            fail();
+            fail("WorkWithBigString should not have succeeded");
         } catch (ProcCallException e) {
             // this should eventually happen
             assertTrue(totalBytes > expectedMaxSuccessBytes);
@@ -348,7 +297,6 @@ public class TestFailuresSuite extends RegressionSuite {
             fail(e.toString());
             return;
         }
-        fail();
     }
 
     public void testPerPlanFragmentMemoryOverload() throws IOException, ProcCallException {
@@ -411,14 +359,14 @@ public class TestFailuresSuite extends RegressionSuite {
 
         try {
             client.callProcedure("TooFewParams", 1);
-            fail();
+            fail("TooFewParams should not have succeeded");
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().startsWith("Error sending"));
         }
 
         try {
             client.callProcedure("TooFewParams");
-            fail();
+            fail("TooFewParams should not have succeeded");
         } catch (ProcCallException e) {
             assertTrue(e.getMessage().startsWith("Error sending"));
         }
@@ -430,7 +378,7 @@ public class TestFailuresSuite extends RegressionSuite {
 
         try {
             client.callProcedure("TooFewParams", 1, 1);
-            fail();
+            fail("TooFewParams should not have succeeded");
         } catch (ProcCallException e) {
         }
     }
@@ -459,14 +407,12 @@ public class TestFailuresSuite extends RegressionSuite {
         assertEquals(response.getAppStatus(), Byte.MIN_VALUE);
         assertEquals(response.getResults()[0].getStatusCode(), 3);
 
-        boolean threwException = false;
         try {
             response = client.callProcedure( "ReturnAppStatus", 4, "statusstring", (byte)4);
+            fail("ReturnAppStatus should not have succeeded.");
         } catch (ProcCallException e) {
-            threwException = true;
             response = e.getClientResponse();
         }
-        assertTrue(threwException);
         assertTrue("statusstring".equals(response.getAppStatusString()));
         assertEquals(response.getAppStatus(), 4);
     }
