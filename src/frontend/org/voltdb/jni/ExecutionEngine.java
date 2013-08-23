@@ -341,7 +341,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             VoltLogger log = new VoltLogger("CONSOLE");
             log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute -- "+duration/1000.0+" seconds spent accessing "
                     +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+ realBatchIndex
-                    +" of batch "+m_rProcContext.m_voltExecuteSQLIndex+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
+                    +" of batch "+(m_rProcContext.m_voltExecuteSQLIndex+1)+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
 
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
         }
@@ -354,10 +354,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                 lastAccessedTable,
                 lastAccessedTableSize,
                 tuplesFound);
-        // Set a timer and time out read only queries.
-        //        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
-        //            return true;
-        //        else
+
+        // Return true if we want to interrupt ee. Otherwise return false
         return false;
     }
 
@@ -413,9 +411,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             RunningProcedureContext rProcContext) throws EEException
     {
         try {
-        	if(rProcContext != null) {
-        		m_rProcContext = rProcContext;
-        	}
+            if(rProcContext != null) {
+                m_rProcContext = rProcContext;
+            }
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
             // Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
