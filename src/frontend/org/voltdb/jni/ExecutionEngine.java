@@ -72,6 +72,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public static final int ERRORCODE_ERROR = 1; // just error or not so far.
     public static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
     public static final int ERRORCODE_NEED_PLAN = 110;
+    public static final int ERRORCODE_PROGRESS_UPDATE = 111;
 
     /** For now sync this value with the value in the EE C++ code to get good stats. */
     public static final int EE_PLAN_CACHE_SIZE = 1000;
@@ -89,10 +90,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private int m_cacheMisses = 0;
     private int m_eeCacheSize = 0;
 
-    private RunningProcedureContext m_rProcContext;
+    /** Context information of the current running procedure*/
+    private RunningProcedureContext m_rProcContext = new RunningProcedureContext();
     private boolean m_readOnly;
     private long m_startTime;
-    private long m_logDuration;
+    private long m_logDuration = 1000;
+
+    /** information about EE calls back to JAVA. For test.*/
+    public int m_callsFromEE = 0;
+    public long m_lastTuplesAccessed = 0;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -319,46 +325,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             String lastAccessedTable,
             long lastAccessedTableSize,
             long tuplesFound) {
+        ++m_callsFromEE;
+        m_lastTuplesAccessed = tuplesFound;
+
         long currentTime = System.currentTimeMillis();
         long duration = currentTime - m_startTime;
+
         if(duration > m_logDuration) {
             VoltLogger log = new VoltLogger("CONSOLE");
-
             log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute -- "+duration/1000.0+" seconds spent accessing "
                     +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+(m_rProcContext.m_batchIndexBase+batchIndex+1)
-                    +" of batch "+m_rProcContext.m_voltExecuteSQLIndex+" on site "+CoreUtils.hsIdToString(m_siteId)+". STMT: "
+                    +" of batch "+(m_rProcContext.m_voltExecuteSQLIndex+1)+" on site "+CoreUtils.hsIdToString(m_siteId)+". STMT: "
                     +m_rProcContext.m_batchSQLStmt[batchIndex]);
-
-//            log.info("Long Running Procedure Status: "+m_rProcContext.m_procedureName+" procedure on site "+m_hostId+" has spent "+duration/1000.0
-//                    +"s, has processed "+tuplesFound+" tuples. Current executor is "+planNodeName+" Last accessed table was "+lastAccessedTable+" containing "+
-//                    lastAccessedTableSize+" tuples. Current stmt is the "+m_rProcContext.m_voltExecuteSQLIndex+
-//                    "'th call to voltExecuteSQL, batch index "+(m_rProcContext.m_batchIndexBase+batchIndex+1));
-
-//
-//            log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute on site "+m_hostId+". Current statistics:");
-//            log.info("Execution time: "+duration/1000.0+"s");
-//            log.info("Current statement being executed: Statement "+(m_rProcContext.m_batchIndexBase+batchIndex+1)+" of "+m_rProcContext.m_voltExecuteSQLIndex+"'th call to VoltExecuteSQL");
-//            log.info("Current plan fragment: "+planNodeName);
-//            log.info("Last table accessed: "+lastAccessedTable+", "+lastAccessedTableSize+" tuples");
-//            log.info("Total tuples accessed: "+tuplesFound);
-//
-
-//            log.info("Long running operation on site "+m_hostId);
-//            log.info("[Proc:"+m_rProcContext.m_procedureName+"]"
-//                    +"["+"Execution time:"+duration/1000.0+"s]"
-//                    +"["+"Executor:"+planNodeName+"]"
-//                    +"["+"Target table(size):"+lastAccessedTable+"("+lastAccessedTableSize+")"+"]"
-//                    +"["+"Tuples processed:"+tuplesFound+"]"
-//                    +"["+"VoltExecuteSQL index:"+m_rProcContext.m_voltExecuteSQLIndex+"]"
-//                    +"["+"Batch index:"+(m_rProcContext.m_batchIndexBase+batchIndex+1)+"]"
-//                    );
 
             m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
         }
-        //Set timer and time out read only queries.
-        //        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
-        //            return true;
-        //        else
+        // Return true if we want to interrupt ee. Otherwise return false
         return false;
     }
 
@@ -410,45 +392,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
-                                            long undoQuantumToken) throws EEException
-    {
-        try {
-            //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
-            m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
-            //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
-            m_logDuration = 1000;
-            m_startTime = System.currentTimeMillis();
-            VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
-                    parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
-            m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
-                    m_cacheMisses, m_partitionId);
-            return results;
-        }
-        finally {
-            // don't count any cache misses when there's an exception. This is a lie and they
-            // will still be used to estimate the cache size, but it's hard to count cache hits
-            // during an exception, so we don't count cache misses either to get the right ratio.
-            m_cacheMisses = 0;
-        }
-    }
-
-    /** Run multiple plan fragments */
-    public VoltTable[] executePlanFragments(int numFragmentIds,
-                                            long[] planFragmentIds,
-                                            long[] inputDepIds,
-                                            Object[] parameterSets,
-                                            long spHandle,
-                                            long lastCommittedSpHandle,
-                                            long uniqueId,
                                             long undoQuantumToken,
                                             RunningProcedureContext rProcContext) throws EEException
     {
         try {
-            m_rProcContext = rProcContext;
-            //For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
+            if(rProcContext != null) {
+                m_rProcContext = rProcContext;
+            }
+            // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
-            //Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
-            m_logDuration = 1000;
+            // Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
             m_startTime = System.currentTimeMillis();
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
@@ -461,6 +414,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // will still be used to estimate the cache size, but it's hard to count cache hits
             // during an exception, so we don't count cache misses either to get the right ratio.
             m_cacheMisses = 0;
+            m_logDuration = 0;
         }
     }
 

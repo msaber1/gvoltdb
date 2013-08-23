@@ -128,7 +128,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     byte[] m_procNameInBytes = "".getBytes();
     short m_voltExecuteSQLIndex;
     short m_batchIndexBase;
-    public void setRunningProcedureContext(String procName, short voltExecuteSQLIndex, short batchIndexBase) {
+    public void setRunningProcedureContext(String procName,
+                short voltExecuteSQLIndex,
+                short batchIndexBase) {
         m_procNameInBytes = procName.getBytes();
         m_voltExecuteSQLIndex = voltExecuteSQLIndex;
         m_batchIndexBase = batchIndexBase;
@@ -349,7 +351,17 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // fragment with the provided outputDepId
     public void setEmptyForRestart(int outputDepId) {
         m_emptyForRestart = true;
-        addFragment(EMPTY_HASH, outputDepId, ByteBuffer.allocate(0));
+        ParameterSet blank = ParameterSet.emptyParameterSet();
+        ByteBuffer mt = ByteBuffer.allocate(blank.getSerializedSize());
+        try {
+            blank.flattenToBuffer(mt);
+        }
+        catch (IOException ioe) {
+            // Shouldn't ever happen, just bail out to not-obviously equivalent behavior
+            mt = ByteBuffer.allocate(2);
+            mt.putShort((short)0);
+        }
+        addFragment(EMPTY_HASH, outputDepId, mt);
     }
 
     public boolean isEmptyForRestart() {
@@ -476,10 +488,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         // Fragment ID block (20 bytes per sha1-hash)
         msgsize += 20 * m_items.size();
 
-        // Procedure name gets an length (4) and the name (.length)
+        // Procedure name gets an length (2) and the name (.length)
         msgsize += 2;
-        if(m_procNameInBytes.length != 0)
-            msgsize += m_procNameInBytes.length;
+        if(m_procNameInBytes.length != 0) {
+                msgsize += m_procNameInBytes.length;
+        }
 
         // voltDBExecuteSQLIndex gets an length (2)
         msgsize += 2;
@@ -823,9 +836,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             sb.append("  WRITE, COORD ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
 
-        for (FragmentData item : m_items) {
+        if (!m_emptyForRestart) {
+            for (FragmentData item : m_items) {
+                sb.append("\n=====\n");
+                sb.append(item.toString());
+            }
+        }
+        else {
             sb.append("\n=====\n");
-            sb.append(item.toString());
+            sb.append("  FRAGMENT EMPTY FOR RESTART SERIALIZATION");
         }
 
         if (m_isFinal)

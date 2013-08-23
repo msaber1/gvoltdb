@@ -164,12 +164,9 @@ OrderByExecutor::p_execute(const NValueArray &params)
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
     vector<TableTuple> xs;
-    int foundTuples = 0;
     while (iterator.next(tuple))
     {
-        if(++foundTuples % LONG_OP_THRESHOLD == 0) {
-            progressUpdate(foundTuples);
-        }
+        doLongOpTracking();
         assert(tuple.isActive());
         xs.push_back(tuple);
     }

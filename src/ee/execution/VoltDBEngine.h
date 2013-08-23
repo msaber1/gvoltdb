@@ -114,7 +114,7 @@ class RecoveryProtoMsg;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 const size_t PLAN_CACHE_SIZE = 1024 * 10;
-const int64_t LONG_OP_THRESHOLD = 100000;
+const int64_t LONG_OP_THRESHOLD = 10000;
 
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
@@ -175,12 +175,20 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         /** index of the batch piece being executed */
         int m_currentIndexInBatch;
+        long m_tuplesFound;
+        Table* m_lastAccessedTable;
 
         inline void setIndexInBatch(int indexInBatch) {
             m_currentIndexInBatch = indexInBatch;
         }
         inline int getIndexInBatch() {
             return m_currentIndexInBatch;
+        }
+        inline void setLastAccessedTable(Table* table) {
+            m_lastAccessedTable = table;
+        }
+        inline Table* getLastAccessedTable() {
+            return m_lastAccessedTable;
         }
 
         // Created to transition existing unit tests to context abstraction.

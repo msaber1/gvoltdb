@@ -367,6 +367,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     // children are positioned before it in this list, therefore
     // dependency tracking is not needed here.
     size_t ttl = execsForFrag->list.size();
+    m_tuplesFound = 0;
     for (int ctr = 0; ctr < ttl; ++ctr) {
         AbstractExecutor *executor = execsForFrag->list[ctr];
         assert (executor);
@@ -719,7 +720,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // find all of the indexes to add
             //////////////////////////////////////////
 
-            vector<TableIndex*> currentIndexes = persistenttable->allIndexes();
+            const vector<TableIndex*> currentIndexes = persistenttable->allIndexes();
 
             // iterate over indexes for this table in the catalog
             map<string, catalog::Index*>::const_iterator indexIter;
@@ -967,7 +968,7 @@ void VoltDBEngine::rebuildTableCollections()
                                                   tcd->getTable()->getTableStats());
 
             // add all of the indexes to the stats source
-            std::vector<TableIndex*> tindexes = tcd->getTable()->allIndexes();
+            const std::vector<TableIndex*>& tindexes = tcd->getTable()->allIndexes();
             for (int i = 0; i < tindexes.size(); i++) {
                 TableIndex *index = tindexes[i];
                 getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
