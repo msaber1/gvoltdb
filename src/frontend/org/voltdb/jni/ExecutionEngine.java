@@ -97,7 +97,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private boolean m_readOnly;
     private long m_startTime;
     private long m_currentUniqueId;
-    private static final long m_logDuration = 0;
+    private static final long m_logDuration = 1000;
 
     /** information about EE calls back to JAVA. For test.*/
     public int m_callsFromEE = 0;
