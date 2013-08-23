@@ -91,6 +91,13 @@ public class InterruptAgent extends OpsAgent
         return null;
     }
 
+    /**
+     *  Set the uniqueId to be interrupted in RealVoltDB, we may need a list of uniqueIds if we are going to cancel multiple
+     *  transactions.
+     * @param obj
+     * @return
+     * @throws JSONException
+     */
     private VoltTable[] setUniqueIdToInterrupt(JSONObject obj) throws JSONException {
         long uniqueId = obj.getLong("uniqueId");
         VoltDB.instance().setUniqueIdToInterrupt(uniqueId);

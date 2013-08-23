@@ -341,7 +341,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             VoltLogger log = new VoltLogger("CONSOLE");
             log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute -- "+duration/1000.0+" seconds spent accessing "
                     +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+ realBatchIndex
-                    +" of batch "+m_rProcContext.m_voltExecuteSQLIndex+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
+                    +" of batch "+(m_rProcContext.m_voltExecuteSQLIndex+1)+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
 
             //System.err.println("getUniqueIdToInterrupt: "+VoltDB.instance().getUniqueIdToInterrupt());
             if(VoltDB.instance().getUniqueIdToInterrupt() == m_currentUniqueId) {
