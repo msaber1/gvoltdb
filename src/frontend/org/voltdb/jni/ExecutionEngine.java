@@ -97,7 +97,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     private boolean m_readOnly;
     private long m_startTime;
     private long m_currentUniqueId;
-    private static final long m_logDuration = 1000;
+    private long m_logDuration = 1000;
 
     /** information about EE calls back to JAVA. For test.*/
     public int m_callsFromEE = 0;
@@ -335,30 +335,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
         long currentTime = System.currentTimeMillis();
         long duration = currentTime - m_startTime;
-        long logDuration = m_logDuration;
+        short realBatchIndex = (short)(m_rProcContext.m_batchIndexBase+batchIndex+1);
 
-        if(duration > logDuration) {
+        if(duration > m_logDuration) {
             VoltLogger log = new VoltLogger("CONSOLE");
-            if(m_rProcContext==null) {
-                m_rProcContext = new RunningProcedureContext();
-            }
-            short realBatchIndex = (short)(m_rProcContext.m_batchIndexBase+batchIndex+1);
             log.info("Procedure "+m_rProcContext.m_procedureName+" is taking a long time to execute -- "+duration/1000.0+" seconds spent accessing "
                     +tuplesFound+" tuples. Current plan fragment "+planNodeName+" in query "+ realBatchIndex
                     +" of batch "+m_rProcContext.m_voltExecuteSQLIndex+" on site "+CoreUtils.hsIdToString(m_siteId)+".");
 
-            this.m_rProcStats.beginProcedure(m_currentUniqueId,
-                    m_rProcContext.m_procedureName,
-                    duration,
-                    realBatchIndex,
-                    m_rProcContext.m_voltExecuteSQLIndex,
-                    planNodeName,
-                    lastAccessedTable,
-                    lastAccessedTableSize,
-                    tuplesFound);
-
-            logDuration = (logDuration < 30000) ? 2*logDuration : 30000;
+            m_logDuration = (m_logDuration < 30000) ? 2*m_logDuration : 30000;
         }
+        this.m_rProcStats.beginProcedure(m_currentUniqueId,
+                m_rProcContext.m_procedureName,
+                duration,
+                realBatchIndex,
+                m_rProcContext.m_voltExecuteSQLIndex,
+                planNodeName,
+                lastAccessedTable,
+                lastAccessedTableSize,
+                tuplesFound);
         // Set a timer and time out read only queries.
         //        if(m_readOnly && currentTime - m_startTime > Long.MAX_VALUE)
         //            return true;
@@ -418,7 +413,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             RunningProcedureContext rProcContext) throws EEException
     {
         try {
-            m_rProcContext = rProcContext;
+        	if(rProcContext != null) {
+        		m_rProcContext = rProcContext;
+        	}
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
             // Consider put the following line in EEJNI.coreExecutePlanFrag... before where the native method is called?
@@ -436,6 +433,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // will still be used to estimate the cache size, but it's hard to count cache hits
             // during an exception, so we don't count cache misses either to get the right ratio.
             m_cacheMisses = 0;
+            m_logDuration = 1000;
         }
     }
 
