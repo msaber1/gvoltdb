@@ -85,7 +85,6 @@ public:
         index = NULL;
         outer_table = NULL;
         m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
-        m_engine = engine;
     }
 
     ~NestLoopIndexExecutor();
@@ -94,17 +93,6 @@ protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
-    inline void progressUpdate(int foundTuples, Table* targetTable) {
-        //Update stats in java and let java determine if we should cancel this query.
-        if(m_engine->getTopend()->fragmentProgressUpdate(m_engine->getIndexInBatch(),
-                planNodeToString(m_abstractNode->getPlanNodeType()),
-                targetTable->name(),
-                targetTable->activeTupleCount(),
-                foundTuples)){
-            VOLT_ERROR("Time out read only query.");
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, "Time out read only query.");
-        }
-    };
 
     NestLoopIndexPlanNode* node;
     IndexScanPlanNode* inline_node;
