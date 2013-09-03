@@ -235,6 +235,7 @@ private:
     uint32_t m_nextFreeTuple;
     uint32_t m_lastCompactionOffset;
     const double m_tuplesPerBlockDivNumBuckets;
+    bool m_bigAlloc;
 
     /*
      * queue of offsets to <b>once used and then deleted</b> tuples.
@@ -273,8 +274,7 @@ inline void intrusive_ptr_release(voltdb::TupleBlock * p)
 {
     if (--(p->m_references) == 0) {
         p->~TupleBlock();
-        voltdb::BigMemoryAllocator::free(p);
-        //voltdb::ThreadLocalPool::getExact(sizeof(voltdb::TupleBlock))->free(p);
+        voltdb::ThreadLocalPool::getExact(sizeof(voltdb::TupleBlock))->free(p);
     }
 }
 

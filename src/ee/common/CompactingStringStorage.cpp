@@ -55,10 +55,7 @@ CompactingStringStorage::getExact(size_t size)
     int32_t ssize = static_cast<int32_t>(size);
     PoolPtrType pool;
     if (iter == m_poolMap.end()) {
-        // compute num_elements to be closest multiple
-        // leading to a 2Meg buffer
-        int32_t num_elements = (2 * 1024 * 1024 / ssize) + 1;
-        pool = PoolPtrType(new CompactingStringPool(ssize, num_elements));
+        pool = PoolPtrType(new CompactingStringPool(ssize));
         m_poolMap.insert(pair<size_t, PoolPtrType>(size, pool));
     }
     else

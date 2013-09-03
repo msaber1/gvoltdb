@@ -33,8 +33,8 @@ namespace voltdb
     {
     public:
         // Create a compacting pool.  As memory is required, it will
-        // allocate buffers of size elementSize * elementsPerBuffer bytes
-        CompactingPool(int32_t elementSize, int32_t elementsPerBuffer);
+        // allocate 2mb buffers
+        CompactingPool(int32_t elementSize);
 
         // get a pointer to elementSize bytes of free memory
         void* malloc();

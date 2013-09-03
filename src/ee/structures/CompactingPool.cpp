@@ -22,8 +22,8 @@
 using namespace voltdb;
 using namespace std;
 
-CompactingPool::CompactingPool(int32_t elementSize, int32_t elementsPerBuffer) :
-    m_size(elementSize), m_allocator(elementSize, elementsPerBuffer)
+CompactingPool::CompactingPool(int32_t elementSize) :
+    m_size(elementSize), m_allocator(elementSize, 2*1024*1024 /*2mb*/, true)
 {
 }
 

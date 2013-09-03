@@ -36,17 +36,18 @@ class ContiguousAllocator {
     };
 
     int64_t m_count;
-    int32_t m_allocSize;
-    int32_t m_chunkSize;
-    Buffer *m_tail;
+    const int32_t m_allocSize;
+    const int32_t m_allocsPerBlock;
+    const int32_t m_blockSize;
     int32_t m_blockCount;
+    Buffer *m_tail;
 
 public:
     /**
      * @param allocSize is the size in bytes of individual allocations.
-     * @param chunkSize is the number of allocations per buffer (not bytes).
+     * @param blockSize is the size of each allocation, naturally bigger than allocSize.
      */
-    ContiguousAllocator(int32_t allocSize, int32_t chunkSize);
+    ContiguousAllocator(int32_t allocSize, int32_t blockSize, bool bigAlloc);
     ~ContiguousAllocator();
 
     void *alloc();

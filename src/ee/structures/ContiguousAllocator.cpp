@@ -21,8 +21,17 @@
 
 using namespace voltdb;
 
-ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t chunkSize)
-: m_count(0), m_allocSize(allocSize), m_chunkSize(chunkSize), m_tail(NULL), m_blockCount(0) {}
+ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t blockSize, bool bigAlloc)
+: m_count(0),
+  m_allocSize(allocSize),
+  m_allocsPerBlock((blockSize - sizeof(Buffer)) / allocSize),
+  m_blockSize(blockSize),
+  m_blockCount(0),
+  m_tail(NULL)
+{
+    assert(allocSize > 0);
+    assert((blockSize - sizeof(Buffer)) > allocSize);
+}
 
 ContiguousAllocator::~ContiguousAllocator() {
     while (m_tail) {
@@ -36,11 +45,11 @@ void *ContiguousAllocator::alloc() {
     m_count++;
 
     // determine where in the current block the new alloc will go
-    int64_t blockOffset = (m_count - 1) % m_chunkSize;
+    int64_t blockOffset = (m_count - 1) % m_allocsPerBlock;
 
     // if a new block is needed...
     if (blockOffset == 0) {
-        void *memory = malloc(sizeof(Buffer) + m_allocSize * m_chunkSize);
+        void *memory = malloc(m_blockSize);
 
         Buffer *buf = reinterpret_cast<Buffer*>(memory);
 
@@ -63,7 +72,7 @@ void *ContiguousAllocator::last() const {
     assert(m_tail != NULL);
 
     // determine where in the current block the last alloc is
-    int64_t blockOffset = (m_count - 1) % m_chunkSize;
+    int64_t blockOffset = (m_count - 1) % m_allocsPerBlock;
     return m_tail->data + (m_allocSize * blockOffset);
 }
 
@@ -77,7 +86,7 @@ void ContiguousAllocator::trim() {
     m_count--;
 
     // determine where in the current block the last alloc is
-    int64_t blockOffset = m_count % m_chunkSize;
+    int64_t blockOffset = m_count % m_allocsPerBlock;
 
     // yay! kill a block
     if (blockOffset == 0) {
@@ -90,7 +99,6 @@ void ContiguousAllocator::trim() {
 
 size_t ContiguousAllocator::bytesAllocated() const {
     size_t total = static_cast<size_t>(m_blockCount) *
-        static_cast<size_t>(m_allocSize) *
-        static_cast<size_t>(m_chunkSize);
+        static_cast<size_t>(m_blockSize);
     return total;
 }

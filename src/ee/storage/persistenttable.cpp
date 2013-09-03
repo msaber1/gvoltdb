@@ -85,7 +85,7 @@ TableTuple keyTuple;
 #define TABLE_BLOCKSIZE 2097152
 
 PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetSize) :
-    Table(tableAllocationTargetSize == 0 ? TABLE_BLOCKSIZE : tableAllocationTargetSize),
+    Table(2*1024*1024),
     m_iter(this, m_data.begin()),
     m_allowNulls(),
     m_partitionColumn(partitionColumn),
