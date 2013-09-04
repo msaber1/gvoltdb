@@ -18,6 +18,7 @@
 #include "BigMemoryAllocator.h"
 
 #include <cassert>
+#include <cstdio>
 
 using namespace voltdb;
 
