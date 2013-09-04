@@ -118,7 +118,7 @@ void BigMemoryAllocator::free(void *ptr) {
 
     int64_t offset = static_cast<int64_t>((char*)ptr - (char*)m_base);
     if ((offset % m_blocksize) != 0) {
-        printf("Offset %lld, blocksize %lld\n", offset, m_blocksize);
+        printf("Offset %lld, blocksize %lld\n", (long long int)offset, (long long int)m_blocksize);
         fflush(stdout);
         assert(false);
     }
