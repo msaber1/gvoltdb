@@ -16,6 +16,7 @@
  */
 
 #include "ContiguousAllocator.h"
+#include "storage/BigMemoryAllocator.h"
 
 #include <cassert>
 
@@ -27,7 +28,8 @@ ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t blockSize, b
   m_allocsPerBlock(static_cast<int32_t>((blockSize - sizeof(Buffer)) / allocSize)),
   m_blockSize(blockSize),
   m_blockCount(0),
-  m_tail(NULL)
+  m_tail(NULL),
+  m_bigAlloc(bigAlloc)
 {
     assert(allocSize > 0);
     assert((blockSize - sizeof(Buffer)) > allocSize);
@@ -49,7 +51,13 @@ void *ContiguousAllocator::alloc() {
 
     // if a new block is needed...
     if (blockOffset == 0) {
-        void *memory = malloc(m_blockSize);
+        void *memory = NULL;
+        if (m_bigAlloc) {
+            memory = BigMemoryAllocator::alloc(m_blockSize);
+        }
+        else {
+            memory = malloc(m_blockSize);
+        }
 
         Buffer *buf = reinterpret_cast<Buffer*>(memory);
 
@@ -91,7 +99,12 @@ void ContiguousAllocator::trim() {
     // yay! kill a block
     if (blockOffset == 0) {
         Buffer *buf = m_tail->prev;
-        free(m_tail);
+        if (m_bigAlloc) {
+            BigMemoryAllocator::free(buf);
+        }
+        else {
+            free(m_tail);
+        }
         m_tail = buf;
         m_blockCount--;
     }

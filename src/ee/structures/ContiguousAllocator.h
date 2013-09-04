@@ -41,6 +41,7 @@ class ContiguousAllocator {
     const int32_t m_blockSize;
     int32_t m_blockCount;
     Buffer *m_tail;
+    bool m_bigAlloc;
 
 public:
     /**
