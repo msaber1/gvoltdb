@@ -24,7 +24,7 @@ using namespace voltdb;
 ContiguousAllocator::ContiguousAllocator(int32_t allocSize, int32_t blockSize, bool bigAlloc)
 : m_count(0),
   m_allocSize(allocSize),
-  m_allocsPerBlock((blockSize - sizeof(Buffer)) / allocSize),
+  m_allocsPerBlock(static_cast<int32_t>((blockSize - sizeof(Buffer)) / allocSize)),
   m_blockSize(blockSize),
   m_blockCount(0),
   m_tail(NULL)
