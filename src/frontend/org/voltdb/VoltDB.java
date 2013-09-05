@@ -268,6 +268,13 @@ public class VoltDB {
                     continue;
                 }
 
+                // Handle request for program version
+                if (arg.equalsIgnoreCase("--version")) {
+                    String[] version = RealVoltDB.extractBuildInfo();
+                    System.out.println("VoltDB v" + version[0] + (m_isEnterprise ? " Enterprise Edition" : " Community Edition"));
+                    System.exit(-1);
+                }
+
                 // Handle request for help/usage
                 if (arg.equalsIgnoreCase("-h") || arg.equalsIgnoreCase("--help")) {
                     usage(System.out);
@@ -437,8 +444,19 @@ public class VoltDB {
                     }
                 } else if (arg.equals("enableiv2")) {
                     m_enableIV2 = true;
+                } else if (arg.equals("help")) {
+                    // See if there's a verb following this arg that we need to get help for.
+                    if (i != args.length-1)
+                    {
+                        usage(args[i+1], System.out);
+                    }
+                    else
+                    {
+                        usage(System.out);
+                    }
+                    System.exit(-1);
                 } else {
-                    hostLog.fatal("Unrecognized option to VoltDB: " + arg);
+                    hostLog.fatal("Unrecognized verb to VoltDB: " + arg);
                     usage();
                     System.exit(-1);
                 }
@@ -447,10 +465,10 @@ public class VoltDB {
             // If no action is specified, issue an error.
             if (null == m_startAction) {
                 if (org.voltdb.utils.MiscUtils.isPro()) {
-                    hostLog.fatal("You must specify a startup action, either create, recover, replica, rejoin, or compile.");
+                    hostLog.fatal("You must specify a startup verb: either create, recover, replica, rejoin, or compile.");
                 } else
                 {
-                    hostLog.fatal("You must specify a startup action, either create, recover, rejoin, or compile.");
+                    hostLog.fatal("You must specify a startup verb: either create, recover, rejoin, or compile.");
                 }
                 usage();
                 System.exit(-1);
@@ -485,7 +503,7 @@ public class VoltDB {
 
             if (m_startAction == null) {
                     isValid = false;
-                    hostLog.fatal("The startup action is missing (either create, recover, replica or rejoin).");
+                    hostLog.fatal("The voltdb command line verb is missing (either create, recover, replica or rejoin).");
                 }
 
             if (m_startAction == StartAction.CREATE &&
@@ -538,32 +556,107 @@ public class VoltDB {
         /**
          * Prints a usage message on stderr.
          */
-        public void usage() { usage(System.err); }
+        public void usage() { usage(null, System.err); }
 
         /**
          * Prints a usage message on the designated output stream.
          */
-        public void usage(PrintStream os) {
+        public void usage(PrintStream os) { usage(null, os); }
+
+        /**
+         * Prints a usage message on the designated output stream.
+         */
+        public void usage(String arg, PrintStream os) {
             // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
-            String message = "";
-            if (org.voltdb.utils.MiscUtils.isPro()) {
-                message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml> \n"
-                        + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb [live] rejoin host <hostname>\n";
-            } else {
-                message = "Usage: voltdb create  catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n"
-                        + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
-                        + "       voltdb rejoin host <hostname>\n";
+            String message = "\nUsage: voltdb VERB [ OPTIONS ... ] [ ARGUMENTS ... ]\n" +
+                    "\n" +
+                    "This is the command line interface to VoltDB runtime functions.\n" +
+                    "Specific actions are provided by verbs.  Run \"voltdb help VERB\" to display\n" +
+                    "full usage for a verb, including its options and arguments.\n" +
+                    "\n" +
+                    "Options:\n" +
+                    "  --version   show program's version number and exit\n" +
+                    "  -h, --help  show this help message and exit\n" +
+                    "\n" +
+                    "-- Verb Descriptions --\n" +
+                    "\n" +
+                    "create                     Create a new empty database.\n" +
+                    "replica                    Create a new empty database as the target for replication.\n" +
+                    "recover                    Start a database with recovered durable data.\n" +
+                    "rejoin                     Start a node and rejoin it to the cluster.\n" +
+                    "compile                    Build a VoltDB database catalog.\n" +
+                    "\n" +
+                    "-- Common Verbs --\n" +
+                    "\n" +
+                    "help [ VERB ... ]  Display general or verb-specific help.\n" +
+            "\n";
+
+            if (null != arg)
+            {
+                // Help for a specific verb.
+                if (arg.equalsIgnoreCase("create"))
+                {
+                    if (org.voltdb.utils.MiscUtils.isPro()) {
+                        message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n";
+                        message += "\nIf no deployment is specified, a default 1 node cluster deployment will be configured.\n";
+                    }
+                    else
+                    {
+                        message = "Usage: voltdb create catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n";
+                        message += "\nIf no deployment is specified, a default 1 node cluster deployment will be configured.\n";
+                    }
+                }
+                else
+                if (arg.equalsIgnoreCase("replica"))
+                {
+                    if (org.voltdb.utils.MiscUtils.isPro()) {
+                        message = "Usage: voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n";
+                        message += "\nIf no deployment is specified, a default 1 node cluster deployment will be configured.\n";
+                    }
+                    else
+                    {
+                        message = "Usage: voltdb replica catalog <catalog.jar> [host <hostname>] [deployment <deployment.xml>]\n";
+                        message += "\nIf no deployment is specified, a default 1 node cluster deployment will be configured.\n";
+                    }
+                }
+                else
+                if (arg.equalsIgnoreCase("recover"))
+                {
+                    if (org.voltdb.utils.MiscUtils.isPro()) {
+                        message = "Usage: voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n";
+                        message += "\nIf no deployment is specified, a default 1 node cluster deployment will be configured.\n";
+                    }
+                    else
+                    {
+                        message = "Usage: voltdb recover [host <hostname>] [deployment <deployment.xml>]\n";
+                        message += "\nIf no deployment is specified, a default 1 node cluster deployment will be configured.\n";
+                    }
+                }
+                else
+                if (arg.equalsIgnoreCase("rejoin"))
+                {
+                    if (org.voltdb.utils.MiscUtils.isPro()) {
+                        message = "Usage: voltdb [live] rejoin host <hostname>\n\n";
+                    }
+                    else
+                    {
+                        message = "Usage: voltdb rejoin host <hostname>\n\n";
+                    }
+                }
+                else
+                if (arg.equalsIgnoreCase("compile"))
+                {
+                    message = "Usage: voltdb compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";
+                }
+                else
+                    message = "Verb: " + arg + " is not a valid argument.  Valid verbs include: create, replica recover, rejoin, compile\n";
             }
-            message += "       voltdb compile [<option> ...] [<ddl-file> ...]  (run voltdb compile -h for more details)\n";
+
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
             hostLog.info(message);
-            // Don't bother logging these for log4j, only dump them to the designated stream.
-            os.println("If no deployment is specified, a default 1 node cluster deployment will be configured.");
         }
 
         /**
