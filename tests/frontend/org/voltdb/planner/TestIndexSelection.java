@@ -53,7 +53,7 @@ public class TestIndexSelection extends PlannerTestCase {
         AbstractPlanNode pn = compile("select id from a, t where a.id < (t.a + ?);");
         pn = pn.getChild(0);
         pn = pn.getChild(0);
-        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // System.out.println("DEBUG: " + pn.toExplainPlanString(getDatabase()));
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         IndexScanPlanNode indexScan = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assertEquals(IndexLookupType.LT, indexScan.getLookupType());
@@ -71,7 +71,7 @@ public class TestIndexSelection extends PlannerTestCase {
         AbstractPlanNode pn = compile("select a from t where a = ? and b = ? and c = ? and d = ? " +
                                       "and e >= ? and e <= ?;");
         pn = pn.getChild(0);
-        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // System.out.println("DEBUG: " + pn.toExplainPlanString(getDatabase()));
         assertTrue(pn instanceof IndexScanPlanNode);
         assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1_HASH\""));
     }
@@ -82,7 +82,7 @@ public class TestIndexSelection extends PlannerTestCase {
     {
         AbstractPlanNode pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;");
         pn = pn.getChild(0);
-        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // System.out.println("DEBUG: " + pn.toExplainPlanString(getDatabase()));
         assertTrue(pn instanceof IndexScanPlanNode);
         assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_B\""));
     }
@@ -92,7 +92,7 @@ public class TestIndexSelection extends PlannerTestCase {
     public void testEng4792PlanWithCompoundEQLTEOrderedByPK() throws JSONException
     {
         AbstractPlanNode pn = compile("select id from a where deleted=? and updated_date <= ? order by id limit ?;");
-        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+        // System.out.println("DEBUG: " + pn.toExplainPlanString(getDatabase()));
         pn = pn.getChild(0);
         // ENG-5066: now Limit is pushed under Projection
         assertTrue(pn instanceof ProjectionPlanNode);

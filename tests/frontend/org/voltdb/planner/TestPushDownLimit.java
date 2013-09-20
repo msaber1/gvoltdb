@@ -109,7 +109,7 @@ public class TestPushDownLimit extends PlannerTestCase {
         assertTrue(pn.size() > 0);
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString(getDatabase()));
         }
 
         AbstractPlanNode p;
