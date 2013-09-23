@@ -20,32 +20,13 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+package org.voltdb.utils;
 
-package org.voltdb.sqlgenerator;
+public class TestCSVLoaderElastic extends TestCSVLoader {
 
-import org.voltdb.compiler.VoltProjectBuilder;
-
-
-public class SimpleProjectBuilder extends VoltProjectBuilder {
-    public static final Class<?> PROCEDURES[] = new Class<?>[] {
-        StubProcedure.class
-    };
-
-    private String m_filename = null;
-
-    public SimpleProjectBuilder(String filename) {
-        m_filename = filename;
-    }
-
-    public void addDefaultProcedures() {
-        addProcedures(PROCEDURES);
-    }
-
-    public void addDefaultPartitioning() {
-        addPartitionInfo("P1", "ID");
-    }
-
-    public void addDefaultSchema() {
-        addSchema(getClass().getResource(m_filename));
+    @Override
+    protected void setUp() throws Exception {
+        super.setUp();
+        System.setProperty("HASHINATOR", "elastic");
     }
 }

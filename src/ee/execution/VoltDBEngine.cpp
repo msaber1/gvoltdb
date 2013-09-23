@@ -485,6 +485,8 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
 
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
+
+    VOLT_TRACE("Catalog string contents:\n%s\n",catalogPayload.c_str());
     m_catalog->execute(catalogPayload);
 
 
@@ -727,7 +729,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                  indexIter != catalogTable->indexes().end();
                  indexIter++)
             {
-                std::string indexName = indexIter->first;
+                std::string indexName = indexIter->second->name();
                 std::string catalogIndexId = TableCatalogDelegate::getIndexIdString(*indexIter->second);
 
                 // Look for an index on the table to match the catalog index
@@ -1435,7 +1437,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
             }
         }
         VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
-                   (int)positions.size(), remaining);
+                   (int)positions.size(), (long)remaining);
     }
     catch (SerializableEEException &e) {
         resetReusedResultOutputBuffer();
