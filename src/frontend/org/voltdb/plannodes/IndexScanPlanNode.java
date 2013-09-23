@@ -506,11 +506,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
         m_forDeterminismOnly = jobj.optBoolean(Members.DETERMINISM_ONLY.name());
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
-        JSONObject tempjobj = null;
         //load end_expression
         m_endExpression = AbstractExpression.fromJSONChild(jobj, Members.END_EXPRESSION.name());
         // load initial_expression
-        m_initialExpression = AbstractExpression.fromJSONChild(tempjobj, Members.INITIAL_EXPRESSION.name());
+        m_initialExpression = AbstractExpression.fromJSONChild(jobj, Members.INITIAL_EXPRESSION.name());
         //load searchkey_expressions
         AbstractExpression.loadFromJSONArrayChild(m_searchkeyExpressions, jobj,
                 Members.SEARCHKEY_EXPRESSIONS.name());
