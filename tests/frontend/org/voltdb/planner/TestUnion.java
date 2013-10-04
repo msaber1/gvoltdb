@@ -23,6 +23,7 @@
 
 package org.voltdb.planner;
 
+import org.voltdb.compiler.DeterminismMode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
@@ -54,6 +55,16 @@ public class TestUnion extends PlannerTestCase {
         UnionPlanNode unionPN = (UnionPlanNode) pn.getChild(0);
         assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
         assertTrue(unionPN.getChildCount() == 2);
+
+        CompiledPlan cp = compileAdHocPlan("SELECT A FROM T1 where A = 1 UNION SELECT B FROM T2 UNION SELECT C FROM T3 WHERE C = 3;", DeterminismMode.FASTER);
+        Object pkey = cp.getPartitioningKey();
+        assertTrue(pkey instanceof Long);
+        assertEquals(1, (long)(Long)pkey);
+        pn = cp.rootPlanGraph;
+        assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+        unionPN = (UnionPlanNode) pn.getChild(0);
+        assertTrue(unionPN.getUnionType() == ParsedUnionStmt.UnionType.UNION);
+        assertTrue(unionPN.getChildCount() == 3);
 
         // In the future, new capabilities like "pushdown of set ops into the collector fragment" and
         // "designation of coordinator execution sites for multi-partition (multi-fragment) plans"

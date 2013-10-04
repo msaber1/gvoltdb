@@ -45,12 +45,12 @@ public class TestUnionSuite extends RegressionSuite {
      */
     public void testUnion() throws NoConnectionsException, IOException, ProcCallException {
         Client client = this.getClient();
-        client.callProcedure("InsertA", 0, 1); // In the final result set - 0
-        client.callProcedure("InsertB", 1, 1); // In the final result set - 1
-        client.callProcedure("InsertB", 2, 1); // Eliminated (duplicate)
-        client.callProcedure("InsertC", 1, 2); // In the final result set - 2
-        client.callProcedure("InsertC", 2, 3); // In the final result set - 3
-        client.callProcedure("InsertC", 3, 3); // Eliminated (duplicate)
+        client.callProcedure("InsertA", 1, 2); // In the final result set - 0
+        client.callProcedure("InsertB", 2, 2); // In the final result set - 1
+        client.callProcedure("InsertB", 3, 2); // Eliminated (duplicate)
+        client.callProcedure("InsertC", 2, 3); // In the final result set - 2
+        client.callProcedure("InsertC", 3, 4); // In the final result set - 3
+        client.callProcedure("InsertC", 4, 4); // Eliminated (duplicate)
         VoltTable result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A UNION SELECT I FROM B UNION SELECT I FROM C;")
                                  .getResults()[0];
         assertEquals(4, result.getRowCount());
@@ -61,7 +61,7 @@ public class TestUnionSuite extends RegressionSuite {
                 .getResults()[0];
         assertEquals(4, result.getRowCount());
         // test with parameters
-        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 0 UNION SELECT I FROM B UNION SELECT I FROM C WHERE I = 3;")
+        result = client.callProcedure("@AdHoc", "SELECT PKEY FROM A where PKEY = 1 UNION SELECT I FROM B UNION SELECT I FROM C WHERE I = 4;")
                 .getResults()[0];
         assertEquals(3, result.getRowCount());
     }

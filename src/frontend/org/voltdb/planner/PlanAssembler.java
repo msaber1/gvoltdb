@@ -41,8 +41,8 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
-import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt.MVFixInfo;
+import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -465,7 +465,7 @@ public class PlanAssembler {
         }
 
         if (commonPartitioning != null) {
-            m_partitioning = (PartitioningForStatement)commonPartitioning.clone();
+            m_partitioning = commonPartitioning;
         }
 
         // need to reset plan id for the entire UNION
