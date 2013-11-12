@@ -32,7 +32,6 @@ import java.util.List;
 import org.apache.commons.lang3.StringUtils;
 import org.junit.AfterClass;
 import org.junit.Test;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -158,14 +157,14 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             results = m_client.callProcedure("executeSQLSP", 24, "select * from parted1 order by partval").getResults();
 
-            if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
+            //if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
                 for (int ii = 0; ii < 4; ii++) {
                     assertEquals( 1, results[ii].getRowCount());
                     assertTrue(results[ii].advanceRow());
                     assertEquals(24, results[ii].getLong(0));
                     assertEquals( 4, results[ii].getLong(1));
                 }
-            } else {
+            /*} else {
                 //These constants break when partitioning changes
                 //Recently 23, 24, and 25, started hashing to the same place /facepalm
                 for (int ii = 0; ii < 4; ii++) {
@@ -188,7 +187,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
                     assertEquals(25, results[ii].getLong(0));
                     assertEquals( 5, results[ii].getLong(1));
                 }
-            }
+            }*/
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -232,17 +231,17 @@ public class TestAdHocQueries extends AdHocQueryTester {
             int hashableC;
             //Hashes to partition 1
             int hashableD;
-            if (TheHashinator.getConfiguredHashinatorType() == HashinatorType.LEGACY) {
+            //if (TheHashinator.getConfiguredHashinatorType() == HashinatorType.LEGACY) {
                 hashableA = 4;
                 hashableB = 1;
                 hashableC = 2;
                 hashableD = 3;
-            } else {
-                hashableA = 8;
-                hashableB = 2;
-                hashableC = 1;
-                hashableD = 4;
-            }
+            //} else {
+            //    hashableA = 8;
+            //    hashableB = 2;
+            //    hashableC = 1;
+            //    hashableD = 4;
+            //}
 
             //If things break you can use this to find what hashes where and fix the constants
 //            for (int ii = 0; ii < 10; ii++) {
@@ -363,15 +362,15 @@ public class TestAdHocQueries extends AdHocQueryTester {
             System.out.println(result.toString());
 
             // test single-partition stuff
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 0 : 2).getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 0).getResults()[0];
             System.out.println(result.toString());
             assertEquals(0, result.getRowCount());
-            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 1 : 0).getResults()[0];
+            result = env.m_client.callProcedure("@AdHoc", "SELECT * FROM BLAH;", 1).getResults()[0];
             System.out.println(result.toString());
             assertEquals(1, result.getRowCount());
 
             try {
-                env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY ? 1 : 2);
+                env.m_client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (0, 0, 0);", 1);
                 fail("Badly partitioned insert failed to throw expected exception");
             }
             catch (Exception e) {}

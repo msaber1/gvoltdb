@@ -19,30 +19,35 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.*;
 import java.util.HashSet;
 import java.util.Map;
+import java.util.NavigableMap;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.TreeMap;
+import java.util.TreeSet;
 
-import com.google.common.collect.ImmutableSortedSet;
-import com.google.common.collect.Maps;
-import com.google.common.collect.SortedMapDifference;
 import org.apache.cassandra_voltpatches.MurmurHash3;
 import org.voltcore.utils.Pair;
+import org.voltdb.utils.CompressionService;
 
 import com.google.common.base.Preconditions;
 import com.google.common.base.Supplier;
 import com.google.common.base.Suppliers;
 import com.google.common.collect.ImmutableSortedMap;
+import com.google.common.collect.ImmutableSortedSet;
+import com.google.common.collect.Maps;
+import com.google.common.collect.SortedMapDifference;
 import com.google.common.collect.UnmodifiableIterator;
-import org.voltdb.utils.CompressionService;
 
 /**
  * A hashinator that uses Murmur3_x64_128 to hash values and a consistent hash ring
  * to pick what partition to route a particular value.
  */
 public class ElasticHashinator extends TheHashinator {
+    // ENG-5387 - run need partition count to run both hashinators
+    private final int catalogPartitionCount;
+
     public static int DEFAULT_TOTAL_TOKENS =
         Integer.parseInt(System.getProperty("ELASTIC_TOTAL_TOKENS", "16384"));
 
@@ -56,6 +61,7 @@ public class ElasticHashinator extends TheHashinator {
                 return java.security.AccessController.doPrivileged
                         (new java.security
                                 .PrivilegedExceptionAction<sun.misc.Unsafe>() {
+                            @Override
                             public sun.misc.Unsafe run() throws Exception {
                                 java.lang.reflect.Field f = sun.misc
                                         .Unsafe.class.getDeclaredField("theUnsafe");
@@ -115,7 +121,29 @@ public class ElasticHashinator extends TheHashinator {
 
     @Override
     public int pHashToPartition(VoltType type, Object obj) {
-        return hashinateBytes(valueToBytes(obj));
+        int genericPartition = hashinateBytes(valueToBytes(obj));
+
+        // Annoying, legacy hashes numbers and bytes differently, need to preserve that.
+        if (obj == null || VoltType.isNullVoltType(obj)) {
+            return 0;
+        } else if (obj instanceof Long) {
+            long value = ((Long) obj).longValue();
+            return pHashinateLong(value);
+        } else if (obj instanceof Integer) {
+            long value = ((Integer) obj).intValue();
+            return pHashinateLong(value);
+        } else if (obj instanceof Short) {
+            long value = ((Short) obj).shortValue();
+            return pHashinateLong(value);
+        } else if (obj instanceof Byte) {
+            long value = ((Byte) obj).byteValue();
+            return pHashinateLong(value);
+        } else if (obj.getClass() == byte[].class) {
+            obj = bytesToValue(type, (byte[]) obj);
+            return pHashinateBytes(valueToBytes(obj));
+        }
+
+        return genericPartition;
     }
 
     /**
@@ -147,6 +175,11 @@ public class ElasticHashinator extends TheHashinator {
                 return builder.build();
             }
         });
+
+        // ENG-5387 - run need partition count to run both hashinators
+        Set<Integer> uniquePartitionIds = new TreeSet<Integer>();
+        uniquePartitionIds.addAll(getTokens().values());
+        catalogPartitionCount = uniquePartitionIds.size();
     }
 
     /**
@@ -168,6 +201,11 @@ public class ElasticHashinator extends TheHashinator {
         m_tokenCount = tokens.size();
         m_configBytes = m_configBytesSupplier;
         m_cookedBytes = m_cookedBytesSupplier;
+
+        // ENG-5387 - run need partition count to run both hashinators
+        Set<Integer> uniquePartitionIds = new TreeSet<Integer>();
+        uniquePartitionIds.addAll(getTokens().values());
+        catalogPartitionCount = uniquePartitionIds.size();
     }
 
     public static byte[] addPartitions(TheHashinator oldHashinator,
@@ -268,16 +306,36 @@ public class ElasticHashinator extends TheHashinator {
 
     @Override
     public int pHashinateLong(long value) {
+        // special case this hard to hash value to 0 (in both c++ and java)
         if (value == Long.MIN_VALUE) return 0;
 
-        return partitionForToken(MurmurHash3.hash3_x64_128(value));
+        partitionForToken(MurmurHash3.hash3_x64_128(value));
+
+        // for perf testing (see ENG-5387)
+
+        // hash the same way c++ does
+        int index = (int)(value^(value>>>32));
+        int retval = java.lang.Math.abs(index % catalogPartitionCount);
+
+        return retval;
     }
 
     @Override
     public int pHashinateBytes(byte[] bytes) {
         ByteBuffer buf = ByteBuffer.wrap(bytes);
         final int token = MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);
-        return partitionForToken(token);
+        partitionForToken(token);
+
+        // for perf testing (see ENG-5387)
+
+        int hashCode = 0;
+        int offset = 0;
+        for (int ii = 0; ii < bytes.length; ii++) {
+            hashCode = 31 * hashCode + bytes[offset++];
+        }
+        int retval =  java.lang.Math.abs(hashCode % catalogPartitionCount);
+
+        return retval;
     }
 
     @Override

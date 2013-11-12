@@ -93,7 +93,16 @@ protected:
         // special case this hard to hash value to 0 (in both c++ and java)
         if (value == INT64_MIN) return 0;
 
-        return partitionForToken(MurmurHash3_x64_128(value));
+        partitionForToken(MurmurHash3_x64_128(value));
+
+        // legacy hashinate code below for ENG-5387
+
+        // hash the same way java does
+        int32_t index = static_cast<int32_t>(value^(static_cast<uint64_t>(value) >> 32));
+        int retval = abs(index % partitionCount);
+
+        return retval;
+
     }
 
     /*
@@ -102,16 +111,39 @@ protected:
      */
     int32_t hashinate(const char *string, int32_t length) const {
         int32_t hash = MurmurHash3_x64_128(string, length, 0);
-        return partitionForToken(hash);
+        partitionForToken(hash);
+
+        // legacy hashinate code below for ENG-5387
+
+        int32_t hashCode = 0;
+        int32_t offset = 0;
+        if (length < 0) {
+            throwDynamicSQLException("Attempted to hashinate a value with length(%d) < 0", length);
+        }
+        for (int32_t ii = 0; ii < length; ii++) {
+            hashCode = 31 * hashCode + string[offset++];
+        }
+        int retval = abs(hashCode % partitionCount);
+
+        return retval;
     }
 
 private:
 
-    ElasticHashinator(int32_t *tokens, uint32_t tokenCount, bool owned) : tokens(tokens), tokenCount(tokenCount), tokensOwner( owned ? tokens : NULL ) {}
+    ElasticHashinator(int32_t *tokens, uint32_t tokenCount, bool owned) : tokens(tokens), tokenCount(tokenCount), tokensOwner( owned ? tokens : NULL ) {
+        std::set<int32_t> uniquePartitionIds;
+        for (uint32_t i = 1; i < (tokenCount * 2); i += 2) {
+            uniquePartitionIds.insert(tokens[i]);
+        }
+        partitionCount = static_cast<int32_t>(uniquePartitionIds.size());
+    }
 
     const int32_t *tokens;
     const uint32_t tokenCount;
     boost::scoped_array<int32_t> tokensOwner;
+
+    // ENG-5387 - run need partition count to run both hashinators
+    int32_t partitionCount;
 
     int32_t partitionForToken(int32_t hash) const {
         int32_t min = 0;
