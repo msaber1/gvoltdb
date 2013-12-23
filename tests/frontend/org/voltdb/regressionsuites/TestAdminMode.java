@@ -23,7 +23,6 @@
 
 package org.voltdb.regressionsuites;
 import java.io.IOException;
-import java.nio.channels.SocketChannel;
 
 import junit.framework.Test;
 
@@ -31,10 +30,8 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -188,7 +185,7 @@ public class TestAdminMode extends RegressionSuite
     }
 
     // Somewhat hacky test of the LIVECLIENTS @Statistics selector
-    public void testBacklogAndPolling() throws Exception
+    /*public void testBacklogAndPolling() throws Exception
     {
         if (isValgrind()) {
             // no reasonable way to get the timing right in valgrind
@@ -242,7 +239,7 @@ public class TestAdminMode extends RegressionSuite
             channel.close();
             adminclient.close();
         }
-    }
+    }*/
 
     static class Callback implements ProcedureCallback {
         boolean m_stats = false;

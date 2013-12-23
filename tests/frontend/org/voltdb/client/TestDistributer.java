@@ -289,7 +289,6 @@ public class TestDistributer extends TestCase {
             dist.createConnection("localhost", "", "", 20000);
             dist.createConnection("localhost", "", "", 20001);
 
-            Thread.sleep(1000);
             assertTrue(volt1.handler != null);
             assertTrue(volt0.handler != null);
         }
@@ -377,15 +376,15 @@ public class TestDistributer extends TestCase {
     }
 
 
-    /**
-     * Test connection timeouts.
-     * Create a fake voltdb that runs all happy for a while, but
-     * then can be told to shut up if it knows what's good for it.
-     * Wait for the connection timeout to kill the connection and
-     * call the appropriate callbacks.
-     */
+    //
+    // Test connection timeouts.
+    // Create a fake voltdb that runs all happy for a while, but
+    // then can be told to shut up if it knows what's good for it.
+    // Wait for the connection timeout to kill the connection and
+    // call the appropriate callbacks.
+    //
     @Test
-    public void testResponseTimeout() throws Exception {
+    public void testConnectionTimeout() throws Exception {
 
         final CountDownLatch latch = new CountDownLatch(2);
 
@@ -412,7 +411,7 @@ public class TestDistributer extends TestCase {
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
-                1000 /* One second connection timeout */,
+                1000, // One second connection timeout
                 false);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         dist.createConnection("localhost", "", "", 20000);
@@ -441,10 +440,10 @@ public class TestDistributer extends TestCase {
         volt.join();
     }
 
-    /**
-     * Test query timeouts. Create a fake voltdb that runs all happy for a while, but then can be told to shut up if it
-     * knows what's good for it. Wait for the query timeout.
-     */
+    //
+    // Test query timeouts. Create a fake voltdb that runs all happy for a while, but then can be told to shut up if it
+    // knows what's good for it. Wait for the query timeout.
+    //
     @Test
     public void testQueryTimeout() throws Exception {
 
@@ -467,7 +466,7 @@ public class TestDistributer extends TestCase {
         // create distributer and connect it to the client
         Distributer dist = new Distributer(false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
-                30000 /* thirty second connection timeout */,
+                30000, // thirty second connection timeout
                 false);
         dist.createConnection("localhost", "", "", 20000);
 
@@ -494,12 +493,12 @@ public class TestDistributer extends TestCase {
         volt.join();
     }
 
-    /**
-     * Test that a connection actually times out when it should timeout,
-     * rather than sooner. Also check pings aren't sent super duper early.
-     * @throws IOException
-     * @throws InterruptedException
-     */
+    //
+    // Test that a connection actually times out when it should timeout,
+    // rather than sooner. Also check pings aren't sent super duper early.
+    // @throws IOException
+    // @throws InterruptedException
+    //
     @Test
     public void testResponseNoEarlyTimeout() throws IOException, InterruptedException {
         final CountDownLatch latch = new CountDownLatch(1);
@@ -521,7 +520,7 @@ public class TestDistributer extends TestCase {
         // create distributer and connect it to the client
         Distributer dist = new Distributer( false,
                 ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
-                CONNECTION_TIMEOUT /* six second connection timeout */,
+                CONNECTION_TIMEOUT, // six second connection timeout
                 false);
         dist.addClientStatusListener(new TimeoutMonitorCSL());
         long start = System.currentTimeMillis();
@@ -553,6 +552,7 @@ public class TestDistributer extends TestCase {
         volt.join();
     }
 
+    @Test
     public void testClient() throws Exception {
        MockVolt volt = null;
 
@@ -592,10 +592,10 @@ public class TestDistributer extends TestCase {
             volt0.start();
 
             ClientConfig config = new ClientConfig();
-            /*
-             * The library will immediately generate two transactions
-             * to init client affinity
-             */
+
+            // The library will immediately generate two transactions
+            // to init client affinity
+            //
             config.setMaxOutstandingTxns(7);
             config.setConnectionResponseTimeout(2000);
 
@@ -637,10 +637,17 @@ public class TestDistributer extends TestCase {
         final String hostname = "doesnotexist";
         boolean threwException = false;
         try {
-            ConnectionUtil.getAuthenticatedConnection(hostname, "", new byte[0], 32);
-        } catch (java.net.UnknownHostException e) {
+            Distributer dist = new Distributer(false,
+                    ClientConfig.DEFAULT_PROCEDURE_TIMOUT_MS,
+                    30000, // thirty second connection timeout
+                    false);
+            dist.createConnection(hostname, "", "", 32);
+        }
+        catch (java.net.UnknownHostException e) {
             threwException = true;
             assertTrue(e.getMessage().equals(hostname));
+        } catch (InterruptedException e) {
+            fail();
         }
         assertTrue(threwException);
     }

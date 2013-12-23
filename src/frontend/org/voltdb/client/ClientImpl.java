@@ -20,8 +20,11 @@ package org.voltdb.client;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -71,6 +74,31 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      */
     private final CopyOnWriteArrayList<Long> m_blessedThreadIds = new CopyOnWriteArrayList<Long>();
 
+    /**
+     * Get a hashed password using SHA-1 in a consistent way.
+     * @param password The password to encode.
+     * @return The bytes of the hashed password.
+     */
+    public static byte[] getHashedPassword(String password) {
+        if (password == null)
+            return null;
+
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("SHA-1");
+        } catch (NoSuchAlgorithmException e) {
+            e.printStackTrace();
+            System.exit(-1);
+        }
+        byte hashedPassword[] = null;
+        try {
+            hashedPassword = md.digest(password.getBytes("UTF-8"));
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException("JVM doesn't support UTF-8. Please use a supported JVM", e);
+        }
+        return hashedPassword;
+    }
+
     /****************************************************
                         Public API
      ****************************************************/
@@ -96,7 +124,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         m_username = config.m_username;
 
         if (config.m_cleartext) {
-            m_passwordHash = ConnectionUtil.getHashedPassword(config.m_password);
+            m_passwordHash = getHashedPassword(config.m_password);
         } else {
             m_passwordHash = Encoder.hexDecode(config.m_password);
         }
@@ -104,7 +132,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             m_distributer.addClientStatusListener(config.m_listener);
         }
         assert(config.m_maxOutstandingTxns > 0);
-        m_blessedThreadIds.addAll(m_distributer.getThreadIds());
         if (config.m_autoTune) {
             m_distributer.m_rateLimiter.enableAutoTuning(
                     config.m_autoTuneTargetInternalLatency);
@@ -163,13 +190,18 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new IOException("Client instance is shutdown");
         }
         final String subProgram = (program == null) ? "" : program;
-        final byte[] subPassword = (hashedPassword == null) ? ConnectionUtil.getHashedPassword("") : hashedPassword;
+        final byte[] subPassword = (hashedPassword == null) ? getHashedPassword("") : hashedPassword;
 
         if (!verifyCredentialsAreAlwaysTheSame(subProgram, subPassword)) {
             throw new IOException("New connection authorization credentials do not match previous credentials for client.");
         }
 
-        m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port);
+        try {
+            m_distributer.createConnectionWithHashedCredentials(host, subProgram, subPassword, port);
+        }
+        catch (InterruptedException e) {
+            throw new IOException("Connection creation was interrupted.", e);
+        }
     }
 
     /**

@@ -23,9 +23,10 @@
 
 package org.voltdb.regressionsuites;
 
+import io.netty_voltpatches.channel.socket.SocketChannel;
+
 import java.io.IOException;
 import java.net.ConnectException;
-import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
@@ -39,11 +40,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.client.ClientFactory;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.common.Constants;
-
-import com.google_voltpatches.common.net.HostAndPort;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -96,8 +93,8 @@ public class RegressionSuite extends TestCase {
         synchronized (m_clientChannels) {
             for (final SocketChannel sc : m_clientChannels) {
                 try {
-                    ConnectionUtil.closeConnection(sc);
-                } catch (final IOException e) {
+                    sc.close().sync();
+                } catch (final Exception e) {
                     e.printStackTrace();
                 }
             }
@@ -208,14 +205,14 @@ public class RegressionSuite extends TestCase {
      *
      * @return A SocketChannel that is already authenticated with the server
      */
-    public SocketChannel getClientChannel() throws IOException {
+    /*public SocketChannel getClientChannel() throws IOException {
         return getClientChannel(false);
     }
     public SocketChannel getClientChannel(final boolean noTearDown) throws IOException {
         final List<String> listeners = m_config.getListenerAddresses();
         final Random r = new Random();
         final String listener = listeners.get(r.nextInt(listeners.size()));
-        byte[] hashedPassword = ConnectionUtil.getHashedPassword(m_password);
+        byte[] hashedPassword = ClientImpl.getHashedPassword(m_password);
         HostAndPort hNp = HostAndPort.fromString(listener);
         int port = Constants.DEFAULT_PORT;
         if (hNp.hasPort()) {
@@ -231,7 +228,7 @@ public class RegressionSuite extends TestCase {
             }
         }
         return channel;
-    }
+    }*/
 
     /**
      * Protected method used by MultiConfigSuiteBuilder to set the VoltServerConfig

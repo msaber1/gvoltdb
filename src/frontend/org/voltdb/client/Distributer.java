@@ -17,11 +17,27 @@
 
 package org.voltdb.client;
 
+import io.netty_voltpatches.bootstrap.Bootstrap;
+import io.netty_voltpatches.buffer.ByteBuf;
+import io.netty_voltpatches.buffer.Unpooled;
+import io.netty_voltpatches.channel.Channel;
+import io.netty_voltpatches.channel.ChannelHandlerContext;
+import io.netty_voltpatches.channel.ChannelInboundHandlerAdapter;
+import io.netty_voltpatches.channel.ChannelInitializer;
+import io.netty_voltpatches.channel.ChannelOption;
+import io.netty_voltpatches.channel.ChannelPipeline;
+import io.netty_voltpatches.channel.EventLoopGroup;
+import io.netty_voltpatches.channel.nio.NioEventLoopGroup;
+import io.netty_voltpatches.channel.socket.SocketChannel;
+import io.netty_voltpatches.channel.socket.nio.NioSocketChannel;
+import io.netty_voltpatches.handler.codec.LengthFieldBasedFrameDecoder;
+import io.netty_voltpatches.handler.codec.LengthFieldPrepender;
+import io.netty_voltpatches.util.ReferenceCountUtil;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
@@ -31,6 +47,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -42,17 +59,12 @@ import jsr166y.ThreadLocalRandom;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-import org.voltcore.network.Connection;
-import org.voltcore.network.QueueMonitor;
-import org.voltcore.network.VoltNetworkPool;
-import org.voltcore.network.VoltProtocolHandler;
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientStatusListenerExt.DisconnectCause;
 import org.voltdb.client.HashinatorLite.HashinatorLiteType;
 import org.voltdb.common.Constants;
+import org.voltdb.utils.SerializationHelper;
 
 /**
  *   De/multiplexes transactions across a cluster
@@ -73,9 +85,6 @@ class Distributer {
             new CopyOnWriteArrayList<NodeConnection>();
 
     private final ArrayList<ClientStatusListenerExt> m_listeners = new ArrayList<ClientStatusListenerExt>();
-
-    //Selector and connection handling, does all work in blocking selection thread
-    private final VoltNetworkPool m_network;
 
     // Temporary until a distribution/affinity algorithm is written
     private int m_nextConnection = 0;
@@ -115,10 +124,12 @@ class Distributer {
 
     public final RateLimiter m_rateLimiter = new RateLimiter();
 
+    private final EventLoopGroup m_workerGroup = new NioEventLoopGroup();
+
     //private final Timer m_timer;
     private final ScheduledExecutorService m_ex =
         Executors.newSingleThreadScheduledExecutor(
-                CoreUtils.getThreadFactory("VoltDB Client Reaper Thread"));
+                ClientUtils.getThreadFactory("VoltDB Client Reaper Thread"));
     ScheduledFuture<?> m_timeoutReaperHandle;
 
     /**
@@ -194,7 +205,7 @@ class Distributer {
                             // memoize why it's closing
                             c.m_closeCause = DisconnectCause.TIMEOUT;
                             // this should trigger NodeConnection.stopping(..)
-                            c.m_connection.unregister();
+                            c.unregister();
                         }
 
                         // if 1/3 of the timeoutMS since last response, send a ping
@@ -269,19 +280,145 @@ class Distributer {
         String name;
     }
 
-    class NodeConnection extends VoltProtocolHandler implements org.voltcore.network.QueueMonitor {
-        private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
-        private final HashMap<Long, CallbackBookeeping> m_callbacks;
-        private final HashMap<String, ClientStats> m_stats = new HashMap<String, ClientStats>();
-        private Connection m_connection;
-        private boolean m_isConnected = true;
+    public class NodeConnection extends ChannelInboundHandlerAdapter {
 
+        private final InetSocketAddress m_addr;
+        private final ByteBuf m_firstMessage;
+        private boolean m_authenticated = false;
+        private final AtomicInteger m_callbacksToInvoke = new AtomicInteger(0);
+        private final HashMap<Long, CallbackBookeeping> m_callbacks = new HashMap<Long, CallbackBookeeping>();;
+        private final HashMap<String, ClientStats> m_stats = new HashMap<String, ClientStats>();
+        private boolean m_isConnected = true;
         long m_lastResponseTime = System.currentTimeMillis();
         boolean m_outstandingPing = false;
         ClientStatusListenerExt.DisconnectCause m_closeCause = DisconnectCause.CONNECTION_CLOSED;
+        Channel m_channel = null;
+        int m_hostId = -1;
+        long m_connectionId = -1;
+        long m_clusterTimestamp = -1;
+        int m_leaderIp = -1;
+        CountDownLatch m_authenticatedLatch = new CountDownLatch(1);
 
-        public NodeConnection(long ids[]) {
-            m_callbacks = new HashMap<Long, CallbackBookeeping>();
+        NodeConnection(InetSocketAddress addr, String service, String username, byte[] hashedPassword) throws IOException {
+            m_addr = addr;
+
+            // encode strings
+            byte[] serviceBytes = service == null ? null : service.getBytes(Constants.UTF8ENCODING);
+            byte[] usernameBytes = username == null ? null : username.getBytes(Constants.UTF8ENCODING);
+
+            // get the length of the data to serialize
+            int requestSize = 1;
+            requestSize += serviceBytes == null ? 4 : 4 + serviceBytes.length;
+            requestSize += usernameBytes == null ? 4 : 4 + usernameBytes.length;
+            requestSize += hashedPassword.length;
+
+            ByteBuffer b = ByteBuffer.allocate(requestSize);
+
+            // serialize it
+            b.put((byte) 0);                                      // version
+            SerializationHelper.writeVarbinary(serviceBytes, b);  // data service (export|database)
+            SerializationHelper.writeVarbinary(usernameBytes, b);
+            b.put(hashedPassword);
+            b.flip();
+
+            m_firstMessage = Unpooled.buffer(requestSize);
+            m_firstMessage.writeBytes(b);
+        }
+
+        void processAuthenticationResponse(ChannelHandlerContext ctx, ByteBuf in) throws IOException {
+
+            try {
+                in.readByte(); // skip version byte
+
+                byte loginResponseCode = in.readByte();
+
+                if (loginResponseCode != 0) {
+                    ctx.close();
+                    switch (loginResponseCode) {
+                    case Constants.MAX_CONNECTIONS_LIMIT_ERROR:
+                        throw new IOException("Server has too many connections");
+                    case Constants.WIRE_PROTOCOL_TIMEOUT_ERROR:
+                        throw new IOException("Connection timed out during authentication. " +
+                        "The VoltDB server may be overloaded.");
+                    case Constants.EXPORT_DISABLED_REJECTION:
+                        throw new IOException("Export not enabled for server");
+                    case Constants.WIRE_PROTOCOL_FORMAT_ERROR:
+                        throw new IOException("Wire protocol format violation error");
+                    case Constants.AUTHENTICATION_FAILURE_DUE_TO_REJOIN:
+                        throw new IOException("Failed to authenticate to rejoining node");
+                    default:
+                        throw new IOException("Authentication rejected");
+                    }
+                }
+
+                m_hostId = in.readInt();
+                m_connectionId = in.readLong();
+                m_clusterTimestamp = in.readLong();
+                m_leaderIp = in.readInt();
+
+                int buildStringLength = in.readInt();
+                byte buildStringBytes[] = new byte[buildStringLength];
+                in.readBytes(buildStringBytes);
+                m_buildString = new String(buildStringBytes, Constants.UTF8ENCODING);
+
+                m_authenticated = true;
+            }
+            finally {
+                m_authenticatedLatch.countDown();
+            }
+        }
+
+        public void unregister() {
+            m_channel.close();
+        }
+
+        public long connectionId() {
+            // TODO
+            return -1;
+        }
+
+        /**
+         * Returns the hostname if it was resolved, otherwise it returns the IP. Doesn't do a reverse DNS lookup
+         */
+        String getHostnameOrIP() {
+            return m_addr.getHostString();
+        }
+
+        int getRemotePort() {
+            return m_addr.getPort();
+        }
+
+        InetSocketAddress getRemoteSocketAddress() {
+            return m_addr;
+        }
+
+        /**
+         * If the hostname has been resolved this will return the hostname and the IP + port of the remote connection.
+         * If the hostname was not resolved this will return just the IP + port.
+         * The format is hostname/127.0.0.1:21212 if resolution is done, /127.0.0.1:21212 otherwise
+         * When logged from the server the remote port # will allow you to identify individual connections to the server
+         * by the ephemeral port number.
+         *
+         * @return hostname and IP and port as a string
+         */
+        String getHostnameAndIPAndPort() {
+            return "FAILURE";
+        }
+
+        public int getLeaderIP() {
+            return 0;
+        }
+
+        public long getClusterTimestamp() {
+            return 0;
+        }
+
+        public int getHostID() {
+            return 0;
+        }
+
+        public String getBuildString() {
+            return null;
         }
 
         public void createWork(long handle, String name, ByteBuffer c,
@@ -294,7 +431,7 @@ class Distributer {
                 if (!m_isConnected) {
                     final ClientResponse r = new ClientResponseImpl(
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                            "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
+                            "Connection to database host (" + getHostnameAndIPAndPort() +
                     ") was lost before a response was received");
                     try {
                         callback.clientCallback(r);
@@ -310,20 +447,23 @@ class Distributer {
                 m_callbacks.put(handle, new CallbackBookeeping(now, callback, name, timeout));
                 m_callbacksToInvoke.incrementAndGet();
             }
-            m_connection.writeStream().enqueue(c);
+
+            ByteBuf buf = Unpooled.wrappedBuffer(c);
+            m_channel.writeAndFlush(buf);
         }
 
         void sendPing() {
             ProcedureInvocation invocation = new ProcedureInvocation(PING_HANDLE, "@Ping");
-            ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
-            buf.putInt(buf.capacity() - 4);
+            ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
             try {
                 invocation.flattenToBuffer(buf);
                 buf.flip();
             } catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            m_connection.writeStream().enqueue(buf);
+
+            ByteBuf bb = Unpooled.wrappedBuffer(buf);
+            m_channel.writeAndFlush(bb);
             m_outstandingPing = true;
         }
 
@@ -345,8 +485,8 @@ class Distributer {
             if (stats == null) {
                 stats = new ClientStats();
                 stats.m_connectionId = connectionId();
-                stats.m_hostname = m_connection.getHostnameOrIP();
-                stats.m_port = m_connection.getRemotePort();
+                stats.m_hostname = getHostnameOrIP();
+                stats.m_port = getRemotePort();
                 stats.m_procName = procName;
                 stats.m_startTS = System.currentTimeMillis();
                 stats.m_endTS = Long.MIN_VALUE;
@@ -355,91 +495,17 @@ class Distributer {
             stats.update(roundTrip, clusterRoundTrip, abort, failure);
         }
 
-        @Override
-        public void handleMessage(ByteBuffer buf, Connection c) {
-            long now = System.currentTimeMillis();
-            ClientResponseImpl response = new ClientResponseImpl();
-            try {
-                response.initFromBuffer(buf);
-            } catch (IOException e1) {
-                // TODO Auto-generated catch block
-                e1.printStackTrace();
-            }
-            ProcedureCallback cb = null;
-            long callTime = 0;
-            int delta = 0;
-            long handle = response.getClientHandle();
-            synchronized (this) {
-                // track the timestamp of the most recent read on this connection
-                m_lastResponseTime = now;
-
-                // handle ping response and get out
-                if (response.getClientHandle() == PING_HANDLE) {
-                    m_outstandingPing = false;
-                    return;
-                }
-
-                CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
-                // presumably (hopefully) this is a response for a timed-out message
-                if (stuff == null) {
-                    // also ignore internal (topology and procedure) calls
-                    if (handle >= 0) {
-                        // notify any listeners of the late response
-                        for (ClientStatusListenerExt listener : m_listeners) {
-                            listener.lateProcedureResponse(
-                                    response,
-                                    m_connection.getHostnameOrIP(),
-                                    m_connection.getRemotePort());
-                        }
-                    }
-                }
-                // handle a proper callback
-                else {
-                    callTime = stuff.timestamp;
-                    delta = (int)(now - callTime);
-                    cb = stuff.callback;
-                    assert(cb != null);
-                    final byte status = response.getStatus();
-                    boolean abort = false;
-                    boolean error = false;
-                    if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
-                        abort = true;
-                    } else if (status != ClientResponse.SUCCESS) {
-                        error = true;
-                    }
-                    int clusterRoundTrip = response.getClusterRoundtrip();
-                    m_rateLimiter.transactionResponseReceived(now, clusterRoundTrip);
-                    updateStats(stuff.name, delta, clusterRoundTrip, abort, error);
-                }
-            }
-
-            // cb might be null on late response
-            if (cb != null) {
-                response.setClientRoundtrip(delta);
-                assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
-                try {
-                    cb.clientCallback(response);
-                } catch (Exception e) {
-                    uncaughtException(cb, response, e);
-                }
-                int callbacksToInvoke = m_callbacksToInvoke.decrementAndGet();
-                assert(callbacksToInvoke >= 0);
-            }
-        }
-
-        @Override
-        public int getMaxRead() {
-            return Integer.MAX_VALUE;
-        }
-
         public boolean hadBackPressure() {
-            return m_connection.writeStream().hadBackPressure();
+            return false;
         }
 
+        @Override
+        public void channelActive(ChannelHandlerContext ctx) {
+            ctx.writeAndFlush(m_firstMessage);
+        }
 
         @Override
-        public void stopping(Connection c) {
-            super.stopping(c);
+        public void channelInactive(ChannelHandlerContext ctx) {
             synchronized (this) {
                 //Prevent queueing of new work to this connection
                 synchronized (Distributer.this) {
@@ -490,8 +556,8 @@ class Distributer {
                     //Notify listeners that a connection has been lost
                     for (ClientStatusListenerExt s : m_listeners) {
                         s.connectionLost(
-                                m_connection.getHostnameOrIP(),
-                                m_connection.getRemotePort(),
+                                getHostnameOrIP(),
+                                getRemotePort(),
                                 m_connections.size(),
                                 m_closeCause);
                     }
@@ -502,7 +568,7 @@ class Distributer {
                 final ClientResponse r =
                     new ClientResponseImpl(
                             ClientResponse.CONNECTION_LOST, new VoltTable[0],
-                            "Connection to database host (" + m_connection.getHostnameAndIPAndPort() +
+                            "Connection to database host (" + getHostnameAndIPAndPort() +
                     ") was lost before a response was received");
                 for (final CallbackBookeeping callBk : m_callbacks.values()) {
                     try {
@@ -519,49 +585,127 @@ class Distributer {
         }
 
         @Override
-        public Runnable offBackPressure() {
-            return new Runnable() {
-                @Override
-                public void run() {
-                    /*
-                     * Synchronization on Distributer.this is critical to ensure that queue
-                     * does not report backpressure AFTER the write stream reports that backpressure
-                     * has ended thus resulting in a lost wakeup.
-                     */
-                    synchronized (Distributer.this) {
-                        for (final ClientStatusListenerExt csl : m_listeners) {
-                            csl.backpressure(false);
+        public void channelRead(ChannelHandlerContext ctx, Object msg) throws Exception {
+            try {
+                ByteBuf in = (ByteBuf) msg;
+                if (!m_authenticated) {
+                    processAuthenticationResponse(ctx, in);
+                    return;
+                }
+
+                // process typical client
+                long now = System.currentTimeMillis();
+
+                ByteBuffer b = ByteBuffer.allocate(in.readableBytes());
+                in.readBytes(b);
+                b.flip();
+
+                ClientResponseImpl response = new ClientResponseImpl();
+                response.initFromBuffer(b);
+
+                ProcedureCallback cb = null;
+                long callTime = 0;
+                int delta = 0;
+                long handle = response.getClientHandle();
+                synchronized (this) {
+                    // track the timestamp of the most recent read on this connection
+                    m_lastResponseTime = now;
+
+                    // handle ping response and get out
+                    if (response.getClientHandle() == Distributer.PING_HANDLE) {
+                        m_outstandingPing = false;
+                        return;
+                    }
+
+                    CallbackBookeeping stuff = m_callbacks.remove(response.getClientHandle());
+                    // presumably (hopefully) this is a response for a timed-out message
+                    if (stuff == null) {
+                        // also ignore internal (topology and procedure) calls
+                        if (handle >= 0) {
+                            // notify any listeners of the late response
+                            for (ClientStatusListenerExt listener : m_listeners) {
+                                listener.lateProcedureResponse(
+                                        response,
+                                        getHostnameOrIP(),
+                                        getRemotePort());
+                            }
                         }
                     }
+                    // handle a proper callback
+                    else {
+                        callTime = stuff.timestamp;
+                        delta = (int)(now - callTime);
+                        cb = stuff.callback;
+                        assert(cb != null);
+                        final byte status = response.getStatus();
+                        boolean abort = false;
+                        boolean error = false;
+                        if (status == ClientResponse.USER_ABORT || status == ClientResponse.GRACEFUL_FAILURE) {
+                            abort = true;
+                        } else if (status != ClientResponse.SUCCESS) {
+                            error = true;
+                        }
+                        int clusterRoundTrip = response.getClusterRoundtrip();
+                        m_rateLimiter.transactionResponseReceived(now, clusterRoundTrip);
+                        updateStats(stuff.name, delta, clusterRoundTrip, abort, error);
+                    }
                 }
-            };
-        }
 
-        @Override
-        public Runnable onBackPressure() {
-            return null;
-        }
-
-        @Override
-        public QueueMonitor writestreamMonitor() {
-            return this;
-        }
-
-        private int m_queuedBytes = 0;
-        private final int m_maxQueuedBytes = 262144;
-
-        @Override
-        public boolean queue(int bytes) {
-            m_queuedBytes += bytes;
-            if (m_queuedBytes > m_maxQueuedBytes) {
-                return true;
+                // cb might be null on late response
+                if (cb != null) {
+                    response.setClientRoundtrip(delta);
+                    assert(response.getHash() == null); // make sure it didn't sneak into wire protocol
+                    try {
+                        cb.clientCallback(response);
+                    } catch (Exception e) {
+                        uncaughtException(cb, response, e);
+                    }
+                    int callbacksToInvoke = m_callbacksToInvoke.decrementAndGet();
+                    assert(callbacksToInvoke >= 0);
+                }
             }
-            return false;
+            finally {
+                ReferenceCountUtil.release(msg);
+            }
         }
 
-        public InetSocketAddress getSocketAddress() {
-            return m_connection.getRemoteSocketAddress();
+        @Override
+        public void exceptionCaught(ChannelHandlerContext ctx, Throwable cause)
+                throws Exception {
+            // TODO Auto-generated method stub
+            super.exceptionCaught(ctx, cause);
         }
+    }
+
+    NodeConnection create(InetSocketAddress addr, String service, String username, byte[] hashedPassword)
+            throws InterruptedException, IOException
+    {
+        if (addr.isUnresolved()) {
+            throw new java.net.UnknownHostException(addr.getHostName());
+        }
+
+        final NodeConnection conn = new NodeConnection(addr, service, username, hashedPassword);
+
+        Bootstrap b = new Bootstrap(); // (1)
+        b.group(m_workerGroup); // (2)
+        b.channel(NioSocketChannel.class); // (3)
+        b.option(ChannelOption.SO_KEEPALIVE, true); // (4)
+        b.handler(new ChannelInitializer<SocketChannel>() {
+            @Override
+            public void initChannel(SocketChannel ch) throws Exception {
+                ChannelPipeline p = ch.pipeline();
+                p.addLast("frameDecoder", new LengthFieldBasedFrameDecoder(50 * 1024 * 1024, 0, 4, 0, 4));
+                p.addLast("frameEncoder", new LengthFieldPrepender(4));
+                p.addLast("clientProtocolHandler", conn);
+            }
+        });
+
+        conn.m_channel = b.connect(addr).sync().channel();
+
+        conn.m_authenticatedLatch.await();
+        assert(conn.m_authenticated);
+
+        return conn;
     }
 
     void drain() throws InterruptedException {
@@ -592,9 +736,6 @@ class Distributer {
             long connectionResponseTimeoutMS,
             boolean useClientAffinity) {
         m_useMultipleThreads = useMultipleThreads;
-        m_network = new VoltNetworkPool(
-            m_useMultipleThreads ? Math.max(1, CoreUtils.availableProcessors() / 4 ) : 1, null);
-        m_network.start();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;
         m_connectionResponseTimeoutMS = connectionResponseTimeoutMS;
         m_useClientAffinity = useClientAffinity;
@@ -604,25 +745,20 @@ class Distributer {
     }
 
     void createConnection(String host, String program, String password, int port)
-    throws UnknownHostException, IOException
+    throws UnknownHostException, IOException, InterruptedException
     {
-        byte hashedPassword[] = ConnectionUtil.getHashedPassword(password);
+        byte hashedPassword[] = ClientImpl.getHashedPassword(password);
         createConnectionWithHashedCredentials(host, program, hashedPassword, port);
     }
 
     void createConnectionWithHashedCredentials(String host, String program, byte[] hashedPassword, int port)
-    throws UnknownHostException, IOException
+    throws UnknownHostException, IOException, InterruptedException
     {
-        final Object socketChannelAndInstanceIdAndBuildString[] =
-            ConnectionUtil.getAuthenticatedConnection(host, program, hashedPassword, port);
         InetSocketAddress address = new InetSocketAddress(host, port);
-        final SocketChannel aChannel = (SocketChannel)socketChannelAndInstanceIdAndBuildString[0];
-        final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
-        final int hostId = (int)instanceIdWhichIsTimestampAndLeaderIp[0];
+        final NodeConnection cxn = create(address, "database", program, hashedPassword);
 
-        NodeConnection cxn = new NodeConnection(instanceIdWhichIsTimestampAndLeaderIp);
-        Connection c = m_network.registerChannel( aChannel, cxn);
-        cxn.m_connection = c;
+        //final long instanceIdWhichIsTimestampAndLeaderIp[] = (long[])socketChannelAndInstanceIdAndBuildString[1];
+        final int hostId = cxn.getHostID();
 
         synchronized (this) {
 
@@ -634,20 +770,20 @@ class Distributer {
             }
 
             if (m_clusterInstanceId == null) {
-                long timestamp = instanceIdWhichIsTimestampAndLeaderIp[2];
-                int addr = (int)instanceIdWhichIsTimestampAndLeaderIp[3];
+                long timestamp = cxn.getClusterTimestamp();
+                int addr = cxn.getLeaderIP();
                 m_clusterInstanceId = new Object[] { timestamp, addr };
             } else {
-                if (!(((Long)m_clusterInstanceId[0]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[2]) ||
-                        !(((Integer)m_clusterInstanceId[1]).longValue() == instanceIdWhichIsTimestampAndLeaderIp[3])) {
+                if (!(((Long)m_clusterInstanceId[0]).longValue() == cxn.getClusterTimestamp()) ||
+                        !(((Integer)m_clusterInstanceId[1]).longValue() == cxn.getLeaderIP())) {
                     // clean up the pre-registered voltnetwork connection/channel
-                    c.unregister();
+                    cxn.unregister();
                     throw new IOException(
                             "Cluster instance id mismatch. Current is " + m_clusterInstanceId[0] + "," + m_clusterInstanceId[1] +
-                            " and server's was " + instanceIdWhichIsTimestampAndLeaderIp[2] + "," + instanceIdWhichIsTimestampAndLeaderIp[3]);
+                            " and server's was " + cxn.getClusterTimestamp() + "," + cxn.getLeaderIP());
                 }
             }
-            m_buildString = (String)socketChannelAndInstanceIdAndBuildString[2];
+            m_buildString = cxn.getBuildString();
 
             m_connections.add(cxn);
         }
@@ -798,8 +934,7 @@ class Distributer {
          * createWork synchronizes on an individual connection which allows for more concurrency
          */
         if (cxn != null) {
-            ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
-            buf.putInt(buf.capacity() - 4);
+            ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
             try {
                 invocation.flattenToBuffer(buf);
                 buf.flip();
@@ -823,7 +958,16 @@ class Distributer {
         m_ex.shutdown();
         m_ex.awaitTermination(1, TimeUnit.SECONDS);
 
-        m_network.shutdown();
+        m_workerGroup.shutdownGracefully(0, 1, TimeUnit.SECONDS);
+        m_workerGroup.awaitTermination(1, TimeUnit.SECONDS);
+
+        for (NodeConnection conn : m_connections) {
+            conn.unregister();
+        }
+
+        while (m_connections.size() > 0) {
+            Thread.yield();
+        }
     }
 
     private void uncaughtException(ProcedureCallback cb, ClientResponse r, Throwable t) {
@@ -882,12 +1026,14 @@ class Distributer {
 
         Map<Long, Pair<String, long[]>> ioStats;
         try {
-            ioStats = m_network.getIOStats(false);
+            // TODO
+            //ioStats = m_network.getIOStats(false);
+            return null;
         } catch (Exception e) {
             return null;
         }
 
-        for (NodeConnection conn : m_connections) {
+        /*for (NodeConnection conn : m_connections) {
             Pair<String, long[]> perConnIOStats = ioStats.get(conn.connectionId());
             if (perConnIOStats == null) continue;
 
@@ -898,7 +1044,7 @@ class Distributer {
             retval.put(conn.connectionId(), cios);
         }
 
-        return retval;
+        return retval;*/
     }
 
     Map<Integer, ClientAffinityStats> getAffinityStatsSnapshot()
@@ -928,14 +1074,10 @@ class Distributer {
         return m_buildString;
     }
 
-    public List<Long> getThreadIds() {
-        return m_network.getThreadIds();
-    }
-
     public List<InetSocketAddress> getConnectedHostList() {
         ArrayList<InetSocketAddress> addressList = new ArrayList<InetSocketAddress>();
         for (NodeConnection conn : m_connections) {
-            addressList.add(conn.getSocketAddress());
+            addressList.add(conn.getRemoteSocketAddress());
         }
         return Collections.unmodifiableList(addressList);
     }
@@ -944,8 +1086,6 @@ class Distributer {
         //First table contains the description of partition ids master/slave relationships
         VoltTable vt = tables[0];
 
-        //In future let TOPO return cooked bytes when cooked and we use correct recipe
-        boolean cooked = false;
         if (tables.length == 1) {
             //Just in case the new client connects to the old version of Volt that only returns 1 topology table
             // We're going to get the MPI back in this table, so subtract it out from the number of partitions.
@@ -961,8 +1101,7 @@ class Distributer {
             }
             m_hashinator = new HashinatorLite(
                     HashinatorLiteType.valueOf(tables[1].getString("HASHTYPE")),
-                    tables[1].getVarbinary("HASHCONFIG"),
-                    cooked);
+                    tables[1].getVarbinary("HASHCONFIG"));
         }
         m_partitionMasters.clear();
         m_partitionReplicas.clear();

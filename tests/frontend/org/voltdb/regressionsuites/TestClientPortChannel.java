@@ -26,10 +26,11 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
-import junit.framework.TestCase;
-import org.voltdb.BackendTarget;
 
-import org.voltdb.client.ConnectionUtil;
+import junit.framework.TestCase;
+
+import org.voltdb.BackendTarget;
+import org.voltdb.client.ClientImpl;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestClientPortChannel extends TestCase {
@@ -110,7 +111,7 @@ public class TestClientPortChannel extends TestCase {
         buf.put("database".getBytes("UTF-8"));
         buf.putInt(0);
         buf.put("".getBytes("UTF-8"));
-        buf.put(ConnectionUtil.getHashedPassword(""));
+        buf.put(ClientImpl.getHashedPassword(""));
         buf.flip();
         conn.write(buf);
 
@@ -208,7 +209,7 @@ public class TestClientPortChannel extends TestCase {
         buf.put("dataCase".getBytes("UTF-8"));
         buf.putInt(0);
         buf.put("".getBytes("UTF-8"));
-        buf.put(ConnectionUtil.getHashedPassword(""));
+        buf.put(ClientImpl.getHashedPassword(""));
         buf.flip();
         channel.write(buf);
 
@@ -235,7 +236,7 @@ public class TestClientPortChannel extends TestCase {
         buf.put("database".getBytes("UTF-8"));
         buf.putInt(0);
         buf.put("".getBytes("UTF-8"));
-        buf.put(ConnectionUtil.getHashedPassword(""));
+        buf.put(ClientImpl.getHashedPassword(""));
         buf.flip();
         channel.write(buf);
 

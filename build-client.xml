@@ -203,31 +203,10 @@ JAVA COMPILATION
                   javax/annotation_voltpatches/**/*.java
                   org/apache/cassandra_voltpatches/MurmerHash.java
                   org/apache/commons/cli_voltpatches/**/*.java
-                  org/apache/hadoop_voltpatches/hbase/utils/DirectMemoryUtils.java
                   org/apache/hadoop_voltpatches/util/PureJavaCrc*.java
-                  org/apache/jute_voltpatches/**/*.java
-                  org/apache/zookeeper_voltpatches/KeeperException.java
-                  org/cliffc_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
                   jsr166y/**/*.java
-
-                  org/voltcore/logging/Level.java
-                  org/voltcore/logging/VoltLogger.java
-                  org/voltcore/logging/VoltUtilLoggingLogger.java
-
-                  org/voltcore/network/*.java
-
-                  org/voltcore/utils/CoreUtils.java
-                  org/voltcore/utils/COWMap.java
-                  org/voltcore/utils/COWNavigableSet.java
-                  org/voltcore/utils/COWSortedMap.java
-                  org/voltcore/utils/DBBPool.java
-                  org/voltcore/utils/DeferredSerialization.java
-                  org/voltcore/utils/EstTime.java
-                  org/voltcore/utils/EstTimeUpdater.java
-                  org/voltcore/utils/InstanceId.java
-                  org/voltcore/utils/Pair.java
-                  org/voltcore/utils/RateLimitedLogger.java
+                  io/netty_voltpatches/**/*.java
 
                   org/voltdb/CLIConfig.java
                   org/voltdb/client/**/*.java

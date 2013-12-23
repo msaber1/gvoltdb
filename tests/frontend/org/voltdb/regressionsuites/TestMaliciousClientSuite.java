@@ -23,9 +23,6 @@
 
 package org.voltdb.regressionsuites;
 
-import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
@@ -47,7 +44,7 @@ public class TestMaliciousClientSuite extends RegressionSuite {
         super(name);
     }
 
-    @org.junit.Test
+    /*@org.junit.Test
     public void testManyClientsComingAndGoing() throws Exception {
         for (int ii = 0; ii < 2000; ii++) {
             ArrayList<SocketChannel> channels = new ArrayList<SocketChannel>();
@@ -60,7 +57,7 @@ public class TestMaliciousClientSuite extends RegressionSuite {
             System.out.printf("Ran through testManyClientsComingAndGoing loop %d times.\n", ii);
             System.out.flush();
         }
-    }
+    }*/
 //
 //    /*
 //     * Expect a variety of failure conditions like OOMm out of file descriptors etc.
