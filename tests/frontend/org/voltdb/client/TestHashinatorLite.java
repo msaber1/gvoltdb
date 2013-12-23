@@ -62,7 +62,7 @@ public class TestHashinatorLite extends TestCase {
         testExpectNonZeroHash(h1, h2, partitionCount);
 
         configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
-        h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
+        h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes);
         h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
         testExpectNonZeroHash(h1, h2, partitionCount);
     }
@@ -95,7 +95,7 @@ public class TestHashinatorLite extends TestCase {
         testSameLongHash1(h1, h2, partitionCount);
 
         configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
-        h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
+        h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes);
         h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
         testSameLongHash1(h1, h2, partitionCount);
     }
@@ -160,7 +160,7 @@ public class TestHashinatorLite extends TestCase {
             testSizeChanges(h1, h2, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
-            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
+            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes);
             h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
             testSizeChanges(h1, h2, partitionCount);
         }
@@ -211,7 +211,7 @@ public class TestHashinatorLite extends TestCase {
             testEdgeCases(h1, h2, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
-            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
+            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes);
             h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
             testEdgeCases(h1, h2, partitionCount);
         }
@@ -254,7 +254,7 @@ public class TestHashinatorLite extends TestCase {
             testSameLongHash(h1, h2, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
-            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
+            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes);
             h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
             testSameLongHash(h1, h2, partitionCount);
         }
@@ -296,7 +296,7 @@ public class TestHashinatorLite extends TestCase {
             testSameStringHash(h1, h2, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
-            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
+            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes);
             h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
             testSameStringHash(h1, h2, partitionCount);
         }
@@ -336,7 +336,7 @@ public class TestHashinatorLite extends TestCase {
             testNumberCoercionHash(h1, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
-            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
+            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes);
             testNumberCoercionHash(h1, partitionCount);
         }
     }
@@ -375,7 +375,7 @@ public class TestHashinatorLite extends TestCase {
         testNulls(h1, h2, partitionCount);
 
         configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
-        h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
+        h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes);
         h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
         testNulls(h1, h2, partitionCount);
     }
@@ -437,7 +437,7 @@ public class TestHashinatorLite extends TestCase {
             testSameBytesHash(h1, h2, partitionCount);
 
             configBytes = ElasticHashinator.getConfigureBytes(partitionCount, ElasticHashinator.DEFAULT_TOTAL_TOKENS);
-            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes, false);
+            h1 = new HashinatorLite(HashinatorLiteType.ELASTIC, configBytes);
             h2 = TheHashinator.getHashinator(HashinatorType.ELASTIC.hashinatorClass, configBytes, false);
             testSameBytesHash(h1, h2, partitionCount);
         }

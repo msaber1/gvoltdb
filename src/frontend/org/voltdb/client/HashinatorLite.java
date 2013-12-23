@@ -24,7 +24,6 @@ import java.nio.ByteOrder;
 import java.util.zip.InflaterOutputStream;
 
 import org.apache.cassandra_voltpatches.MurmurHash3;
-import org.voltcore.utils.Pair;
 import org.voltdb.ParameterConverter;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
@@ -67,30 +66,8 @@ public class HashinatorLite {
      * Pointer to an array of integers containing the tokens and partitions. Even values are tokens and odd values
      * are partition ids.
      */
-    private long m_etokens = 0;
-    private int m_etokenCount;
-
-    private final sun.misc.Unsafe unsafe;
-
-    private sun.misc.Unsafe getUnsafe() {
-        try {
-            return sun.misc.Unsafe.getUnsafe();
-        } catch (SecurityException se) {
-            try {
-                return java.security.AccessController.doPrivileged(new java.security.PrivilegedExceptionAction<sun.misc.Unsafe>() {
-                    @Override
-                    public sun.misc.Unsafe run() throws Exception {
-                        java.lang.reflect.Field f = sun.misc.Unsafe.class.getDeclaredField("theUnsafe");
-                        f.setAccessible(true);
-                        return (sun.misc.Unsafe) f.get(null);
-                    }
-                });
-            } catch (java.security.PrivilegedActionException e) {
-                throw new RuntimeException("Could not initialize intrinsics",
-                        e.getCause());
-            }
-        }
-    }
+    private int[] m_tokens;
+    private int m_tokenCount;
 
     private final HashinatorLiteType m_type;
 
@@ -102,14 +79,26 @@ public class HashinatorLite {
      * Initialize TheHashinator with the specified implementation class and configuration.
      * The starting version number will be 0.
      */
-    public HashinatorLite(HashinatorLiteType type, byte configBytes[], boolean cooked) {
+    public HashinatorLite(HashinatorLiteType type, byte configBytes[]) {
         m_type = type;
-        unsafe = getUnsafe();
 
         if (type == HashinatorLiteType.ELASTIC) {
-            Pair<Long, Integer> p = (cooked ? updateCooked(configBytes) : updateRaw(configBytes));
-            m_etokens = p.getFirst();
-            m_etokenCount = p.getSecond();
+            ByteBuffer buf = ByteBuffer.wrap(configBytes);
+            m_tokenCount = buf.getInt();
+            if (m_tokenCount < 0) {
+                throw new RuntimeException("Bad elastic hashinator config");
+            }
+
+            m_tokens = new int[m_tokenCount * 2];
+            int lastToken = Integer.MIN_VALUE;
+            for (int i = 0; i < m_tokenCount; i++) {
+                final int token = buf.getInt();
+                Preconditions.checkArgument(token >= lastToken);
+                lastToken = token;
+                m_tokens[i * 2] = token;
+                final int partitionId = buf.getInt();
+                m_tokens[i * 2 + 1] = partitionId;
+            }
         }
         else {
             catalogPartitionCount = ByteBuffer.wrap(configBytes).getInt();
@@ -117,88 +106,7 @@ public class HashinatorLite {
     }
 
     public HashinatorLite(int numPartitions) {
-        this(HashinatorLiteType.LEGACY, getLegacyConfigureBytes(numPartitions), false);
-    }
-
-    @Override
-    public void finalize() {
-        if (m_etokens != 0) {
-            unsafe.freeMemory(m_etokens);
-        }
-    }
-
-    /**
-     * Update from optimized (cooked) wire format. token-1 token-2 ... partition-1 partition-2 ... tokens are 4 bytes
-     *
-     * @param compressedData optimized and compressed config data
-     * @return token/partition map
-     */
-    private Pair<Long, Integer> updateCooked(byte[] compressedData) {
-        // Uncompress (inflate) the bytes.
-        byte[] cookedBytes;
-        try {
-            cookedBytes = gunzipBytes(compressedData);
-        } catch (IOException e) {
-            throw new RuntimeException("Unable to decompress elastic hashinator data.");
-        }
-
-        int numEntries = (cookedBytes.length >= 4
-                ? ByteBuffer.wrap(cookedBytes).getInt()
-                : 0);
-        int tokensSize = 4 * numEntries;
-        int partitionsSize = 4 * numEntries;
-        if (numEntries <= 0 || cookedBytes.length != 4 + tokensSize + partitionsSize) {
-            throw new RuntimeException("Bad elastic hashinator cooked config size.");
-        }
-        long tokens = unsafe.allocateMemory(8 * numEntries);
-        ByteBuffer tokenBuf = ByteBuffer.wrap(cookedBytes, 4, tokensSize);
-        ByteBuffer partitionBuf = ByteBuffer.wrap(cookedBytes, 4 + tokensSize, partitionsSize);
-        int tokensArray[] = new int[numEntries];
-        for (int zz = 3; zz >= 0; zz--) {
-            for (int ii = 0; ii < numEntries; ii++) {
-                int value = tokenBuf.get();
-                value = (value << (zz * 8)) & (0xFF << (zz * 8));
-                tokensArray[ii] = (tokensArray[ii] | value);
-            }
-        }
-
-        int lastToken = Integer.MIN_VALUE;
-        for (int ii = 0; ii < numEntries; ii++) {
-            int token = tokensArray[ii];
-            Preconditions.checkArgument(token >= lastToken);
-            lastToken = token;
-            long ptr = tokens + (ii * 8);
-            unsafe.putInt(ptr, token);
-            final int partitionId = partitionBuf.getInt();
-            unsafe.putInt(ptr + 4, partitionId);
-        }
-        return Pair.of(tokens, numEntries);
-    }
-
-    /**
-     * Update from raw config bytes. token-1/partition-1 token-2/partition-2 ... tokens are 8 bytes
-     *
-     * @param configBytes raw config data
-     * @return token/partition map
-     */
-    private Pair<Long, Integer> updateRaw(byte configBytes[]) {
-        ByteBuffer buf = ByteBuffer.wrap(configBytes);
-        int numEntries = buf.getInt();
-        if (numEntries < 0) {
-            throw new RuntimeException("Bad elastic hashinator config");
-        }
-        long tokens = unsafe.allocateMemory(8 * numEntries);
-        int lastToken = Integer.MIN_VALUE;
-        for (int ii = 0; ii < numEntries; ii++) {
-            long ptr = tokens + (ii * 8);
-            final int token = buf.getInt();
-            Preconditions.checkArgument(token >= lastToken);
-            lastToken = token;
-            unsafe.putInt(ptr, token);
-            final int partitionId = buf.getInt();
-            unsafe.putInt(ptr + 4, partitionId);
-        }
-        return Pair.of(tokens, numEntries);
+        this(HashinatorLiteType.LEGACY, getLegacyConfigureBytes(numPartitions));
     }
 
     /**
@@ -217,7 +125,7 @@ public class HashinatorLite {
                 return 0;
             }
 
-            return partitionForToken(MurmurHash3.hash3_x64_128(value));
+            return getPartitionForHash(MurmurHash3.hash3_x64_128(value));
         } else {
             // special case this hard to hash value to 0 (in both c++ and java)
             if (value == Long.MIN_VALUE) {
@@ -228,16 +136,6 @@ public class HashinatorLite {
             int index = (int) (value ^ (value >>> 32));
             return java.lang.Math.abs(index % catalogPartitionCount);
         }
-    }
-
-    /**
-     * For a given a value hash, find the token that corresponds to it. This will be the first token <= the value hash,
-     * or if the value hash is < the first token in the ring, it wraps around to the last token in the ring closest to
-     * Long.MAX_VALUE
-     */
-    public int partitionForToken(int hash) {
-        long token = getTokenPtr(hash);
-        return unsafe.getInt(token + 4);
     }
 
     /**
@@ -256,8 +154,7 @@ public class HashinatorLite {
         if (m_type.equals(HashinatorLiteType.ELASTIC)) {
             ByteBuffer buf = ByteBuffer.wrap(bytes);
             final int hash = MurmurHash3.hash3_x64_128(buf, 0, bytes.length, 0);
-            long token = getTokenPtr(hash);
-            return unsafe.getInt(token + 4);
+            return getPartitionForHash(hash);
         } else {
             int hashCode = 0;
             int offset = 0;
@@ -268,24 +165,23 @@ public class HashinatorLite {
         }
     }
 
-    private long getTokenPtr(int hash) {
+    private int getPartitionForHash(int hash) {
         int min = 0;
-        int max = m_etokenCount - 1;
+        int max = m_tokenCount - 1;
 
         while (min <= max) {
             int mid = (min + max) >>> 1;
-            final long midPtr = m_etokens + (8 * mid);
-            int midval = unsafe.getInt(midPtr);
+            int midval = m_tokens[mid * 2];
 
             if (midval < hash) {
                 min = mid + 1;
             } else if (midval > hash) {
                 max = mid - 1;
             } else {
-                return midPtr;
+                return m_tokens[mid * 2 + 1];
             }
         }
-        return m_etokens + (min - 1) * 8;
+        return m_tokens[(min - 1) * 2 + 1];
     }
 
     /**
