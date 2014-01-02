@@ -51,12 +51,21 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         String type = stmtNode.attributes.get("uniontype");
         // Set operation type
         m_unionType = UnionType.valueOf(type);
-
-        assert(stmtNode.children.size() == m_children.size());
+        // The join order map must contain an entry for each child plus one for the whole statement
+        if (joinOrderMap != null && joinOrderMap.size() != m_children.size() + 1) {
+            throw new RuntimeException("The specified join order doesn not match the set operation statement.");
+        }
         int i = 0;
         for (VoltXMLElement selectSQL : stmtNode.children) {
-            AbstractParsedStmt nextSelectStmt = m_children.get(i++);
-            nextSelectStmt.parse(selectSQL);
+            AbstractParsedStmt nextStmt = m_children.get(i++);
+            if (joinOrderMap != null) {
+                String joinOrder = joinOrderMap.get("sql" + i);
+                nextStmt.parseJoinOrder(joinOrder);
+                if (joinOrder == null) {
+                    throw new RuntimeException("The specified join order doesn not match the set operation statement.");
+                }
+            }
+            nextStmt.parse(selectSQL);
         }
     }
 
@@ -90,19 +99,23 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
         }
     }
 
+    @Override
+    protected String extractJoinOrderAlias(String joinOrder, int idx, int stmtCnt) {
+        return "sql" + stmtCnt;
+    }
+
     /**Miscellaneous post parse activity
      * .
      * @param sql
      * @param joinOrder
      */
-    void postParse(String sql, String joinOrder) {
+    @Override
+    void postParse(String sqlStmt) {
         for (AbstractParsedStmt selectStmt : m_children) {
-            selectStmt.postParse(sql, joinOrder);
+            selectStmt.postParse(sqlStmt);
         }
 
-        this.sql = sql;
-        this.joinOrder = joinOrder;
+        sql = sqlStmt;
     }
-
 
 }

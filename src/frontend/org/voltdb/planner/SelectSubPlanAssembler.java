@@ -70,17 +70,19 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     {
         super(db, parsedStmt, partitioning);
         //If a join order was provided
-        if (parsedStmt.joinOrder != null) {
+        if (parsedStmt.joinOrderMap != null) {
+            String joinOrder = parsedStmt.joinOrderMap.get("sql");
+            assert(joinOrder != null);
             //Extract the table names/aliases from the , separated list
             ArrayList<String> tableAliases = new ArrayList<String>();
             //Don't allow dups for now since self joins aren't supported
             HashSet<String> dupCheck = new HashSet<String>();
-            for (String table : parsedStmt.joinOrder.split(",")) {
+            for (String table : joinOrder.split(",")) {
                 tableAliases.add(table.trim());
                 if (!dupCheck.add(table.trim())) {
                     StringBuilder sb = new StringBuilder();
                     sb.append("The specified join order \"");
-                    sb.append(parsedStmt.joinOrder).append("\" contains duplicate tables. ");
+                    sb.append(joinOrder).append("\" contains duplicate tables. ");
                     throw new RuntimeException(sb.toString());
                 }
             }
@@ -88,7 +90,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             if (parsedStmt.tableAliasIndexMap.size() != tableAliases.size()) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("The specified join order \"");
-                sb.append(parsedStmt.joinOrder).append("\" does not contain the correct number of tables\n");
+                sb.append(joinOrder).append("\" does not contain the correct number of tables\n");
                 sb.append("Expected ").append(parsedStmt.tableList.size());
                 sb.append(" but found ").append(tableAliases.size()).append(" tables");
                 throw new RuntimeException(sb.toString());
@@ -100,7 +102,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             if (specifiedNames.isEmpty() == false) {
                 StringBuilder sb = new StringBuilder();
                 sb.append("The specified join order \"");
-                sb.append(parsedStmt.joinOrder).append("\" contains ");
+                sb.append(joinOrder).append("\" contains ");
                 int i = 0;
                 for (String name : specifiedNames) {
                     sb.append(name);

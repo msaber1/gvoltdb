@@ -27,6 +27,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.types.JoinType;
 
 public class TestJoinOrder extends PlannerTestCase {
@@ -173,6 +174,142 @@ public class TestJoinOrder extends PlannerTestCase {
             fail();
         } catch (Exception ex) {
             assertTrue(ex.getMessage().indexOf("does not contain the correct number of tables") != -1);
+        }
+    }
+
+    public void testSubqueryJoinOrder() {
+        {
+            AbstractPlanNode pn = compileWithJoinOrder(
+                    "select * FROM T1, T2, (select * from T3, T4) TEMP1, (select * from T5) TEMP2, T6",
+                    "T2, (T5) TEMP2, T1, (T4, T3) TEMP1, T6");
+            AbstractPlanNode n = pn.getChild(0).getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+            assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
+            assertEquals("T6", ((SeqScanPlanNode) n.getChild(1)).getTargetTableName());
+            n = n.getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+            assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
+            assertEquals("TEMP1", ((SeqScanPlanNode) n.getChild(1)).getTargetTableName());
+            assertTrue(n.getChild(1).getChildCount() == 1);
+            AbstractPlanNode s1 = n.getChild(1).getChild(0).getChild(0);
+            n = n.getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+            assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
+            assertEquals("T1", ((SeqScanPlanNode) n.getChild(1)).getTargetTableName());
+            n = n.getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+            assertTrue(n.getChild(1) instanceof SeqScanPlanNode);
+            assertEquals("TEMP2", ((SeqScanPlanNode) n.getChild(1)).getTargetTableName());
+            n = n.getChild(0);
+            assertTrue(n instanceof SeqScanPlanNode);
+            assertEquals("T2", ((SeqScanPlanNode) n).getTargetTableName());
+
+            assertTrue(s1 instanceof NestLoopPlanNode);
+            assertEquals("T3", ((SeqScanPlanNode) s1.getChild(1)).getTargetTableName());
+            assertEquals("T4", ((SeqScanPlanNode) s1.getChild(0)).getTargetTableName());
+        }
+
+        {
+            AbstractPlanNode pn = compileWithJoinOrder(
+                    "select * FROM (select * from (select * from T3, T4) TEMP1) TEMP2" ,
+                    "((T4, T3) TEMP1) TEMP2");
+            AbstractPlanNode n = pn.getChild(0);
+            assertTrue(n instanceof SeqScanPlanNode);
+            assertEquals("TEMP2", ((SeqScanPlanNode) n).getTargetTableName());
+            assertTrue(n.getChildCount() == 1);
+            n = n.getChild(0);
+            assertTrue(n instanceof SeqScanPlanNode);
+            assertEquals("TEMP1", ((SeqScanPlanNode) n).getTargetTableName());
+            assertTrue(n.getChildCount() == 1);
+            n = n.getChild(0).getChild(0);
+            assertTrue(n instanceof NestLoopPlanNode);
+            assertEquals("T4", ((SeqScanPlanNode) n.getChild(0)).getTargetTableName());
+            assertEquals("T3", ((SeqScanPlanNode) n.getChild(1)).getTargetTableName());
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, (select * from T2) TEMP",
+                    "T1, (T2)");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf("The specified join order does not specify the subquery alias.") != -1);
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, (select * from T2) TEMP",
+                    "T1, T2) TEMP");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf("The specified join order contains unbalanced '()' parentheses.") != -1);
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, (select * from T2) TEMP, T3",
+                    "T1, ((T2) TEMP, T3");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf("The specified join order contains unbalanced '()' parentheses.") != -1);
+        }
+}
+
+    public void testUnionJoinOrder() {
+        {
+            AbstractPlanNode pn = compileWithJoinOrder("select A,B from T1, T2 UNION select C,D from T3,T4",
+                    "(T2,T1),(T4,T3)");
+            assertTrue(pn.getChild(0) instanceof UnionPlanNode);
+            pn = pn.getChild(0);
+            assertTrue(pn.getChildCount() == 2);
+            AbstractPlanNode n1 = pn.getChild(0).getChild(0);
+            assertTrue(n1 instanceof NestLoopPlanNode);
+            AbstractPlanNode n2 = pn.getChild(1).getChild(0);
+            assertTrue(n2 instanceof NestLoopPlanNode);
+            assertTrue(n1.getChild(0) instanceof SeqScanPlanNode);
+            assertTrue(n1.getChild(1) instanceof SeqScanPlanNode);
+            assertEquals("T2", ((SeqScanPlanNode) n1.getChild(0)).getTargetTableName());
+            assertEquals("T1", ((SeqScanPlanNode) n1.getChild(1)).getTargetTableName());
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, T2 union select * from T3, T4",
+                    "(T1, T2)");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf("The specified join order doesn not match the set operation statement.") != -1);
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, T2 union select * from T3, T4",
+                    "(T1, T2),(T3, T4), (");
+            fail();
+        } catch (Exception ex) {
+            assertTrue(ex.getMessage().indexOf("The specified join order contains unbalanced '()' parentheses.") != -1);
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, T2 union select * from T3, T4",
+                    "(T1, T2)(T3, T4");
+            fail();
+        } catch (Exception ex) {
+            System.out.println(ex.getMessage());
+            assertTrue(ex.getMessage().indexOf("The specified join order doesn not match the set operation statement.") != -1);
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, T2 union select * from T3, T4",
+                    "(T1, T2)");
+            fail();
+        } catch (Exception ex) {
+            System.out.println(ex.getMessage());
+            assertTrue(ex.getMessage().indexOf("The specified join order doesn not match the set operation statement.") != -1);
+        }
+
+        try {
+            compileWithInvalidJoinOrder("select * FROM T1, T2 union select * from T3, T4",
+                    "(T1, T2),(T3, T4");
+            fail();
+        } catch (Exception ex) {
+            System.out.println(ex.getMessage());
+            assertTrue(ex.getMessage().indexOf("The specified join order contains unbalanced '()' parentheses.") != -1);
         }
     }
 

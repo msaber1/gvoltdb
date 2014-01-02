@@ -22,6 +22,7 @@ import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -75,8 +76,18 @@ public abstract class AbstractParsedStmt {
     // Hierarchical join representation
     public JoinNode joinTree = null;
 
-    //User specified join order, null if none is specified
-    public String joinOrder = null;
+    // User specified join order, null if none is specified
+    // The expected format for a select statement with subqueries is:
+    // T1, (T2,T3) TEMP1, T4, (T5,T6) TEMP2
+    // The subquery tables must be grouped by the () following by the subquery alias.
+    // The map contains entries for all immediate subqueries plus the entry for the main query.
+    // The key for the subquery entry is the subquery alias. The main entry key is always 'sql'.
+    // The expected format for a set operation statement with is:
+    // (T1,T2), (T2,T3)
+    // The tables for each individual statement must be grouped by the ().
+    // The map contains entries for all children.
+    // The key for the individual statement entry is the 'sqlN' where N is the number from 0 to N.
+    public Map<String, String> joinOrderMap = null;
 
     // Statement cache
     public List<StmtTableScan> stmtCache = new ArrayList<StmtTableScan>();
@@ -148,6 +159,9 @@ public abstract class AbstractParsedStmt {
    */
   private static AbstractParsedStmt parse(AbstractParsedStmt parsedStmt, String sql,
           VoltXMLElement stmtTypeElement,  String[] paramValues, Database db, String joinOrder) {
+      // parse join order to extract subqueries if any
+      parsedStmt.parseJoinOrder(joinOrder);
+
       // parse tables and parameters
       parsedStmt.parseTablesAndParams(stmtTypeElement);
 
@@ -155,7 +169,7 @@ public abstract class AbstractParsedStmt {
       parsedStmt.parse(stmtTypeElement);
 
       // post parse action
-      parsedStmt.postParse(sql, joinOrder);
+      parsedStmt.postParse(sql);
 
       return parsedStmt;
 
@@ -229,9 +243,8 @@ public abstract class AbstractParsedStmt {
      * @param sql
      * @param joinOrder
      */
-    void postParse(String sql, String joinOrder) {
-        this.sql = sql;
-        this.joinOrder = joinOrder;
+    void postParse(String sqlStmt) {
+        sql = sqlStmt;
     }
 
     /**
@@ -633,7 +646,7 @@ public abstract class AbstractParsedStmt {
             tableAlias = tableName;
         }
         // Possible sub-query
-        AbstractParsedStmt subQuery = parseSubQuery(tableNode);
+        AbstractParsedStmt subQuery = parseSubQuery(tableAlias, tableNode);
 
         // add table to the query cache before processing the JOIN/WHERE expressions
         // The order is important because processing sub-query expressions assumes that
@@ -1040,7 +1053,7 @@ public abstract class AbstractParsedStmt {
         return retval;
     }
 
-    private AbstractParsedStmt parseSubQuery(VoltXMLElement tableScan) {
+    private AbstractParsedStmt parseSubQuery(String tableAlias, VoltXMLElement tableScan) {
         AbstractParsedStmt subQuery = null;
         for (VoltXMLElement childNode : tableScan.children) {
             if (childNode.name.equals("tablesubquery")) {
@@ -1049,6 +1062,13 @@ public abstract class AbstractParsedStmt {
                     // Propagate parameters from the parent to the child
                     subQuery.m_paramsById.putAll(m_paramsById);
                     subQuery.m_paramList = m_paramList;
+                    // Get the subquery join order if any
+                    String joinOrder = null;
+                    if (joinOrderMap != null) {
+                        joinOrder = joinOrderMap.get(tableAlias);
+                        // if the join order was specified the subquery must have its join order
+                        assert(joinOrder != null);
+                    }
                     subQuery = AbstractParsedStmt.parse(subQuery, sql, childNode.children.get(0), m_paramValues, m_db, joinOrder);
                     break;
                 }
@@ -1097,4 +1117,112 @@ public abstract class AbstractParsedStmt {
         }
         return false;
     }
+
+    /** Parse a join order. The expected format for a statement with subqueries is:
+     * T1, (T2,T3) TEMP1, T4, (T5,T6) TEMP2
+     * The subquery tables must be grouped by the () following by the subquery alias.
+     * The produced map contains entries for all immediate subqueries plus the entry for the main query.
+     * The key for the subquery entry is the subquery alias. The main entry key is always 'sql'.
+     *
+     * @param joinOrder
+     */
+    protected void parseJoinOrder(String joinOrder) {
+        if (joinOrder == null) {
+            return;
+        }
+        joinOrderMap = new HashMap<String, String>();
+        String mainAlias = "sql";
+        boolean inSubquery = false;
+        int level = 0;
+        int subqueryCnt = 0;
+        // Collection to keep subqueries begin and end indexes.
+        // An entry with an even index is the beginning of the subquery, odd - the end of the subquery
+        ArrayList<Integer> subqueryIdx = new ArrayList<Integer>();
+        char joinOrderChars[] = joinOrder.toCharArray();
+        for(int idx = 0; idx < joinOrderChars.length; ++idx) {
+            char ch = joinOrderChars[idx];
+            if ('(' == ch) {
+                if (level < 0) {
+                    throw new RuntimeException("The specified join order contains unbalanced '()' parentheses.");
+                } else if (level == 0) {
+                    assert(inSubquery == false);
+                    // start of the subquery
+                    inSubquery = true;
+                    // Remember the start of the subquery
+                    subqueryIdx.add(idx);
+                    // increment the level
+                    ++level;
+                    ++subqueryCnt;
+                } else {
+                    assert(inSubquery == true);
+                    // this is a grand child subquery which will be handled by the child.
+                    ++level;
+                    continue;
+                }
+            } else if (')' == ch) {
+                if (level < 1) {
+                    throw new RuntimeException("The specified join order contains unbalanced '()' parentheses.");
+                } else if (level == 1) {
+                    // Closing bracket fot the top level subquery
+                    assert(inSubquery == true);
+                    // End the subquery
+                    inSubquery = false;
+                    // Remember the end of the subquery
+                    subqueryIdx.add(idx);
+                    // decrement the level
+                    --level;
+                    // extract the subquery alias
+                    String alias = extractJoinOrderAlias(joinOrder, idx, subqueryCnt);
+                    // extract the subquery itself
+                    assert(subqueryIdx.size() > 1);
+                    int beginIdx = subqueryIdx.get(subqueryIdx.size() -2);
+                    int endIdx = subqueryIdx.get(subqueryIdx.size() -1);
+                    // exclude () chars
+                    assert (beginIdx + 1 < endIdx -1);
+                    String subqueryJoinOrder = joinOrder.substring(beginIdx + 1, endIdx);
+                    joinOrderMap.put(alias, subqueryJoinOrder);
+                    // advance to the next subquery
+                    idx = joinOrder.indexOf(',', idx + 1);
+                    if (idx == -1) {
+                     // This is the last subquery
+                        break;
+                    }
+                } else {
+                    assert(inSubquery == true);
+                    // this is a grand child subquery which will be handled by the child.
+                    --level;
+                    continue;
+                }
+            }
+
+        }
+        if (level != 0) {
+            throw new RuntimeException("The specified join order contains unbalanced '()' parentheses.");
+        }
+        // last step to remove the subquery join orders from the parent one
+        String mainJoinOrder = joinOrder;
+        if (joinOrderMap.isEmpty() == false) {
+            assert(subqueryIdx.size() > 1 && subqueryIdx.size() % 2 == 0);
+            mainJoinOrder = joinOrder.substring(0, subqueryIdx.get(0));
+            for(int idx = 1; idx < subqueryIdx.size(); idx += 2) {
+                String next = (idx == subqueryIdx.size() - 1) ?
+                        joinOrder.substring(subqueryIdx.get(idx) + 1, joinOrder.length()) :
+                            joinOrder.substring(subqueryIdx.get(idx) + 1, subqueryIdx.get(idx + 1));
+                        mainJoinOrder = mainJoinOrder + next;
+            }
+        }
+        joinOrderMap.put(mainAlias, mainJoinOrder);
+    }
+
+    protected String extractJoinOrderAlias(String joinOrder, int idx, int stmtCnt) {
+        if (idx + 1 == joinOrder.length()) {
+            throw new RuntimeException("The specified join order does not specify the subquery alias.");
+        }
+       int aliasEndIdx = joinOrder.indexOf(',', idx + 1);
+        String alias = (aliasEndIdx != -1) ? joinOrder.substring(idx + 1, aliasEndIdx) :
+            joinOrder.substring(idx + 1);
+        alias = alias.trim();
+        return alias;
+    }
+
 }
