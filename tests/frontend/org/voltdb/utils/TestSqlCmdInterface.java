@@ -456,6 +456,49 @@ public class TestSqlCmdInterface
         assertThis2(query, expected, 3, ID);
     }
 
+    // SELECT .. WHERE C IN (SELECT...)
+    @Test
+    public void testParseQuery28() {
+        ID = 28;
+        String select = "select * from t1 where C in (select * from t2)";
+        String expected = select.replaceAll("\\s*\\;+\\s*", " ");
+        assertThis(select, expected, 1, ID);
+    }
+
+    // SELECT .. WHERE EXISTS (SELECT...)
+    @Test
+    public void testParseQuery29() {
+        ID = 29;
+        String select = "select * from t1 where exists (select * from t2)";
+        String expected = select.replaceAll("\\s*\\;+\\s*", " ");
+        assertThis(select, expected, 1, ID);
+    }
+
+    // SELECT FROM (SELECT...)
+    @Test
+    public void testParseQuery30() {
+        ID = 30;
+        String select = "select * from (select * from t1) temp";
+        String expected = select.replaceAll("\\s*\\;+\\s*", " ");
+        assertThis(select, expected, 1, ID);
+    }
+
+    // SELECT FROM t1, t2,  (SELECT...)
+    @Test
+    public void testParseQuery31() {
+        ID = 31;
+        String select = "select * from t1, t2  ,  ( select * from t1) temp";
+        assertThis(select, select, 1, ID);
+    }
+
+    // SELECT FROM (SELECT ...) T1,  (SELECT...) T2
+    @Test
+    public void testParseQuery32() {
+        ID = 32;
+        String select = "select * from t1, ( select * from t1) temp1,  ( select * from t1) temp2";
+        assertThis(select, select, 1, ID);
+    }
+
     private static void setQryString(File QryFileHandle) throws FileNotFoundException {
         // Prepare a Scanner that will "scan" the document
         Scanner opnScanner = new Scanner(QryFileHandle);

@@ -71,6 +71,9 @@ public class SQLCommand
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern AutoSplit = Pattern.compile("(\\s|((\\(\\s*)+))(select|insert|update|delete|exec|execute|explain|explainproc)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern SetOp = Pattern.compile("(\\s|\\))\\s*(union|except|intersect)(\\s\\s*all)?((\\s*\\({0,1}\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern InExistsSubquery = Pattern.compile("\\s*(in|exists)((\\s*\\(\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern FromSubquery1 = Pattern.compile("\\s*(from)((\\s*\\(\\s*)*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
+    private static final Pattern FromSubquery2 = Pattern.compile("(\\s*,\\s*\\(\\s*)select", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     /**
      * Matches a command followed by and SQL CRUD statement verb
@@ -143,9 +146,12 @@ public class SQLCommand
         /*
          * Mark all subsequent set portions of a query with SQL_PARSER_SETOP_SELECT tag
          */
-        query = SetOp.matcher(query).replaceAll("$1$2$3$4SQL_PARSER_SETOP_SELECT");
+        query = SetOp.matcher(query).replaceAll("$1$2$3$4SQL_PARSER_KEEP_SELECT");
+        query = InExistsSubquery.matcher(query).replaceAll(" $1$2SQL_PARSER_KEEP_SELECT");
+        query = FromSubquery1.matcher(query).replaceAll(" $1$2SQL_PARSER_KEEP_SELECT");
+        query = FromSubquery2.matcher(query).replaceAll("$1SQL_PARSER_KEEP_SELECT");
         query = AutoSplit.matcher(query).replaceAll(";$2$4 "); // there be dragons here
-        query = query.replaceAll("SQL_PARSER_SETOP_SELECT", "select");
+        query = query.replaceAll("SQL_PARSER_KEEP_SELECT", "select");
         String[] sqlFragments = query.split("\\s*;+\\s*");
 
         ArrayList<String> queries = new ArrayList<String>();
