@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -52,14 +52,15 @@ public class TestIndexSelection extends PlannerTestCase {
         AbstractPlanNode pn = compile("select id from a, t where a.id < (t.a + ?);");
         pn = pn.getChild(0);
         pn = pn.getChild(0);
-        // System.out.println("DEBUG: " + pn.toExplainPlanString());
+//        System.out.println("DEBUG: " + pn.toExplainPlanString());
         assertTrue(pn instanceof NestLoopIndexPlanNode);
         IndexScanPlanNode indexScan = (IndexScanPlanNode)pn.getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assertEquals(IndexLookupType.LT, indexScan.getLookupType());
         assertTrue(indexScan.toJSONString().contains("\"TARGET_INDEX_NAME\":\"SYS_IDX_ID_"));
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
-        assertTrue(pn.toJSONString().contains("\"TABLE_NAME\":\"T\""));
+//        System.out.println("DEBUG: " + pn.toJSONString());
+        assertTrue(pn.toJSONString().contains("\"TARGET_TABLE_NAME\":\"T\""));
     }
 
     // This tests recognition of covering parameters to prefer a hash index that would use a

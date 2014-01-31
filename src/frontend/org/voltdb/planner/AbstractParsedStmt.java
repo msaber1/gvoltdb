@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -94,7 +94,7 @@ public abstract class AbstractParsedStmt {
     public HashMap<String, Integer> tableAliasIndexMap = new HashMap<String, Integer>();
 
     protected final String[] m_paramValues;
-    protected final Database m_db;
+    public final Database m_db;
 
     static final String INSERT_NODE_NAME = "insert";
     static final String UPDATE_NODE_NAME = "update";
@@ -436,6 +436,8 @@ public abstract class AbstractParsedStmt {
                 // Need to use its alias to uniquely identify the sub-query
                 tableCache = new StmtSubqueryScan(new TempTable(tableAlias, tableAlias, subQuery), tableAlias);
             }
+            tableCache.populateColumnDictionary();
+
             stmtCache.add(tableCache);
             tableAliasIndexMap.put(tableAlias, nextIndex);
         }

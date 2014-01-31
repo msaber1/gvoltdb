@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -106,12 +106,14 @@ import org.voltdb.compilereport.StatementAnnotation;
 import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.planner.StmtTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
+import org.voltdb.SystemProcedureCatalog;
 
 /**
  *
@@ -433,7 +435,8 @@ public abstract class CatalogUtil {
             } else {
                 List<AbstractExpression> indexedExprs = null;
                 try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring);
+                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring,
+                            StmtTableScan.getStmtTableScan(catalog_tbl));
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();
@@ -1671,7 +1674,7 @@ public abstract class CatalogUtil {
             indexSize = getSortedCatalogItems(index.getColumns(), "index").size();
         } else {
             try {
-                indexSize = AbstractExpression.fromJSONArrayString(jsonstring).size();
+                indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
                 e.printStackTrace();
@@ -1680,4 +1683,23 @@ public abstract class CatalogUtil {
 
         return indexSize;
     }
+
+    /**
+     * Return if given proc is durable if its a sysproc SystemProcedureCatalog is consulted. All non sys procs are all
+     * durable.
+     *
+     * @param procName
+     * @return true if proc is durable for non sys procs return true (durable)
+     */
+    public static boolean isDurableProc(String procName) {
+        //For sysprocs look at sysproc catalog.
+        if (procName.charAt(0) == '@') {
+            SystemProcedureCatalog.Config sysProc = SystemProcedureCatalog.listing.get(procName);
+            if (sysProc != null) {
+                return sysProc.isDurable();
+            }
+        }
+        return true;
+    }
+
 }
