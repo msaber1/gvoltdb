@@ -290,7 +290,7 @@ AbstractPlanNode::getOutputSchema() const
 }
 
 TupleSchema*
-AbstractPlanNode::generateTupleSchema(bool allowNulls) const
+AbstractPlanNode::generateTempTableSchema() const
 {
     // Get the effective output schema.
     // In general, this may require a search.
@@ -298,7 +298,6 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls) const
     int schema_size = static_cast<int>(outputSchema.size());
     vector<voltdb::ValueType> columnTypes;
     vector<int32_t> columnSizes;
-    vector<bool> columnAllowNull(schema_size, allowNulls);
 
     for (int i = 0; i < schema_size; i++)
     {
@@ -311,9 +310,7 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls) const
         columnSizes.push_back(col->getExpression()->getValueSize());
     }
 
-    TupleSchema* schema =
-        TupleSchema::createTupleSchema(columnTypes, columnSizes,
-                                       columnAllowNull, true);
+    TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes);
     return schema;
 }
 
@@ -325,7 +322,7 @@ AbstractPlanNode::generateDMLCountTupleSchema()
     vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_BIGINT);
     vector<int32_t> columnSizes(1, sizeof(int64_t));
     vector<bool> columnAllowNull(1, false);
-    TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, true);
+    TupleSchema* schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull);
     return schema;
 }
 

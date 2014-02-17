@@ -144,7 +144,7 @@ public:
     */
     size_t maxExportSerializationSize() const {
         size_t bytes = 0;
-        int cols = sizeInValues();
+        int cols = m_schema->columnCount();
         for (int i = 0; i < cols; ++i) {
             switch (getType(i)) {
               case VALUE_TYPE_TINYINT:
@@ -187,22 +187,17 @@ public:
     size_t getNonInlinedMemorySize() const
     {
         size_t bytes = 0;
-        int cols = sizeInValues();
         // fast-path for no inlined cols
-        if (m_schema->getUninlinedObjectColumnCount() != 0)
-        {
-            for (int i = 0; i < cols; ++i)
-            {
-                // peekObjectLength is unhappy with non-varchar
-                if (((getType(i) == VALUE_TYPE_VARCHAR) || (getType(i) == VALUE_TYPE_VARBINARY)) &&
-                    !m_schema->columnIsInlined(i))
-                {
-                    if (!getNValue(i).isNull())
-                    {
+        if (m_schema->getUninlinedObjectColumnCount() != 0) {
+            int cols = m_schema->columnCount();
+            for (int i = 0; i < cols; ++i) {
+                // peekObjectLength is unhappy with non-object types
+                if (isObjectType(getType(i)) && ! m_schema->columnIsInlined(i)) {
+                    NValue objectValue = getNValue(i);
+                    if ( ! objectValue.isNull()) {
                         bytes +=
                             StringRef::
-                            computeStringMemoryUsed((ValuePeeker::
-                                                     peekObjectLength(getNValue(i))));
+                            computeStringMemoryUsed(ValuePeeker::peekObjectLength(objectValue));
                     }
                 }
             }
@@ -210,7 +205,7 @@ public:
         return bytes;
     }
 
-    void setNValue(const int idx, voltdb::NValue value);
+    void setNValue(int idx, const voltdb::NValue& value);
     /*
      * Copies range of NValues from one tuple to another.
      */
@@ -224,8 +219,7 @@ public:
      * to provide NULL for stringPool in which case the strings will
      * be allocated on the heap.
      */
-    void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
-                                             Pool *dataPool);
+    void setNValueAllocateForObjectCopies(int idx, const voltdb::NValue& value, Pool *dataPool);
 
     /** How long is a tuple? */
     inline int tupleLength() const {
@@ -251,7 +245,7 @@ public:
     }
 
     /** Is the column value null? */
-    inline bool isNull(const int idx) const {
+    inline bool isNull(int idx) const {
         return getNValue(idx).isNull();
     }
 
@@ -267,7 +261,7 @@ public:
     /** Get the value of a specified column (const) */
     //not performant because it has to check the schema to see how to
     //return the SlimValue.
-    inline const NValue getNValue(const int idx) const {
+    inline const NValue getNValue(int idx) const {
         assert(m_schema);
         assert(m_data);
         assert(idx < m_schema->columnCount());
@@ -295,7 +289,7 @@ public:
     // required of the upcoming release or undo.
     void copyForPersistentUpdate(const TableTuple &source,
                                  std::vector<char*> &oldObjects, std::vector<char*> &newObjects);
-    void copy(const TableTuple &source);
+    void copyTuple(const TableTuple &source);
 
     /** this does set NULL in addition to clear string count.*/
     void setAllNulls();
@@ -306,9 +300,9 @@ public:
     int compare(const TableTuple &other) const;
 
     void deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *stringPool);
-    void serializeTo(voltdb::SerializeOutput &output);
+    void serializeTo(voltdb::SerializeOutput &output) const;
     void serializeToExport(voltdb::ExportSerializeOutput &io,
-                          int colOffset, uint8_t *nullArray);
+                          int colOffset, uint8_t *nullArray) const;
 
     void freeObjectColumns();
     size_t hashCode(size_t seed) const;
@@ -350,6 +344,10 @@ private:
         *(reinterpret_cast<char*> (m_data)) &= static_cast<char>(~DIRTY_MASK);
     }
 
+    void copyTupleData(void* source_data) {
+        ::memcpy(m_data, source_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
+    }
+
     /** The types of the columns in the tuple */
     const TupleSchema *m_schema;
 
@@ -359,13 +357,13 @@ private:
      */
     char *m_data;
 
-    inline char* getDataPtr(const int idx) {
+    inline char* getDataPtr(int idx) {
         assert(m_schema);
         assert(m_data);
         return &m_data[m_schema->columnOffset(idx) + TUPLE_HEADER_SIZE];
     }
 
-    inline const char* getDataPtr(const int idx) const {
+    inline const char* getDataPtr(int idx) const {
         assert(m_schema);
         assert(m_data);
         return &m_data[m_schema->columnOffset(idx) + TUPLE_HEADER_SIZE];
@@ -479,22 +477,22 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
 
 /** Copy scalars by value and non-scalars (non-inlined strings, decimals) by
     reference from a slim value in to this tuple. */
-inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
+inline void TableTuple::setNValue(int idx, const voltdb::NValue& value) {
     assert(m_schema);
     assert(m_data);
-    const ValueType type = m_schema->columnType(idx);
-    value = value.castAs(type);
+    const ValueType type = getType(idx);
+    NValue typedValue = value.castAs(type);
+    char *storage = getDataPtr(idx);
     const bool isInlined = m_schema->columnIsInlined(idx);
-    char *dataPtr = getDataPtr(idx);
     const int32_t columnLength = m_schema->columnLength(idx);
-    value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
+    typedValue.serializeToTupleStorage(storage, isInlined, columnLength);
 }
 
 /** Multi column version. */
 inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int end) {
     assert(m_schema);
     assert(lhs.getSchema());
-    assert(beginIdx + end - begin <= sizeInValues());
+    assert(beginIdx + end - begin <= m_schema->columnCount());
     while (begin != end) {
         assert(m_schema->columnType(beginIdx) == lhs.getSchema()->columnType(begin));
         setNValue(beginIdx++, lhs.getNValue(begin++));
@@ -502,80 +500,32 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
 }
 
 /* Copy strictly by value from slimvalue into this tuple */
-inline void TableTuple::setNValueAllocateForObjectCopies(const int idx,
-                                                            voltdb::NValue value,
-                                                            Pool *dataPool)
+inline void TableTuple::setNValueAllocateForObjectCopies(int idx, const voltdb::NValue& value,
+                                                         Pool *dataPool)
 {
     assert(m_schema);
     assert(m_data);
     //assert(isActive())
-    const ValueType type = m_schema->columnType(idx);
-    value = value.castAs(type);
+    const ValueType type = getType(idx);
+    NValue typedValue = value.castAs(type);
     const bool isInlined = m_schema->columnIsInlined(idx);
-    char *dataPtr = getDataPtr(idx);
+    char *storage = getDataPtr(idx);
     const int32_t columnLength = m_schema->columnLength(idx);
-    value.serializeToTupleStorageAllocateForObjects(dataPtr, isInlined,
-                                                    columnLength, dataPool);
+    typedValue.serializeToTupleStorageAllocateForObjects(storage, isInlined, columnLength, dataPool);
 }
 
 /*
  * With a persistent insert the copy should do an allocation for all uninlinable strings
  */
 inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source, Pool *pool) {
-    assert(m_schema);
-    assert(source.m_schema);
-    assert(source.m_data);
-    assert(m_data);
-
-    const bool allowInlinedObjects = m_schema->allowInlinedObjects();
-    const TupleSchema *sourceSchema = source.m_schema;
-    const bool oAllowInlinedObjects = sourceSchema->allowInlinedObjects();
+    copyTuple(source);
     const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
-
-#ifndef NDEBUG
-    if(!compatibleForCopy(source)) {
-        std::ostringstream message;
-        message << "src  tuple: " << source.debug("") << std::endl;
-        message << "src schema: " << source.m_schema->debug() << std::endl;
-        message << "dest schema: " << m_schema->debug() << std::endl;
-        throwFatalException( "%s", message.str().c_str());
-    }
-#endif
-
-    if (allowInlinedObjects == oAllowInlinedObjects) {
-        /*
-         * The source and target tuple have the same policy WRT to
-         * inlining strings. A memcpy can be used to speed the process
-         * up for all columns that are not uninlineable strings.
-         */
-        if (uninlineableObjectColumnCount > 0) {
-            // copy the data AND the isActive flag
-            ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
-            /*
-             * Copy each uninlined string column doing an allocation for string copies.
-             */
-            for (uint16_t ii = 0; ii < uninlineableObjectColumnCount; ii++) {
-                const uint16_t uinlineableObjectColumnIndex =
-                  m_schema->getUninlinedObjectColumnInfoIndex(ii);
-                setNValueAllocateForObjectCopies(uinlineableObjectColumnIndex,
-                                                    source.getNValue(uinlineableObjectColumnIndex),
-                                                    pool);
-            }
-            m_data[0] = source.m_data[0];
-        } else {
-            // copy the data AND the isActive flag
-            ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
-        }
-    } else {
-        // Can't copy the string ptr from the other tuple if the string
-        // is inlined into the tuple
-        assert(!(!allowInlinedObjects && oAllowInlinedObjects));
-        const uint16_t columnCount = m_schema->columnCount();
-        for (uint16_t ii = 0; ii < columnCount; ii++) {
-            setNValueAllocateForObjectCopies(ii, source.getNValue(ii), pool);
-        }
-
-        m_data[0] = source.m_data[0];
+    // Copy each uninlined string column doing an allocation for string copies.
+    for (uint16_t ii = 0; ii < uninlineableObjectColumnCount; ii++) {
+        const uint16_t uinlineableObjectColumnIndex =
+                m_schema->getUninlinedObjectColumnInfoIndex(ii);
+        setNValueAllocateForObjectCopies(uinlineableObjectColumnIndex,
+                source.getNValue(uinlineableObjectColumnIndex), pool);
     }
 }
 
@@ -588,13 +538,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
 {
     assert(m_schema);
     assert(m_schema == source.m_schema);
-    const int columnCount = m_schema->columnCount();
     const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
-    /*
-     * The source and target tuple have the same policy WRT to
-     * inlining strings because a TableTuple used for updating a
-     * persistent table uses the same schema as the persistent table.
-     */
     if (uninlineableObjectColumnCount > 0) {
         uint16_t uninlineableObjectColumnIndex = 0;
         uint16_t nextUninlineableObjectColumnInfoIndex = m_schema->getUninlinedObjectColumnInfoIndex(0);
@@ -604,6 +548,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
          * is changed in this update. If it is changed then free the
          * old string and copy/allocate the new one from the source.
          */
+        const int columnCount = m_schema->columnCount();
         for (uint16_t ii = 0; ii < columnCount; ii++) {
             if (ii == nextUninlineableObjectColumnInfoIndex) {
                 char *       *mPtr = reinterpret_cast<char**>(getDataPtr(ii));
@@ -635,7 +580,7 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
                 // memcpy of a few more bytes of the tuple.
                 // Solution? It would likely be faster even for object-heavy tuples to work in three passes:
                 // 1) collect up all the "changed object pointer" offsets.
-                // 2) do the same wholesale tuple memcpy as in the no-objects "else" clause, below,
+                // 2) do the same wholesale copyTupleData (memcpy) as the no-objects "else" clause, below,
                 // 3) replace the object pointer at each "changed object pointer offset"
                 //    with a pointer to an object copy of its new referent.
                 setNValueAllocateForObjectCopies(ii, source.getNValue(ii), NULL);
@@ -646,20 +591,15 @@ inline void TableTuple::copyForPersistentUpdate(const TableTuple &source,
         m_data[0] = source.m_data[0];
     } else {
         // copy the tuple flags and the data (all inline/scalars)
-        ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
+        copyTupleData(source.m_data);
     }
 }
 
-inline void TableTuple::copy(const TableTuple &source) {
+inline void TableTuple::copyTuple(const TableTuple &source) {
     assert(m_schema);
+    assert(m_data);
     assert(source.m_schema);
     assert(source.m_data);
-    assert(m_data);
-
-    const uint16_t columnCount = m_schema->columnCount();
-    const bool allowInlinedObjects = m_schema->allowInlinedObjects();
-    const TupleSchema *sourceSchema = source.m_schema;
-    const bool oAllowInlinedObjects = sourceSchema->allowInlinedObjects();
 
 #ifndef NDEBUG
     if(!compatibleForCopy(source)) {
@@ -671,27 +611,20 @@ inline void TableTuple::copy(const TableTuple &source) {
     }
 #endif
 
-    if (allowInlinedObjects == oAllowInlinedObjects) {
-        // copy the data AND the isActive flag
-        ::memcpy(m_data, source.m_data, m_schema->tupleLength() + TUPLE_HEADER_SIZE);
-    } else {
-        // Can't copy the string ptr from the other tuple if the
-        // string is inlined into the tuple
-        assert(!(!allowInlinedObjects && oAllowInlinedObjects));
-        for (uint16_t ii = 0; ii < columnCount; ii++) {
-            setNValue(ii, source.getNValue(ii));
-        }
-        m_data[0] = source.m_data[0];
-    }
+    // copy the data AND the status flags
+    copyTupleData(source.m_data);
 }
 
-inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *dataPool) {
+inline void TableTuple::deserializeFrom(voltdb::SerializeInput &input, Pool *dataPool)
+{
     assert(m_schema);
     assert(m_data);
 
-    tupleIn.readInt();
-    for (int j = 0; j < m_schema->columnCount(); ++j) {
+    input.readInt();
+    const int columnCount = m_schema->columnCount();
+    for (int j = 0; j < columnCount; ++j) {
         const ValueType type = m_schema->columnType(j);
+        char *storage = getDataPtr(j);
         /**
          * Hack hack. deserializeFrom is only called when we serialize
          * and deserialize tables. The serialization format for
@@ -705,17 +638,19 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
          * serializing to tuple storage.
          */
         const bool isInlined = m_schema->columnIsInlined(j);
-        char *dataPtr = getDataPtr(j);
         const int32_t columnLength = m_schema->columnLength(j);
-        NValue::deserializeFrom(tupleIn, type, dataPtr, isInlined, columnLength, dataPool);
+        NValue::deserializeFrom(input, type, storage, isInlined, columnLength, dataPool);
     }
 }
 
-inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) {
+inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) const
+{
     size_t start = output.reserveBytes(4);
 
-    for (int j = 0; j < m_schema->columnCount(); ++j) {
-        //int fieldStart = output.position();
+    assert(m_schema);
+    assert(m_data);
+    const int columnCount = m_schema->columnCount();
+    for (int j = 0; j < columnCount; ++j) {
         NValue value = getNValue(j);
         value.serializeTo(output);
     }
@@ -727,22 +662,24 @@ inline void TableTuple::serializeTo(voltdb::SerializeOutput &output) {
 inline
 void
 TableTuple::serializeToExport(ExportSerializeOutput &io,
-                              int colOffset, uint8_t *nullArray)
+                              int colOffset, uint8_t *nullArray) const
 {
-    int columnCount = sizeInValues();
-    for (int i = 0; i < columnCount; i++) {
+    assert(m_schema);
+    assert(m_data);
+    int columnCount = m_schema->columnCount();
+    for (int j = 0; j < columnCount; ++j) {
         // NULL doesn't produce any bytes for the NValue
         // Handle it here to consolidate manipulation of
         // the nullarray.
-        if (isNull(i)) {
-            // turn on i'th bit of nullArray
-            int byte = (colOffset + i) >> 3;
-            int bit = (colOffset + i) % 8;
+        if (isNull(j)) {
+            // turn on j'th bit of nullArray
+            int byte = (colOffset + j) >> 3;
+            int bit = (colOffset + j) % 8;
             int mask = 0x80 >> bit;
             nullArray[byte] = (uint8_t)(nullArray[byte] | mask);
             continue;
         }
-        getNValue(i).serializeToExport(io);
+        getNValue(j).serializeToExport(io);
     }
 }
 
@@ -754,9 +691,10 @@ inline bool TableTuple::equals(const TableTuple &other) const {
 }
 
 inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other) const {
-    for (int ii = 0; ii < m_schema->columnCount(); ii++) {
-        const NValue lhs = getNValue(ii);
-        const NValue rhs = other.getNValue(ii);
+    const int columnCount = m_schema->columnCount();
+    for (int j = 0; j < columnCount; ++j) {
+        const NValue lhs = getNValue(j);
+        const NValue rhs = other.getNValue(j);
         if (lhs.op_notEquals(rhs).isTrue()) {
             return false;
         }
@@ -768,9 +706,10 @@ inline void TableTuple::setAllNulls() {
     assert(m_schema);
     assert(m_data);
 
-    for (int ii = 0; ii < m_schema->columnCount(); ++ii) {
-        NValue value = NValue::getNullValue(m_schema->columnType(ii));
-        setNValue(ii, value);
+    const int columnCount = m_schema->columnCount();
+    for (int j = 0; j < columnCount; ++j) {
+        NValue value = NValue::getNullValue(m_schema->columnType(j));
+        setNValue(j, value);
     }
 }
 

@@ -306,7 +306,7 @@ class CompactingTreeUniqueIndex : public TableIndex
 
     virtual TableIndex *cloneEmptyNonCountingTreeIndex() const
     {
-        return new CompactingTreeUniqueIndex<KeyType, false >(TupleSchema::createTupleSchema(getKeySchema()), m_scheme);
+        return new CompactingTreeUniqueIndex<KeyType, false >(getKeySchema()->cloneSchema(), m_scheme);
     }
 
 

@@ -47,7 +47,6 @@
 #define HSTOREIDS_H
 
 #include <stdint.h>
-#include <string>
 
 //
 // ID type definitions.

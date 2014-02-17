@@ -58,7 +58,7 @@ TableCatalogDelegate::~TableCatalogDelegate()
     }
 }
 
-TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catalogTable) {
+static TupleSchema* tableCatalogDelegateCreateTupleSchema(catalog::Table const &catalogTable) {
     // Columns:
     // Column is stored as map<String, Column*> in Catalog. We have to
     // sort it by Column index to preserve column order.
@@ -74,17 +74,17 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catal
         const int columnIndex = catalog_column->index();
         const ValueType type = static_cast<ValueType>(catalog_column->type());
         columnTypes[columnIndex] = type;
-        const int32_t size = static_cast<int32_t>(catalog_column->size());
         //Strings length is provided, other lengths are derived from type
-        bool varlength = (type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY);
-        const int32_t length = varlength ? size : static_cast<int32_t>(NValue::getTupleStorageSize(type));
+        bool varlength = isObjectType(type);
+        const int32_t length = varlength ? static_cast<int32_t>(catalog_column->size()) :
+                                           static_cast<int32_t>(TupleSchema::getTupleStorageSize(type));
         columnLengths[columnIndex] = length;
         columnAllowNull[columnIndex] = catalog_column->nullable();
     }
 
     return TupleSchema::createTupleSchema(columnTypes,
                                           columnLengths,
-                                          columnAllowNull, true);
+                                          columnAllowNull);
 }
 
 bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
@@ -252,7 +252,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     }
 
     // get the schema for the table
-    TupleSchema *schema = createTupleSchema(catalogTable);
+    TupleSchema *schema = tableCatalogDelegateCreateTupleSchema(catalogTable);
 
     // Indexes
     map<string, TableIndexScheme> index_map;

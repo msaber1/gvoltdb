@@ -191,7 +191,7 @@ void setNewCurrent(const char *testName,
     currentColumnLengths = columnLengths;
     currentColumnAllowNull = columnAllowNull;
 
-    voltdb::TupleSchema *schema = voltdb::TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull);
     schemaCache.push_back(schema);
     // just pack the indices tightly
     vector<int> columnIndices;
@@ -417,32 +417,32 @@ int main(int argc, char **argv)
             while (typecode) {
                 if (strcmp(typecode, kBigIntTypecode) == 0) {
                     columnTypes.push_back(VALUE_TYPE_BIGINT);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+                    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kIntegerTypecode) == 0) {
                     columnTypes.push_back(VALUE_TYPE_INTEGER);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+                    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kSmallIntTypecode) == 0) {
                     columnTypes.push_back(VALUE_TYPE_SMALLINT);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT));
+                    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_SMALLINT));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kTinyIntTypecode) == 0) {
                     columnTypes.push_back(VALUE_TYPE_TINYINT);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+                    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kFloatTypecode) == 0) {
                     columnTypes.push_back(VALUE_TYPE_DOUBLE);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+                    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_DOUBLE));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kDecimalTypecode) == 0) {
                     columnTypes.push_back(VALUE_TYPE_DECIMAL);
-                    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DECIMAL));
+                    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_DECIMAL));
                     columnAllowNull.push_back(false);
                 }
                 else if (strcmp(typecode, kStringTypecode4) == 0) {
@@ -510,7 +510,9 @@ int main(int argc, char **argv)
                 cerr << "Operation code parse error on line: " << line << endl;
                 exit(-1);
             }
-            voltdb::TupleSchema *tupleSchema = voltdb::TupleSchema::createTupleSchema(currentColumnTypes, currentColumnLengths, currentColumnAllowNull, true);
+            TupleSchema *tupleSchema = TupleSchema::createTupleSchema(currentColumnTypes,
+                                                                      currentColumnLengths,
+                                                                      currentColumnAllowNull);
             schemaCache.push_back(tupleSchema);
             cmd.key = tupleFromString(tuple1, tupleSchema);
             if (tuple2) cmd.key2 = tupleFromString(tuple2, tupleSchema);

@@ -41,11 +41,11 @@ vector<string> StatsSource::generateBaseStatsColumnNames() {
 }
 
 void StatsSource::populateBaseSchema(vector<ValueType> &types, vector<int32_t> &columnLengths, vector<bool> &allowNull) {
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
     types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
 }
 
 StatsSource::StatsSource()  : m_statsTable(NULL) {
@@ -76,7 +76,7 @@ void StatsSource::configure(
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
     populateSchema(columnTypes, columnLengths, columnAllowNull);
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull);
 
     for (int ii = 0; ii < columnNames.size(); ii++) {
         m_columnName2Index[columnNames[ii]] = ii;

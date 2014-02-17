@@ -286,12 +286,6 @@ void PersistentTable::truncateTable(VoltDBEngine* engine) {
     this->decrementRefcount();
 }
 
-
-void setSearchKeyFromTuple(TableTuple &source) {
-    keyTuple.setNValue(0, source.getNValue(1));
-    keyTuple.setNValue(1, source.getNValue(2));
-}
-
 /*
  * Regular tuple insertion that does an allocation and copy for
  * uninlined strings and creates and registers an UndoAction.
@@ -594,7 +588,7 @@ void PersistentTable::updateTupleForUndo(char* tupleWithUnwantedValues,
 
     bool dirty = targetTupleToUpdate.isDirty();
     // this is the actual in-place revert to the old version
-    targetTupleToUpdate.copy(sourceTupleWithNewValues);
+    targetTupleToUpdate.copyTuple(sourceTupleWithNewValues);
     if (dirty) {
         targetTupleToUpdate.setDirtyTrue();
     } else {

@@ -77,20 +77,8 @@ TableTuple *newTuple(TupleSchema *schema, int idx, long value) {
 
 TEST_F(CompactingHashIndexTest, ENG1193) {
     TableIndex *index = NULL;
-    vector<int> columnIndices;
-    vector<ValueType> columnTypes;
-    vector<int32_t> columnLengths;
-    vector<bool> columnAllowNull;
-
-    columnIndices.push_back(0);
-    columnTypes.push_back(VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-    columnAllowNull.push_back(false);
-
-    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes,
-                                                         columnLengths,
-                                                         columnAllowNull,
-                                                         true);
+    vector<int> columnIndices(1, 0);
+    TupleSchema *schema = TupleSchema::createTestUniformTupleSchema(1, true, VALUE_TYPE_BIGINT);
 
     TableIndexScheme scheme("test_index", HASH_TABLE_INDEX,
                             columnIndices, TableIndex::simplyIndexColumns(),

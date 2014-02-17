@@ -41,38 +41,45 @@ public:
     // This needs to keep in synch with the VoltType.MAX_VALUE_LENGTH defined in java.
     enum class_constants { COLUMN_MAX_VALUE_LENGTH = 1048576 };
 
-    /** Static factory method to create a TupleSchema object with a fixed number of columns */
-    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes, const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull, bool allowInlinedStrings);
-    /** Static factory method fakes a copy constructor */
-    static TupleSchema* createTupleSchema(const TupleSchema *schema);
+    static uint16_t getTupleStorageSize(ValueType type);
 
-    /**
-     * Static factory method to create a TupleSchema object by copying the
-     * specified columns of the given schema.
-     */
-    static TupleSchema* createTupleSchema(const TupleSchema *schema,
-                                          const std::vector<uint16_t> set);
+    /** Factory method fakes a copy constructor */
+    TupleSchema* cloneSchema() const;
+
+    /** Static factory method to create a TupleSchema for a table with the described columns */
+    static TupleSchema* createTupleSchema(const std::vector<ValueType>& columnTypes,
+                                          const std::vector<int32_t>& columnSizes,
+                                          const std::vector<bool>& allowNull);
+
+    /** Static factory method to create a TupleSchema for a temp table, does not enforce non-nulls */
+    static TupleSchema* createTupleSchema(const std::vector<ValueType>& columnTypes,
+                                          const std::vector<int32_t>& columnSizes);
 
     /**
      * Static factory method to create a TupleSchema object by joining the two
      * given TupleSchema objects. The result contains the first TupleSchema
      * followed by the second one.
-     *
-     * This method has the same limitation that the number of columns of a
-     * schema has to be less than or equal to 64.
      */
-    static TupleSchema* createTupleSchema(const TupleSchema *first,
-                                          const TupleSchema *second);
+    static TupleSchema* createTestFullCombinedTupleSchema(const TupleSchema *first,
+                                                          const TupleSchema *second);
 
     /**
      * Static factory method to create a TupleSchema object by including the
      * specified columns of the two given TupleSchema objects. The result
      * contains only those columns specified in the bitmasks.
      */
-    static TupleSchema* createTupleSchema(const TupleSchema *first,
-                                          const std::vector<uint16_t> firstSet,
-                                          const TupleSchema *second,
-                                          const std::vector<uint16_t> secondSet);
+    static TupleSchema* createTestCombinedTupleSchema(const TupleSchema *first,
+                                                      const std::vector<uint16_t>& firstSet,
+                                                      const TupleSchema *second,
+                                                      const std::vector<uint16_t>& secondSet);
+
+    /**
+     * Static factory method to create a simple TupleSchema object for test.
+     * It defines a tuple with a uniform column type whose storage can be easily represented by a
+     * scalar variable or vector for ease of validation.
+     */
+    static TupleSchema* createTestUniformTupleSchema(int repeat, bool allowNull,
+                                                     ValueType columnType, int32_t columnSize = -1);
 
     /** Static factory method to destroy a TupleSchema object. Set to null after this call */
     static void freeTupleSchema(TupleSchema *schema);
@@ -98,9 +105,6 @@ public:
     /** Return the number of bytes used by one tuple. */
     inline uint32_t tupleLength() const;
 
-    /** Returns a flag indicating whether strings will be inlined in this schema **/
-    bool allowInlinedObjects() const;
-
     /** Get a string representation of this schema for debugging */
     std::string debug() const;
 
@@ -121,7 +125,7 @@ private:
     };
 
     /*
-     * Report the actual length in bytes of a column. For inlined strings this will include the two byte length prefix and null terminator.
+     * Report the actual length in bytes of a column. For inlined strings this will include the length prefix and null terminator.
      */
     uint32_t columnLengthPrivate(const int index) const;
 
@@ -141,16 +145,14 @@ private:
      */
     static uint16_t countUninlineableObjectColumns(
             std::vector<ValueType> columnTypes,
-            std::vector<int32_t> columnSizes,
-            bool allowInlinedObjects);
+            std::vector<int32_t> columnSizes);
 
     // can't (shouldn't) call constructors or destructor
     // prevents TupleSchema from being created on the stack
     TupleSchema() {}
     TupleSchema(const TupleSchema &ts) {};
     ~TupleSchema() {}
-    //Whether this schema allows strings to be inlined
-    bool m_allowInlinedObjects;
+
     // number of columns
     uint16_t m_columnCount;
     uint16_t m_uninlinedObjectColumnCount;
@@ -216,10 +218,6 @@ inline uint32_t TupleSchema::tupleLength() const {
     // index "m_count" has the offset for the end of the tuple
     // index "m_count-1" has the offset for the last column
     return getColumnInfo(m_columnCount)->offset;
-}
-
-inline bool TupleSchema::allowInlinedObjects() const {
-    return m_allowInlinedObjects;
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) const {

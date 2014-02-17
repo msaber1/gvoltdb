@@ -166,16 +166,16 @@ public:
 
         m_tupleWidth = (sizeof(int32_t) * 2) + (sizeof(int64_t) * 7);
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
 
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
@@ -218,10 +218,9 @@ public:
 
     void initTable(bool allowInlineStrings, int nparts_, int tableAllocationTargetSize) {
         m_npartitions = nparts_;
-        m_tableSchema = voltdb::TupleSchema::createTupleSchema(m_tableSchemaTypes,
-                                                               m_tableSchemaColumnSizes,
-                                                               m_tableSchemaAllowNull,
-                                                               allowInlineStrings);
+        m_tableSchema = TupleSchema::createTupleSchema(m_tableSchemaTypes,
+                                                       m_tableSchemaColumnSizes,
+                                                       m_tableSchemaAllowNull);
 
         voltdb::TableIndexScheme indexScheme("primaryKeyIndex",
                                              voltdb::BALANCED_TREE_INDEX,
@@ -319,7 +318,7 @@ public:
         voltdb::TableTuple tuple(table->schema());
         voltdb::TableTuple tempTuple = table->tempTuple();
         if (tableutil::getRandomTuple(table, tuple)) {
-            tempTuple.copy(tuple);
+            tempTuple.copyTuple(tuple);
             int value = ::rand();
             tempTuple.setNValue(1, ValueFactory::getIntegerValue(value));
             if (setFrom != NULL) {

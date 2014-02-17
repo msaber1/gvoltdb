@@ -77,20 +77,13 @@ public:
         CatalogId database_id = 1000;
 
         std::vector<std::string> columnNames(5);
-        std::vector<voltdb::ValueType> columnTypes;
-        std::vector<int32_t> columnLengths;
-        std::vector<bool> columnAllowNull;
-        for (int ctr = 0; ctr < 5; ctr++) {
+        columnNames[0] = "id";
+        for (int ctr = 1; ctr < 5; ctr++) {
             char name[16];
-            if (ctr == 0) ::snprintf(name, 16, "id");
-            else ::snprintf(name, 16, "val%02d", ctr);
+            ::snprintf(name, 16, "val%02d", ctr);
             columnNames[ctr] = name;
-            columnTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-            columnLengths.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-            columnAllowNull.push_back(false);
         }
-        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
-
+        TupleSchema *schema = TupleSchema::createTestUniformTupleSchema(5, false, VALUE_TYPE_BIGINT);
         table = TableFactory::getTempTable(database_id, "test_table", schema, columnNames, NULL);
 
         //::printf("making a test table...\n");

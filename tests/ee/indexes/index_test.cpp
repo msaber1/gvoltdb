@@ -97,12 +97,7 @@ public:
     {
         int num_of_columns = 100;
         CatalogId database_id = 1000;
-        vector<boost::shared_ptr<const TableColumn> > columns;
         vector<string> columnNames(num_of_columns);
-
-        vector<ValueType> columnTypes(num_of_columns, VALUE_TYPE_BIGINT);
-        vector<int32_t> columnLengths(num_of_columns, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-        vector<bool> columnAllowNull(num_of_columns, false);
 
         char buffer[32];
         for (int ctr = 0; ctr < num_of_columns; ctr++)
@@ -111,11 +106,8 @@ public:
             columnNames[ctr] = buffer;
         }
 
-        TupleSchema* schema =
-            TupleSchema::createTupleSchema(columnTypes,
-                                           columnLengths,
-                                           columnAllowNull,
-                                           true);
+        TupleSchema *schema =
+                TupleSchema::createTestUniformTupleSchema(num_of_columns, false, VALUE_TYPE_BIGINT);
 
         // make up 40 column index (320 byte key). this is intentionally arranged to
         // not be all consecutive columns and not strictly ordered from left to right
@@ -277,26 +269,16 @@ public:
                                unique, countable, initiallyNullTupleSchema);
 
         CatalogId database_id = 1000;
-        vector<boost::shared_ptr<const TableColumn> > columns;
 
         vector<string> columnNames(NUM_OF_COLUMNS);
-
         char buffer[32];
-        vector<ValueType> columnTypes(NUM_OF_COLUMNS, VALUE_TYPE_BIGINT);
-        vector<int32_t>
-            columnLengths(NUM_OF_COLUMNS,
-                          NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-        vector<bool> columnAllowNull(NUM_OF_COLUMNS, false);
         for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++)
         {
             snprintf(buffer, 32, "column%02d", ctr);
             columnNames[ctr] = buffer;
         }
-        TupleSchema* schema =
-            TupleSchema::createTupleSchema(columnTypes,
-                                           columnLengths,
-                                           columnAllowNull,
-                                           true);
+        TupleSchema *schema =
+                TupleSchema::createTestUniformTupleSchema(NUM_OF_COLUMNS, false, VALUE_TYPE_BIGINT);
 
         index.tupleSchema = schema;
         vector<int> pkey_column_indices;
@@ -447,15 +429,8 @@ TEST_F(IndexTest, IntsUnique) {
     //EXPECT_EQ( 62520, index->getMemoryEstimate());
 
     TableTuple tuple(table->schema());
-    vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
-    vector<int32_t>
-        keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-    vector<bool> keyColumnAllowNull(2, true);
-    TupleSchema* keySchema =
-        TupleSchema::createTupleSchema(keyColumnTypes,
-                                       keyColumnLengths,
-                                       keyColumnAllowNull,
-                                       true);
+    TupleSchema* keySchema = TupleSchema::createTestUniformTupleSchema(2, true, VALUE_TYPE_BIGINT);
+
     TableTuple searchkey(keySchema);
     searchkey.move(new char[searchkey.tupleLength()]);
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
@@ -609,15 +584,7 @@ TEST_F(IndexTest, IntsMulti) {
     //EXPECT_EQ( 52000, index->getMemoryEstimate());
 
     TableTuple tuple(table->schema());
-    vector<ValueType> keyColumnTypes(2, VALUE_TYPE_BIGINT);
-    vector<int32_t>
-        keyColumnLengths(2, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-    vector<bool> keyColumnAllowNull(2, true);
-    TupleSchema* keySchema =
-        TupleSchema::createTupleSchema(keyColumnTypes,
-                                       keyColumnLengths,
-                                       keyColumnAllowNull,
-                                       true);
+    TupleSchema* keySchema = TupleSchema::createTestUniformTupleSchema(2, true, VALUE_TYPE_BIGINT);
     TableTuple searchkey(keySchema);
     searchkey.move(new char[searchkey.tupleLength()]);
     searchkey.setNValue(0, ValueFactory::getBigIntValue(static_cast<int64_t>(550)));
@@ -749,10 +716,8 @@ TEST_F(IndexTest, TupleKeyUnique) {
 
     // make a tuple with the index key schema
     int indexWidth = 40;
-    vector<bool> keyColumnAllowNull(indexWidth, true);
-    vector<ValueType> keyColumnTypes(indexWidth, VALUE_TYPE_BIGINT);
-    vector<int32_t> keyColumnLengths(indexWidth, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
-    TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull, true);
+    TupleSchema *keySchema =
+            TupleSchema::createTestUniformTupleSchema(indexWidth, true, VALUE_TYPE_BIGINT);
     TableTuple searchkey(keySchema);
     // provide storage for search key tuple
     searchkey.move(new char[searchkey.tupleLength()]);

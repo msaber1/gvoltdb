@@ -89,8 +89,7 @@ bool tableutil::setRandomTupleValues(voltdb::Table* table, voltdb::TableTuple *t
          * The pointer won't be transferred into the tuple if the schema has that column inlined.
          */
         voltdb::ValueType t = tuple->getSchema()->columnType(col_ctr);
-        if (((t == voltdb::VALUE_TYPE_VARCHAR) || (t == voltdb::VALUE_TYPE_VARBINARY)) &&
-                tuple->getSchema()->columnIsInlined(col_ctr)) {
+        if (isObjectType(t) && tuple->getSchema()->columnIsInlined(col_ctr)) {
             value.free();
         }
     }

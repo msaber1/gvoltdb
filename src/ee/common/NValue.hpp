@@ -2135,37 +2135,6 @@ inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObj
 }
 
 /**
- * Get the amount of storage necessary to store a value of the specified type
- * in a tuple
- */
-inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
-    switch (type) {
-      case VALUE_TYPE_BIGINT:
-      case VALUE_TYPE_TIMESTAMP:
-        return sizeof(int64_t);
-      case VALUE_TYPE_TINYINT:
-        return sizeof(int8_t);
-      case VALUE_TYPE_SMALLINT:
-        return sizeof(int16_t);
-      case VALUE_TYPE_INTEGER:
-        return sizeof(int32_t);
-      case VALUE_TYPE_DOUBLE:
-        return sizeof(double);
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-        return sizeof(char*);
-      case VALUE_TYPE_DECIMAL:
-        return sizeof(TTInt);
-      default:
-          char message[128];
-          snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
-                   getTypeName(type).c_str());
-          throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                        message);
-    }
-}
-
-/**
  * Compare any two NValues. Comparison is not guaranteed to
  * succeed if the values are incompatible.  Avoid use of
  * comparison in favor of op_*.

@@ -66,22 +66,22 @@ void IndexStats::populateIndexStatsSchema(
 
     // is unique
     types.push_back(VALUE_TYPE_TINYINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT));
     allowNull.push_back(false);
 
     // is countable
     types.push_back(VALUE_TYPE_TINYINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT));
     allowNull.push_back(false);
 
     // entry count
     types.push_back(VALUE_TYPE_BIGINT);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
     allowNull.push_back(false);
 
     // memory usage
     types.push_back(VALUE_TYPE_INTEGER);
-    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
     allowNull.push_back(false);
 }
 
@@ -99,10 +99,7 @@ IndexStats::generateEmptyIndexStatsTable()
     vector<bool> columnAllowNull;
     IndexStats::populateIndexStatsSchema(columnTypes, columnLengths,
                                          columnAllowNull);
-    TupleSchema *schema =
-        TupleSchema::createTupleSchema(columnTypes, columnLengths,
-                                       columnAllowNull, true);
-
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull);
     return
         reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
                                                             name,

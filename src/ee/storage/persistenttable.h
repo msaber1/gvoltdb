@@ -60,7 +60,6 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/ElasticIndex.h"
 #include "storage/table.h"
-#include "storage/TupleStreamWrapper.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
 #include "storage/TableStreamerInterface.h"
@@ -80,7 +79,6 @@ class MaterializedViewInfo;
 
 namespace voltdb {
 
-class TableColumn;
 class TableIndex;
 class TableIterator;
 class TableFactory;
@@ -682,13 +680,6 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
     return boost::shared_ptr<ElasticIndexTupleRangeIterator>(
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
-
-inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
-    assert (m_tempTuple.m_data);
-    m_tempTuple.copy(source);
-    return m_tempTuple;
-}
-
 
 inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
 {

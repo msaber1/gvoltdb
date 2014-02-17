@@ -22,6 +22,7 @@
  */
 
 #include "harness.h"
+#include "common/executorcontext.hpp"
 #include "common/TupleSchema.h"
 #include "common/types.h"
 #include "common/NValue.hpp"
@@ -94,16 +95,16 @@ public:
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
 
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
@@ -120,11 +121,10 @@ public:
         delete m_table;
     }
 
-    void initTable(bool allowInlineStrings) {
-        m_tableSchema = voltdb::TupleSchema::createTupleSchema(m_tableSchemaTypes,
-                                                               m_tableSchemaColumnSizes,
-                                                               m_tableSchemaAllowNull,
-                                                               allowInlineStrings);
+    void initTable() {
+        m_tableSchema = TupleSchema::createTupleSchema(m_tableSchemaTypes,
+                                                       m_tableSchemaColumnSizes,
+                                                       m_tableSchemaAllowNull);
 
         voltdb::TableIndexScheme indexScheme("BinaryTreeUniqueIndex",
                                              voltdb::BALANCED_TREE_INDEX,
@@ -244,7 +244,7 @@ public:
                 voltdb::TableTuple tuple(table->schema());
                 voltdb::TableTuple tempTuple = table->tempTuple();
                 if (tableutil::getRandomTuple(table, tuple)) {
-                    tempTuple.copy(tuple);
+                    tempTuple.copyTuple(tuple);
                     tempTuple.setNValue(1, ValueFactory::getIntegerValue(::rand()));
                     table->updateTuple(tuple, tempTuple);
                     m_tuplesUpdated++;
@@ -279,7 +279,7 @@ public:
 };
 
 TEST_F(CompactionTest, BasicCompaction) {
-    initTable(true);
+    initTable();
 #ifdef MEMCHECK
     int tupleCount = 1000;
 #else
@@ -365,7 +365,7 @@ TEST_F(CompactionTest, BasicCompaction) {
 }
 
 TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
-    initTable(true);
+    initTable();
 #ifdef MEMCHECK
     int tupleCount = 1000;
 #else
@@ -516,7 +516,7 @@ TEST_F(CompactionTest, CompactionWithCopyOnWrite) {
  */
 #ifndef MEMCHECK
 TEST_F(CompactionTest, TestENG897) {
-    initTable(true);
+    initTable();
     addRandomUniqueTuples( m_table, 32263 * 5);
 
     //Delete stuff to put everything in a bucket

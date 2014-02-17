@@ -127,22 +127,6 @@ public:
     }
 
     /**
-     * Predicates accessor.
-     */
-    StreamPredicateList &getPredicates()
-    {
-        return m_predicates;
-    }
-
-    /**
-     * Tuple length accessor.
-     */
-    int getMaxTupleLength() const
-    {
-        return m_maxTupleLength;
-    }
-
-    /**
      * Tuple serializer accessor.
      */
     TupleSerializer &getSerializer()
@@ -182,13 +166,7 @@ protected:
                          int32_t partitionId,
                          TupleSerializer &serializer);
 
-    /**
-     * Predicate delete flags accessor.
-     */
-    std::vector<bool> &getPredicateDeleteFlags()
-    {
-        return m_predicateDeleteFlags;
-    }
+    void openStreams(TupleOutputStreamProcessor &outputStreams);
 
     PersistentTableSurgeon &m_surgeon;
 

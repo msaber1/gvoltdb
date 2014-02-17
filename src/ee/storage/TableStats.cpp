@@ -42,14 +42,27 @@ vector<string> TableStats::generateTableStatsColumnNames() {
 void TableStats::populateTableStatsSchema(
         vector<ValueType> &types,
         vector<int32_t> &columnLengths,
-        vector<bool> &allowNull) {
+        vector<bool> &allowNull)
+{
     StatsSource::populateBaseSchema(types, columnLengths, allowNull);
-    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_VARCHAR); columnLengths.push_back(4096); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_BIGINT); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
-    types.push_back(VALUE_TYPE_INTEGER); columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER)); allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_VARCHAR);
+    columnLengths.push_back(4096);
+    allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_VARCHAR);
+    columnLengths.push_back(4096);
+    allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_BIGINT);
+    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
+    allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER);
+    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER);
+    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    allowNull.push_back(false);
+    types.push_back(VALUE_TYPE_INTEGER);
+    columnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
+    allowNull.push_back(false);
 }
 
 Table*
@@ -64,18 +77,13 @@ TableStats::generateEmptyTableStatsTable()
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
-    TableStats::populateTableStatsSchema(columnTypes, columnLengths,
-                                         columnAllowNull);
-    TupleSchema *schema =
-        TupleSchema::createTupleSchema(columnTypes, columnLengths,
-                                       columnAllowNull, true);
-
-    return
-        reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
-                                                            name,
-                                                            schema,
-                                                            columnNames,
-                                                            NULL));
+    TableStats::populateTableStatsSchema(columnTypes, columnLengths, columnAllowNull);
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull);
+    return reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,
+                                                               name,
+                                                               schema,
+                                                               columnNames,
+                                                               NULL));
 }
 
 /*
@@ -161,14 +169,11 @@ void TableStats::updateStatsTuple(TableTuple *tuple) {
             StatsSource::m_columnName2Index["TUPLE_COUNT"],
             ValueFactory::getBigIntValue(tupleCount));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_ALLOCATED_MEMORY"],
-                     ValueFactory::
-                     getIntegerValue(static_cast<int32_t>(allocated_tuple_mem_kb)));
+                     ValueFactory::getIntegerValue(static_cast<int32_t>(allocated_tuple_mem_kb)));
     tuple->setNValue(StatsSource::m_columnName2Index["TUPLE_DATA_MEMORY"],
-                     ValueFactory::
-                     getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
+                     ValueFactory::getIntegerValue(static_cast<int32_t>(occupied_tuple_mem_kb)));
     tuple->setNValue( StatsSource::m_columnName2Index["STRING_DATA_MEMORY"],
-                      ValueFactory::
-                      getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
+                      ValueFactory::getIntegerValue(static_cast<int32_t>(string_data_mem_kb)));
 }
 
 /**

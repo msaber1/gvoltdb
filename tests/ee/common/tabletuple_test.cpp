@@ -36,21 +36,15 @@ class TableTupleTest : public Test
 
 TEST_F(TableTupleTest, ComputeNonInlinedMemory)
 {
-    vector<bool> column_allow_null(2, true);
     vector<ValueType> all_types;
     all_types.push_back(VALUE_TYPE_BIGINT);
     all_types.push_back(VALUE_TYPE_VARCHAR);
 
     // Make sure that inlined strings are actually inlined
     vector<int32_t> all_inline_lengths;
-    all_inline_lengths.push_back(NValue::
-                                 getTupleStorageSize(VALUE_TYPE_BIGINT));
+    all_inline_lengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
     all_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH - 1);
-    TupleSchema* all_inline_schema =
-        TupleSchema::createTupleSchema(all_types,
-                                       all_inline_lengths,
-                                       column_allow_null,
-                                       true);
+    TupleSchema* all_inline_schema = TupleSchema::createTupleSchema(all_types, all_inline_lengths);
 
     TableTuple inline_tuple(all_inline_schema);
     inline_tuple.move(new char[inline_tuple.tupleLength()]);
@@ -65,14 +59,9 @@ TEST_F(TableTupleTest, ComputeNonInlinedMemory)
 
     // Now check that an non-inlined schema returns the right thing.
     vector<int32_t> non_inline_lengths;
-    non_inline_lengths.push_back(NValue::
-                                 getTupleStorageSize(VALUE_TYPE_BIGINT));
+    non_inline_lengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
     non_inline_lengths.push_back(UNINLINEABLE_OBJECT_LENGTH + 10000);
-    TupleSchema* non_inline_schema =
-        TupleSchema::createTupleSchema(all_types,
-                                       non_inline_lengths,
-                                       column_allow_null,
-                                       true);
+    TupleSchema* non_inline_schema = TupleSchema::createTupleSchema(all_types, non_inline_lengths);
 
     TableTuple non_inline_tuple(non_inline_schema);
     non_inline_tuple.move(new char[non_inline_tuple.tupleLength()]);

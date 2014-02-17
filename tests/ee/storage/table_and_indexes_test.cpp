@@ -52,19 +52,19 @@ class TableAndIndexTest : public Test {
             vector<bool> districtColumnAllowNull(11, true);
             districtColumnAllowNull[0] = false;
 
-            districtColumnTypes.push_back(VALUE_TYPE_TINYINT); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            districtColumnTypes.push_back(VALUE_TYPE_TINYINT); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+            districtColumnTypes.push_back(VALUE_TYPE_TINYINT); districtColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT));
+            districtColumnTypes.push_back(VALUE_TYPE_TINYINT); districtColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT));
             districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(16);
             districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(32);
             districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(32);
             districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(32);
             districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(2);
             districtColumnTypes.push_back(VALUE_TYPE_VARCHAR); districtColumnLengths.push_back(9);
-            districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            districtColumnTypes.push_back(VALUE_TYPE_INTEGER); districtColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+            districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+            districtColumnTypes.push_back(VALUE_TYPE_DOUBLE); districtColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+            districtColumnTypes.push_back(VALUE_TYPE_INTEGER); districtColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
 
-            districtTupleSchema = TupleSchema::createTupleSchema(districtColumnTypes, districtColumnLengths, districtColumnAllowNull, true);
+            districtTupleSchema = TupleSchema::createTupleSchema(districtColumnTypes, districtColumnLengths, districtColumnAllowNull);
 
             districtIndex1ColumnIndices.push_back(1);
             districtIndex1ColumnIndices.push_back(0);
@@ -78,17 +78,17 @@ class TableAndIndexTest : public Test {
             vector<bool> warehouseColumnAllowNull(9, true);
             warehouseColumnAllowNull[0] = false;
 
-            warehouseColumnTypes.push_back(VALUE_TYPE_TINYINT); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+            warehouseColumnTypes.push_back(VALUE_TYPE_TINYINT); warehouseColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT));
             warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(16);
             warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(32);
             warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(32);
             warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(32);
             warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(2);
             warehouseColumnTypes.push_back(VALUE_TYPE_VARCHAR); warehouseColumnLengths.push_back(9);
-            warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+            warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+            warehouseColumnTypes.push_back(VALUE_TYPE_DOUBLE); warehouseColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_DOUBLE));
 
-            warehouseTupleSchema = TupleSchema::createTupleSchema(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull, true);
+            warehouseTupleSchema = TupleSchema::createTupleSchema(warehouseColumnTypes, warehouseColumnLengths, warehouseColumnAllowNull);
 
             warehouseIndex1ColumnIndices.push_back(0);
 
@@ -103,9 +103,9 @@ class TableAndIndexTest : public Test {
             customerColumnAllowNull[1] = false;
             customerColumnAllowNull[2] = false;
 
-            customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-            customerColumnTypes.push_back(VALUE_TYPE_TINYINT); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
-            customerColumnTypes.push_back(VALUE_TYPE_TINYINT); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+            customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
+            customerColumnTypes.push_back(VALUE_TYPE_TINYINT); customerColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT));
+            customerColumnTypes.push_back(VALUE_TYPE_TINYINT); customerColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT));
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
@@ -115,17 +115,17 @@ class TableAndIndexTest : public Test {
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(9);
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(32);
-            customerColumnTypes.push_back(VALUE_TYPE_TIMESTAMP); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
+            customerColumnTypes.push_back(VALUE_TYPE_TIMESTAMP); customerColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_TIMESTAMP));
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(2);
-            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_DOUBLE));
-            customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-            customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+            customerColumnTypes.push_back(VALUE_TYPE_DOUBLE); customerColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_DOUBLE));
+            customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
+            customerColumnTypes.push_back(VALUE_TYPE_INTEGER); customerColumnLengths.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
             customerColumnTypes.push_back(VALUE_TYPE_VARCHAR); customerColumnLengths.push_back(500);
 
-            customerTupleSchema = TupleSchema::createTupleSchema(customerColumnTypes, customerColumnLengths, customerColumnAllowNull, true);
+            customerTupleSchema = TupleSchema::createTupleSchema(customerColumnTypes, customerColumnLengths, customerColumnAllowNull);
 
             customerIndex1ColumnIndices.push_back(2);
             customerIndex1ColumnIndices.push_back(1);

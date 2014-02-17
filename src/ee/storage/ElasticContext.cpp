@@ -151,7 +151,7 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
     size_t i = 0;
     TableTuple tuple(getTable().schema());
     while (m_scanner->next(tuple)) {
-        if (getPredicates()[0].eval(&tuple).isTrue()) {
+        if (m_predicates[0].eval(&tuple).isTrue()) {
             m_surgeon.indexAdd(tuple);
         }
         // Take a breather after every chunk of m_nTuplesPerCall tuples.
@@ -174,9 +174,8 @@ int64_t ElasticContext::handleStreamMore(TupleOutputStreamProcessor &outputStrea
 bool ElasticContext::notifyTupleInsert(TableTuple &tuple)
 {
     if (m_indexActive) {
-        StreamPredicateList &predicates = getPredicates();
-        assert(predicates.size() > 0);
-        if (predicates[0].eval(&tuple).isTrue()) {
+        assert(m_predicates.size() > 0);
+        if (m_predicates[0].eval(&tuple).isTrue()) {
             m_surgeon.indexAdd(tuple);
         }
     }
@@ -213,12 +212,11 @@ void ElasticContext::notifyTupleMovement(TBPtr sourceBlock,
                                          TableTuple &targetTuple)
 {
     if (m_indexActive) {
-        StreamPredicateList &predicates = getPredicates();
-        assert(predicates.size() > 0);
+        assert(m_predicates.size() > 0);
         if (m_surgeon.indexHas(sourceTuple)) {
             m_surgeon.indexRemove(sourceTuple);
         }
-        if (predicates[0].eval(&targetTuple).isTrue()) {
+        if (m_predicates[0].eval(&targetTuple).isTrue()) {
             m_surgeon.indexAdd(targetTuple);
         }
     }

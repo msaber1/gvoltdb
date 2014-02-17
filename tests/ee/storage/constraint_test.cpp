@@ -110,7 +110,7 @@ protected:
         assert (columnNames.size() == columnTypes.size());
         assert (columnTypes.size() == columnSizes.size());
         assert (columnSizes.size() == columnNullables.size());
-        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnNullables, true);
+        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnSizes, columnNullables);
         if (pkey != NULL) {
             pkey->tupleSchema = schema;
         }
@@ -137,7 +137,7 @@ TEST_F(ConstraintTest, NotNull) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
         addColumn(name, VALUE_TYPE_BIGINT,
-                  NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT),
+                  TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT),
                   allow_null[ctr]);
     }
     setTable();
@@ -183,7 +183,7 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
         addColumn(name, VALUE_TYPE_BIGINT,
-                  NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),
+                  TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT),
                   allow_null[ctr]);
     }
 
@@ -244,7 +244,7 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
         addColumn(name, VALUE_TYPE_BIGINT,
-                  NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
+                  TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
     }
 
     std::vector<int> pkey_column_indices;
@@ -300,7 +300,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnNotNull) {
     for (int ctr = 0; ctr < columnCount; ctr++) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
-        addColumn(name, VALUE_TYPE_BIGINT, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
+        addColumn(name, VALUE_TYPE_BIGINT, TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
     }
 
     std::vector<int> pkey_column_indices;
@@ -346,7 +346,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnAllowNull) {
     for (int ctr = 0; ctr < columnCount; ctr++) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
-        addColumn(name, VALUE_TYPE_BIGINT, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
+        addColumn(name, VALUE_TYPE_BIGINT, TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
     }
 
     std::vector<int> pkey_column_indices;
