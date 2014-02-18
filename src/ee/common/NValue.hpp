@@ -1586,7 +1586,7 @@ class NValue {
     }
 
     int compareStringValue (const NValue rhs) const {
-        if (isObjectType(rhs.getValueType())) {
+        if ( ! isObjectType(rhs.getValueType())) {
             char message[128];
             snprintf(message, 128,
                      "Type %s cannot be cast for comparison to type %s",
