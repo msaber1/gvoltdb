@@ -15,8 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/DefaultTupleSerializer.h"
-#include "common/serializeio.h"
-#include "common/TupleSchema.h"
 
 namespace voltdb {
 /**
@@ -36,7 +34,7 @@ int DefaultTupleSerializer::getMaxSerializedTupleSize(const TupleSchema *schema)
         if (!schema->columnIsInlined(ii)) {
             size -= sizeof(void*);
             size += 4 + schema->columnLength(ii);
-        } else if ((schema->columnType(ii) == VALUE_TYPE_VARCHAR) || (schema->columnType(ii) == VALUE_TYPE_VARBINARY)) {
+        } else if (isObjectType(schema->columnType(ii))) {
             size += 3;//Serialization always uses a 4-byte length prefix
         }
     }

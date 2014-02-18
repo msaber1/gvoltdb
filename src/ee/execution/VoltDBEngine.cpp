@@ -669,7 +669,7 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
         }
 
         // check the size of types where size matters
-        if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
+        if (isObjectType(type)) {
             if (t2->schema()->columnLength(index) != size) {
                 return false;
             }

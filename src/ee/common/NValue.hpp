@@ -666,7 +666,8 @@ class NValue {
             throw SQLException(SQLException::dynamic_sql_error,
                     "Must not ask  for object length on sql null object.");
         }
-        if ((getValueType() != VALUE_TYPE_VARCHAR) && (getValueType() != VALUE_TYPE_VARBINARY)) {
+        assert(isObjectType(m_valueType));
+        if ( ! isObjectType(m_valueType)) {
             // probably want getTupleStorageSize() for non-object types.
             // at the moment, only varchars are using getObjectLength().
             throw SQLException(SQLException::dynamic_sql_error,
@@ -1585,7 +1586,7 @@ class NValue {
     }
 
     int compareStringValue (const NValue rhs) const {
-        if ((rhs.getValueType() != VALUE_TYPE_VARCHAR) && (rhs.getValueType() != VALUE_TYPE_VARBINARY)) {
+        if (isObjectType(rhs.getValueType())) {
             char message[128];
             snprintf(message, 128,
                      "Type %s cannot be cast for comparison to type %s",
@@ -2772,12 +2773,11 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
         return;
     }
 
-    assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
+    assert(isObjectType(m_valueType));
     assert(m_sourceInlined);
 
     if (isNull()) {
         *reinterpret_cast<void**>(m_data) = NULL;
-        // serializeToTupleStorage fusses about this inline flag being set, even for NULLs
         setSourceInlined(false);
         return;
     }

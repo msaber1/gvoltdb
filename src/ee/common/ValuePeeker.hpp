@@ -72,20 +72,17 @@ public:
     }
 
     static inline void* peekObjectValue(const NValue value) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+        assert(isObjectType(value.getValueType()));
         return value.getObjectValue();
     }
 
     static inline int32_t peekObjectLength(const NValue value) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+        assert(isObjectType(value.getValueType()));
         return value.getObjectLength();
     }
 
     static std::string peekStringCopy(const NValue value) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+        assert(isObjectType(value.getValueType()));
         std::string result(reinterpret_cast<const char*>(value.getObjectValue()),
                                                          value.getObjectLength());
         return result;

@@ -81,7 +81,7 @@ class TableTupleExportTest : public Test {
         addToSchema(VALUE_TYPE_VARCHAR, 15);  // 6
         addToSchema(VALUE_TYPE_VARCHAR, UNINLINEABLE_OBJECT_LENGTH * 2);  // 7
     }
-    
+
     ~TableTupleExportTest() {
     }
 

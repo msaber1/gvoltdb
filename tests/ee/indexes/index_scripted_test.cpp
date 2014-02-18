@@ -510,9 +510,8 @@ int main(int argc, char **argv)
                 cerr << "Operation code parse error on line: " << line << endl;
                 exit(-1);
             }
-            TupleSchema *tupleSchema = TupleSchema::createTupleSchema(currentColumnTypes,
-                                                                      currentColumnLengths,
-                                                                      currentColumnAllowNull);
+            TupleSchema *tupleSchema =
+                    TupleSchema::createTupleSchema(currentColumnTypes, currentColumnLengths, currentColumnAllowNull);
             schemaCache.push_back(tupleSchema);
             cmd.key = tupleFromString(tuple1, tupleSchema);
             if (tuple2) cmd.key2 = tupleFromString(tuple2, tupleSchema);
