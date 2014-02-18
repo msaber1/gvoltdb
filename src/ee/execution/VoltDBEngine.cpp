@@ -652,7 +652,7 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
     {
         int index = outerIter->second->index();
         int size = outerIter->second->size();
-        int32_t type = outerIter->second->type();
+        int type = outerIter->second->type();
         std::string name = outerIter->second->name();
         bool nullable = outerIter->second->nullable();
 
@@ -669,7 +669,7 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
         }
 
         // check the size of types where size matters
-        if (isObjectType(type)) {
+        if (isObjectType((ValueType)type)) {
             if (t2->schema()->columnLength(index) != size) {
                 return false;
             }
