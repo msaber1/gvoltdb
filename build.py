@@ -219,7 +219,6 @@ CTX.INPUT['common'] = """
 """
 
 CTX.INPUT['execution'] = """
- FragmentManager.cpp
  JNITopend.cpp
  VoltDBEngine.cpp
 """
@@ -384,7 +383,6 @@ if whichtests in ("${eetestsuite}", "execution"):
     CTX.TESTS['execution'] = """
      add_drop_table
      engine_test
-     FragmentManagerTest
     """
 
 if whichtests in ("${eetestsuite}", "expressions"):

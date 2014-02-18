@@ -51,7 +51,7 @@ protected:
     inline virtual ~UndoQuantum() {}
 
 public:
-    virtual inline void registerUndoAction(UndoAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
+    inline void registerUndoAction(UndoAction *undoAction, UndoQuantumReleaseInterest *interest = NULL) {
         assert(undoAction);
         m_undoActions.push_back(undoAction);
 
@@ -128,8 +128,6 @@ public:
     inline int64_t getUndoToken() const {
         return m_undoToken;
     }
-
-    virtual bool isDummy() {return false;}
 
     inline int64_t getAllocatedMemory() const
     {
