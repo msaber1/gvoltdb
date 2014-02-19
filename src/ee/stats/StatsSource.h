@@ -28,9 +28,7 @@
 
 namespace voltdb {
 class Table;
-class TableFactory;
 class TupleSchema;
-class TableTuple;
 
 /**
  * Abstract superclass of all sources of statistical information inside the EE. Statistics are currently represented as a single

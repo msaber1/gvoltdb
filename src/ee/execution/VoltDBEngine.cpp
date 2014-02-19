@@ -59,6 +59,7 @@
 #include "common/FatalException.hpp"
 #include "common/RecoveryProtoMessage.h"
 #include "common/TupleOutputStreamProcessor.h"
+#include "common/TupleOutputStream.h"
 #include "common/LegacyHashinator.h"
 #include "common/ElasticHashinator.h"
 #include "catalog/catalogmap.h"
@@ -637,40 +638,44 @@ VoltDBEngine::processCatalogDeletes(int64_t timestamp )
     }
 }
 
-bool
-VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
+static bool catalogColumnSchemaMatchesCurrentTable(const catalog::CatalogMap<catalog::Column> &columns,
+        PersistentTable *t2)
+{
     // covers column count
-    if (t1->columns().size() != t2->columnCount()) {
+    if (columns.size() != t2->columnCount()) {
         return false;
     }
 
     // make sure each column has same metadata
     map<string, catalog::Column*>::const_iterator outerIter;
-    for (outerIter = t1->columns().begin();
-         outerIter != t1->columns().end();
-         outerIter++)
-    {
-        int index = outerIter->second->index();
-        int size = outerIter->second->size();
-        int32_t type = outerIter->second->type();
-        std::string name = outerIter->second->name();
-        bool nullable = outerIter->second->nullable();
+    for (outerIter = columns.begin(); outerIter != columns.end(); ++outerIter) {
+        catalog::Column* catColumn = outerIter->second;
+        int index = catColumn->index();
+        int size = catColumn->size();
+        int32_t type = catColumn->type();
+        std::string name = catColumn->name();
+        bool nullable = catColumn->nullable();
+        bool asBytes = true; //FIXME = catColumn->declaredUnitIsBytes();
 
         if (t2->columnName(index).compare(name)) {
             return false;
         }
 
-        if (t2->schema()->columnAllowNull(index) != nullable) {
+        const TupleSchema* schema = t2->schema();
+        if (schema->columnAllowNull(index) != nullable) {
             return false;
         }
 
-        if (t2->schema()->columnType(index) != type) {
+        if (schema->columnType(index) != type) {
             return false;
         }
 
         // check the size of types where size matters
-        if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
-            if (t2->schema()->columnLength(index) != size) {
+        if (isObjectType((ValueType)type)) {
+            if (schema->columnDeclaredLength(index) != size) {
+                return false;
+            }
+            if (schema->columnDeclaredUnitIsBytes(index) != asBytes) {
                 return false;
             }
         }
@@ -766,7 +771,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             // indexes as we go
             //////////////////////////////////////////
 
-            if (!hasSameSchema(catalogTable, persistenttable)) {
+            if ( ! catalogColumnSchemaMatchesCurrentTable(catalogTable->columns(), persistenttable)) {
                 char msg[512];
                 snprintf(msg, sizeof(msg), "Table %s has changed schema and will be rebuilt.",
                          catalogTable->name().c_str());

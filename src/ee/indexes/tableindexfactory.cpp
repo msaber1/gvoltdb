@@ -238,7 +238,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
                 isIntsOnly = false;
             }
             uint32_t declaredLength;
-            if (exprType == VALUE_TYPE_VARCHAR || exprType == VALUE_TYPE_VARBINARY) {
+            if (isObjectType(exprType)) {
                 // Setting the column length to TUPLE_SCHEMA_COLUMN_MAX_VALUE_LENGTH constrains the
                 // maximum length of expression values that can be indexed with the same limit
                 // that gets applied to column values.
@@ -254,7 +254,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
                 declaredLength = TupleSchema::COLUMN_MAX_VALUE_LENGTH;
                 isInlinesOrColumnsOnly = false;
             } else {
-                declaredLength = NValue::getTupleStorageSize(exprType);
+                declaredLength = TupleSchema::getTupleStorageSize(exprType);
             }
             keyColumnTypes.push_back(exprType);
             keyColumnLengths.push_back(declaredLength);
@@ -267,11 +267,10 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
                 isIntsOnly = false;
             }
             keyColumnTypes.push_back(exprType);
-            keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[ii]));
+            keyColumnLengths.push_back(tupleSchema->columnDeclaredLength(scheme.columnIndices[ii]));
         }
     }
-    std::vector<bool> keyColumnAllowNull(valueCount, true);
-    TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths, keyColumnAllowNull, true);
+    TupleSchema *keySchema = TupleSchema::createTupleSchema(keyColumnTypes, keyColumnLengths);
     assert(keySchema);
     VOLT_TRACE("Creating index for '%s' with key schema '%s'", scheme.name.c_str(), keySchema->debug().c_str());
     TableIndexPicker picker(keySchema, isIntsOnly, isInlinesOrColumnsOnly, scheme);

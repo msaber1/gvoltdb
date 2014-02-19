@@ -80,15 +80,13 @@ ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_BIGINT,
                                             VALUE_TYPE_INTEGER,
                                             VALUE_TYPE_BIGINT };
 
-int32_t COLUMN_SIZES[NUM_OF_COLUMNS] =
-    {
-        NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),
-        NValue::getTupleStorageSize(VALUE_TYPE_TINYINT),
-        NValue::getTupleStorageSize(VALUE_TYPE_SMALLINT),
-        NValue::getTupleStorageSize(VALUE_TYPE_INTEGER),
-        NValue::getTupleStorageSize(VALUE_TYPE_BIGINT)
-    };
-bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS] = { true, true, true, true, true };
+int32_t COLUMN_SIZES[NUM_OF_COLUMNS] = {
+        TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT),
+        TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT),
+        TupleSchema::getTupleStorageSize(VALUE_TYPE_SMALLINT),
+        TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER),
+        TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT)
+};
 
 class TableTest : public Test {
 public:
@@ -109,15 +107,13 @@ protected:
         vector<string> columnNames(NUM_OF_COLUMNS);
         vector<ValueType> columnTypes;
         vector<int32_t> columnLengths;
-        vector<bool> columnAllowNull;
         for (int ctr = 0; ctr < NUM_OF_COLUMNS; ctr++) {
             snprintf(buffer, 32, "column%02d", ctr);
             columnNames[ctr] = buffer;
             columnTypes.push_back(COLUMN_TYPES[ctr]);
             columnLengths.push_back(COLUMN_SIZES[ctr]);
-            columnAllowNull.push_back(COLUMN_ALLOW_NULLS[ctr]);
         }
-        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull, true);
+        TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths);
         if (xact) {
             persistent_table = TableFactory::getPersistentTable(database_id, "test_table", schema, columnNames);
             table = persistent_table;

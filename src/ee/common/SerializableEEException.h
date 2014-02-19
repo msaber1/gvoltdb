@@ -54,7 +54,6 @@ public:
 
     void serialize (ReferenceSerializeOutput *output) const;
     virtual const std::string message() const { return m_message; }
-    VoltEEExceptionType getType() const { return m_exceptionType; }
 protected:
     virtual void p_serialize(ReferenceSerializeOutput *output) const {};
 

@@ -39,7 +39,8 @@ TableStreamerContext::TableStreamerContext(
     m_serializer(serializer),
     m_partitionId(partitionId)
 {
-    updatePredicates(predicateStrings);
+    // It's considered bad form to call virtual functions virtually in a constructor.
+    TableStreamerContext::updatePredicates(predicateStrings);
 }
 
 /**
@@ -70,6 +71,15 @@ void TableStreamerContext::updatePredicates(const std::vector<std::string> &pred
     if (!m_predicates.parseStrings(predicateStrings, errmsg, m_predicateDeleteFlags)) {
         throwFatalException("TableStreamerContext() failed to parse predicate strings.");
     }
+}
+
+void TableStreamerContext::openStreams(TupleOutputStreamProcessor &outputStreams)
+{
+    outputStreams.open(m_table,
+                       m_maxTupleLength,
+                       m_partitionId,
+                       m_predicates,
+                       m_predicateDeleteFlags);
 }
 
 }

@@ -109,20 +109,7 @@ public:
         m_context = new ExecutorContext(0, 0, m_quantum, m_topend, m_pool, true, "", 0);
 
         // set up the schema used to fill the new buffer
-        std::vector<ValueType> columnTypes;
-        std::vector<int32_t> columnLengths;
-        std::vector<bool> columnAllowNull;
-        for (int i = 0; i < COLUMN_COUNT; i++) {
-            columnTypes.push_back(VALUE_TYPE_INTEGER);
-            columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-            columnAllowNull.push_back(false);
-        }
-        m_schema =
-          TupleSchema::createTupleSchema(columnTypes,
-                                         columnLengths,
-                                         columnAllowNull,
-                                         true);
-
+        m_schema = TupleSchema::createTestUniformTupleSchema(COLUMN_COUNT, false, VALUE_TYPE_INTEGER);
         // set up the tuple we're going to use to fill the buffer
         // set the tuple's memory to zero
         ::memset(m_tupleMemory, 0, 8 * (COLUMN_COUNT + 1));

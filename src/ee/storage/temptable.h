@@ -197,7 +197,7 @@ inline void TempTable::insertTempTuple(TableTuple &source) {
     // Don't allocate space for the strings on the heap because the strings are being copied from the source
     // are owned by a PersistentTable or part of the EE string pool.
     //
-    target.copy(source); // tuple in freelist must be already cleared
+    target.copyTuple(source); // tuple in freelist must be already cleared
     target.setActiveTrue();
     target.setPendingDeleteFalse();
     target.setPendingDeleteOnUndoReleaseFalse();

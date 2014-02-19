@@ -114,19 +114,7 @@ public:
         srand(0);
 
         // set up the schema used to fill the new buffer
-        std::vector<ValueType> columnTypes;
-        std::vector<int32_t> columnLengths;
-        std::vector<bool> columnAllowNull;
-        for (int i = 0; i < COLUMN_COUNT; i++) {
-            columnTypes.push_back(VALUE_TYPE_INTEGER);
-            columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-            columnAllowNull.push_back(false);
-        }
-        m_schema =
-          TupleSchema::createTupleSchema(columnTypes,
-                                         columnLengths,
-                                         columnAllowNull,
-                                         true);
+        m_schema = TupleSchema::createTestUniformTupleSchema(COLUMN_COUNT, false, VALUE_TYPE_INTEGER);
 
         // allocate a new buffer and wrap it
         m_wrapper = new TupleStreamWrapper(1, 1);

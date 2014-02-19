@@ -25,7 +25,9 @@
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/serializeio.h"
+#include "common/StringRef.h"
 #include "common/ThreadLocalPool.h"
+#include "common/tabletuple.h"
 #include "common/executorcontext.hpp"
 #include "expressions/functionexpression.h"
 #include "expressions/expressionutil.h"
@@ -42,7 +44,41 @@ static const double floatDelta = 0.000000000001;
 
 class NValueTest : public Test {
     ThreadLocalPool m_pool;
+
+    char tiny_tuple;
+    TupleSchema* tiny_schema;
+    int16_t small_tuple;
+    TupleSchema* small_schema;
+    int32_t integer_tuple;
+    TupleSchema* integer_schema;
+    int64_t bigint_tuple;
+    TupleSchema* bigint_schema;
+    TupleSchema* timestamp_schema;
+    double double_tuple;
+    TupleSchema* double_schema;
+    TTInt decimal_tuple;
+    TupleSchema* decimal_schema;
+    char inline_varchar_tuple[10];
+    TupleSchema* inline_varchar_schema;
+    StringRef* outofline_varchar_tuple;
+    TupleSchema* outofline_varchar_schema;
 public:
+
+    NValueTest() : Test()
+    {
+        tiny_schema = TupleSchema::createTestUniformTupleSchema(1, true, VALUE_TYPE_TINYINT);
+        small_schema = TupleSchema::createTestUniformTupleSchema(1, true, VALUE_TYPE_SMALLINT);
+        integer_schema = TupleSchema::createTestUniformTupleSchema(1, true, VALUE_TYPE_INTEGER);
+        bigint_schema = TupleSchema::createTestUniformTupleSchema(1, true, VALUE_TYPE_BIGINT);
+        timestamp_schema = TupleSchema::createTestUniformTupleSchema(1, true, VALUE_TYPE_TIMESTAMP);
+        decimal_schema = TupleSchema::createTestUniformTupleSchema(1, true, VALUE_TYPE_DECIMAL);
+        double_schema = TupleSchema::createTestUniformTupleSchema(1, true, VALUE_TYPE_DOUBLE);
+        inline_varchar_schema = TupleSchema::createTestUniformTupleSchema(1, true, VALUE_TYPE_VARCHAR, 10);
+        outofline_varchar_tuple = StringRef::create(128, NULL);
+        outofline_varchar_schema = TupleSchema::createTestUniformTupleSchema(1, true, VALUE_TYPE_VARCHAR, 100);
+    }
+
+
     string str;
     ValueType vt;
     TTInt value;
@@ -75,7 +111,70 @@ public:
         scaledDirect = (int64_t)(floatDirect * scale);
     }
 
+    TableTuple tupleFromTinyIntValue(int value)
+    {
+        tiny_tuple = (char)value;
+        TableTuple result((char*)&tiny_tuple, tiny_schema);
+        return result;
+    }
 
+    TableTuple tupleFromSmallIntValue(int value)
+    {
+        small_tuple = (int16_t)value;
+        TableTuple result((char*)&small_tuple, small_schema);
+        return result;
+    }
+
+    TableTuple tupleFromIntegerValue(int value)
+    {
+        integer_tuple = (int16_t)value;
+        TableTuple result((char*)&integer_tuple, integer_schema);
+        return result;
+    }
+
+    TableTuple tupleFromBigIntValue(long value)
+    {
+        bigint_tuple = value;
+        TableTuple result((char*)&small_tuple, small_schema);
+        return result;
+    }
+
+    TableTuple tupleFromTimestampValue(long value)
+    {
+        bigint_tuple = value;
+        TableTuple result((char*)&bigint_tuple, timestamp_schema);
+        return result;
+    }
+
+    TableTuple tupleFromDoubleValue(double value)
+    {
+        double_tuple = (int16_t)value;
+        TableTuple result((char*)&double_tuple, double_schema);
+        return result;
+    }
+
+    TableTuple tupleFromStringValue(const char* value)
+    {
+        inline_varchar_tuple[0] = (char)strlen(value);
+        if (inline_varchar_tuple[0] >= 10) {
+            char *copy = outofline_varchar_tuple->get();
+            copy[0] = inline_varchar_tuple[0];
+            ::memcpy(copy, value, inline_varchar_tuple[0]+1);
+            TableTuple result((char*)&outofline_varchar_tuple, outofline_varchar_schema);
+            return result;
+        }
+        memcpy(inline_varchar_tuple+1, value, inline_varchar_tuple[0]);
+        TableTuple result(inline_varchar_tuple, inline_varchar_schema);
+        return result;
+    }
+
+    TableTuple tupleFromDecimalValueFromString(const char* value)
+    {
+        NValue decimalValue = ValueFactory::getDecimalValueFromString(value);
+        decimalValue.copyOutFormattedValue((char*)&decimal_tuple, sizeof(TTInt));
+        TableTuple result((char*)&decimal_tuple, decimal_schema);
+        return result;
+    }
 };
 
 TEST_F(NValueTest, DeserializeDecimal)
@@ -1811,7 +1910,8 @@ TEST_F(NValueTest, SerializeToExport)
     // NULL values and buffer length checking are done
     // before this primitive function.
 
-    NValue nv;
+    TableTuple tt;
+    uint8_t nulls_byte = 0;
 
     // a plenty-large-buffer(tm)
     char buf[1024];
@@ -1819,127 +1919,127 @@ TEST_F(NValueTest, SerializeToExport)
     ExportSerializeOutput out(buf, 1024);
 
     // tinyint
-    nv = ValueFactory::getTinyIntValue(-50);
-    nv.serializeToExport(out);
+    tt = tupleFromTinyIntValue(-50);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-50, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
-    nv = ValueFactory::getTinyIntValue(0);
-    nv.serializeToExport(out);
+    tt = tupleFromTinyIntValue(0);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
-    nv = ValueFactory::getTinyIntValue(50);
-    nv.serializeToExport(out);
+    tt = tupleFromTinyIntValue(50);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(50, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     // smallint
-    nv = ValueFactory::getSmallIntValue(-128);
-    nv.serializeToExport(out);
+    tt = tupleFromSmallIntValue(-128);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-128, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
-    nv = ValueFactory::getSmallIntValue(0);
-    nv.serializeToExport(out);
+    tt = tupleFromSmallIntValue(0);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
-    nv = ValueFactory::getSmallIntValue(128);
-    nv.serializeToExport(out);
+    tt = tupleFromSmallIntValue(128);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(128, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     // int
-    nv = ValueFactory::getIntegerValue(-4999999);
-    nv.serializeToExport(out);
+    tt = tupleFromIntegerValue(-4999999);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-4999999, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
-    nv = ValueFactory::getIntegerValue(0);
-    nv.serializeToExport(out);
+    tt = tupleFromIntegerValue(0);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
-    nv = ValueFactory::getIntegerValue(128);
-    nv.serializeToExport(out);
+    tt = tupleFromIntegerValue(128);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(128, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     // bigint
-    nv = ValueFactory::getBigIntValue(-4999999);
-    nv.serializeToExport(out);
+    tt = tupleFromBigIntValue(-4999999);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-4999999, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
-    nv = ValueFactory::getBigIntValue(0);
-    nv.serializeToExport(out);
+    tt = tupleFromBigIntValue(0);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
-    nv = ValueFactory::getBigIntValue(128);
-    nv.serializeToExport(out);
+    tt = tupleFromBigIntValue(128);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(128, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     // timestamp
-    nv = ValueFactory::getTimestampValue(99999999);
-    nv.serializeToExport(out);
+    tt = tupleFromTimestampValue(99999999);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(99999999, sin.readLong());
     sin.unread(out.position());
     out.position(0);
 
     // double
-    nv = ValueFactory::getDoubleValue(-5.5555);
-    nv.serializeToExport(out);
+    tt = tupleFromDoubleValue(-5.5555);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(-5.5555, sin.readDouble());
     sin.unread(out.position());
     out.position(0);
 
-    nv = ValueFactory::getDoubleValue(0.0);
-    nv.serializeToExport(out);
+    tt = tupleFromDoubleValue(0.0);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(0.0, sin.readDouble());
     sin.unread(out.position());
     out.position(0);
 
-    nv = ValueFactory::getDoubleValue(128.256);
-    nv.serializeToExport(out);
+    tt = tupleFromDoubleValue(128.256);
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(8, out.position());
     EXPECT_EQ(128.256, sin.readDouble());
     sin.unread(out.position());
     out.position(0);
 
     // varchar
-    nv = ValueFactory::getStringValue("ABCDEFabcdef");
-    nv.serializeToExport(out);
-    nv.free();
+    tt = tupleFromStringValue("ABCDEFabcdef");
+    tt.serializeToExport(out, 0, &nulls_byte);
+    tt.getNValue(0).free();
     EXPECT_EQ(12 + 4, out.position());         // chardata plus prefix
     EXPECT_EQ(12, sin.readInt()); // 32 bit length prefix
     EXPECT_EQ('A', sin.readChar());
@@ -1958,8 +2058,8 @@ TEST_F(NValueTest, SerializeToExport)
     out.position(0);
 
     // decimal
-    nv = ValueFactory::getDecimalValueFromString("-1234567890.456123000000");
-    nv.serializeToExport(out);
+    tt = tupleFromDecimalValueFromString("-1234567890.456123000000");
+    tt.serializeToExport(out, 0, &nulls_byte);
     EXPECT_EQ(24 + 4, out.position());
     EXPECT_EQ(24, sin.readInt()); // 32 bit length prefix
     EXPECT_EQ('-', sin.readChar());
@@ -2297,8 +2397,16 @@ static NValue streamNValueArrayintoInList(ValueType vt, NValue* nvalue, int leng
     setup.writeByte(VALUE_TYPE_ARRAY);
     setup.writeByte(vt);
     setup.writeShort((short)length); // number of list elements
-    for (int ii = 0; ii < length; ++ii) {
-        nvalue[ii].serializeTo(setup);
+    if (vt == VALUE_TYPE_INTEGER) {
+        for (int ii = 0; ii < length; ++ii) {
+            setup.writeInt(ValuePeeker::peekInteger(nvalue[ii]));
+        }
+    } else {
+        for (int ii = 0; ii < length; ++ii) {
+            std::string value = ValuePeeker::peekStringCopy(nvalue[ii]);
+            setup.writeInt((int)value.size());
+            setup.writeBytes(value.c_str(), value.size());
+        }
     }
     NValue list;
     list.deserializeFromAllocateForStorage(input, testPool);

@@ -56,7 +56,7 @@ public:
         m_tableSchemaTypes.push_back(VALUE_TYPE_VARCHAR);
         m_tableSchemaTypes.push_back(VALUE_TYPE_VARCHAR);
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT));
         m_tableSchemaColumnSizes.push_back(300);
         m_tableSchemaColumnSizes.push_back(100);
 
@@ -76,11 +76,10 @@ public:
         delete m_table;
     }
 
-    void initTable(bool allowInlineStrings) {
+    void initTable() {
         m_tableSchema = TupleSchema::createTupleSchema(m_tableSchemaTypes,
                                                        m_tableSchemaColumnSizes,
-                                                       m_tableSchemaAllowNull,
-                                                       allowInlineStrings);
+                                                       m_tableSchemaAllowNull);
 
         TableIndexScheme indexScheme("primaryKeyIndex",
                                      BALANCED_TREE_INDEX,
@@ -117,7 +116,7 @@ public:
 };
 
 TEST_F(PersistentTableMemStatsTest, InsertTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -148,7 +147,7 @@ TEST_F(PersistentTableMemStatsTest, InsertTest) {
 }
 
 TEST_F(PersistentTableMemStatsTest, InsertThenUndoInsertTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -182,7 +181,7 @@ TEST_F(PersistentTableMemStatsTest, InsertThenUndoInsertTest) {
 }
 
 TEST_F(PersistentTableMemStatsTest, UpdateTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -201,7 +200,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
      * updating the new tuple.
      */
     TableTuple tempTuple = m_table->tempTuple();
-    tempTuple.copy(tuple);
+    tempTuple.copyTuple(tuple);
     string strval = "123456";
     NValue new_string = ValueFactory::getStringValue(strval);
     tempTuple.setNValue(1, new_string);
@@ -231,7 +230,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
 }
 
 TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -250,7 +249,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
      * updating the new tuple.
      */
     TableTuple tempTuple = m_table->tempTuple();
-    tempTuple.copy(tuple);
+    tempTuple.copyTuple(tuple);
     string strval = "123456";
     NValue new_string = ValueFactory::getStringValue(strval);
     tempTuple.setNValue(1, new_string);
@@ -281,7 +280,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
 }
 
 TEST_F(PersistentTableMemStatsTest, DeleteTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;
@@ -312,7 +311,7 @@ TEST_F(PersistentTableMemStatsTest, DeleteTest) {
 }
 
 TEST_F(PersistentTableMemStatsTest, DeleteAndUndoTest) {
-    initTable(true);
+    initTable();
     tableutil::addRandomTuples(m_table, 10);
     int64_t orig_size = m_table->nonInlinedMemorySize();
     //cout << "Original non-inline size: " << orig_size << endl;

@@ -47,7 +47,6 @@
 #define VOLTDBENGINE_H
 
 #include <map>
-#include <set>
 #include <string>
 #include <vector>
 #include <cassert>
@@ -61,6 +60,7 @@
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/mem_fun.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/serializeio.h"
@@ -68,12 +68,8 @@
 #include "common/valuevector.h"
 #include "common/Pool.hpp"
 #include "common/UndoLog.h"
-#include "common/SerializableEEException.h"
-#include "common/Topend.h"
 #include "common/DefaultTupleSerializer.h"
-#include "common/TupleOutputStream.h"
 #include "common/TheHashinator.h"
-#include "execution/FragmentManager.h"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
 #include "logging/StdoutLogProxy.h"
@@ -107,6 +103,7 @@ class SerializeInput;
 class SerializeOutput;
 class PersistentTable;
 class Table;
+class Topend;
 class CatalogDelegate;
 class TableCatalogDelegate;
 class PlanNodeFragment;
@@ -445,8 +442,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViews(bool addAll);
         bool updateCatalogDatabaseReference();
-
-        bool hasSameSchema(catalog::Table *t1, voltdb::Table *t2);
 
         void printReport();
 

@@ -34,22 +34,22 @@ namespace voltdb {
  */
 class ValuePeeker {
 public:
-    static inline double peekDouble(const NValue value) {
+    static inline double peekDouble(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_DOUBLE);
         return value.getDouble();
     }
 
-    static inline int8_t peekTinyInt(const NValue value) {
+    static inline int8_t peekTinyInt(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_TINYINT);
         return value.getTinyInt();
     }
 
-    static inline int16_t peekSmallInt(const NValue value) {
+    static inline int16_t peekSmallInt(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_SMALLINT);
         return value.getSmallInt();
     }
 
-    static inline int32_t peekInteger(const NValue value) {
+    static inline int32_t peekInteger(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_INTEGER);
         return value.getInteger();
     }
@@ -57,60 +57,57 @@ public:
     // cast as int and peek at value. this is used by index code that need a
     // real number from a tuple and the limit node code used to get the limit
     // from an expression.
-    static inline int32_t peekAsInteger(const NValue value) {
+    static inline int32_t peekAsInteger(const NValue& value) {
         return value.castAsInteger().getInteger();
     }
 
-    static inline int64_t peekBigInt(const NValue value) {
+    static inline int64_t peekBigInt(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_BIGINT);
         return value.getBigInt();
     }
 
-    static inline int64_t peekTimestamp(const NValue value) {
+    static inline int64_t peekTimestamp(const NValue& value) {
         assert(value.getValueType() == VALUE_TYPE_TIMESTAMP);
         return value.getTimestamp();
     }
 
-    static inline void* peekObjectValue(const NValue value) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+    static inline void* peekObjectValue(const NValue& value) {
+        assert(isObjectType(value.getValueType()));
         return value.getObjectValue();
     }
 
-    static inline int32_t peekObjectLength(const NValue value) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+    static inline int32_t peekObjectLength(const NValue& value) {
+        assert(isObjectType(value.getValueType()));
         return value.getObjectLength();
     }
 
-    static std::string peekStringCopy(const NValue value) {
-        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
-               (value.getValueType() == VALUE_TYPE_VARBINARY));
+    static std::string peekStringCopy(const NValue& value) {
+        assert(isObjectType(value.getValueType()));
         std::string result(reinterpret_cast<const char*>(value.getObjectValue()),
                                                          value.getObjectLength());
         return result;
     }
 
-    static inline ValueType peekValueType(const NValue value) {
+    static inline ValueType peekValueType(const NValue& value) {
         return value.getValueType();
     }
 
-    static inline TTInt peekDecimal(const NValue value) {
+    static inline TTInt peekDecimal(const NValue& value) {
         return value.getDecimal();
     }
 
     // exists for test.
-    static inline std::string peekDecimalString(const NValue value) {
+    static inline std::string peekDecimalString(const NValue& value) {
         return value.createStringFromDecimal();
     }
 
     // cast as big int and peek at value. this is used by
     // index code that need a real number from a tuple.
-    static inline int64_t peekAsBigInt(const NValue value) {
+    static inline int64_t peekAsBigInt(const NValue& value) {
         return value.castAsBigIntAndGetValue();
     }
 
-    static inline int64_t peekAsRawInt64(const NValue value) {
+    static inline int64_t peekAsRawInt64(const NValue& value) {
         return value.castAsRawInt64AndGetValue();
     }
 };

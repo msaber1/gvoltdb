@@ -171,6 +171,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
     assert(targetTuple.sizeInValues() == targetTable->columnCount());
     TableIterator input_iterator = m_inputTable->iterator();
+    TableTuple &tempTuple = targetTable->tempTuple();
     while (input_iterator.next(m_inputTuple)) {
         //
         // OPTIMIZATION: Single-Sited Query Plans
@@ -189,7 +190,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         // bringing garbage with it, we're only going to copy what we really
         // need to into the target tuple.
         //
-        TableTuple &tempTuple = targetTable->getTempTupleInlined(targetTuple);
+        tempTuple.copyTuple(targetTuple);
         for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
             tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
                                 m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));

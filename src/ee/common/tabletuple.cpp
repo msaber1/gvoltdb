@@ -103,7 +103,12 @@ std::string TableTuple::debugNoHeader() const {
     return ret;
 }
 
-bool TableTuple::compatibleForCopy(const TableTuple &source) {
+#ifndef NDEBUG
+bool TableTuple::compatibleForCopy(const TableTuple &source)
+{
+    if (m_schema == source.m_schema) {
+        return true;
+    }
     if (m_schema->columnCount() != source.m_schema->columnCount()) {
         VOLT_ERROR("Can not copy tuple: incompatible column count.");
         return false;
@@ -112,30 +117,18 @@ bool TableTuple::compatibleForCopy(const TableTuple &source) {
     for (int i = 0; i < m_schema->columnCount(); ++i) {
         const ValueType mType = m_schema->columnType(i);
         const ValueType sType = source.m_schema->columnType(i);
-        if (mType != sType && NValue::promoteForOp(mType, mType) != sType) {
+        if (mType != sType) {
             VOLT_ERROR("Can not copy tuple: incompatible column types.");
             return false;
         }
-        const bool mAllowInlinedObjects = m_schema->allowInlinedObjects();
-        const bool sAllowInlinedObjects = source.m_schema->allowInlinedObjects();
-        if (mAllowInlinedObjects && sAllowInlinedObjects) {
-            const bool mIsInlined = m_schema->columnIsInlined(i);
-            const bool sIsInlined = source.m_schema->columnIsInlined(i);
-            if (mIsInlined != sIsInlined) {
-                VOLT_ERROR("Can not copy tuple: incompatible column inlining.");
-                return false;
-            }
-        }
-        else {
-            const int32_t mColumnLength = m_schema->columnLength(i);
-            const int32_t sColumnLength = source.m_schema->columnLength(i);
-            if (mColumnLength < sColumnLength) {
-                VOLT_ERROR("Can not copy tuple: incompatible column lengths.");
-                return false;
-            }
+        const bool mIsInlined = m_schema->columnIsInlined(i);
+        const bool sIsInlined = source.m_schema->columnIsInlined(i);
+        if (mIsInlined != sIsInlined) {
+            VOLT_ERROR("Can not copy tuple: incompatible column inlining.");
+            return false;
         }
     }
     return true;
 }
-
+#endif
 }

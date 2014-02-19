@@ -59,6 +59,7 @@ namespace voltdb {
 #define OBJECT_NULL_BIT static_cast<char>(1 << 6)
 #define OBJECT_CONTINUATION_BIT static_cast<char>(1 << 7)
 #define OBJECT_MAX_LENGTH_SHORT_LENGTH 63
+#define MAX_UTF8_BYTES_PER_CHARACTER 4
 
 //The int used for storage and return values
 typedef ttmath::Int<2> TTInt;
@@ -233,61 +234,54 @@ class NValue {
     /* Create an NValue promoted/demoted to type */
     NValue castAs(ValueType type) const;
 
-        // todo: Why doesn't this return size_t? Also, this is a
-        // quality of ValueType, not NValue.
-
-    /* Calculate the tuple storage size for an NValue type. VARCHARs
-       assume out-of-band tuple storage */
-    static uint16_t getTupleStorageSize(const ValueType type);
-
-       // todo: Could the isInlined argument be removed by have the
-       // caller dereference the pointer?
-
     /* Deserialize a scalar of the specified type from the tuple
        storage area provided. If this is an Object type then the third
        argument indicates whether the object is stored in the tuple
        inline */
     static NValue initFromTupleStorage(const void *storage, ValueType type, bool isInlined);
 
-    /* Serialize the scalar this NValue represents to the provided
-       storage area. If the scalar is an Object type that is not
-       inlined then the provided data pool or the heap will be used to
-       allocated storage for a copy of the object. */
-    void serializeToTupleStorageAllocateForObjects(
-        void *storage, const bool isInlined, const int32_t maxLength,
-        Pool *dataPool) const;
+    static void setStorageToObject(char* storage, int length, const char* data, Pool* dataPool);
+    static void allocateObjectSelfCopyInTupleStorage(char* storage, Pool* dataPool);
 
-    /* Serialize the scalar this NValue represents to the storage area
-       provided. If the scalar is an Object type then the object will
-       be copy if it can be inlined into the tuple. Otherwise a
-       pointer to the object will be copied into the storage area. No
-       allocations are performed. */
-    void serializeToTupleStorage(
-        void *storage, const bool isInlined, const int32_t maxLength) const;
+    static int32_t getObjectLengthAndValueFromStorage(const char* storage, const char** dataOut);
 
-    /* Deserialize a scalar value of the specified type from the
-       SerializeInput directly into the tuple storage area
-       provided. This function will perform memory allocations for
-       Object types as necessary using the provided data pool or the
-       heap. This is used to deserialize tables. */
-    static void deserializeFrom(
-        SerializeInput &input, const ValueType type, char *storage,
-        bool isInlined, const int32_t maxLength, Pool *dataPool);
+    static size_t computeStringMemoryUsedByTupleStorage(const char* storage);
 
-        // TODO: no callers use the first form; Should combine these
-        // eliminate the potential NValue copy.
+    void copyOutFormattedValue(char* storage, int allocatedLength) const {
+        ::memcpy(storage, m_data, allocatedLength);
+    }
+
+    bool exceedsDeclaredLength(int32_t maxLength, bool declaredUnitIsBytes) const {
+        assert(isObjectType(m_valueType));
+        int32_t actualBytes = getObjectLength();
+        if (actualBytes <= maxLength) {
+            // This is always a safe case.
+            return false;
+        }
+        // Eliminate all unsafe cases that don't need UTF-8 character counting.
+        if (declaredUnitIsBytes || actualBytes > (maxLength * MAX_UTF8_BYTES_PER_CHARACTER)) {
+            return true;
+        }
+        // Remaining cases do need UTF-8 character counting.
+        char *valueChars = reinterpret_cast<char*>(getObjectValue());
+        UTF8Iterator skipper(valueChars, valueChars + actualBytes);
+        assert(maxLength > 0);
+        // If skipping maxLength characters exhausts the string, it's safe.
+        skipper.skipCodePoints(maxLength);
+        return ! skipper.atEnd();
+    }
+
+    bool isInlinedObject() const {
+        assert(isObjectType(m_valueType));
+        return m_sourceInlined;
+    }
+
 
     /* Read a ValueType from the SerializeInput stream and deserialize
        a scalar value of the specified type into this NValue from the provided
        SerializeInput and perform allocations as necessary. */
     void deserializeFromAllocateForStorage(SerializeInput &input, Pool *dataPool);
     void deserializeFromAllocateForStorage(ValueType vt, SerializeInput &input, Pool *dataPool);
-
-    /* Serialize this NValue to a SerializeOutput */
-    void serializeTo(SerializeOutput &output) const;
-
-    /* Serialize this NValue to an Export stream */
-    void serializeToExport(ExportSerializeOutput&) const;
 
     // See comment with inlined body, below.
     void allocateObjectFromInlinedValue(Pool* stringPool = NULL);
@@ -575,6 +569,30 @@ class NValue {
      * Private methods are private for a reason. Don't expose the raw
      * data so that it can be operated on directly.
      */
+    static int32_t stringRefDecode(const StringRef* sref, const char** dataOut)
+    {
+        assert(sref != NULL);
+
+	    // Generated mask that removes the null and continuation bits from a single byte length value
+        const char mask = ~static_cast<char>(OBJECT_NULL_BIT | OBJECT_CONTINUATION_BIT);
+
+        const char* data = sref->get();
+        int32_t length = 0;
+        if ((data[0] & OBJECT_CONTINUATION_BIT) != 0) {
+            char numberBytes[4];
+            numberBytes[0] = static_cast<char>(data[0] & mask);
+            numberBytes[1] = data[1];
+            numberBytes[2] = data[2];
+            numberBytes[3] = data[3];
+            length = ntohl(*reinterpret_cast<int32_t*>(numberBytes));
+            *dataOut = data + 4;
+        } else {
+            length = data[0] & mask;
+            *dataOut = data + 1;
+        }
+        return length;
+}
+
 
     // Function declarations for NValue.cpp definitions.
     void createDecimalFromString(const std::string &txt);
@@ -666,7 +684,8 @@ class NValue {
             throw SQLException(SQLException::dynamic_sql_error,
                     "Must not ask  for object length on sql null object.");
         }
-        if ((getValueType() != VALUE_TYPE_VARCHAR) && (getValueType() != VALUE_TYPE_VARBINARY)) {
+        assert(isObjectType(m_valueType));
+        if ( ! isObjectType(m_valueType)) {
             // probably want getTupleStorageSize() for non-object types.
             // at the moment, only varchars are using getObjectLength().
             throw SQLException(SQLException::dynamic_sql_error,
@@ -1453,46 +1472,6 @@ class NValue {
         return retval;
     }
 
-    /**
-     * Copy the arbitrary size object that this value points to as an
-     * inline object in the provided storage area
-     */
-    void inlineCopyObject(void *storage, int32_t maxLength) const {
-        if (isNull()) {
-            /*
-             * The 7th bit of the length preceding value
-             * is used to indicate that the object is null.
-             */
-            *reinterpret_cast<char*>(storage) = OBJECT_NULL_BIT;
-        }
-        else {
-            const int32_t objectLength = getObjectLength();
-            if (objectLength > maxLength) {
-                if (maxLength == 0) {
-                    throwFatalLogicErrorStreamed("Zero maxLength for object type " << valueToString(getValueType()));
-                }
-                char msg[1024];
-                snprintf(msg, 1024,
-                         "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d",
-                                    objectLength, maxLength);
-                throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-                                   msg);
-            }
-            if (m_sourceInlined)
-            {
-                ::memcpy( storage, *reinterpret_cast<char *const *>(m_data), getObjectLengthLength() + objectLength);
-            }
-            else
-            {
-                const StringRef* sref =
-                    *reinterpret_cast<StringRef* const*>(m_data);
-                ::memcpy(storage, sref->get(),
-                         getObjectLengthLength() + objectLength);
-            }
-        }
-
-    }
-
     int compareAnyIntegerValue (const NValue rhs) const {
         int64_t lhsValue, rhsValue;
 
@@ -1585,7 +1564,7 @@ class NValue {
     }
 
     int compareStringValue (const NValue rhs) const {
-        if ((rhs.getValueType() != VALUE_TYPE_VARCHAR) && (rhs.getValueType() != VALUE_TYPE_VARBINARY)) {
+        if ( ! isObjectType(rhs.getValueType())) {
             char message[128];
             snprintf(message, 128,
                      "Type %s cannot be cast for comparison to type %s",
@@ -2135,37 +2114,6 @@ inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObj
 }
 
 /**
- * Get the amount of storage necessary to store a value of the specified type
- * in a tuple
- */
-inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
-    switch (type) {
-      case VALUE_TYPE_BIGINT:
-      case VALUE_TYPE_TIMESTAMP:
-        return sizeof(int64_t);
-      case VALUE_TYPE_TINYINT:
-        return sizeof(int8_t);
-      case VALUE_TYPE_SMALLINT:
-        return sizeof(int16_t);
-      case VALUE_TYPE_INTEGER:
-        return sizeof(int32_t);
-      case VALUE_TYPE_DOUBLE:
-        return sizeof(double);
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-        return sizeof(char*);
-      case VALUE_TYPE_DECIMAL:
-        return sizeof(TTInt);
-      default:
-          char message[128];
-          snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
-                   getTypeName(type).c_str());
-          throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                        message);
-    }
-}
-
-/**
  * Compare any two NValues. Comparison is not guaranteed to
  * succeed if the values are incompatible.  Avoid use of
  * comparison in favor of op_*.
@@ -2350,26 +2298,8 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
          * will always know which byte contains the most signficant digits.
          */
 
-        /*
-         * Generated mask that removes the null and continuation bits
-         * from a single byte length value
-         */
-        const char mask = ~static_cast<char>(OBJECT_NULL_BIT | OBJECT_CONTINUATION_BIT);
-
-        char* data = sref->get();
-        int32_t length = 0;
-        if ((data[0] & OBJECT_CONTINUATION_BIT) != 0) {
-            char numberBytes[4];
-            numberBytes[0] = static_cast<char>(data[0] & mask);
-            numberBytes[1] = data[1];
-            numberBytes[2] = data[2];
-            numberBytes[3] = data[3];
-            length = ntohl(*reinterpret_cast<int32_t*>(numberBytes));
-        } else {
-            length = data[0] & mask;
-        }
-
-        //std::cout << "NValue::initFromTupleStorage: length: " << length << std::endl;
+        const char* unusedValue = 0;
+        int32_t length = stringRefDecode(sref, &unusedValue);
         retval.setObjectLength(length); // this unsets the null tag.
         break;
     }
@@ -2380,221 +2310,48 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
     return retval;
 }
 
-/**
- * Serialize the scalar this NValue represents to the provided
- * storage area. If the scalar is an Object type that is not
- * inlined then the provided data pool or the heap will be used to
- * allocated storage for a copy of the object.
- */
-inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, const bool isInlined,
-                                                       const int32_t maxLength, Pool *dataPool) const
+inline void NValue::allocateObjectSelfCopyInTupleStorage(char* storage, Pool* dataPool)
 {
-    const ValueType type = getValueType();
-    int32_t length = 0;
-
-    switch (type) {
-      case VALUE_TYPE_TIMESTAMP:
-        *reinterpret_cast<int64_t*>(storage) = getTimestamp();
-        break;
-      case VALUE_TYPE_TINYINT:
-        *reinterpret_cast<int8_t*>(storage) = getTinyInt();
-        break;
-      case VALUE_TYPE_SMALLINT:
-        *reinterpret_cast<int16_t*>(storage) = getSmallInt();
-        break;
-      case VALUE_TYPE_INTEGER:
-        *reinterpret_cast<int32_t*>(storage) = getInteger();
-        break;
-      case VALUE_TYPE_BIGINT:
-        *reinterpret_cast<int64_t*>(storage) = getBigInt();
-        break;
-      case VALUE_TYPE_DOUBLE:
-        *reinterpret_cast<double*>(storage) = getDouble();
-        break;
-      case VALUE_TYPE_DECIMAL:
-        ::memcpy(storage, m_data, sizeof(TTInt));
-        break;
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-        //Potentially non-inlined type requires special handling
-        if (isInlined) {
-            inlineCopyObject(storage, maxLength);
-        }
-        else {
-            if (isNull()) {
-                *reinterpret_cast<void**>(storage) = NULL;
-            }
-            else {
-                length = getObjectLength();
-                const int8_t lengthLength = getObjectLengthLength();
-                const int32_t minlength = lengthLength + length;
-                if (length > maxLength) {
-                    char msg[1024];
-                    snprintf(msg, 1024, "In NValue::serializeToTupleStorageAllocateForObjects, Object exceeds specified size. Size is %d"
-                            " and max is %d", length, maxLength);
-                    throw SQLException(
-                        SQLException::data_exception_string_data_length_mismatch,
-                        msg);
-
-                }
-                StringRef* sref = StringRef::create(minlength, dataPool);
-                char *copy = sref->get();
-                setObjectLengthToLocation(length, copy);
-                ::memcpy(copy + lengthLength, getObjectValue(), length);
-                *reinterpret_cast<StringRef**>(storage) = sref;
-            }
-        }
-        break;
-      default: {
-          throwDynamicSQLException(
-                  "NValue::serializeToTupleStorageAllocateForObjects() unrecognized type '%s'",
-                  getTypeName(type).c_str());
-      }
-    }
+    StringRef* tempSref = *reinterpret_cast<StringRef**>(storage);
+    const char* unusedValue = 0;
+    int32_t length = stringRefDecode(tempSref, &unusedValue);
+    // the result of "get" is more useful here than stringRefDecode's output
+    // because it includes the encoded length byte(s).
+    char *orig = tempSref->get();
+    StringRef* sref = StringRef::create(length, dataPool);
+    char *copy = sref->get();
+    ::memcpy(copy, orig, length);
+    *reinterpret_cast<StringRef**>(storage) = sref;
 }
 
-/**
- * Serialize the scalar this NValue represents to the storage area
- * provided. If the scalar is an Object type then the object will
- * be copy if it can be inlined into the tuple. Otherwise a
- * pointer to the object will be copied into the storage area. No
- * allocations are performed.
- */
-inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined, const int32_t maxLength) const
+inline int32_t NValue::getObjectLengthAndValueFromStorage(const char* storage, const char** dataOut)
 {
-    const ValueType type = getValueType();
-    switch (type) {
-      case VALUE_TYPE_TIMESTAMP:
-        *reinterpret_cast<int64_t*>(storage) = getTimestamp();
-        break;
-      case VALUE_TYPE_TINYINT:
-        *reinterpret_cast<int8_t*>(storage) = getTinyInt();
-        break;
-      case VALUE_TYPE_SMALLINT:
-        *reinterpret_cast<int16_t*>(storage) = getSmallInt();
-        break;
-      case VALUE_TYPE_INTEGER:
-        *reinterpret_cast<int32_t*>(storage) = getInteger();
-        break;
-      case VALUE_TYPE_BIGINT:
-        *reinterpret_cast<int64_t*>(storage) = getBigInt();
-        break;
-      case VALUE_TYPE_DOUBLE:
-        *reinterpret_cast<double*>(storage) = getDouble();
-        break;
-      case VALUE_TYPE_DECIMAL:
-        ::memcpy( storage, m_data, sizeof(TTInt));
-        break;
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-        //Potentially non-inlined type requires special handling
-        if (isInlined) {
-            inlineCopyObject(storage, maxLength);
-        }
-        else {
-            if (isNull() || getObjectLength() <= maxLength) {
-                if (m_sourceInlined && !isInlined)
-                {
-                    throwDynamicSQLException(
-                            "Cannot serialize an inlined string to non-inlined tuple storage in serializeToTupleStorage()");
-                }
-                // copy the StringRef pointers
-                *reinterpret_cast<StringRef**>(storage) =
-                  *reinterpret_cast<StringRef* const*>(m_data);
-            }
-            else {
-                const int32_t length = getObjectLength();
-                throwDynamicSQLException(
-                        "In NValue::serializeToTupleStorage(), Object exceeds specified size. Size is %d and max is %d", length, maxLength);
-            }
-        }
-        break;
-      default:
-          char message[128];
-          snprintf(message, 128, "NValue::serializeToTupleStorage() unrecognized type '%s'",
-                   getTypeName(type).c_str());
-          throw SQLException(SQLException::data_exception_most_specific_type_mismatch,
-                             message);
-    }
+    StringRef* sref = *reinterpret_cast<StringRef**>(const_cast<char*>(storage));
+    assert(sref != NULL);
+
+    return stringRefDecode(sref, dataOut);
 }
 
-
-/**
- * Deserialize a scalar value of the specified type from the
- * SerializeInput directly into the tuple storage area
- * provided. This function will perform memory allocations for
- * Object types as necessary using the provided data pool or the
- * heap. This is used to deserialize tables.
- */
-inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
-                             char *storage, bool isInlined, const int32_t maxLength, Pool *dataPool) {
-    switch (type) {
-      case VALUE_TYPE_BIGINT:
-      case VALUE_TYPE_TIMESTAMP:
-        *reinterpret_cast<int64_t*>(storage) = input.readLong();
-        break;
-      case VALUE_TYPE_TINYINT:
-        *reinterpret_cast<int8_t*>(storage) = input.readByte();
-        break;
-      case VALUE_TYPE_SMALLINT:
-        *reinterpret_cast<int16_t*>(storage) = input.readShort();
-        break;
-      case VALUE_TYPE_INTEGER:
-        *reinterpret_cast<int32_t*>(storage) = input.readInt();
-        break;
-      case VALUE_TYPE_DOUBLE:
-        *reinterpret_cast<double* >(storage) = input.readDouble();
-        break;
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-      {
-          const int32_t length = input.readInt();
-          if (length > maxLength) {
-              char msg[1024];
-              snprintf(msg, 1024, "In NValue::deserializeFrom, Object exceeds specified size. Size is %d and max is %d", length, maxLength);
-              throw SQLException(
-                  SQLException::data_exception_string_data_length_mismatch,
-                  msg);
-          }
-
-          const int8_t lengthLength = getAppropriateObjectLengthLength(length);
-          // the NULL SQL string is a NULL C pointer
-          if (isInlined) {
-              setObjectLengthToLocation(length, storage);
-              if (length == OBJECTLENGTH_NULL) {
-                  break;
-              }
-              const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
-              ::memcpy( storage + lengthLength, data, length);
-          } else {
-              if (length == OBJECTLENGTH_NULL) {
-                  *reinterpret_cast<void**>(storage) = NULL;
-                  return;
-              }
-              const char *data = reinterpret_cast<const char*>(input.getRawPointer(length));
-              const int32_t minlength = lengthLength + length;
-              StringRef* sref = StringRef::create(minlength, dataPool);
-              char* copy = sref->get();
-              setObjectLengthToLocation( length, copy);
-              ::memcpy(copy + lengthLength, data, length);
-              *reinterpret_cast<StringRef**>(storage) = sref;
-          }
-          break;
-      }
-      case VALUE_TYPE_DECIMAL: {
-          int64_t *longStorage = reinterpret_cast<int64_t*>(storage);
-          //Reverse order for Java BigDecimal BigEndian
-          longStorage[1] = input.readLong();
-          longStorage[0] = input.readLong();
-          break;
-      }
-      default:
-          char message[128];
-          snprintf(message, 128, "NValue::deserializeFrom() unrecognized type '%s'",
-                   getTypeName(type).c_str());
-          throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                        message);
+inline size_t NValue::computeStringMemoryUsedByTupleStorage(const char* storage)
+{
+    const StringRef* sref = *reinterpret_cast<const StringRef * const*>(storage);
+    if (sref == NULL) {
+        return 0;
     }
+    const char* unusedValue = 0;
+    int32_t length = stringRefDecode(sref, &unusedValue);
+    return StringRef::computeStringMemoryUsed(length);
+}
+
+inline void NValue::setStorageToObject(char* storage, int length, const char* data, Pool* dataPool)
+{
+    const int8_t lengthLength = getAppropriateObjectLengthLength(length);
+    const int32_t minlength = lengthLength + length;
+    StringRef* sref = StringRef::create(minlength, dataPool);
+    char* copy = sref->get();
+    setObjectLengthToLocation(length, copy);
+    ::memcpy(copy + lengthLength, data, length);
+    *reinterpret_cast<StringRef**>(storage) = sref;
 }
 
 /**
@@ -2684,117 +2441,6 @@ inline void NValue::deserializeFromAllocateForStorage(ValueType type, SerializeI
     }
 }
 
-/**
- * Serialize this NValue to the provided SerializeOutput
- */
-inline void NValue::serializeTo(SerializeOutput &output) const {
-    const ValueType type = getValueType();
-    switch (type) {
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-      {
-          if (isNull()) {
-              output.writeInt(OBJECTLENGTH_NULL);
-              break;
-          }
-          const int32_t length = getObjectLength();
-          if (length < OBJECTLENGTH_NULL) {
-              throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
-          }
-          output.writeInt(static_cast<int32_t>(length));
-          if (length != OBJECTLENGTH_NULL) {
-              // Not a null string: write it out
-              const char * str = reinterpret_cast<const char*>(getObjectValue());
-              if (str == NULL) {}
-              output.writeBytes(getObjectValue(), length);
-          }
-
-          break;
-      }
-      case VALUE_TYPE_TINYINT: {
-          output.writeByte(getTinyInt());
-          break;
-      }
-      case VALUE_TYPE_SMALLINT: {
-          output.writeShort(getSmallInt());
-          break;
-      }
-      case VALUE_TYPE_INTEGER: {
-          output.writeInt(getInteger());
-          break;
-      }
-      case VALUE_TYPE_TIMESTAMP: {
-          output.writeLong(getTimestamp());
-          break;
-      }
-      case VALUE_TYPE_BIGINT: {
-          output.writeLong(getBigInt());
-          break;
-      }
-      case VALUE_TYPE_DOUBLE: {
-          output.writeDouble(getDouble());
-          break;
-      }
-      case VALUE_TYPE_DECIMAL: {
-          output.writeLong(getDecimal().table[1]);
-          output.writeLong(getDecimal().table[0]);
-          break;
-      }
-      default:
-          throwDynamicSQLException( "NValue::serializeTo() found a column "
-                   "with ValueType '%s' that is not handled", getValueTypeString().c_str());
-    }
-}
-
-inline void NValue::serializeToExport(ExportSerializeOutput &io) const
-{
-    switch (getValueType()) {
-      case VALUE_TYPE_TINYINT:
-      case VALUE_TYPE_SMALLINT:
-      case VALUE_TYPE_INTEGER:
-      case VALUE_TYPE_BIGINT:
-      case VALUE_TYPE_TIMESTAMP:
-      {
-          int64_t val = castAsBigIntAndGetValue();
-          io.writeLong(val);
-          return;
-      }
-      case VALUE_TYPE_DOUBLE:
-      {
-          double value = getDouble();
-          io.writeDouble(value);
-          return;
-      }
-      case VALUE_TYPE_VARCHAR:
-      case VALUE_TYPE_VARBINARY:
-      {
-          // requires (and uses) bytecount not character count
-          io.writeBinaryString(getObjectValue(), getObjectLength());
-          return;
-      }
-      case VALUE_TYPE_DECIMAL:
-      {
-          std::string decstr = createStringFromDecimal();
-          int32_t objectLength = (int32_t)decstr.length();
-          io.writeBinaryString(decstr.data(), objectLength);
-          return;
-      }
-      case VALUE_TYPE_INVALID:
-      case VALUE_TYPE_NULL:
-      case VALUE_TYPE_BOOLEAN:
-      case VALUE_TYPE_ADDRESS:
-      case VALUE_TYPE_ARRAY:
-      case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
-          char message[128];
-          snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
-          throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                        message);
-    }
-
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "Invalid type in serializeToExport");
-}
-
 /** Reformat an object-typed value from its inlined form to its allocated out-of-line form,
  *  for use with a wider/widened tuple column, either persistent (stringPool==NULL) or temp **/
 inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
@@ -2803,12 +2449,11 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* stringPool)
         return;
     }
 
-    assert(m_valueType == VALUE_TYPE_VARCHAR || m_valueType == VALUE_TYPE_VARBINARY);
+    assert(isObjectType(m_valueType));
     assert(m_sourceInlined);
 
     if (isNull()) {
         *reinterpret_cast<void**>(m_data) = NULL;
-        // serializeToTupleStorage fusses about this inline flag being set, even for NULLs
         setSourceInlined(false);
         return;
     }

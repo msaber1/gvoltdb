@@ -15,8 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/DefaultTupleSerializer.h"
-#include "common/serializeio.h"
-#include "common/TupleSchema.h"
 
 namespace voltdb {
 /**
@@ -33,11 +31,21 @@ int DefaultTupleSerializer::getMaxSerializedTupleSize(const TupleSchema *schema)
     size_t size = 4;
     size += static_cast<size_t>(schema->tupleLength());
     for (int ii = 0; ii < schema->columnCount(); ii++) {
-        if (!schema->columnIsInlined(ii)) {
+        if ( ! isObjectType(schema->columnType(ii))) {
+            // Tuple bytes for fixed length values are serialized one for one
+            continue;
+        }
+        if (schema->columnIsInlined(ii)) {
+            // Serialization always uses a 4-byte length prefix
+            // in the place of the inlined object's 1 byte prefix.
+            size += 3;
+        } else {
+            // The StringRef pointer adds to tuple size but not serialized size.
             size -= sizeof(void*);
-            size += 4 + schema->columnLength(ii);
-        } else if ((schema->columnType(ii) == VALUE_TYPE_VARCHAR) || (schema->columnType(ii) == VALUE_TYPE_VARBINARY)) {
-            size += 3;//Serialization always uses a 4-byte length prefix
+            // Serialization adds a 4 byte length and value bytes up to the maximum
+            // required to store a value of the declared byte or character count.
+            size += 4 + (schema->columnDeclaredLength(ii) *
+                    (schema->columnDeclaredUnitIsBytes(ii) ? 1 : MAX_UTF8_BYTES_PER_CHARACTER));
         }
     }
     return static_cast<int>(size);
