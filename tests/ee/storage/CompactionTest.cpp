@@ -95,16 +95,16 @@ public:
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
         m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
 
-        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
-        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER));
 
-        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT));
 
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);

@@ -119,8 +119,6 @@ TupleSchema::createTestCombinedTupleSchema(const TupleSchema *first,
         const std::vector<uint16_t>& secondSet)
 {
     assert(first);
-
-    const std::vector<uint16_t>::size_type combinedColumnCount = firstSet.size() + secondSet.size();
     std::vector<ValueType> columnTypes;
     std::vector<int32_t> columnLengths;
     std::vector<bool> columnAllowNull;

@@ -80,14 +80,12 @@ ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_BIGINT,
                                             VALUE_TYPE_INTEGER,
                                             VALUE_TYPE_BIGINT };
 
-int32_t COLUMN_SIZES[NUM_OF_COLUMNS] =
-    {
+int32_t COLUMN_SIZES[NUM_OF_COLUMNS] = {
         TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT),
         TupleSchema::getTupleStorageSize(VALUE_TYPE_TINYINT),
         TupleSchema::getTupleStorageSize(VALUE_TYPE_SMALLINT),
         TupleSchema::getTupleStorageSize(VALUE_TYPE_INTEGER),
-        TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT)
-    };
+        TupleSchema::getTupleStorageSize(VALUE_TYPE_BIGINT) };
 
 class TableTest : public Test {
 public:
