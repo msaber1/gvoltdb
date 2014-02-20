@@ -267,7 +267,7 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
                 isIntsOnly = false;
             }
             keyColumnTypes.push_back(exprType);
-            keyColumnLengths.push_back(tupleSchema->columnLength(scheme.columnIndices[ii]));
+            keyColumnLengths.push_back(tupleSchema->columnDeclaredLength(scheme.columnIndices[ii]));
         }
     }
     std::vector<bool> keyColumnAllowNull(valueCount, true);

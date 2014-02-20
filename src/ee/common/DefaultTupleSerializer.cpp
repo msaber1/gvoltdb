@@ -33,14 +33,20 @@ int DefaultTupleSerializer::getMaxSerializedTupleSize(const TupleSchema *schema)
     size_t size = 4;
     size += static_cast<size_t>(schema->tupleLength());
     for (int ii = 0; ii < schema->columnCount(); ii++) {
-        if (!schema->columnIsInlined(ii)) {
+        if (isObjectType(schema->columnType(ii))) {
+            if (schema->columnIsInlined(ii)) {
+                size += 3;//Serialization always uses a 4-byte length prefix in place of the inlined 1.
+                continue;
+            }
+            // the out-of-line length and value do get serialized.
+            size += 4 + schema->columnDeclaredLength(ii) *
+                (schema->columnDeclaredUnitIsBytes(ii) ? 1 : MAX_UTF8_BYTES_PER_CHARACTER);
+            // the StringRef pointer does not get serialized
             size -= sizeof(void*);
-            size += 4 + schema->columnLength(ii);
-        } else if ((schema->columnType(ii) == VALUE_TYPE_VARCHAR) || (schema->columnType(ii) == VALUE_TYPE_VARBINARY)) {
-            size += 3;//Serialization always uses a 4-byte length prefix
         }
     }
     return static_cast<int>(size);
 }
+
 }
 

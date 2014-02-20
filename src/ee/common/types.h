@@ -457,6 +457,8 @@ enum TaskType {
 std::string getTypeName(ValueType type);
 bool isNumeric(ValueType type);
 bool isIntegralType(ValueType type);
+inline bool isObjectType(ValueType type)
+{ return type == VALUE_TYPE_VARCHAR || type == VALUE_TYPE_VARBINARY; }
 
 // for testing, obtain a random instance of the specified type
 NValue getRandomValue(ValueType type);

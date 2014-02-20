@@ -669,10 +669,11 @@ VoltDBEngine::hasSameSchema(catalog::Table *t1, voltdb::Table *t2) {
         }
 
         // check the size of types where size matters
-        if ((type == VALUE_TYPE_VARCHAR) || (type == VALUE_TYPE_VARBINARY)) {
-            if (t2->schema()->columnLength(index) != size) {
+        if (isObjectType((ValueType)type)) {
+            if (t2->schema()->columnDeclaredLength(index) != size) {
                 return false;
             }
+            //TODO: When implementing ENG-5876, check that length units are consistent -- BYTE vs. CHAR.
         }
     }
 

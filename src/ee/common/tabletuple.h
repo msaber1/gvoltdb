@@ -210,7 +210,7 @@ public:
         return bytes;
     }
 
-    void setNValue(const int idx, voltdb::NValue value);
+    void setNValue(int idx, const voltdb::NValue& value);
     /*
      * Copies range of NValues from one tuple to another.
      */
@@ -224,8 +224,7 @@ public:
      * to provide NULL for stringPool in which case the strings will
      * be allocated on the heap.
      */
-    void setNValueAllocateForObjectCopies(const int idx, voltdb::NValue value,
-                                             Pool *dataPool);
+    void setNValueAllocateForObjectCopies(int idx, const voltdb::NValue& value, Pool *dataPool);
 
     /** How long is a tuple? */
     inline int tupleLength() const {
@@ -288,8 +287,6 @@ public:
     std::string debugNoHeader() const;
 
     /** Copy values from one tuple into another (uses memcpy) */
-    // verify assumptions for copy. do not use at runtime (expensive)
-    bool compatibleForCopy(const TableTuple &source);
     void copyForPersistentInsert(const TableTuple &source, Pool *pool = NULL);
     // The vector "output" arguments detail the non-inline object memory management
     // required of the upcoming release or undo.
@@ -300,7 +297,7 @@ public:
     /** this does set NULL in addition to clear string count.*/
     void setAllNulls();
 
-    bool equals(const TableTuple &other) const;
+    bool equals(const TableTuple &other) const { return equalsNoSchemaCheck(other); }
     bool equalsNoSchemaCheck(const TableTuple &other) const;
 
     int compare(const TableTuple &other) const;
@@ -479,15 +476,31 @@ inline TableTuple& TableTuple::operator=(const TableTuple &rhs) {
 
 /** Copy scalars by value and non-scalars (non-inlined strings, decimals) by
     reference from a slim value in to this tuple. */
-inline void TableTuple::setNValue(const int idx, voltdb::NValue value) {
+inline void TableTuple::setNValue(const int idx, const voltdb::NValue& value) {
     assert(m_schema);
     assert(m_data);
     const ValueType type = m_schema->columnType(idx);
-    value = value.castAs(type);
-    const bool isInlined = m_schema->columnIsInlined(idx);
-    char *dataPtr = getDataPtr(idx);
-    const int32_t columnLength = m_schema->columnLength(idx);
-    value.serializeToTupleStorage(dataPtr, isInlined, columnLength);
+    NValue typedValue = value.castAs(type);
+    char *storage = getDataPtr(idx);
+    if (isObjectType(type)) {
+        if (m_schema->columnIsInlined(idx)) {
+            int32_t maxLength = m_schema->columnAllocatedLength(idx);
+            if ( ! typedValue.inlineCopyDataOut(storage, maxLength)) {
+                int32_t declaredLength = m_schema->columnDeclaredLength(idx);
+                bool lengthIsBytes = m_schema->columnDeclaredUnitIsBytes(idx);
+                char msg[1024];
+                snprintf(msg, 1024,
+                         "Object exceeds specified size. Size is %d %s and max is %d",
+                         declaredLength, (lengthIsBytes ? "bytes" : "characters"), maxLength);
+                throw SQLException(SQLException::data_exception_string_data_length_mismatch, msg);
+            }
+            return;
+        }
+    }
+    if ( ! typedValue.copyDataOut(storage, NValue::getTupleStorageSize(type))) {
+        throwFatalLogicErrorStreamed(
+                "Cannot serialize an inlined string to non-inlined tuple storage in setNValue");
+    }
 }
 
 /** Multi column version. */
@@ -501,21 +514,43 @@ inline void TableTuple::setNValues(int beginIdx, TableTuple lhs, int begin, int 
     }
 }
 
-/* Copy strictly by value from slimvalue into this tuple */
-inline void TableTuple::setNValueAllocateForObjectCopies(const int idx,
-                                                            voltdb::NValue value,
-                                                            Pool *dataPool)
+inline void TableTuple::setNValueAllocateForObjectCopies(int idx, const voltdb::NValue& value,
+        Pool *dataPool)
 {
-    assert(m_schema);
-    assert(m_data);
-    //assert(isActive())
+    // start with a raw copy
+    setNValue(idx, value);
     const ValueType type = m_schema->columnType(idx);
-    value = value.castAs(type);
-    const bool isInlined = m_schema->columnIsInlined(idx);
-    char *dataPtr = getDataPtr(idx);
-    const int32_t columnLength = m_schema->columnLength(idx);
-    value.serializeToTupleStorageAllocateForObjects(dataPtr, isInlined,
-                                                    columnLength, dataPool);
+    if ( ! isObjectType(type)) {
+        return;
+    }
+    int32_t declaredLength = m_schema->columnDeclaredLength(idx);
+    bool lengthIsBytes = m_schema->columnDeclaredUnitIsBytes(idx);
+    char *storage = getDataPtr(idx);
+    int32_t actualExcessiveLength = 0;
+    if (m_schema->columnIsInlined(idx)) {
+        if (lengthIsBytes) {
+            return; // Safe cases -- the bytes fit in the allocated space.
+        }
+        if (storage[0] == INLINE_LENGTH_NULL_BYTE) {
+            return;
+        }
+        actualExcessiveLength = NValue::tooManyInlineCharactersInStorage(storage, declaredLength);
+    }
+    else if (NULL == *reinterpret_cast<void**>(storage)) {
+        return;
+    }
+    else {
+        actualExcessiveLength = NValue::allocateObjectSelfCopyInStorage(storage,
+                declaredLength, lengthIsBytes, dataPool);
+    }
+    if (actualExcessiveLength <= declaredLength) {
+        return;
+    }
+    char msg[1024];
+    snprintf(msg, 1024,
+             "Object exceeds specified size. Size is %d %s and max is %d",
+             actualExcessiveLength, (lengthIsBytes ? "bytes" : "characters"), declaredLength);
+    throw SQLException(SQLException::data_exception_string_data_length_mismatch, msg);
 }
 
 /*
@@ -533,12 +568,11 @@ inline void TableTuple::copyForPersistentInsert(const voltdb::TableTuple &source
     const uint16_t uninlineableObjectColumnCount = m_schema->getUninlinedObjectColumnCount();
 
 #ifndef NDEBUG
-    if(!compatibleForCopy(source)) {
-        std::ostringstream message;
-        message << "src  tuple: " << source.debug("") << std::endl;
-        message << "src schema: " << source.m_schema->debug() << std::endl;
-        message << "dest schema: " << m_schema->debug() << std::endl;
-        throwFatalException( "%s", message.str().c_str());
+    if ( ! m_schema->isCompatibleForCopy(source.m_schema)) {
+        VOLT_ERROR("Can not copy tuple: incompatible schemas.");
+        throwFatalLogicErrorStreamed("src  tuple: " << source.debug("") <<
+                "\nsrc schema: " << source.m_schema->debug() <<
+                "\ndest schema: " << m_schema->debug());
     }
 #endif
 
@@ -662,12 +696,11 @@ inline void TableTuple::copy(const TableTuple &source) {
     const bool oAllowInlinedObjects = sourceSchema->allowInlinedObjects();
 
 #ifndef NDEBUG
-    if(!compatibleForCopy(source)) {
-        std::ostringstream message;
-        message << "src  tuple: " << source.debug("") << std::endl;
-        message << "src schema: " << source.m_schema->debug() << std::endl;
-        message << "dest schema: " << m_schema->debug() << std::endl;
-        throwFatalException("%s", message.str().c_str());
+    if ( ! m_schema->isCompatibleForCopy(source.m_schema)) {
+        VOLT_ERROR("Can not copy tuple: incompatible schemas.");
+        throwFatalLogicErrorStreamed("src  tuple: " << source.debug("") <<
+                "\nsrc schema: " << source.m_schema->debug() <<
+                "\ndest schema: " << m_schema->debug());
     }
 #endif
 
@@ -704,10 +737,21 @@ inline void TableTuple::deserializeFrom(voltdb::SerializeInput &tupleIn, Pool *d
          * TableTuple. The memory allocation will be performed when
          * serializing to tuple storage.
          */
-        const bool isInlined = m_schema->columnIsInlined(j);
-        char *dataPtr = getDataPtr(j);
-        const int32_t columnLength = m_schema->columnLength(j);
-        NValue::deserializeFrom(tupleIn, type, dataPtr, isInlined, columnLength, dataPool);
+        char *storage = getDataPtr(j);
+        if (isObjectType(type)) {
+            bool isInlined = m_schema->columnIsInlined(j);
+            int32_t columnLength = m_schema->columnDeclaredLength(j);
+            bool lengthIsBytes = m_schema->columnDeclaredUnitIsBytes(j);
+            int32_t lengthToRead = NValue::deserializeObjectFrom(tupleIn, storage,
+                    isInlined, columnLength, lengthIsBytes, dataPool);
+            if ( lengthToRead > columnLength ) {
+                char msg[1024];
+                snprintf(msg, 1024, "In deserializeFrom, Object exceeds specified size. Size is %d and max is %d", lengthToRead, columnLength);
+                throw SQLException(SQLException::data_exception_string_data_length_mismatch, msg);
+            }
+        } else {
+            NValue::deserializeFrom(tupleIn, type, storage);
+        }
     }
 }
 
@@ -745,14 +789,14 @@ TableTuple::serializeToExport(ExportSerializeOutput &io,
         getNValue(i).serializeToExport(io);
     }
 }
-
+/*
 inline bool TableTuple::equals(const TableTuple &other) const {
     if (!m_schema->equals(other.m_schema)) {
         return false;
     }
     return equalsNoSchemaCheck(other);
 }
-
+*/
 inline bool TableTuple::equalsNoSchemaCheck(const TableTuple &other) const {
     for (int ii = 0; ii < m_schema->columnCount(); ii++) {
         const NValue lhs = getNValue(ii);

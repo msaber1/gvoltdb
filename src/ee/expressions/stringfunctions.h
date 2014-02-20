@@ -20,17 +20,6 @@
 
 namespace voltdb {
 
-static inline int32_t getCharLength(const char *valueChars, const size_t length) {
-    // very efficient code to count characters in UTF string and ASCII string
-    int32_t i = 0, j = 0;
-    size_t len = length;
-    while (len-- > 0) {
-        if ((valueChars[i] & 0xc0) != 0x80) j++;
-        i++;
-    }
-    return j;
-}
-
 // Return the beginning char * place of the ith char.
 // Return the end char* when ith is larger than it has, NULL if ith is less and equal to zero.
 static inline const char* getIthCharPosition(const char *valueChars, const size_t length, const int32_t ith) {
@@ -62,7 +51,7 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
         return getNullValue();
 
     char *valueChars = reinterpret_cast<char*>(getObjectValue());
-    return getBigIntValue(static_cast<int64_t>(getCharLength(valueChars, getObjectLength())));
+    return getBigIntValue(static_cast<int64_t>(getUTF8CharLength(valueChars, getObjectLength())));
 }
 
 /** implement the 1-argument SQL SPACE function */
@@ -145,7 +134,7 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
     if (position == std::string::npos)
         position = 0;
     else {
-        position = getCharLength(poolStr.substr(0,position).c_str(),position) + 1;
+        position = getUTF8CharLength(poolStr.substr(0,position).c_str(),position) + 1;
     }
     return getIntegerValue(static_cast<int32_t>(position));
 }
@@ -212,7 +201,7 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
     const int32_t valueUTF8Length = strValue.getObjectLength();
     char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
     const char *valueEnd = valueChars+valueUTF8Length;
-    int32_t charLen = getCharLength(valueChars,valueUTF8Length);
+    int32_t charLen = getUTF8CharLength(valueChars,valueUTF8Length);
     if (count >= charLen)
         return getTempStringValue(valueChars,(int32_t)(valueEnd - valueChars));
 
