@@ -7,10 +7,13 @@
 *.pyc
 *.swp
 *~
+.DS_Store
+host*+0000.txt
 voltdb_crash*
 buildstring.txt
 /plannerlog.txt
 obj/
+groovyout/
 /src/catgen/out
 /src/ee/catalog/*
 /src/ee/tags

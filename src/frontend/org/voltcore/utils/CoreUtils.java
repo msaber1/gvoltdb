@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -14,6 +14,7 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+
 package org.voltcore.utils;
 
 import java.io.ByteArrayOutputStream;
@@ -39,10 +40,10 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.Callable;
+import java.util.concurrent.Executor;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.SynchronousQueue;
@@ -50,6 +51,8 @@ import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicLong;
+
+import jsr166y.LinkedTransferQueue;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.ReverseDNSCache;
@@ -69,6 +72,21 @@ public class CoreUtils {
 
     public static final int SMALL_STACK_SIZE = 1024 * 256;
     public static final int MEDIUM_STACK_SIZE = 1024 * 512;
+
+    public static final ListenableFuture<Object> COMPLETED_FUTURE = new ListenableFuture<Object>() {
+        @Override
+        public void addListener(Runnable listener, Executor executor) { executor.execute(listener); }
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) { return false; }
+        @Override
+        public boolean isCancelled() { return false;  }
+        @Override
+        public boolean isDone() { return true; }
+        @Override
+        public Object get() { return null; }
+        @Override
+        public Object get(long timeout, TimeUnit unit) { return null; }
+    };
 
     /**
      * Get a single thread executor that caches it's thread meaning that the thread will terminate
@@ -327,7 +345,7 @@ public class CoreUtils {
                         }
                     }
                 }
-            }, 3600, TimeUnit.SECONDS);
+            }, 1, TimeUnit.DAYS);
 
     /**
      * Return the local IP address, if it's resolvable.  If not,

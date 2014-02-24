@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2013 VoltDB Inc.
+ * Copyright (C) 2008-2014 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -124,14 +124,14 @@ public class TupleValueExpression extends AbstractValueExpression {
     /**
      * @return the column index
      */
-    public Integer getColumnIndex() {
+    public int getColumnIndex() {
         return m_columnIndex;
     }
 
     /**
      * @param columnIndex The index of the column to set
      */
-    public void setColumnIndex(Integer columnIndex) {
+    public void setColumnIndex(int columnIndex) {
         m_columnIndex = columnIndex;
     }
 
@@ -301,11 +301,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         return inputSchema.getIndexOfTve(this);
     }
 
-    @Override
-    public String baseTableAlias() {
-        return m_tableAlias;
-    }
-
     // Even though this function applies generally to expressions and tables and not just to TVEs as such,
     // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
     // depend on tables.
@@ -337,21 +332,42 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     @Override
     public String explain(String impliedTableName) {
-        if (m_tableName == null) {
-            String tableName = "";
+        String tableName = m_tableName;
+        String columnName = m_columnName;
+        if (columnName == null || columnName.equals("")) {
+            columnName = "column#" + m_columnIndex;
+        }
+        if (m_verboseExplainForDebugging) {
+            columnName += " (as JSON: ";
+            JSONStringer stringer = new JSONStringer();
+            try
+            {
+                stringer.object();
+                toJSONString(stringer);
+                stringer.endObject();
+                columnName += stringer.toString();
+            }
+            catch (Exception e)
+            {
+                columnName += "CORRUPTED beyond the ability to format? " + e;
+                e.printStackTrace();
+            }
+            columnName += ")";
+        }
+        if (tableName == null) {
             if (m_tableIdx != 0) {
                 assert(m_tableIdx == 1);
                 // This is join inner table
-                tableName += "inner table.";
+                return "inner-table." + columnName;
             }
-            return tableName + "column:" + m_columnIndex;
         }
-
-        if (m_tableName.equals(impliedTableName)) {
-            return m_columnName;
-        } else {
-            return m_tableName + "." + m_columnName;
+        else if ( ! tableName.equals(impliedTableName)) {
+            return tableName + "." + columnName;
+        } else if (m_verboseExplainForDebugging) {
+            // In verbose mode, always show an "implied' tableName that would normally be left off.
+            return "{" + tableName + "}." + columnName;
         }
+        return columnName;
     }
 
 }
