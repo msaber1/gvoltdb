@@ -27,6 +27,8 @@ else
     VOLTDB_VOLTDB="$VOLTDB_BASE/voltdb"
 fi
 
+VOLTPKG=../../tools/voltpkg
+
 APPCLASSPATH=$CLASSPATH:$({ \
     \ls -1 "$VOLTDB_VOLTDB"/voltdb-*.jar; \
     \ls -1 "$VOLTDB_LIB"/*.jar; \
@@ -164,9 +166,40 @@ function jdbc-benchmark() {
         --threads=40
 }
 
+### Docker commands
+
+function docker-build() {
+    test -f Dockerfile || $VOLTPKG docker
+    docker build -q --rm -t $APPNAME .
+}
+
+function docker-run() {
+    docker run -t $APPNAME
+}
+
+function docker-rebuild() {
+    test -f Dockerfile || $VOLTPKG docker
+    docker build -q --no-cache --rm -t $APPNAME .
+}
+
+function docker-clean() {
+    docker stop $(docker ps -a -q)
+    docker rm $(docker ps -a -q)
+    docker rmi $(docker images -a -q)
+}
+
+function docker-show() {
+    docker images | awk "NR==1||\$1~/^$APPNAME/{print}"
+}
+
+function docker-generate() {
+    $VOLTPKG docker -O
+}
+
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
-    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
+    echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|...}"
+    echo "       {...|docker-build|docker-run|docker-rebuild|docker-clean|docker-show|docker-generate}"
 }
 
 # Run the target passed as the first arg on the command line

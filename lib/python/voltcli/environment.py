@@ -43,12 +43,15 @@ config_name = 'volt.cfg'
 config_name_local = 'volt_local.cfg'
 
 # Filled in during startup.
-standalone   = None
-version      = None
-command_dir  = None
-command_name = None
-voltdb_jar   = None
-classpath    = None
+standalone    = None
+version       = None
+command_dir   = None
+command_name  = None
+voltdb_jar    = None
+classpath     = None
+voltdb_lib    = None
+voltdb_voltdb = None
+voltdb_base   = None
 
 # Location of third_party/python if available.
 third_party_python = None
@@ -176,6 +179,12 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
         utility.abort('Failed to find the VoltDB library directory.',
                         ('You may need to perform a build.',
                          'Searched the following:', lib_search_globs))
+
+    # For convenience provide additional voltdb_... global path variables.
+    global voltdb_lib, voltdb_voltdb, voltdb_base
+    voltdb_lib = os.environ['VOLTDB_LIB']
+    voltdb_voltdb = os.path.dirname(voltdb_jar)
+    voltdb_base = os.path.dirname(voltdb_voltdb)
 
     # LOG4J configuration
     if 'LOG4J_CONFIG_PATH' not in os.environ:
