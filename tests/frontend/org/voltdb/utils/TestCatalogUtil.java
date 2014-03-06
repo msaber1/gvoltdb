@@ -779,7 +779,7 @@ public class TestCatalogUtil extends TestCase {
         final File tmpKafkaBuiltin = VoltProjectBuilder.writeStringToTempFile(withBuiltinKafkaExport);
         DeploymentType builtin_kafkadeployment = CatalogUtil.getDeployment(new FileInputStream(tmpKafkaBuiltin));
 
-        Catalog cat4 = compiler.compileCatalog(null, x);
+        Catalog cat4 = compiler.compileCatalogFromDDL(x);
         crc = CatalogUtil.compileDeploymentAndGetCRC(cat4, builtin_kafkadeployment, true, false);
         assertTrue("Deployment file failed to parse", crc != -1);
 
@@ -791,6 +791,6 @@ public class TestCatalogUtil extends TestCase {
         assertEquals(builtin_kafkadeployment.getExport().getTarget(), ServerExportEnum.KAFKA);
         prop = catconn.getConfig().get(ExportDataProcessor.EXPORT_TO_TYPE);
         assertEquals(prop.getValue(), "org.voltdb.exportclient.KafkaExportClient");
-        
+
     }
 }

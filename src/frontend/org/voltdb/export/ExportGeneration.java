@@ -712,6 +712,21 @@ public class ExportGeneration {
 
     }
 
+    //Pause all data sources.
+    public void pause() throws IOException {
+        List<ListenableFuture<?>> tasks = new ArrayList<ListenableFuture<?>>();
+        for (HashMap<String, ExportDataSource> map : m_dataSourcesByPartition.values()) {
+            for (ExportDataSource source : map.values()) {
+                tasks.add(source.pause());
+            }
+        }
+        try {
+            Futures.allAsList(tasks).get();
+        } catch (Exception e) {
+            Throwables.propagateIfPossible(e, IOException.class);
+        }
+    }
+
     /*
      * Returns true if the generatino was completely truncated away
      */

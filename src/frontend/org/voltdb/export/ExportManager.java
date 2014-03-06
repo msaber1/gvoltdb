@@ -153,6 +153,27 @@ public class ExportManager
         }
     };
 
+    //Pause export
+    public void pause() throws Exception {
+        ExportGeneration oldGeneration = null;
+        synchronized (ExportManager.this) {
+            oldGeneration = m_generations.firstEntry().getValue();
+            if (oldGeneration != null) {
+                oldGeneration.pause();
+            }
+        }
+    }
+
+    //Resume export
+    public void resume() throws Exception {
+        synchronized (ExportManager.this) {
+            ExportDataProcessor pc = m_processor.get();
+            if (pc != null) {
+                pc.resume();
+            }
+        }
+    }
+
     private void rollToNextGeneration() throws Exception {
         ExportDataProcessor newProcessor = null;
         ExportDataProcessor oldProcessor = null;

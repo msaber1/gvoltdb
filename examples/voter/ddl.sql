@@ -74,4 +74,5 @@ CREATE PROCEDURE FROM CLASS voter.procedures.Vote;
 PARTITION PROCEDURE Vote ON TABLE votes COLUMN phone_number;
 CREATE PROCEDURE FROM CLASS voter.procedures.ContestantWinningStates;
 CREATE PROCEDURE FROM CLASS voter.procedures.GetStateHeatmap;
+-- export votes table.
 EXPORT table export_votes;
