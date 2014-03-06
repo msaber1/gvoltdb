@@ -758,10 +758,14 @@ public class SQLCommand
     {
         Procedures.put("@Pause",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@PauseExport",
+                ImmutableMap.<Integer, List<String>>builder().put(0, new ArrayList<String>()).build());
         Procedures.put("@Quiesce",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@Resume",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@ResumeExport",
+                ImmutableMap.<Integer, List<String>>builder().put(0, new ArrayList<String>()).build());
         Procedures.put("@Shutdown",
                 ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
         Procedures.put("@SnapshotDelete",

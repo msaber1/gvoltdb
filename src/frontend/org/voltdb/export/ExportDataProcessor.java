@@ -49,6 +49,11 @@ public interface ExportDataProcessor  {
     public void readyForData();
 
     /**
+     * Inform the processor that we should resume.
+     */
+    public void resume();
+
+    /**
      * Queue a work message to the processor's mailbox.
      */
     public void queueWork(Runnable r);

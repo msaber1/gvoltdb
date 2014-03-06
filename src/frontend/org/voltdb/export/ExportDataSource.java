@@ -57,6 +57,8 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  *  Allows an ExportDataProcessor to access underlying table queues
@@ -85,12 +87,15 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
     private Runnable m_onMastership;
     private final ListeningExecutorService m_es;
     private SettableFuture<BBContainer> m_pollFuture;
+    private AtomicReference<BBContainer> m_inFlightContainer = new AtomicReference<BBContainer>();
+
     private final AtomicReference<Pair<Mailbox, ImmutableList<Long>>> m_ackMailboxRefs =
             new AtomicReference<Pair<Mailbox,ImmutableList<Long>>>(Pair.of((Mailbox)null, ImmutableList.<Long>builder().build()));
     private final Semaphore m_bufferPushPermits = new Semaphore(16);
 
     private final int m_nullArrayLength;
     private long m_lastReleaseOffset = 0;
+    private AtomicBoolean m_paused = new AtomicBoolean(false);
 
     /**
      * Create a new data source.
@@ -445,7 +450,6 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             + " Buffer info: " + uso + " Size: " + buffer.capacity());
                     return;
                 }
-                final BBContainer cont = DBBPool.wrapBB(buffer);
                 try {
                     m_committedBuffers.offer(new StreamBlock(
                             new BBContainer(buffer) {
@@ -523,6 +527,30 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         });
     }
 
+    public ListenableFuture<?> pause() {
+        return m_es.submit(new Callable<Object>() {
+            @Override
+            public Object call() throws Exception {
+                m_paused.set(true);
+                //Cancel the future.
+                if (m_pollFuture != null) {
+                    //We may have processed it so in flight could get counted twice. handle this.
+                    m_pollFuture.cancel(true);
+                    m_pollFuture = null;
+                }
+                return null;
+            }
+        });
+    }
+
+    public void setResumed() {
+        m_paused.set(false);
+    }
+
+    public boolean isPaused() {
+        return m_paused.get();
+    }
+
     public long getGeneration() {
         return m_generation;
     }
@@ -590,8 +618,12 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
         return fut;
     }
 
+    public void setLastInFilghtContainer(BBContainer cont) {
+        m_inFlightContainer.set(cont);
+    }
+
     private void pollImpl(SettableFuture<BBContainer> fut) {
-        if (fut == null) {
+        if (fut == null || isPaused()) {
             return;
         }
 

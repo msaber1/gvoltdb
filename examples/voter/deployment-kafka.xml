@@ -6,8 +6,12 @@
     </httpd>
     <export enabled="true" target="kafka">
         <configuration>
-            <property name="dateformat">yyyy-MM-dd-HH-mm-ss</property>
-            <property name="metadata.broker.list">localhost:9092,anish:9092,volt6a:9092</property>
+            <!-- Set any properties that you would like your kafka client to use. -->
+            <!-- 
+                 If you are running kafka locally make sure you run zookeeper needed by kafka
+                 on different port as their and our default port clashes
+            -->
+            <property name="metadata.broker.list">localhost:9092</property>
             <property name="request.required.acks">1</property>
         </configuration>
     </export>
