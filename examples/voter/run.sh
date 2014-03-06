@@ -169,7 +169,7 @@ function jdbc-benchmark() {
 ### Docker commands
 
 function docker-build() {
-    test -f Dockerfile || $VOLTPKG docker
+    test -f Dockerfile || docker-generate
     docker build -q --rm -t $APPNAME .
 }
 
@@ -178,14 +178,23 @@ function docker-run() {
 }
 
 function docker-rebuild() {
-    test -f Dockerfile || $VOLTPKG docker
+    test -f Dockerfile || docker-generate
     docker build -q --no-cache --rm -t $APPNAME .
 }
 
 function docker-clean() {
-    docker stop $(docker ps -a -q)
-    docker rm $(docker ps -a -q)
-    docker rmi $(docker images -a -q)
+    for C in $(docker ps -a -q); do
+        docker stop $C
+        docker rm $C
+    done
+    for I in $(docker images -a -q); do
+        docker rmi $I
+    done
+}
+
+function docker-clean-all() {
+    docker-clean
+    \rm -rf dist Dockerfile
 }
 
 function docker-show() {
@@ -199,7 +208,7 @@ function docker-generate() {
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|...}"
-    echo "       {...|docker-build|docker-run|docker-rebuild|docker-clean|docker-show|docker-generate}"
+    echo "       {...|docker-build|docker-run|docker-rebuild|docker-clean|docker-clean-all|docker-show|docker-generate}"
 }
 
 # Run the target passed as the first arg on the command line

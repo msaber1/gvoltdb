@@ -311,9 +311,16 @@ class PythonSourceFinder(object):
                         exec(code, syms_tmp)
             elif os.path.exists(scan_loc.path):
                 for modpath in glob.glob(os.path.join(scan_loc.path, '*.py')):
-                    debug('Executing module "%s"...' % modpath)
+                    verbose_info('Executing module "%s"...' % modpath)
                     syms_tmp = copy.copy(syms)
-                    execfile(modpath, syms_tmp)
+                    # Temporarily add the containing folder to the Python path so that
+                    # the module can find  and load nearby library modules.
+                    try:
+                        sys_path_orig = copy.copy(sys.path)
+                        sys.path.insert(0, os.path.dirname(modpath))
+                        execfile(modpath, syms_tmp)
+                    finally:
+                        sys.path = sys_path_orig
 
 #===============================================================================
 def normalize_list(items, width, filler = None):

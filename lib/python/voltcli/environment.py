@@ -49,6 +49,7 @@ command_dir   = None
 command_name  = None
 voltdb_jar    = None
 classpath     = None
+voltdb_bin    = None
 voltdb_lib    = None
 voltdb_voltdb = None
 voltdb_base   = None
@@ -181,10 +182,27 @@ def initialize(standalone_arg, command_name_arg, command_dir_arg, version_arg):
                          'Searched the following:', lib_search_globs))
 
     # For convenience provide additional voltdb_... global path variables.
-    global voltdb_lib, voltdb_voltdb, voltdb_base
+    global voltdb_bin, voltdb_lib, voltdb_voltdb, voltdb_base
     voltdb_lib = os.environ['VOLTDB_LIB']
     voltdb_voltdb = os.path.dirname(voltdb_jar)
     voltdb_base = os.path.dirname(voltdb_voltdb)
+
+    # Finding VoltDB bin is a little harder than it should be.  Start with the
+    # lib directory and look up one or two levels for a bin with VoltDB
+    # programs.  This should work for a VoltDB distribution, the source layout,
+    # and installations under /usr, /usr/local, /opt, etc..
+    voltdb_bin = None
+    bin_base = os.path.dirname(voltdb_lib)
+    # In source and distribution trees bin shares lib's parent directory.
+    if os.path.exists(os.path.join(bin_base, 'bin', 'voltdb')):
+        voltdb_bin = os.path.join(bin_base, 'bin')
+    # In system installations voltdb_lib is in a subdirectory of lib.
+    else:
+        bin_base = os.path.dirname(bin_base)
+        if os.path.exists(os.path.join(bin_base, 'bin', 'voltdb')):
+            voltdb_bin = os.path.join(bin_base, 'bin')
+    if voltdb_bin is None:
+        utility.abort('Failed to find the VoltDB bin directory.')
 
     # LOG4J configuration
     if 'LOG4J_CONFIG_PATH' not in os.environ:
