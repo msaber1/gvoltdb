@@ -84,6 +84,19 @@ function server() {
     $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
+# run the voltdb server locally as a daemon process
+function daemon() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    echo "Starting the VoltDB server."
+    echo "To perform this action manually, use the command line: "
+    echo
+    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar"
+    echo
+    $VOLTDB create -B -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+}
+
 # run the voltdb server locally
 function rejoin() {
     # if a catalog doesn't exist, build one
@@ -100,7 +113,7 @@ function client() {
 # Asynchronous benchmark sample
 # Use this target for argument help
 function async-benchmark-help() {
-    srccompile
+    test -f obj/$APPNAME/AsyncBenchmark.class || srccompile
     java -classpath obj:$CLIENTCLASSPATH:obj voter.AsyncBenchmark --help
 }
 
@@ -108,7 +121,7 @@ function async-benchmark-help() {
 # ratelimit: must be a reasonable value if lantencyreport is ON
 # Disable the comments to get latency report
 function async-benchmark() {
-    srccompile
+    test -f obj/$APPNAME/AsyncBenchmark.class || srccompile
     java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.AsyncBenchmark \
         --displayinterval=5 \
@@ -122,7 +135,7 @@ function async-benchmark() {
 }
 
 function simple-benchmark() {
-    srccompile
+    test -f obj/$APPNAME/SimpleBenchmark.class || srccompile
     java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.SimpleBenchmark localhost
 }
@@ -130,12 +143,12 @@ function simple-benchmark() {
 # Multi-threaded synchronous benchmark sample
 # Use this target for argument help
 function sync-benchmark-help() {
-    srccompile
+    test -f obj/$APPNAME/SyncBenchmark.class || srccompile
     java -classpath obj:$CLIENTCLASSPATH:obj voter.SyncBenchmark --help
 }
 
 function sync-benchmark() {
-    srccompile
+    test -f obj/$APPNAME/SyncBenchmark.class || srccompile
     java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.SyncBenchmark \
         --displayinterval=5 \
@@ -150,12 +163,12 @@ function sync-benchmark() {
 # JDBC benchmark sample
 # Use this target for argument help
 function jdbc-benchmark-help() {
-    srccompile
+    test -f obj/$APPNAME/JDBCBenchmark.class || srccompile
     java -classpath obj:$CLIENTCLASSPATH:obj voter.JDBCBenchmark --help
 }
 
 function jdbc-benchmark() {
-    srccompile
+    test -f obj/$APPNAME/JDBCBenchmark.class || srccompile
     java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.JDBCBenchmark \
         --displayinterval=5 \
@@ -174,7 +187,7 @@ function docker-build() {
 }
 
 function docker-run() {
-    docker run -t $APPNAME
+    docker run -p 127.0.0.1:41212:21212 -t $APPNAME
 }
 
 function docker-rebuild() {
@@ -205,10 +218,22 @@ function docker-generate() {
     $VOLTPKG docker -O
 }
 
+function docker-client() {
+    test -f obj/$APPNAME/AsyncBenchmark.class || srccompile
+    echo java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.AsyncBenchmark \
+        --displayinterval=5 \
+        --warmup=5 \
+        --duration=120 \
+        --servers=127.0.0.1:41212 \
+        --contestants=6 \
+        --maxvotes=2
+}
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|...}"
-    echo "       {...|docker-build|docker-run|docker-rebuild|docker-clean|docker-clean-all|docker-show|docker-generate}"
+    echo "       {...|docker-build|docker-run|docker-rebuild|docker-clean|docker-clean-all|...}"
+    echo "       {...|docker-client|docker-show|docker-generate}"
 }
 
 # Run the target passed as the first arg on the command line

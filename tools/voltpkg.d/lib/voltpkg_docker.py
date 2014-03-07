@@ -146,6 +146,20 @@ class DockerTool(object):
         if not workdir:
             workdir = '%(image_folder)s'
         self._add_line('WORKDIR', workdir)
+        # Generate ENV statement to add dist/bin to the PATH.
+        #TODO: Un-hard-code it and or make it more base image-specific.
+        self._add_line('ENV', 'PATH', ':'.join([
+            self._path('%(image_folder)s', '%(dist_folder)s', 'bin'),
+            '/usr/local/sbin',
+            '/usr/local/bin',
+            '/usr/sbin',
+            '/usr/bin',
+            '/sbin',
+            '/bin',
+        ]))
+        # Expose the port.
+        #TODO: Un-hard-code it.
+        self._add_line('EXPOSE', '21212')
         # Generate Dockerfile ENTRYPOINT by splitting command line arguments
         # and wrapping as a list of quoted strings inside square brackets.
         # Treat the relative paths as relative to the target folder inside the image.
@@ -155,7 +169,7 @@ class DockerTool(object):
                 args[0] = self._path('%(image_folder)s', args[0])
         else:
             args = [self._path('%(image_folder)s', '%(dist_folder)s', 'bin', 'voltdb')]
-        self._add_line('ENTRYPOINT', '[%s]' % '.'.join(['"%s"' % arg for arg in args]))
+        self._add_line('ENTRYPOINT', '[%s]' % ','.join(['"%s"' % arg for arg in args]))
         # TODO: Deal with ports?
         #self._add_line('EXPOSE', '21212')
 
