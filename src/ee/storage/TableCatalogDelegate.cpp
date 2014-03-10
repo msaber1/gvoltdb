@@ -82,9 +82,7 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catal
         columnAllowNull[columnIndex] = catalog_column->nullable();
     }
 
-    return TupleSchema::createTupleSchema(columnTypes,
-                                          columnLengths,
-                                          columnAllowNull, true);
+    return TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull);
 }
 
 bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,

@@ -99,9 +99,7 @@ IndexStats::generateEmptyIndexStatsTable()
     vector<bool> columnAllowNull;
     IndexStats::populateIndexStatsSchema(columnTypes, columnLengths,
                                          columnAllowNull);
-    TupleSchema *schema =
-        TupleSchema::createTupleSchema(columnTypes, columnLengths,
-                                       columnAllowNull, true);
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull);
 
     return
         reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,

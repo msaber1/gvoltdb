@@ -66,11 +66,8 @@ TableStats::generateEmptyTableStatsTable()
     vector<ValueType> columnTypes;
     vector<int32_t> columnLengths;
     vector<bool> columnAllowNull;
-    TableStats::populateTableStatsSchema(columnTypes, columnLengths,
-                                         columnAllowNull);
-    TupleSchema *schema =
-        TupleSchema::createTupleSchema(columnTypes, columnLengths,
-                                       columnAllowNull, true);
+    TableStats::populateTableStatsSchema(columnTypes, columnLengths, columnAllowNull);
+    TupleSchema *schema = TupleSchema::createTupleSchema(columnTypes, columnLengths, columnAllowNull);
 
     return
         reinterpret_cast<Table*>(TableFactory::getTempTable(databaseId,

@@ -43,6 +43,12 @@ public:
 
     /** Static factory method to create a TupleSchema object with a fixed number of columns */
     static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes, const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull, bool allowInlinedStrings);
+    // This overload is the one to use in production code.
+    // The one above exists to support legacy cppunit tests that should be migrated to use the new
+    // production signature (dropping the bool allowInlinedStrings instead of passing it as true).
+    static TupleSchema* createTupleSchema(const std::vector<ValueType> columnTypes,
+            const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull);
+
     /** Static factory method fakes a copy constructor */
     static TupleSchema* createTupleSchema(const TupleSchema *schema);
 
@@ -98,9 +104,6 @@ public:
     /** Return the number of bytes used by one tuple. */
     inline uint32_t tupleLength() const;
 
-    /** Returns a flag indicating whether strings will be inlined in this schema **/
-    bool allowInlinedObjects() const;
-
     /** Get a string representation of this schema for debugging */
     std::string debug() const;
 
@@ -141,16 +144,13 @@ private:
      */
     static uint16_t countUninlineableObjectColumns(
             std::vector<ValueType> columnTypes,
-            std::vector<int32_t> columnSizes,
-            bool allowInlinedObjects);
+            std::vector<int32_t> columnSizes);
 
     // can't (shouldn't) call constructors or destructor
     // prevents TupleSchema from being created on the stack
     TupleSchema() {}
     TupleSchema(const TupleSchema &ts) {};
     ~TupleSchema() {}
-    //Whether this schema allows strings to be inlined
-    bool m_allowInlinedObjects;
     // number of columns
     uint16_t m_columnCount;
     uint16_t m_uninlinedObjectColumnCount;
@@ -218,8 +218,11 @@ inline uint32_t TupleSchema::tupleLength() const {
     return getColumnInfo(m_columnCount)->offset;
 }
 
-inline bool TupleSchema::allowInlinedObjects() const {
-    return m_allowInlinedObjects;
+inline TupleSchema* TupleSchema::createTupleSchema(const std::vector<ValueType> columnTypes, const std::vector<int32_t> columnSizes, const std::vector<bool> allowNull, bool allowInlinedStrings)
+{
+    // Assert that the "disallow" option was never actually used, even in legacy tests.
+    assert(allowInlinedStrings);
+    return createTupleSchema(columnTypes, columnSizes, allowNull);
 }
 
 inline const TupleSchema::ColumnInfo* TupleSchema::getColumnInfo(int columnIndex) const {
