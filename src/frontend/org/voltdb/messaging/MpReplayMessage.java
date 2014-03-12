@@ -21,6 +21,7 @@ import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.iv2.TxnEgo;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -135,5 +136,20 @@ public class MpReplayMessage extends VoltMessage {
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        if (m_invocation != null) {
+            sb.append(m_invocation.getProcName());
+        } else {
+            sb.append("Sentinel");
+        }
+        sb.append(" ").append(TxnEgo.txnIdToString(m_txnId));
+        sb.append(", pid: ").append(m_partitionId);
+        sb.append(", involved partitions: ").append(m_involvedPartitions);
+        return sb.toString();
     }
 }
