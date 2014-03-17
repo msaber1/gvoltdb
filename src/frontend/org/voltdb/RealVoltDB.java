@@ -2062,6 +2062,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return m_isRunning;
     }
 
+    @Override
+    public boolean isSafeToSuicide() {
+        return true;
+    }
+
     /**
      * Debugging function - creates a record of the current state of the system.
      * @param out PrintStream to write report to.

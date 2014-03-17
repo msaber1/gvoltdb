@@ -113,6 +113,8 @@ public interface VoltDBInterface
      */
     public boolean isRunning();
 
+    public boolean isSafeToSuicide();
+
     /**
      * @return The number of milliseconds the cluster has been up
      */

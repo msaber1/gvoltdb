@@ -334,6 +334,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public boolean isSafeToSuicide() {
+        return false;
+    }
+
+    @Override
     public void readBuildInfo(String editionTag)
     {
     }
