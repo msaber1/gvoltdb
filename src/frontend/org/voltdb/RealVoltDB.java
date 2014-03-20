@@ -2524,4 +2524,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
         return baseRqt + tableRqt + rejoinRqt;
     }
+
+    public SnapshotIOAgent getSnapshotIOAgent()
+    {
+        return m_snapshotIOAgent;
+    }
 }

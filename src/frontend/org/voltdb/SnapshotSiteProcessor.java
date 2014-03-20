@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -352,7 +353,6 @@ public class SnapshotSiteProcessor {
             SystemProcedureExecutionContext context,
             SnapshotFormat format,
             Deque<SnapshotTableTask> tasks,
-            List<SnapshotDataTarget> targets,
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers)
     {
@@ -366,13 +366,6 @@ public class SnapshotSiteProcessor {
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
-
-        for (final SnapshotDataTarget target : targets) {
-            if (target.needsFinalClose()) {
-                assert(m_snapshotTargets != null);
-                m_snapshotTargets.add(target);
-            }
-        }
 
         // Table doesn't implement hashCode(), so use the table ID as key
         for (Map.Entry<Integer, byte[]> tablePredicates : makeTablesAndPredicatesToSnapshot(tasks).entrySet()) {
@@ -401,13 +394,19 @@ public class SnapshotSiteProcessor {
         for (Collection<SnapshotTableTask> perTableTasks : m_snapshotTableTasks.asMap().values()) {
             maxTableTaskSize = Math.max(maxTableTaskSize, perTableTasks.size());
         }
-
-        // This site has no snapshot work to do, still queue a task to clean up. Otherwise,
-        // the snapshot will never finish.
-        queueInitialSnapshotTasks(now);
     }
 
-    private void queueInitialSnapshotTasks(long now)
+    public void setDataTargets(Collection<SnapshotDataTarget> targets)
+    {
+        for (final SnapshotDataTarget target : targets) {
+            if (target.needsFinalClose()) {
+                assert(m_snapshotTargets != null);
+                m_snapshotTargets.add(target);
+            }
+        }
+    }
+
+    public void queueInitialSnapshotTasks(long now)
     {
         VoltDB.instance().schedulePriorityWork(
                 new Runnable() {
@@ -719,6 +718,7 @@ public class SnapshotSiteProcessor {
                     VoltDB.crashLocalVoltDB("TxnId should match", false, null);
                 }
                 int remainingHosts = jsonObj.getInt("hostCount") - 1;
+                SNAP_LOG.warn("Running log snapshot completion to ZK " + remainingHosts);
                 jsonObj.put("hostCount", remainingHosts);
                 if (!snapshotSuccess) {
                     SNAP_LOG.error("Snapshot failed at this node, snapshot will not be viable for log truncation");

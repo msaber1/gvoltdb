@@ -712,11 +712,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
 
                 if (success) {
                     loggingLog.info("Snapshot initiation for log truncation was successful");
-                    /*
-                     * Race to create the completion node before deleting
-                     * the request node so that we can guarantee that the
-                     * completion node will have the correct information
-                     */
+
                     JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
                     final long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
                     try {
@@ -724,14 +720,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB(
                                 "Unexpected error deleting truncation snapshot request", true, e);
-                    }
-
-                    SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
-                    int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
-                    if (!SnapshotSaveAPI.createSnapshotCompletionNode(snapshotPath, nonce,
-                                                                      snapshotTxnId,
-                                                                      hostId, true, truncReqId)) {
-                        SnapshotSaveAPI.increaseParticipateHost(snapshotTxnId, hostId);
                     }
 
                     try {

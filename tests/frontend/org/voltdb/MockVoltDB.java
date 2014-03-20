@@ -529,6 +529,12 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public SnapshotIOAgent getSnapshotIOAgent()
+    {
+        return null;
+    }
+
+    @Override
     public ScheduledFuture<?> schedulePriorityWork(Runnable work,
             long initialDelay, long delay, TimeUnit unit) {
         return null;

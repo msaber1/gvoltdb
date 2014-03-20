@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.util.ArrayDeque;
@@ -27,6 +26,7 @@ import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.json_voltpatches.JSONObject;
@@ -131,52 +131,52 @@ public abstract class SnapshotWritePlan
      * successful (yes, unfortunately, but this was the polarity of things
      * before I refactored them and I was too lazy to flip it).
      */
-    public boolean createSetup(
-            String file_path, String file_nonce,
-            long txnId, Map<Integer, Long> partitionTransactionIds,
-            JSONObject jsData, SystemProcedureExecutionContext context,
-            String hostname, final VoltTable result,
-            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-            SiteTracker tracker,
-            HashinatorSnapshotData hashinatorData,
-            long timestamp)
-    {
-        try {
-            boolean aborted = createSetupInternal(file_path, file_nonce,
-                    txnId, partitionTransactionIds, jsData, context,
-                    hostname, result, exportSequenceNumbers,
-                    tracker, hashinatorData, timestamp);
-            return aborted;
-        }
-        catch (Exception ex) {
-            /*
-             * Close all the targets to release the threads. Don't let sites get any tasks.
-             */
-            m_taskListsForHSIds.clear();
-            for (SnapshotDataTarget sdt : m_targets) {
-                try {
-                    sdt.close();
-                } catch (Exception e) {
-                    SNAP_LOG.error("Failed to create snapshot write plan: " + ex.getMessage(), ex);
-                    SNAP_LOG.error("Failed closing data target after error: " + e.getMessage(), e);
-                }
-            }
+//    public Callable<Boolean> createSetup(
+//            String file_path, String file_nonce,
+//            long txnId, Map<Integer, Long> partitionTransactionIds,
+//            JSONObject jsData, SystemProcedureExecutionContext context,
+//            final VoltTable result,
+//            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
+//            SiteTracker tracker,
+//            HashinatorSnapshotData hashinatorData,
+//            long timestamp)
+//    {
+//        return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, jsData, context,
+//                result, exportSequenceNumbers, tracker, hashinatorData, timestamp);
 
-            StringWriter sw = new StringWriter();
-            PrintWriter pw = new PrintWriter(sw);
-            ex.printStackTrace(pw);
-            pw.flush();
-            result.addRow(
-                    context.getHostId(),
-                    hostname,
-                    "",
-                    "FAILURE",
-                    "SNAPSHOT INITIATION OF " + file_path + file_nonce +
-                    "RESULTED IN Exception: \n" + sw.toString());
-            SNAP_LOG.error("Failed to create snapshot write plan: " + ex.getMessage(), ex);
-            return true;
-        }
-    }
+//        try {
+//
+//            return aborted;
+//        }
+//        catch (Exception ex) {
+//            /*
+//             * Close all the targets to release the threads. Don't let sites get any tasks.
+//             */
+//            m_taskListsForHSIds.clear();
+//            for (SnapshotDataTarget sdt : m_targets) {
+//                try {
+//                    sdt.close();
+//                } catch (Exception e) {
+//                    SNAP_LOG.error("Failed to create snapshot write plan: " + ex.getMessage(), ex);
+//                    SNAP_LOG.error("Failed closing data target after error: " + e.getMessage(), e);
+//                }
+//            }
+//
+//            StringWriter sw = new StringWriter();
+//            PrintWriter pw = new PrintWriter(sw);
+//            ex.printStackTrace(pw);
+//            pw.flush();
+//            result.addRow(
+//                    context.getHostId(),
+//                    hostname,
+//                    "",
+//                    "FAILURE",
+//                    "SNAPSHOT INITIATION OF " + file_path + file_nonce +
+//                    "RESULTED IN Exception: \n" + sw.toString());
+//            SNAP_LOG.error("Failed to create snapshot write plan: " + ex.getMessage(), ex);
+//            return true;
+//        }
+    //}
 
     /**
      * Overridden by subclasses.  Do the appropriate work for this type of snapshot to create the plan artifacts.
@@ -187,15 +187,15 @@ public abstract class SnapshotWritePlan
      * snapshots (meaning that if we, for some reason, can't write one table,
      * we'll still try to write every other table), a single failure won't cause us to abort.
      */
-    abstract protected boolean createSetupInternal(
+    abstract public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
             long txnId, Map<Integer, Long> partitionTransactionIds,
             JSONObject jsData, SystemProcedureExecutionContext context,
-            String hostname, final VoltTable result,
+            final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             SiteTracker tracker,
             HashinatorSnapshotData hashinatorData,
-            long timestamp) throws IOException;
+            long timestamp);
 
     /**
      * Get the task lists for each site.  Will only be useful after
@@ -248,7 +248,7 @@ public abstract class SnapshotWritePlan
     }
 
     protected void handleTargetCreationError(SnapshotDataTarget sdt,
-            SystemProcedureExecutionContext context, String file_nonce, String hostname,
+            int hostId, String file_nonce, String hostname,
             String tableName, Exception ex, final VoltTable result)
     {
         SNAP_LOG.warn("Failure creating snapshot target", ex);
@@ -270,7 +270,7 @@ public abstract class SnapshotWritePlan
         PrintWriter pw = new PrintWriter(sw);
         ex.printStackTrace(pw);
         pw.flush();
-        result.addRow(context.getHostId(),
+        result.addRow(hostId,
                 hostname,
                 tableName,
                 "FAILURE",

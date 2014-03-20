@@ -207,4 +207,6 @@ public interface VoltDBInterface
      * Return the license api. This may be null in community editions!
      */
      public LicenseApi getLicenseApi();
+
+    public SnapshotIOAgent getSnapshotIOAgent();
 }
