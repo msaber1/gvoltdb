@@ -159,7 +159,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, context,
-                result, exportSequenceNumbers, timestamp, numTables, snapshotRecord,
+                exportSequenceNumbers, timestamp, numTables, snapshotRecord,
                 partitionedSnapshotTasks, replicatedSnapshotTasks);
     }
 
@@ -168,7 +168,6 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
                                                   final SystemProcedureExecutionContext context,
-                                                  final VoltTable result,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                                   final long timestamp,
                                                   final AtomicInteger numTables,
@@ -186,13 +185,13 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {
                     final SnapshotDataTarget target = createDataTargetForTable(file_path, file_nonce,
-                            context.getHostId(), numTables, snapshotRecord, task.m_table, result);
+                            context.getHostId(), numTables, snapshotRecord, task.m_table);
                     task.setTarget(target);
                 }
 
                 for (SnapshotTableTask task : partitionedSnapshotTasks) {
                     final SnapshotDataTarget target = createDataTargetForTable(file_path, file_nonce,
-                            context.getHostId(), numTables, snapshotRecord, task.m_table, result);
+                            context.getHostId(), numTables, snapshotRecord, task.m_table);
                     task.setTarget(target);
                 }
 
@@ -206,8 +205,8 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                                                         int hostId,
                                                         AtomicInteger numTables,
                                                         SnapshotRegistry.Snapshot snapshotRecord,
-                                                        Table table,
-                                                        VoltTable result)
+                                                        Table table)
+            throws IOException
     {
         SnapshotDataTarget sdt;
         File saveFilePath = SnapshotUtil.constructFileForTable(
@@ -217,13 +216,7 @@ public class CSVSnapshotWritePlan extends SnapshotWritePlan
                 SnapshotFormat.CSV,
                 hostId);
 
-        try {
-            sdt = new SimpleFileSnapshotDataTarget(saveFilePath, !table.getIsreplicated());
-        } catch (IOException ex) {
-            handleTargetCreationError(null, hostId, file_nonce,
-                    CoreUtils.getHostnameOrAddress(), table.getTypeName(), ex, result);
-            return null;
-        }
+        sdt = new SimpleFileSnapshotDataTarget(saveFilePath, !table.getIsreplicated());
 
         m_targets.add(sdt);
         final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(), numTables, snapshotRecord);

@@ -17,7 +17,6 @@
 
 package org.voltdb;
 
-import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
@@ -31,12 +30,11 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.util.concurrent.Callables;
+import com.google_voltpatches.common.collect.Sets;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -84,8 +82,7 @@ public class SnapshotSaveAPI
         new HashMap<Long, Deque<SnapshotTableTask>>();
     private static final AtomicReference<VoltTable> m_createResult = new AtomicReference<VoltTable>();
     private static final AtomicBoolean m_createSuccess = new AtomicBoolean(false);
-    private static SnapshotWritePlan m_plan = null;
-    private static ListenableFuture<Boolean> m_deferredSetupFuture = null;
+    private static ListenableFuture<DeferredSnapshotSetup> m_deferredSetupFuture = null;
 
     //Protected by SnapshotSiteProcessor.m_snapshotCreateLock when accessed from SnapshotSaveAPI.startSnanpshotting
     private static Map<Integer, Long> m_partitionLastSeenTransactionIds =
@@ -239,8 +236,16 @@ public class SnapshotSaveAPI
                             @Override
                             public void run()
                             {
-                                context.getSiteSnapshotConnection().setDataTargets(m_plan.getSnapshotDataTargets());
-                                context.getSiteSnapshotConnection().startSnapshotWork();
+                                DeferredSnapshotSetup deferredSnapshotSetup = null;
+                                try {
+                                    deferredSnapshotSetup = m_deferredSetupFuture.get();
+                                } catch (Exception e) {
+                                    // it doesn't throw
+                                }
+
+                                assert deferredSnapshotSetup != null;
+                                context.getSiteSnapshotConnection().startSnapshotWithTargets(
+                                        deferredSnapshotSetup.getPlan().getSnapshotDataTargets());
                             }
                         }, MoreExecutors.sameThreadExecutor());
                     }
@@ -279,16 +284,23 @@ public class SnapshotSaveAPI
         }
 
         if (block != 0) {
-            HashSet<Exception> failures = null;
+            HashSet<Exception> failures = Sets.newHashSet();
             String status = "SUCCESS";
             String err = "";
             try {
-                failures = context.getSiteSnapshotConnection().completeSnapshotWork();
+                // For blocking snapshot, propogate the error from deferred setup back to the client
+                final DeferredSnapshotSetup deferredSnapshotSetup = m_deferredSetupFuture.get();
+                if (deferredSnapshotSetup != null && deferredSnapshotSetup.getError() != null) {
+                    status = "FAILURE";
+                    err = deferredSnapshotSetup.getError().toString();
+                    failures.add(deferredSnapshotSetup.getError());
+                }
+
+                failures.addAll(context.getSiteSnapshotConnection().completeSnapshotWork());
                 SnapshotSiteProcessor.runPostSnapshotTasks(context);
-            } catch (InterruptedException e) {
+            } catch (Exception e) {
                 status = "FAILURE";
                 err = e.toString();
-                failures = new HashSet<Exception>();
                 failures.add(e);
             }
             final VoltTable blockingResult = SnapshotUtil.constructPartitionResultsTable();
@@ -316,41 +328,6 @@ public class SnapshotSaveAPI
         }
 
         return result;
-    }
-
-
-    private static void logSnapshotStartToZK(long txnId) {
-        /*
-         * Going to send out the requests async to make snapshot init move faster
-         */
-        ZKUtil.StringCallback cb1 = new ZKUtil.StringCallback();
-
-        /*
-         * Log that we are currently snapshotting this snapshot
-         */
-        try {
-            //This node shouldn't already exist... should have been erased when the last snapshot finished
-            assert(VoltDB.instance().getHostMessenger().getZK().exists(
-                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), false)
-                    == null);
-            ByteBuffer snapshotTxnId = ByteBuffer.allocate(8);
-            snapshotTxnId.putLong(txnId);
-            VoltDB.instance().getHostMessenger().getZK().create(
-                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(),
-                    snapshotTxnId.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, cb1, null);
-        } catch (NodeExistsException e) {
-            SNAP_LOG.warn("Didn't expect the snapshot node to already exist", e);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-        }
-
-        try {
-            cb1.get();
-        } catch (NodeExistsException e) {
-            SNAP_LOG.warn("Didn't expect the snapshot node to already exist", e);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-        }
     }
 
     /**
@@ -471,7 +448,7 @@ public class SnapshotSaveAPI
 
     private void createSetupIv2(
             final String file_path, final String file_nonce, SnapshotFormat format,
-            final long txnId, Map<Integer, Long> partitionTransactionIds,
+            final long txnId, final Map<Integer, Long> partitionTransactionIds,
             String data, final SystemProcedureExecutionContext context,
             final VoltTable result,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
@@ -489,29 +466,29 @@ public class SnapshotSaveAPI
                         e);
             }
         }
+
+        SnapshotWritePlan plan;
         if (format == SnapshotFormat.NATIVE) {
-            m_plan = new NativeSnapshotWritePlan();
+            plan = new NativeSnapshotWritePlan();
         }
         else if (format == SnapshotFormat.CSV) {
-            m_plan = new CSVSnapshotWritePlan();
+            plan = new CSVSnapshotWritePlan();
         }
         else if (format == SnapshotFormat.STREAM) {
-            m_plan = new StreamSnapshotWritePlan();
+            plan = new StreamSnapshotWritePlan();
         }
         else if (format == SnapshotFormat.INDEX) {
-            m_plan = new IndexSnapshotWritePlan();
+            plan = new IndexSnapshotWritePlan();
         }
         else {
             throw new RuntimeException("BAD BAD BAD");
         }
-        final Callable<Boolean> deferredSetup = m_plan.createSetup(file_path, file_nonce, txnId,
+        final Callable<Boolean> deferredSetup = plan.createSetup(file_path, file_nonce, txnId,
                 partitionTransactionIds, jsData, context, result, exportSequenceNumbers, tracker,
                 hashinatorData, timestamp);
-        if (deferredSetup == null) {
-            m_deferredSetupFuture = VoltDB.instance().getSnapshotIOAgent().submit(Callables.returning(true));
-        } else {
-            m_deferredSetupFuture = VoltDB.instance().getSnapshotIOAgent().submit(deferredSetup);
-        }
+        m_deferredSetupFuture =
+                VoltDB.instance().submitSnapshotIOWork(
+                        new DeferredSnapshotSetup(plan, deferredSetup, txnId, partitionTransactionIds));
 
         synchronized (m_createLock) {
             //Seems like this should be cleared out just in case
@@ -523,36 +500,19 @@ public class SnapshotSaveAPI
             m_createSuccess.set(m_deferredSetupFuture != null);
             m_createResult.set(result);
 
-            if (m_deferredSetupFuture != null) {
-                m_taskListsForHSIds.putAll(m_plan.getTaskListsForHSIds());
+            m_taskListsForHSIds.putAll(plan.getTaskListsForHSIds());
 
-                // HACK HACK HACK.  If the task list is empty, this host has no work to do for
-                // this snapshot.  We're going to create an empty list of tasks for one of the sites to do
-                // so that we'll have a SnapshotSiteProcessor which will do the logSnapshotCompleteToZK.
-                if (m_taskListsForHSIds.isEmpty()) {
-                    SNAP_LOG.debug("Node had no snapshot work to do.  Creating a null task to drive completion.");
-                    m_taskListsForHSIds.put(context.getSiteId(), new ArrayDeque<SnapshotTableTask>());
-                }
-                SNAP_LOG.debug("Planned tasks: " +
-                        CoreUtils.hsIdCollectionToString(m_plan.getTaskListsForHSIds().keySet()));
-                SNAP_LOG.debug("Created tasks for HSIds: " +
-                        CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
-                /*
-                 * Inform the SnapshotCompletionMonitor of what the partition specific txnids for
-                 * this snapshot were so it can forward that to completion interests.
-                 */
-                VoltDB.instance().getSnapshotCompletionMonitor().registerPartitionTxnIdsForSnapshot(
-                        txnId, partitionTransactionIds);
-
-                m_deferredSetupFuture.addListener(new Runnable() {
-                    @Override
-                    public void run()
-                    {
-                        // Provide the truncation request ID so the monitor can recognize a specific snapshot.
-                        logSnapshotStartToZK(txnId);
-                    }
-                }, MoreExecutors.sameThreadExecutor());
+            // HACK HACK HACK.  If the task list is empty, this host has no work to do for
+            // this snapshot.  We're going to create an empty list of tasks for one of the sites to do
+            // so that we'll have a SnapshotSiteProcessor which will do the logSnapshotCompleteToZK.
+            if (m_taskListsForHSIds.isEmpty()) {
+                SNAP_LOG.debug("Node had no snapshot work to do.  Creating a null task to drive completion.");
+                m_taskListsForHSIds.put(context.getSiteId(), new ArrayDeque<SnapshotTableTask>());
             }
+            SNAP_LOG.debug("Planned tasks: " +
+                           CoreUtils.hsIdCollectionToString(plan.getTaskListsForHSIds().keySet()));
+            SNAP_LOG.debug("Created tasks for HSIds: " +
+                           CoreUtils.hsIdCollectionToString(m_taskListsForHSIds.keySet()));
         }
     }
 }

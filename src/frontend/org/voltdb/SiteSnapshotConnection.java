@@ -37,7 +37,6 @@ public interface SiteSnapshotConnection
             long txnId,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers);
 
-    public void setDataTargets(Collection<SnapshotDataTarget> targets);
-    public void startSnapshotWork();
+    public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets);
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException;
 }

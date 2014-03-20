@@ -38,7 +38,6 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
-import com.google_voltpatches.common.base.Preconditions;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -396,7 +395,7 @@ public class SnapshotSiteProcessor {
         }
     }
 
-    public void setDataTargets(Collection<SnapshotDataTarget> targets)
+    public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets, long now)
     {
         for (final SnapshotDataTarget target : targets) {
             if (target.needsFinalClose()) {
@@ -404,10 +403,8 @@ public class SnapshotSiteProcessor {
                 m_snapshotTargets.add(target);
             }
         }
-    }
 
-    public void queueInitialSnapshotTasks(long now)
-    {
+        // Queue the first snapshot task
         VoltDB.instance().schedulePriorityWork(
                 new Runnable() {
                     @Override

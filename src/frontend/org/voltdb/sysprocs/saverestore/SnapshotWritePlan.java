@@ -17,8 +17,6 @@
 
 package org.voltdb.sysprocs.saverestore;
 
-import java.io.PrintWriter;
-import java.io.StringWriter;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -29,10 +27,12 @@ import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import com.google_voltpatches.common.collect.Maps;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltdb.DevNullSnapshotTarget;
 import org.voltdb.SnapshotDataTarget;
 import org.voltdb.SnapshotTableTask;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -123,69 +123,13 @@ public abstract class SnapshotWritePlan
         new HashMap<Long, Deque<SnapshotTableTask>>();
 
     protected List<SnapshotDataTarget> m_targets = new ArrayList<SnapshotDataTarget>();
+    protected SnapshotRegistry.Snapshot m_snapshotRecord = null;
 
     /**
      * Given the giant list of inputs, generate the snapshot write plan
      * artifacts.  Will dispatch to a subclass appropriate method call based on
-     * the snapshot type.  Returns true if the setup aborted, false if it was
-     * successful (yes, unfortunately, but this was the polarity of things
-     * before I refactored them and I was too lazy to flip it).
-     */
-//    public Callable<Boolean> createSetup(
-//            String file_path, String file_nonce,
-//            long txnId, Map<Integer, Long> partitionTransactionIds,
-//            JSONObject jsData, SystemProcedureExecutionContext context,
-//            final VoltTable result,
-//            Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
-//            SiteTracker tracker,
-//            HashinatorSnapshotData hashinatorData,
-//            long timestamp)
-//    {
-//        return createSetupInternal(file_path, file_nonce, txnId, partitionTransactionIds, jsData, context,
-//                result, exportSequenceNumbers, tracker, hashinatorData, timestamp);
-
-//        try {
-//
-//            return aborted;
-//        }
-//        catch (Exception ex) {
-//            /*
-//             * Close all the targets to release the threads. Don't let sites get any tasks.
-//             */
-//            m_taskListsForHSIds.clear();
-//            for (SnapshotDataTarget sdt : m_targets) {
-//                try {
-//                    sdt.close();
-//                } catch (Exception e) {
-//                    SNAP_LOG.error("Failed to create snapshot write plan: " + ex.getMessage(), ex);
-//                    SNAP_LOG.error("Failed closing data target after error: " + e.getMessage(), e);
-//                }
-//            }
-//
-//            StringWriter sw = new StringWriter();
-//            PrintWriter pw = new PrintWriter(sw);
-//            ex.printStackTrace(pw);
-//            pw.flush();
-//            result.addRow(
-//                    context.getHostId(),
-//                    hostname,
-//                    "",
-//                    "FAILURE",
-//                    "SNAPSHOT INITIATION OF " + file_path + file_nonce +
-//                    "RESULTED IN Exception: \n" + sw.toString());
-//            SNAP_LOG.error("Failed to create snapshot write plan: " + ex.getMessage(), ex);
-//            return true;
-//        }
-    //}
-
-    /**
-     * Overridden by subclasses.  Do the appropriate work for this type of snapshot to create the plan artifacts.
-     * Returns true on abort, false on success.
-     *
-     * Abort means that none of the snapshot data targets that should have been
-     * created was successfully created.  Since we attempt to support partial
-     * snapshots (meaning that if we, for some reason, can't write one table,
-     * we'll still try to write every other table), a single failure won't cause us to abort.
+     * the snapshot type.  Returns a callable for deferred setup, null if there
+     * is nothing to do for deferred setup.
      */
     abstract public Callable<Boolean> createSetup(
             String file_path, String file_nonce,
@@ -212,6 +156,32 @@ public abstract class SnapshotWritePlan
     public List<SnapshotDataTarget> getSnapshotDataTargets()
     {
         return m_targets;
+    }
+
+    public void createAllDevNullTargets()
+    {
+        Map<Integer, SnapshotDataTarget> targets = Maps.newHashMap();
+        final AtomicInteger numTargets = new AtomicInteger();
+
+        for (Deque<SnapshotTableTask> tasksForSite : m_taskListsForHSIds.values()) {
+            for (SnapshotTableTask task : tasksForSite) {
+                SnapshotDataTarget target = targets.get(task.m_table.getRelativeIndex());
+                if (target == null) {
+                    target = new DevNullSnapshotTarget();
+                    final Runnable onClose = new TargetStatsClosure(target,
+                            task.m_table.getTypeName(),
+                            numTargets,
+                            m_snapshotRecord);
+                    target.setOnCloseHandler(onClose);
+
+                    targets.put(task.m_table.getRelativeIndex(), target);
+                    m_targets.add(target);
+                    numTargets.incrementAndGet();
+                }
+
+                task.setTarget(target);
+            }
+        }
     }
 
     protected void placePartitionedTasks(Collection<SnapshotTableTask> tasks, List<Long> hsids)
@@ -246,36 +216,4 @@ public abstract class SnapshotWritePlan
             siteIndex = siteIndex++ % hsids.size();
         }
     }
-
-    protected void handleTargetCreationError(SnapshotDataTarget sdt,
-            int hostId, String file_nonce, String hostname,
-            String tableName, Exception ex, final VoltTable result)
-    {
-        SNAP_LOG.warn("Failure creating snapshot target", ex);
-        /*
-         * Creation of this specific target failed. Close it if it was created.
-         * Continue attempting the snapshot anyways so that at least some of the data
-         * can be retrieved.
-         */
-        try {
-            if (sdt != null) {
-                m_targets.remove(sdt);
-                sdt.close();
-            }
-        } catch (Exception e) {
-            SNAP_LOG.error("Failed to close snapshot data target after error: " + e.getMessage(), e);
-        }
-
-        StringWriter sw = new StringWriter();
-        PrintWriter pw = new PrintWriter(sw);
-        ex.printStackTrace(pw);
-        pw.flush();
-        result.addRow(hostId,
-                hostname,
-                tableName,
-                "FAILURE",
-                "SNAPSHOT INITIATION OF " + file_nonce +
-                "RESULTED IN IOException: \n" + sw.toString());
-    }
-
 }

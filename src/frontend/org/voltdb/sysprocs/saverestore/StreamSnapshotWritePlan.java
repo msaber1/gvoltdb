@@ -113,7 +113,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         // Mark snapshot start in registry
         final AtomicInteger numTables = new AtomicInteger(config.tables.length);
-        final SnapshotRegistry.Snapshot snapshotRecord =
+        m_snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
                     context.getHostId(),
@@ -136,7 +136,7 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
 
         // For each table, create tasks where each task has a data target.
         for (final Table table : config.tables) {
-            createTasksForTable(table, sdts, numTables, snapshotRecord);
+            createTasksForTable(table, sdts, numTables, m_snapshotRecord);
             result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getTypeName(), "SUCCESS", "");
         }
 

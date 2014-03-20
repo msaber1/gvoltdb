@@ -1141,17 +1141,10 @@ implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
     }
 
     @Override
-    public void setDataTargets(Collection<SnapshotDataTarget> targets)
+    public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets)
     {
 
     }
-
-    @Override
-    public void startSnapshotWork()
-    {
-
-    }
-
 
     /*
      *  SiteConnection Interface (VoltProcedure -> ExecutionSite)

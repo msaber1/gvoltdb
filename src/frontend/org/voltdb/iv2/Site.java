@@ -702,12 +702,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                         exportSequenceNumbers);
     }
 
-    @Override
-    public void setDataTargets(Collection<SnapshotDataTarget> targets)
-    {
-        m_snapshotter.setDataTargets(targets);
-    }
-
     /*
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the syncing and closing of snapshot data targets has completed.
@@ -998,9 +992,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void startSnapshotWork()
+    public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets)
     {
-        m_snapshotter.queueInitialSnapshotTasks(System.currentTimeMillis());
+        m_snapshotter.startSnapshotWithTargets(targets, System.currentTimeMillis());
     }
 
     @Override

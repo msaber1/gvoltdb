@@ -48,6 +48,7 @@ import java.util.Map.Entry;
 import java.util.Random;
 import java.util.Set;
 import java.util.SortedMap;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledExecutorService;
@@ -57,6 +58,7 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.log4j.Appender;
@@ -2525,8 +2527,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return baseRqt + tableRqt + rejoinRqt;
     }
 
-    public SnapshotIOAgent getSnapshotIOAgent()
+    public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work)
     {
-        return m_snapshotIOAgent;
+        assert m_snapshotIOAgent != null;
+        return m_snapshotIOAgent.submit(work);
     }
 }

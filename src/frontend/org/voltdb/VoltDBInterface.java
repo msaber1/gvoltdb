@@ -16,10 +16,12 @@
  */
 package org.voltdb;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
+import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.SiteTracker;
@@ -208,5 +210,5 @@ public interface VoltDBInterface
      */
      public LicenseApi getLicenseApi();
 
-    public SnapshotIOAgent getSnapshotIOAgent();
+    public <T> ListenableFuture<T> submitSnapshotIOWork(Callable<T> work);
 }

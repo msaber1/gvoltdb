@@ -65,7 +65,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
 
         // mark snapshot start in registry
         final AtomicInteger numTables = new AtomicInteger(config.tables.length);
-        final SnapshotRegistry.Snapshot snapshotRecord =
+        m_snapshotRecord =
             SnapshotRegistry.startSnapshot(txnId,
                                            context.getHostId(),
                                            file_path,
@@ -79,7 +79,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                                 config.partitionRanges,
                                 pidToLocalHSIds,
                                 numTables,
-                                snapshotRecord);
+                                m_snapshotRecord);
             result.addRow(context.getHostId(), CoreUtils.getHostnameOrAddress(), table.getTypeName(), "SUCCESS", "");
         }
 

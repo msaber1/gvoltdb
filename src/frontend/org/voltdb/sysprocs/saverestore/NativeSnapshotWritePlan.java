@@ -94,7 +94,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         }
 
         final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
-        final SnapshotRegistry.Snapshot snapshotRecord =
+        m_snapshotRecord =
             SnapshotRegistry.startSnapshot(
                     txnId,
                     context.getHostId(),
@@ -131,7 +131,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
         }
 
         if (replicatedSnapshotTasks.isEmpty() && partitionedSnapshotTasks.isEmpty()) {
-            SnapshotRegistry.discardSnapshot(snapshotRecord);
+            SnapshotRegistry.discardSnapshot(m_snapshotRecord);
         }
 
         // Native snapshots place the partitioned tasks on every site and round-robin the
@@ -141,8 +141,8 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
         // All IO work will be deferred and be run on the dedicated snapshot IO thread
         return createDeferredSetup(file_path, file_nonce, txnId, partitionTransactionIds, context,
-                CoreUtils.getHostnameOrAddress(), result, exportSequenceNumbers, tracker, hashinatorData, timestamp,
-                newPartitionCount, tables, snapshotRecord, partitionedSnapshotTasks,
+                exportSequenceNumbers, tracker, hashinatorData, timestamp,
+                newPartitionCount, tables, m_snapshotRecord, partitionedSnapshotTasks,
                 replicatedSnapshotTasks);
     }
 
@@ -151,8 +151,6 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                   final long txnId,
                                                   final Map<Integer, Long> partitionTransactionIds,
                                                   final SystemProcedureExecutionContext context,
-                                                  final String hostname,
-                                                  final VoltTable result,
                                                   final Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                                   final SiteTracker tracker,
                                                   final HashinatorSnapshotData hashinatorData,
@@ -179,13 +177,11 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
 
                 for (SnapshotTableTask task : replicatedSnapshotTasks) {
                     SnapshotDataTarget target = getSnapshotDataTarget(numTables, task);
-                    // TODO: handle null
                     task.setTarget(target);
                 }
 
                 for (SnapshotTableTask task : partitionedSnapshotTasks) {
                     SnapshotDataTarget target = getSnapshotDataTarget(numTables, task);
-                    // TODO: handle null
                     task.setTarget(target);
                 }
 
@@ -193,12 +189,13 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             }
 
             private SnapshotDataTarget getSnapshotDataTarget(AtomicInteger numTables, SnapshotTableTask task)
+                    throws IOException
             {
                 SnapshotDataTarget target = m_createdTargets.get(task.m_table.getRelativeIndex());
                 if (target == null) {
                     target = createDataTargetForTable(file_path, file_nonce, task.m_table, txnId,
-                            context.getHostId(), hostname, context.getCluster().getTypeName(),
-                            context.getDatabase().getTypeName(), context.getNumberOfPartitions(), result,
+                            context.getHostId(), context.getCluster().getTypeName(),
+                            context.getDatabase().getTypeName(), context.getNumberOfPartitions(),
                             tracker, timestamp, numTables, snapshotRecord);
                     m_createdTargets.put(task.m_table.getRelativeIndex(), target);
                 }
@@ -212,42 +209,35 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                                                         Table table,
                                                         long txnId,
                                                         int hostId,
-                                                        String hostname,
                                                         String clusterName,
                                                         String databaseName,
                                                         int partitionCount,
-                                                        VoltTable result,
                                                         SiteTracker tracker,
                                                         long timestamp,
                                                         AtomicInteger numTables,
                                                         SnapshotRegistry.Snapshot snapshotRecord)
+            throws IOException
     {
         SnapshotDataTarget sdt;
 
-        try {
-            File saveFilePath = SnapshotUtil.constructFileForTable(
-                    table,
-                    file_path,
-                    file_nonce,
-                    SnapshotFormat.NATIVE,
-                    hostId);
+        File saveFilePath = SnapshotUtil.constructFileForTable(
+                table,
+                file_path,
+                file_nonce,
+                SnapshotFormat.NATIVE,
+                hostId);
 
-            sdt = new DefaultSnapshotDataTarget(saveFilePath,
-                    hostId,
-                    clusterName,
-                    databaseName,
-                    table.getTypeName(),
-                    partitionCount,
-                    table.getIsreplicated(),
-                    tracker.getPartitionsForHost(hostId),
-                    CatalogUtil.getVoltTable(table),
-                    txnId,
-                    timestamp);
-        } catch (IOException ex) {
-            handleTargetCreationError(null, hostId, file_nonce, hostname, table.getTypeName(),
-                    ex, result);
-            return null;
-        }
+        sdt = new DefaultSnapshotDataTarget(saveFilePath,
+                hostId,
+                clusterName,
+                databaseName,
+                table.getTypeName(),
+                partitionCount,
+                table.getIsreplicated(),
+                tracker.getPartitionsForHost(hostId),
+                CatalogUtil.getVoltTable(table),
+                txnId,
+                timestamp);
 
         m_targets.add(sdt);
         final Runnable onClose = new TargetStatsClosure(sdt, table.getTypeName(), numTables, snapshotRecord);
