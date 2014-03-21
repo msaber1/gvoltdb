@@ -377,14 +377,11 @@ public class SnapshotSaveAPI
 
         try {
             cb.get();
-            SNAP_LOG.warn("Completion node created");
             return true;
         } catch (KeeperException.NodeExistsException e) {
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unexpected exception logging snapshot completion to ZK", true, e);
         }
-
-        SNAP_LOG.warn("Completion node already exists");
 
         return false;
     }
@@ -497,7 +494,7 @@ public class SnapshotSaveAPI
                 SNAP_LOG.warn("Found lingering snapshot tasks while setting up a snapshot");
             }
             m_taskListsForHSIds.clear();
-            m_createSuccess.set(m_deferredSetupFuture != null);
+            m_createSuccess.set(true);
             m_createResult.set(result);
 
             m_taskListsForHSIds.putAll(plan.getTaskListsForHSIds());
