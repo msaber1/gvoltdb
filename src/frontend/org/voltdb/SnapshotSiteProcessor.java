@@ -38,6 +38,7 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
+import com.google_voltpatches.common.collect.Lists;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -156,7 +157,7 @@ public class SnapshotSiteProcessor {
      * of targets in case this EE ends up being the one that needs
      * to close each target.
      */
-    private ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
+    private volatile ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
 
     /**
      * Map of tasks for tables that still need to be snapshotted.
@@ -362,7 +363,6 @@ public class SnapshotSiteProcessor {
         m_lastSnapshotTxnId = txnId;
         m_snapshotTableTasks = MiscUtils.sortedArrayListMultimap();
         m_streamers = Maps.newHashMap();
-        m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         m_exportSequenceNumbersToLogOnCompletion = exportSequenceNumbers;
 
@@ -397,12 +397,13 @@ public class SnapshotSiteProcessor {
 
     public void startSnapshotWithTargets(Collection<SnapshotDataTarget> targets, long now)
     {
+        ArrayList<SnapshotDataTarget> targetsToClose = Lists.newArrayList();
         for (final SnapshotDataTarget target : targets) {
             if (target.needsFinalClose()) {
-                assert(m_snapshotTargets != null);
-                m_snapshotTargets.add(target);
+                targetsToClose.add(target);
             }
         }
+        m_snapshotTargets = targetsToClose;
 
         // Queue the first snapshot task
         VoltDB.instance().schedulePriorityWork(
@@ -519,6 +520,10 @@ public class SnapshotSiteProcessor {
          */
         if (m_snapshotTableTasks == null) {
             return retval;
+        }
+
+        if (m_snapshotTargets == null) {
+            return null;
         }
 
         /*

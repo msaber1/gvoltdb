@@ -30,6 +30,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.PostSnapshotTask;
 import org.voltdb.PrivateVoltTableFactory;
+import org.voltdb.SnapshotDataFilter;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSiteProcessor;
 import org.voltdb.SnapshotTableTask;
@@ -267,14 +268,14 @@ public class StreamSnapshotWritePlan extends SnapshotWritePlan
                                                             snapshotRecord);
             targetInfo.dataTarget.setOnCloseHandler(onClose);
 
-//            final SnapshotTableTask task =
-//                new SnapshotTableTask(table,
-//                                      targetInfo.dataTarget,
-//                                      new SnapshotDataFilter[0], // This task no longer needs partition filtering
-//                                      null,
-//                                      false);
-//
-//            tasks.put(targetInfo.srcHSId, task);
+            final SnapshotTableTask task =
+                new SnapshotTableTask(table,
+                                      new SnapshotDataFilter[0], // This task no longer needs partition filtering
+                                      null,
+                                      false);
+            task.setTarget(targetInfo.dataTarget);
+
+            tasks.put(targetInfo.srcHSId, task);
             m_targets.add(targetInfo.dataTarget);
         }
 
