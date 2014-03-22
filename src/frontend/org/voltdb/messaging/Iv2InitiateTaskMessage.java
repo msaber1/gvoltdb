@@ -109,6 +109,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_shouldReturnResultTables;
     }
 
+    public void setShouldReturnResultTables(boolean flag) {
+        m_shouldReturnResultTables = false;
+    }
+
     public StoredProcedureInvocation getStoredProcedureInvocation() {
         return m_invocation;
     }
@@ -169,7 +173,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         buf.putLong(m_clientInterfaceHandle);
         buf.putLong(m_connectionId);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
-        buf.put((byte)0);//Should never generate a response if we have to forward to a replica
+        buf.put(m_shouldReturnResultTables ? (byte)1 : (byte)0);//Should never generate a response if we have to forward to a replica
         m_invocation.flattenToBuffer(buf);
 
         assert(buf.capacity() == buf.position());

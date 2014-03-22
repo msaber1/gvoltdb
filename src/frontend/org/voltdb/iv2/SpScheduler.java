@@ -508,6 +508,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             msg.getClientInterfaceHandle(),
                             msg.getConnectionId(),
                             msg.isForReplay());
+                replmsg.setShouldReturnResultTables(false);
                 // Update the handle in the copy since the constructor doesn't set it
                 replmsg.setSpHandle(newSpHandle);
                 m_mailbox.send(m_sendToHSIds, replmsg);
