@@ -33,6 +33,7 @@ import java.util.TimeZone;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.PortGenerator;
+import org.voltcore.utils.ShutdownHooks;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
@@ -685,6 +686,10 @@ public class VoltDB {
         }
     }
 
+    public static void crashLocalVoltDB(String errMsg) {
+        crashLocalVoltDB(errMsg, false, null);
+    }
+
     /**
      * Exit the process with an error message, optionally with a stack trace.
      */
@@ -802,6 +807,7 @@ public class VoltDB {
             }
         }
         finally {
+            ShutdownHooks.useOnlyCrashHooks();
             System.exit(-1);
         }
     }
