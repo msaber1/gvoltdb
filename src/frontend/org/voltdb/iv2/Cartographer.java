@@ -40,7 +40,6 @@ import org.voltcore.messaging.BinaryPayloadMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.StatsSource;
@@ -66,6 +65,7 @@ public class Cartographer extends StatsSource
     private final LeaderCacheReader m_iv2Mpi;
     private final Set<Long> m_currentSPMasters = new HashSet<Long>();
     private final HostMessenger m_hostMessenger;
+    private final ClusterWatcher m_cwatcher;
     private final ZooKeeper m_zk;
     private final Set<Integer> m_allMasters = new HashSet<Integer>();
 
@@ -159,10 +159,10 @@ public class Cartographer extends StatsSource
         }
     }
 
-    public Cartographer(HostMessenger hostMessenger)
-    {
+    public Cartographer(HostMessenger hostMessenger, ClusterWatcher cwatcher)    {
         super(false);
         m_hostMessenger = hostMessenger;
+        m_cwatcher = cwatcher;
         m_zk = hostMessenger.getZK();
         m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_SPIMasterCallback);
         m_iv2Mpi = new LeaderCache(m_zk, VoltZK.iv2mpi, m_MPICallback);
@@ -252,41 +252,22 @@ public class Cartographer extends StatsSource
                                    CoreUtils.hsIdToString(hsid));
     }
 
-    /**
-     * Returns the IDs of the partitions currently in the cluster.
-     * @return A list of partition IDs
-     */
-    public static List<Integer> getPartitions(ZooKeeper zk) {
-        List<Integer> partitions = new ArrayList<Integer>();
-        try {
-            List<String> children = zk.getChildren(VoltZK.leaders_initiators, null);
-            for (String child : children) {
-                partitions.add(LeaderElector.getPartitionFromElectionDir(child));
-            }
-        } catch (KeeperException e) {
-            VoltDB.crashLocalVoltDB("Failed to get partition IDs from ZK", true, e);
-        } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Failed to get partition IDs from ZK", true, e);
-        }
-        return partitions;
-    }
-
     public List<Integer> getPartitions() {
-        return Cartographer.getPartitions(m_zk);
+        return m_cwatcher.getPartitions();
     }
 
     public int getPartitionCount()
     {
         // The list returned by getPartitions includes the MP PID.  Need to remove that for the
         // true partition count.
-        return Cartographer.getPartitions(m_zk).size() - 1;
+        return m_cwatcher.getPartitionsCount() - 1;
     }
 
     /**
      * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
      */
     public List<Long> getReplicasForPartition(int partition) {
-        String zkpath = LeaderElector.electionDirForPartition(partition);
+        String zkpath = ClusterWatcher.electionDirForPartition(partition);
         List<Long> retval = new ArrayList<Long>();
         try {
             List<String> children = m_zk.getChildren(zkpath, null);
@@ -315,7 +296,7 @@ public class Cartographer extends StatsSource
         List<Pair<Integer,ZKUtil.ChildrenCallback>> callbacks = new ArrayList<Pair<Integer, ZKUtil.ChildrenCallback>>();
 
         for (Integer partition : partitions) {
-            String zkpath = LeaderElector.electionDirForPartition(partition);
+            String zkpath = ClusterWatcher.electionDirForPartition(partition);
             ZKUtil.ChildrenCallback cb = new ZKUtil.ChildrenCallback();
             callbacks.add(Pair.of(partition, cb));
             m_zk.getChildren(zkpath, false, cb, null);
@@ -416,12 +397,11 @@ public class Cartographer extends StatsSource
      * @return A list of partitions IDs to add to the cluster.
      * @throws JSONException
      */
-    public static List<Integer> getPartitionsToAdd(ZooKeeper zk, JSONObject topo)
+    public static List<Integer> getPartitionsToAdd(List<Integer> existingParts, JSONObject topo)
             throws JSONException
     {
         ClusterConfig  clusterConfig = new ClusterConfig(topo);
         List<Integer> newPartitions = new ArrayList<Integer>();
-        Set<Integer> existingParts = new HashSet<Integer>(getPartitions(zk));
         // Remove MPI
         existingParts.remove(MpInitiator.MP_INIT_PID);
         int partsToAdd = clusterConfig.getPartitionCount() - existingParts.size();

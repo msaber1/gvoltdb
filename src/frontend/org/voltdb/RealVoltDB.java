@@ -125,6 +125,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+import org.voltdb.iv2.ClusterWatcher;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -288,6 +289,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private ScheduledThreadPoolExecutor m_periodicWorkThread;
     private ScheduledThreadPoolExecutor m_periodicPriorityWorkThread;
+
+    private KSafetyStats m_kSafetyStats;
+    private ClusterWatcher m_cwatcher;
 
     // The configured license api: use to decide enterprise/community edition feature enablement
     LicenseApi m_licenseApi;
@@ -474,8 +478,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             JSONObject topo = getTopology(config.m_startAction, m_joinCoordinator);
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<Pair<Integer, Long>>();
             try {
-                // IV2 mailbox stuff
-                m_cartographer = new Cartographer(m_messenger);
+                m_kSafetyStats = new KSafetyStats();
+                m_cwatcher = new ClusterWatcher(getHostMessenger(), m_configuredReplicationFactor, m_kSafetyStats);
+               // IV2 mailbox stuff
+                m_cartographer = new Cartographer(m_messenger, m_cwatcher);
                 ClusterConfig clusterConfig = new ClusterConfig(topo);
                 List<Integer> partitions = null;
                 if (isRejoin) {
@@ -599,8 +605,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             BalancePartitionsStatistics rebalanceStats = new BalancePartitionsStatistics();
             getStatsAgent().registerStatsSource(StatsSelector.REBALANCE, 0, rebalanceStats);
 
-            KSafetyStats kSafetyStats = new KSafetyStats();
-            getStatsAgent().registerStatsSource(StatsSelector.KSAFETY, 0, kSafetyStats);
+            getStatsAgent().registerStatsSource(StatsSelector.KSAFETY, 0, m_kSafetyStats);
 
             /*
              * Initialize the command log on rejoin and join before configuring the IV2
@@ -666,7 +671,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_catalogContext.cluster.getNetworkpartition(),
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
                         usingCommandLog,
-                        topo, m_MPI, kSafetyStats);
+                        topo, m_MPI, m_cwatcher);
                 m_globalServiceElector.registerService(m_leaderAppointer);
             } catch (Exception e) {
                 Throwable toLog = e;
@@ -819,17 +824,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
                     Constructor<?> constructor =
                         elasticServiceClass.getConstructor(HostMessenger.class,
-                                                           ClientInterface.class,
-                                                           Cartographer.class,
-                                                           BalancePartitionsStatistics.class,
-                                                           String.class,
-                                                           int.class);
-                    m_elasticJoinService =
-                        (ElasticJoinService) constructor.newInstance(m_messenger,
-                                    m_clientInterface,                                                                     m_cartographer,
-                                                                     rebalanceStats,
-                                                                     clSnapshotPath,
-                                                                     m_deployment.getCluster().getKfactor());
+                                    ClientInterface.class,
+                                    Cartographer.class,
+                                    BalancePartitionsStatistics.class,
+                                    String.class,
+                                    int.class,
+                                    ClusterWatcher.class);
+                    m_elasticJoinService = (ElasticJoinService) constructor.newInstance(m_messenger, m_clientInterface,
+                            m_cartographer, rebalanceStats, clSnapshotPath,
+                            m_deployment.getCluster().getKfactor(), m_cwatcher);
                     m_elasticJoinService.updateConfig(m_catalogContext);
                 }
             } catch (Exception e) {
@@ -1694,7 +1697,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 VoltDB.crashLocalVoltDB("Failed to join the cluster", true, e);
             }
         }
-
+        //Refresh my zookeeper cache.
+        m_cwatcher.refresh();
         m_isRunning = true;
     }
 
@@ -2064,7 +2068,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     @Override
     public boolean isSafeToSuicide() {
-        return true;
+        return m_cwatcher.isClusterKSafeAfterIDie();
     }
 
     /**

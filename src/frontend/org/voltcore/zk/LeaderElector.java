@@ -36,7 +36,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
 import java.util.concurrent.TimeUnit;
 import org.apache.zookeeper_voltpatches.Watcher;
-import org.voltdb.VoltZK;
 
 public class LeaderElector {
     // The root is always created as INITIALIZING until the first participant is added,
@@ -313,14 +312,6 @@ public class LeaderElector {
         if (topologyChange && cb != null) {
             cb.noticedTopologyChange(added, removed);
         }
-    }
-
-    public static String electionDirForPartition(int partition) {
-        return ZKUtil.path(VoltZK.leaders_initiators, "partition_" + partition);
-    }
-
-    public static int getPartitionFromElectionDir(String partitionDir) {
-        return Integer.parseInt(partitionDir.substring("partition_".length()));
     }
 
     public static String getPrefixFromChildName(String childName) {

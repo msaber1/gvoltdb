@@ -145,8 +145,9 @@ public class TestCartographer extends ZKTestBase {
         VoltZK.createPersistentZKNodes(zk);
         LeaderCache spwriter = new LeaderCache(zk, VoltZK.iv2masters);
         HostMessenger hm = mock(HostMessenger.class);
+        ClusterWatcher cw = mock(ClusterWatcher.class);
         when(hm.getZK()).thenReturn(m_messengers.get(0).getZK());
-        Cartographer dut = new Cartographer(hm);
+        Cartographer dut = new Cartographer(hm, cw);
         // Startup partitions
         spwriter.start(true);
         spwriter.put(0, 0l);
@@ -180,8 +181,9 @@ public class TestCartographer extends ZKTestBase {
         VoltZK.createPersistentZKNodes(zk);
         LeaderCache mpwriter = new LeaderCache(zk, VoltZK.iv2mpi);
         HostMessenger hm = mock(HostMessenger.class);
+        ClusterWatcher cw = mock(ClusterWatcher.class);
         when(hm.getZK()).thenReturn(m_messengers.get(0).getZK());
-        Cartographer dut = new Cartographer(hm);
+        Cartographer dut = new Cartographer(hm, cw);
         mpwriter.start(true);
         // initial master
         mpwriter.put(MpInitiator.MP_INIT_PID, 0l);

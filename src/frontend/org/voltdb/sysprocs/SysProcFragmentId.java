@@ -80,6 +80,7 @@ public class SysProcFragmentId
      * stop node
      */
     public static final long PF_stopNode = 46;
+    public static final long PF_stopNodeAggregate = 47;
 
     public static boolean isSnapshotSaveFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);

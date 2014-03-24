@@ -123,23 +123,25 @@ public class TestLeaderAppointer extends ZKTestBase {
     void createAppointer(boolean enablePPD) throws JSONException
     {
         KSafetyStats stats = new KSafetyStats();
+        ClusterWatcher cwatcher = new ClusterWatcher(m_hm, m_config.getPartitionCount(), stats);
+
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                 m_config.getReplicationFactor(), enablePPD,
                 null, false,
-                m_config.getTopology(m_hostIds), m_mpi, stats);
+                m_config.getTopology(m_hostIds), m_mpi, cwatcher);
         m_dut.onReplayCompletion();
     }
 
     void addReplica(int partitionId, long HSId) throws KeeperException, InterruptedException, Exception
     {
         LeaderElector.createParticipantNode(m_zk,
-                LeaderElector.electionDirForPartition(partitionId),
+                ClusterWatcher.electionDirForPartition(partitionId),
                 Long.toString(HSId), null);
     }
 
     void deleteReplica(int partitionId, long HSId) throws KeeperException, InterruptedException
     {
-        String dir = LeaderElector.electionDirForPartition(partitionId);
+        String dir = ClusterWatcher.electionDirForPartition(partitionId);
         List<String> children = m_zk.getChildren(dir, false);
         for (String child : children) {
             if (LeaderElector.getPrefixFromChildName(child).equals(Long.toString(HSId))) {
@@ -271,11 +273,13 @@ public class TestLeaderAppointer extends ZKTestBase {
         m_dut.shutdown();
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         // create a new appointer and start it up in the replay state
+        KSafetyStats stats = new KSafetyStats();
+        ClusterWatcher cwatcher = new ClusterWatcher(m_hm, m_config.getPartitionCount(), stats);
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(), false,
                                     null, false,
                                     m_config.getTopology(m_hostIds), m_mpi,
-                                    new KSafetyStats());
+                cwatcher);
         m_newAppointee.set(false);
         VoltDB.ignoreCrash = true;
         boolean threw = false;
@@ -494,7 +498,7 @@ public class TestLeaderAppointer extends ZKTestBase {
         assertFalse(VoltDB.wasCrashCalled);
 
         // Create a partition dir
-        LeaderElector.createRootIfNotExist(m_zk, LeaderElector.electionDirForPartition(2));
+        LeaderElector.createRootIfNotExist(m_zk, ClusterWatcher.electionDirForPartition(2));
         Thread.sleep(500); // I'm evil
         assertFalse(VoltDB.wasCrashCalled);
 

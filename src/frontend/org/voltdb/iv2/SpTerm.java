@@ -29,7 +29,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
-import org.voltcore.zk.LeaderElector;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -85,7 +84,7 @@ public class SpTerm implements Term
     {
         try {
             Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
-                    LeaderElector.electionDirForPartition(m_partitionId),
+                    ClusterWatcher.electionDirForPartition(m_partitionId),
                     m_replicasChangeHandler);
             m_babySitter = pair.getFirst();
         }
