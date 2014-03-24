@@ -57,7 +57,6 @@ import com.google_voltpatches.common.io.Files;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
@@ -450,6 +449,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
                             + " Buffer info: " + uso + " Size: " + buffer.capacity());
                     return;
                 }
+                final BBContainer cont = DBBPool.wrapBB(buffer);
                 try {
                     m_committedBuffers.offer(new StreamBlock(
                             new BBContainer(buffer) {
