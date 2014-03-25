@@ -19,6 +19,7 @@
 #define SQLEXCEPTION_H_
 
 #include "common/SerializableEEException.h"
+#include <cstdio> // for snprintf
 
 #define throwDynamicSQLException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::SQLException( SQLException::dynamic_sql_error, reallysuperbig_nonce_message); }
 namespace voltdb {

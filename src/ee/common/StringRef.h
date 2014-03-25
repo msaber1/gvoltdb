@@ -39,39 +39,31 @@ namespace voltdb
         /// string pool.
         static std::size_t computeStringMemoryUsed(std::size_t length);
 
-        friend class CompactingStringPool;
         /// Create and return a new StringRef object which points to an
-        /// allocated memory block of the requested size.  The caller
-        /// may provide an optional Pool from which the memory (and
+        /// allocated memory block of (at least) the requested size.  The caller
+        /// may provide an optional (temporary) Pool from which the memory (and
         /// the memory for the StringRef object itself) will be
-        /// allocated, intended for temporary strings.  If no Pool
-        /// object is provided, the StringRef and the string memory will be
-        /// allocated out of the ThreadLocalPool.
+        /// allocated, intended for temporary strings.
+        /// If no Pool object is provided, the StringRef and the string memory will be
+        /// allocated out of the (persistent) ThreadLocalPool
+        /// (or via direct C++ allocation in MEMCHECK mode).
         static StringRef* create(std::size_t size, Pool* dataPool);
 
-        /// Destroy the given StringRef object and free any memory, if
-        /// any, allocated from pools to store the object.
+        /// Destroy the given StringRef object and free any memory
+        /// allocated from non-temporary pools to store the object.
         /// sref must have been allocated and returned by a call to
-        /// StringRef::create() and must not have been created in a
-        /// temporary Pool
+        /// StringRef::create().
+        /// It is an optional no-op when sref was created in a temporary Pool.
         static void destroy(StringRef* sref);
 
-        char* get();
-        const char* get() const;
+        char* get() { return m_stringPtr + sizeof(StringRef*); }
+        const char* get() const { return m_stringPtr + sizeof(StringRef*); }
 
     private:
-        StringRef(std::size_t size);
-        StringRef(std::size_t size, Pool* dataPool);
-        ~StringRef();
-
-        /// Callback used via the back-pointer in order to update the
-        /// pointer to the memory backing this string reference
-        void updateStringLocation(void* location);
-
-        void setBackPtr();
-
-        std::size_t m_size;
-        bool m_tempPool;
+        StringRef(std::size_t size, char* stringPtr) : m_size(size), m_stringPtr(stringPtr) {}
+        /// A no-op -- All cleanup is handled by destroy(StringRef*)
+        ~StringRef() {}
+        const std::size_t m_size;
         char* m_stringPtr;
     };
 }

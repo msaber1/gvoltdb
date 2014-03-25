@@ -70,7 +70,7 @@ public:
     FastAllocator() {}
 
     template <typename U>
-    FastAllocator( const FastAllocator<U> &other) {}
+    FastAllocator(const FastAllocator<U> &other) {}
     FastAllocator(const FastAllocator<T> &other) {}
 
     static pointer address(reference reference) {
@@ -109,13 +109,7 @@ public:
         if (n == 0) {
             return NULL;
         }
-        const pointer ret = (n == 1) ?
-                static_cast<pointer>(
-                        ThreadLocalPool::getExact(sizeof(T))->malloc()) :
-                        reinterpret_cast<pointer>(new char[sizeof(T) * n]);
-        if (ret == 0) {
-            boost::throw_exception(std::bad_alloc());
-        }
+        const pointer ret = (n == 1) ? allocate() : reinterpret_cast<pointer>(new char[sizeof(T) * n]);
         return ret;
     }
 
@@ -124,9 +118,8 @@ public:
     }
 
     pointer allocate() {
-        boost::shared_ptr<boost::pool<voltdb::voltdb_pool_allocator_new_delete> > pool = ThreadLocalPool::getExact(sizeof(T));
-        const pointer ret = pool->malloc();
-        if (ret == 0) {
+        const pointer ret = reinterpret_cast<pointer>(ThreadLocalPool::allocateObject(sizeof(T)));
+        if (ret == NULL) {
             boost::throw_exception(std::bad_alloc());
         }
         return ret;
@@ -137,7 +130,7 @@ public:
             return;
         }
         if (n == 1) {
-            ThreadLocalPool::getExact(sizeof(T))->free(ptr);
+            ThreadLocalPool::freeObject(sizeof(T), ptr);
         } else {
             delete [] reinterpret_cast<const char*>(ptr);
         }
@@ -147,8 +140,7 @@ public:
         if (ptr == NULL) {
             return;
         }
-        boost::shared_ptr<boost::pool<voltdb::voltdb_pool_allocator_new_delete> > pool = ThreadLocalPool::getExact(sizeof(T));
-        pool->free(ptr);
+        ThreadLocalPool::freeObject(sizeof(T), ptr);
     }
 };
 }

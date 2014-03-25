@@ -88,6 +88,11 @@ class TupleBlock {
     friend void ::intrusive_ptr_add_ref(voltdb::TupleBlock * p);
     friend void ::intrusive_ptr_release(voltdb::TupleBlock * p);
 public:
+    void* operator new(std::size_t sz) {
+        assert(sz == sizeof(voltdb::TupleBlock)); // no derived classes allowed
+        return voltdb::ThreadLocalPool::allocateObject(sizeof(voltdb::TupleBlock));
+    }
+
     TupleBlock(Table *table, TBBucketPtr bucket);
 
     double loadFactor() {
@@ -223,9 +228,6 @@ public:
         return m_bucket;
     }
 private:
-#ifdef MEMCHECK
-    Table* m_table;
-#endif
     char*   m_storage;
     uint32_t m_references;
     uint32_t m_tupleLength;
@@ -246,6 +248,9 @@ private:
 
     TBBucketPtr m_bucket;
     int m_bucketIndex;
+#ifdef USE_MMAP
+    const int m_allocationSize;
+#endif
 
 };
 
@@ -272,7 +277,7 @@ inline void intrusive_ptr_release(voltdb::TupleBlock * p)
 {
     if (--(p->m_references) == 0) {
         p->~TupleBlock();
-        voltdb::ThreadLocalPool::getExact(sizeof(voltdb::TupleBlock))->free(p);
+        voltdb::ThreadLocalPool::freeObject(sizeof(voltdb::TupleBlock), p);
     }
 }
 

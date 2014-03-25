@@ -24,7 +24,6 @@
 #include "common/ValuePeeker.hpp"
 #include "common/serializeio.h"
 #include "common/TheHashinator.h"
-#include "boost_ext/FastAllocator.hpp"
 
 #include <cstring>
 #include <string>

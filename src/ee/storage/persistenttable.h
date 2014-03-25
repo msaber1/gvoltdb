@@ -782,7 +782,7 @@ inline TBPtr PersistentTable::findBlock(char *tuple, TBMap &blocks, int blockSiz
 }
 
 inline TBPtr PersistentTable::allocateNextBlock() {
-    TBPtr block(new (ThreadLocalPool::getExact(sizeof(TupleBlock))->malloc()) TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
+    TBPtr block(new TupleBlock(this, m_blocksNotPendingSnapshotLoad[0]));
     m_data.insert( block->address(), block);
     m_blocksNotPendingSnapshot.insert(block);
     return block;

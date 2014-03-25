@@ -18,14 +18,15 @@
 #ifndef FATALEXCEPTION_HPP_
 #define FATALEXCEPTION_HPP_
 
+#include "common/debuglog.h"
+
+#include <cassert>
 #include <cstdio>
 #include <ostream>
 #include <string>
 #include <sstream>
 #include <stdexcept>
 #include <vector>
-
-#include "common/debuglog.h"
 
 #define throwFatalException(...) { char reallysuperbig_nonce_message[8192]; snprintf(reallysuperbig_nonce_message, 8192, __VA_ARGS__); throw voltdb::FatalException( reallysuperbig_nonce_message, __FILE__, __LINE__); }
 #define HACK_HARDCODED_BACKTRACE_PATH "/tmp/voltdb_backtrace.txt"

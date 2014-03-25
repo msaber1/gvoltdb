@@ -36,10 +36,8 @@
 
 #include "common/ExportSerializeIo.h"
 #include "common/FatalException.hpp"
-#include "common/Pool.hpp"
 #include "common/SQLException.h"
 #include "common/StringRef.h"
-#include "common/ThreadLocalPool.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/types.h"
@@ -853,9 +851,6 @@ class NValue {
     }
 
     bool isBooleanNULL() const ;
-
-    std::size_t getAllocationSizeForObject() const;
-    static std::size_t getAllocationSizeForObject(int32_t length);
 
     static void throwCastSQLException(const ValueType origType,
                                       const ValueType newType)

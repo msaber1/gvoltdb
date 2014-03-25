@@ -1255,7 +1255,7 @@ void VoltDBIPC::setupSigHandler(void) const {
 }
 
 void VoltDBIPC::threadLocalPoolAllocations() {
-    std::size_t poolAllocations = ThreadLocalPool::getPoolAllocationSize();
+    std::size_t poolAllocations = ThreadLocalPool::getTotalPoolBytesAllocated();
     char response[9];
     response[0] = kErrorCode_Success;
     *reinterpret_cast<std::size_t*>(&response[1]) = htonll(poolAllocations);

@@ -18,21 +18,9 @@
 #ifndef THREADLOCALPOOL_H_
 #define THREADLOCALPOOL_H_
 
-#include "CompactingStringStorage.h"
-
-#include "boost/pool/pool.hpp"
-#include "boost/shared_ptr.hpp"
+#include <cstddef> // for std::size_t
 
 namespace voltdb {
-
-struct voltdb_pool_allocator_new_delete
-{
-  typedef std::size_t size_type;
-  typedef std::ptrdiff_t difference_type;
-
-  static char * malloc(const size_type bytes);
-  static void free(char * const block);
-};
 
 /**
  * A wrapper around a set of pools that are local to the current thread.
@@ -45,28 +33,15 @@ public:
     ThreadLocalPool();
     ~ThreadLocalPool();
 
-    /**
-     * Return the nearest power-of-two-plus-or-minus buffer size that
-     * will be allocated for an object of the given length
-     */
-    static std::size_t getAllocationSizeForObject(std::size_t length);
+    static std::size_t getTotalPoolBytesAllocated();
 
-    /**
-     * Retrieve a pool that allocates approximately sized chunks of memory. Provides pools that
-     * are powers of two and powers of two + the previous power of two.
-     */
-    static boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > get(std::size_t size);
+    static void * allocateObject(std::size_t size);
+    static void freeObject(std::size_t size, const void* object);
 
-    /**
-     * Retrieve a pool that allocate chunks that are exactly the requested size. Only creates
-     * pools up to 1 megabyte + 4 bytes.
-     */
-    static boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > getExact(std::size_t size);
-
-    static std::size_t getPoolAllocationSize();
-
-    static CompactingStringStorage* getStringPool();
+    static char * allocateString(std::size_t size);
+    static bool freeString(std::size_t size, const char* string);
 };
+
 }
 
 #endif /* THREADLOCALPOOL_H_ */

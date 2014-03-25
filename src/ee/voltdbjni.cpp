@@ -1235,7 +1235,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
  */
 SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetThreadLocalPoolAllocations
   (JNIEnv *, jclass) {
-    return ThreadLocalPool::getPoolAllocationSize();
+    return ThreadLocalPool::getTotalPoolBytesAllocated();
 }
 
 /*
