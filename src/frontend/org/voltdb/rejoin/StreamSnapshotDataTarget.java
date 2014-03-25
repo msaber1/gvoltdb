@@ -63,7 +63,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
 
     // shortened when in test mode
     final static long DEFAULT_WRITE_TIMEOUT_MS = m_rejoinDeathTestMode ? 10000 : 60000;
-    final static long WATCHDOG_PERIOS_S = 5;
+    final static long WATCHDOG_PERIOD_S = 5;
 
     // schemas for all the tables on this partition
     private final Map<Integer, byte[]> m_schemas = new HashMap<Integer, byte[]>();
@@ -109,7 +109,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
                 CoreUtils.hsIdToString(HSId), m_targetId));
 
         // start a periodic task to look for timed out connections
-        VoltDB.instance().scheduleWork(new Watchdog(0, writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+        VoltDB.instance().scheduleWork(new Watchdog(0, writeTimeout), WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
 
         if (hashinatorConfig != null) {
             // Send the hashinator config as  the first block
@@ -235,8 +235,8 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             }
 
             long bytesWritten = m_sender.m_bytesSent.get(m_targetId).get();
-            rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds.",
-                    CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOS_S));
+            rejoinLog.info(String.format("While sending rejoin data to site %s, %d bytes have been sent in the past %s seconds (%d sent in total so far).",
+                    CoreUtils.hsIdToString(m_destHSId), bytesWritten - m_bytesWrittenSinceConstruction, WATCHDOG_PERIOD_S, bytesWritten));
 
             long now = System.currentTimeMillis();
             for (Entry<Integer, SendWork> e : m_outstandingWork.entrySet()) {
@@ -256,7 +256,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             }
 
             // schedule to run again
-            VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOS_S, -1, TimeUnit.SECONDS);
+            VoltDB.instance().scheduleWork(new Watchdog(bytesWritten, m_writeTimeout), WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
         }
     }
 

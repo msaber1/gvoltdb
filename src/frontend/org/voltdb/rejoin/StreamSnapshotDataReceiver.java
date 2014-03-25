@@ -19,15 +19,24 @@ package org.voltdb.rejoin;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.VoltDB;
 import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.FixedDBBPool;
 
@@ -45,6 +54,15 @@ implements Runnable {
     private final LinkedBlockingQueue<Pair<Long, Pair<Long, BBContainer>>> m_queue =
             new LinkedBlockingQueue<Pair<Long, Pair<Long, BBContainer>>>();
 
+    final static long WATCHDOG_PERIOD_S = 5;
+
+    class SiteTrackingData {
+        long bytesSince = 0;
+        long totalBytes = 0;
+    }
+
+    final Map<String, SiteTrackingData> m_transferTracking = new HashMap<String, SiteTrackingData>();
+
     private final Mailbox m_mb;
     private final FixedDBBPool m_bufferPool;
     private volatile boolean m_closed = false;
@@ -53,6 +71,9 @@ implements Runnable {
         super();
         m_mb = mb;
         m_bufferPool = bufferPool;
+
+        // start a periodic task to look for timed out connections
+        VoltDB.instance().scheduleWork(new Watchdog(), WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
     }
 
     public void close() {
@@ -107,6 +128,24 @@ implements Runnable {
                     RejoinDataMessage dataMsg = (RejoinDataMessage) msg;
                     byte[] data = dataMsg.getData();
 
+                    String trackingKey =
+                            CoreUtils.hsIdToString(dataMsg.m_sourceHSId) +
+                            "=>" +
+                            CoreUtils.hsIdToString(dataMsg.getTargetId());
+
+                    synchronized (m_transferTracking) {
+                        SiteTrackingData trackingData = m_transferTracking.get(trackingKey);
+                        if (trackingData != null) {
+                            trackingData.bytesSince += data.length;
+                            trackingData.totalBytes += data.length;
+                        }
+                        else {
+                            trackingData = new SiteTrackingData();
+                            trackingData.bytesSince = trackingData.totalBytes = data.length;
+                            m_transferTracking.put(trackingKey, trackingData);
+                        }
+                    }
+
                     // Only grab the buffer from the pool after receiving a message from the
                     // mailbox. If the buffer is grabbed before receiving the message,
                     // this thread could hold on to a buffer it may not need and other receivers
@@ -157,4 +196,46 @@ implements Runnable {
             return;
         }
     }
+
+    /**
+     * Task run every so often to look for writes that haven't been acked
+     * in writeTimeout time.
+     */
+    class Watchdog implements Runnable {
+
+        @Override
+        public synchronized void run() {
+
+            Set<String> zeroPairs = new HashSet<>();
+
+            synchronized (m_transferTracking) {
+                for (Entry<String, SiteTrackingData> e : m_transferTracking.entrySet()) {
+                    if (e.getValue().bytesSince == 0) {
+                        zeroPairs.add(e.getKey() + ":" + String.valueOf(e.getValue().totalBytes));
+                    }
+                    else {
+                        rejoinLog.info(String.format(
+                                "Rejoin snapshot for %s received %d bytes in the past %d seconds (% recieved in total so far).",
+                                e.getKey(),
+                                e.getValue().bytesSince,
+                                WATCHDOG_PERIOD_S,
+                                e.getValue().totalBytes));
+                    }
+                }
+            }
+
+            // print sites that didn't send data
+            if (!zeroPairs.isEmpty()) {
+                String list = StringUtils.join(zeroPairs, ", ");
+                rejoinLog.info(String.format(
+                        "Rejoin snapshot received no data in the past %d seconds from %s.",
+                        WATCHDOG_PERIOD_S,
+                        list));
+            }
+
+            // schedule to run again
+            VoltDB.instance().scheduleWork(new Watchdog(), WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
+        }
+    }
+
 }

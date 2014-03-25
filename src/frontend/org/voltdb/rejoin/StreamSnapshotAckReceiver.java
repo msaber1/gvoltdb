@@ -17,16 +17,24 @@
 
 package org.voltdb.rejoin;
 
-import com.google_voltpatches.common.base.Preconditions;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+
+import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB;
 import org.voltdb.exceptions.SerializableException;
 
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Thread that blocks on the receipt of Acks.
@@ -45,6 +53,15 @@ public class StreamSnapshotAckReceiver implements Runnable {
 
     volatile Exception m_lastException = null;
 
+    final static long WATCHDOG_PERIOD_S = 5;
+
+    class SiteTrackingData {
+        long acksSince = 0;
+        long totalAcks = 0;
+    }
+
+    final Map<String, SiteTrackingData> m_ackTracking = new HashMap<String, SiteTrackingData>();
+
     public StreamSnapshotAckReceiver(Mailbox mb)
     {
         this(mb, new StreamSnapshotBase.DefaultMessageFactory());
@@ -56,6 +73,9 @@ public class StreamSnapshotAckReceiver implements Runnable {
         m_msgFactory = msgFactory;
         m_callbacks = Collections.synchronizedMap(new HashMap<Long, AckCallback>());
         m_expectedEOFs = new AtomicInteger();
+
+        // start a periodic task to look for timed out connections
+        VoltDB.instance().scheduleWork(new Watchdog(), WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
     }
 
     public void setCallback(long targetId, AckCallback callback) {
@@ -89,6 +109,24 @@ public class StreamSnapshotAckReceiver implements Runnable {
                     return;
                 }
 
+                String trackingKey =
+                        CoreUtils.hsIdToString(msg.m_sourceHSId) +
+                        "=>" +
+                        CoreUtils.hsIdToString(m_msgFactory.getAckTargetId(msg));
+
+                synchronized (m_ackTracking) {
+                    SiteTrackingData trackingData = m_ackTracking.get(trackingKey);
+                    if (trackingData != null) {
+                        trackingData.acksSince++;
+                        trackingData.totalAcks++;
+                    }
+                    else {
+                        trackingData = new SiteTrackingData();
+                        trackingData.acksSince = trackingData.totalAcks = 1;
+                        m_ackTracking.put(trackingKey, trackingData);
+                    }
+                }
+
                 AckCallback ackCallback = m_callbacks.get(m_msgFactory.getAckTargetId(msg));
                 if (ackCallback == null) {
                     rejoinLog.error("Unknown target ID " + m_msgFactory.getAckTargetId(msg) +
@@ -112,6 +150,47 @@ public class StreamSnapshotAckReceiver implements Runnable {
             rejoinLog.error("Error reading a message from a recovery stream", e);
         } finally {
             rejoinLog.trace("Ack receiver thread exiting");
+        }
+    }
+
+    /**
+     * Task run every so often to look for writes that haven't been acked
+     * in writeTimeout time.
+     */
+    class Watchdog implements Runnable {
+
+        @Override
+        public synchronized void run() {
+
+            Set<String> zeroPairs = new HashSet<>();
+
+            synchronized (m_ackTracking) {
+                for (Entry<String, SiteTrackingData> e : m_ackTracking.entrySet()) {
+                    if (e.getValue().acksSince == 0) {
+                        zeroPairs.add(e.getKey() + ":" + String.valueOf(e.getValue().totalAcks));
+                    }
+                    else {
+                        rejoinLog.info(String.format(
+                                "Rejoin snapshot for %s received %d acks in the past %d seconds (% recieved in total so far).",
+                                e.getKey(),
+                                e.getValue().acksSince,
+                                WATCHDOG_PERIOD_S,
+                                e.getValue().totalAcks));
+                    }
+                }
+            }
+
+            // print sites that didn't send data
+            if (!zeroPairs.isEmpty()) {
+                String list = StringUtils.join(zeroPairs, ", ");
+                rejoinLog.info(String.format(
+                        "Rejoin snapshot received no acks in the past %d seconds from %s.",
+                        WATCHDOG_PERIOD_S,
+                        list));
+            }
+
+            // schedule to run again
+            VoltDB.instance().scheduleWork(new Watchdog(), WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
         }
     }
 }
