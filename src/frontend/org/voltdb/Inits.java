@@ -354,12 +354,7 @@ public class Inits {
             } while (catalogStuff == null);
 
             try {
-<<<<<<< HEAD
-                Pair<String, String> loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes, hostLog);
-                m_rvdb.m_serializedCatalog = loadResults.getFirst();
-=======
                 m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogStuff.bytes, hostLog);
->>>>>>> merge from master
             } catch (IOException e) {
                 VoltDB.crashLocalVoltDB("Unable to load catalog", true, e);
             }
