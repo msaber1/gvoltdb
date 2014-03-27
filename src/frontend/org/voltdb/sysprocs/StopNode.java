@@ -107,16 +107,19 @@ public class StopNode extends VoltSystemProcedure {
         return new VoltTable(
                 new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID,
                         VoltSystemProcedure.CTYPE_ID),
-                new ColumnInfo("RESULT", VoltType.STRING));
+                new ColumnInfo("RESULT", VoltType.STRING),
+                new ColumnInfo("ERR_MSG", VoltType.STRING));
     }
 
     private void stopServerNode(VoltTable result, int hid) {
         if (!VoltDB.instance().isSafeToSuicide()) {
-            hostLog.info("Its unsafe to shutdown node with hostId: " + hid + " StopNode is will not stop node.");
-            result.addRow(VoltDB.instance().getHostMessenger().getHostId(), "FAILED");
+            hostLog.info("Its unsafe to shutdown node with hostId: " + hid
+                    + " StopNode is will not stop node as stopping will violate k-safety.");
+            result.addRow(VoltDB.instance().getHostMessenger().getHostId(), "FAILED",
+                    "Server Node can not be stopped because stopping will violate k-safety.");
             return;
         }
-        result.addRow(VoltDB.instance().getHostMessenger().getHostId(), "SUCCESS");
+        result.addRow(VoltDB.instance().getHostMessenger().getHostId(), "SUCCESS", "");
 
         Thread shutdownThread = new Thread() {
             @Override
