@@ -35,15 +35,13 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.Callable;
-import java.util.concurrent.RejectedExecutionException;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
+import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 /**
@@ -54,22 +52,19 @@ public class ClusterWatcher {
     private static final VoltLogger tmLog = new VoltLogger("TM");
 
     private final ZooKeeper m_zk;
-    private Set<Integer> m_hostsOnRing;
     private final int m_kfactor;
 
     private final ExecutorService m_es = CoreUtils.getSingleThreadExecutor("ClusterWatcher");
     private boolean m_isKSafe;
     private final KSafetyStats m_stats;
-    private AtomicBoolean m_needsRefresh = new AtomicBoolean(true);
+    private final AtomicBoolean m_needsRefresh = new AtomicBoolean(true);
 
     class PartitionInformation {
-
         final int m_pid;
         public byte m_state = 0; //Initializing.
         public boolean m_partitionOnRing;
-        public List<String> m_replicas;
         //Partition to replicas
-        public Map<Integer, List<Integer>> m_replicaHost = new HashMap<Integer, List<Integer>>();
+        List<Integer> m_replicaHost = new ArrayList<>();
         final boolean m_mpi;
 
         PartitionInformation(int pid, boolean mpi) {
@@ -77,37 +72,32 @@ public class ClusterWatcher {
             m_mpi = mpi;
         }
     }
-    private Map<Integer, PartitionInformation> m_partitionInfo = new HashMap<Integer, PartitionInformation>();
+    private Map<Integer, PartitionInformation> m_partitionInfo = new HashMap<>();
 
     public ClusterWatcher(HostMessenger hm, int kfactor, KSafetyStats stats) {
         m_zk = hm.getZK();
-        m_isKSafe = true;
         m_kfactor = kfactor;
         m_stats = stats;
     }
 
     public void dump() {
-        for (PartitionInformation pinfo : m_partitionInfo.values()) {
-            StringBuilder sb = new StringBuilder();
-            sb.append("Info for Partition: ").append(pinfo.m_pid)
-                    .append(" Replicas: ").append(pinfo.m_replicas)
-                    .append(" Partition Hosts: ").append(pinfo.m_replicaHost)
-                    .append(" Partition On Ring: ").append(pinfo.m_partitionOnRing);
+        if (tmLog.isDebugEnabled()) {
+            for (PartitionInformation pinfo : m_partitionInfo.values()) {
+                StringBuilder sb = new StringBuilder();
+                sb.append("Info for Partition: ").append(pinfo.m_pid)
+                        .append(" Partition Hosts: ").append(pinfo.m_replicaHost)
+                        .append(" Partition On Ring: ").append(pinfo.m_partitionOnRing);
 
-            tmLog.info(sb.toString());
-            System.out.println(sb.toString());
+                tmLog.debug(sb.toString());
+            }
         }
     }
 
     private class StateWatcher implements Watcher {
-
         @Override
         public void process(final WatchedEvent event) {
-            try {
-                m_needsRefresh.set(true);
-            } catch (RejectedExecutionException e) {
-                com.google_voltpatches.common.base.Throwables.propagate(e);
-            }
+            tmLog.debug("Setting refresh to true as zk watcher fired.");
+            m_needsRefresh.set(true);
         }
     }
     private final StateWatcher stateWatcher = new StateWatcher();
@@ -120,29 +110,10 @@ public class ClusterWatcher {
                     return reload();
                 }
             }).get();
-        } catch (Throwable t) {
-            com.google_voltpatches.common.base.Throwables.propagate(t);
+        } catch (InterruptedException | ExecutionException t) {
+            tmLog.error("Error in submitting task to cluster watcher.", t);
             return false;
         }
-
-    }
-
-    public boolean isClusterKSafe() {
-        try {
-            return m_es.submit(new Callable<Boolean>() {
-                @Override
-                public Boolean call() throws Exception {
-                    if (m_needsRefresh.get()) {
-                        reload();
-                    }
-                    return m_isKSafe;
-                }
-            }).get();
-        } catch (Throwable t) {
-            com.google_voltpatches.common.base.Throwables.propagate(t);
-            return m_isKSafe;
-        }
-
     }
 
     public boolean isClusterKSafeAfterIDie() {
@@ -150,42 +121,32 @@ public class ClusterWatcher {
             return m_es.submit(new Callable<Boolean>() {
                 @Override
                 public Boolean call() throws Exception {
-//                    if (m_needsRefresh.get()) {
+                    if (m_needsRefresh.get()) {
                         reload();
-//                    }
+                    }
                     boolean retval = true;
                     for (PartitionInformation pinfo : m_partitionInfo.values()) {
                         if (!pinfo.m_partitionOnRing || pinfo.m_mpi) {
                             continue;
                         }
-                        if (pinfo.m_replicaHost.size() <= (m_kfactor + 1)) {
+                        if (pinfo.m_replicaHost.size() < (m_kfactor + 1)) {
                             retval = false;
                             break;
                         }
                     }
+                    if (retval) {
+                        //Since someone is going to die set to refresh.
+                        m_needsRefresh.set(true);
+                    }
                     return retval;
                 }
             }).get();
-        } catch (Throwable t) {
-            com.google_voltpatches.common.base.Throwables.propagate(t);
-            return m_isKSafe;
-        }
-    }
-
-    public Set<Integer> getHostsOnRing() {
-        try {
-            return m_es.submit(new Callable<Set<Integer>>() {
-                @Override
-                public Set<Integer> call() throws Exception {
-                    if (m_needsRefresh.get()) {
-                        reload();
-                    }
-                    return m_hostsOnRing;
-                }
-            }).get();
-        } catch (Throwable t) {
-            com.google_voltpatches.common.base.Throwables.propagate(t);
-            return m_hostsOnRing;
+        } catch (InterruptedException | ExecutionException t) {
+            tmLog.error("Error in isClusterKSafeAfterIDie returning cached value.", t);
+            m_needsRefresh.set(true);
+            synchronized (ClusterWatcher.class) {
+                return m_isKSafe;
+            }
         }
     }
 
@@ -197,12 +158,17 @@ public class ClusterWatcher {
                     if (m_needsRefresh.get()) {
                         reload();
                     }
-                    return new ArrayList(m_partitionInfo.keySet());
+                    synchronized (ClusterWatcher.class) {
+                        return new ArrayList(m_partitionInfo.keySet());
+                    }
                 }
             }).get();
-        } catch (Throwable t) {
-            com.google_voltpatches.common.base.Throwables.propagate(t);
-            return new ArrayList(m_partitionInfo.keySet());
+        } catch (InterruptedException | ExecutionException t) {
+            tmLog.error("Error in getPartitions returning cached value.", t);
+            m_needsRefresh.set(true);
+            synchronized (ClusterWatcher.class) {
+                return new ArrayList(m_partitionInfo.keySet());
+            }
         }
     }
 
@@ -214,54 +180,38 @@ public class ClusterWatcher {
                     if (m_needsRefresh.get()) {
                         reload();
                     }
-                    return m_partitionInfo.size();
+                    synchronized (ClusterWatcher.class) {
+                        return m_partitionInfo.size();
+                    }
                 }
             }).get();
-        } catch (Throwable t) {
-            com.google_voltpatches.common.base.Throwables.propagate(t);
-            return m_partitionInfo.size();
-        }
-    }
-
-    private void setupWatcher() {
-        List<String> partitionDirs = null;
-
-        try {
-            partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, stateWatcher);
-        } catch (Exception e) {
-            Throwables.propagate(e);
-        }
-        final long statTs = System.currentTimeMillis();
-        for (String partitionDir : partitionDirs) {
-            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
-            try {
-                //Set watcher to refresh the cache.
-                m_zk.exists(dir, stateWatcher);
-            } catch (KeeperException ex) {
-                Logger.getLogger(ClusterWatcher.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (InterruptedException ex) {
-                Logger.getLogger(ClusterWatcher.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (InterruptedException | ExecutionException t) {
+            tmLog.error("Error in getPartitionsCount returning cached value.", t);
+            m_needsRefresh.set(true);
+            synchronized (ClusterWatcher.class) {
+                return m_partitionInfo.size();
             }
         }
     }
 
+    // Reload partition and replica information.
+    // also set watcher in th process so any changes will be then tagged for refresh
     private Boolean reload() {
         List<String> partitionDirs = null;
-        final Map<Integer, PartitionInformation> partitionInfo = new HashMap<Integer, PartitionInformation>();
-        final Set<Integer> hostsOnRing = new HashSet<Integer>();
-
+        final Map<Integer, PartitionInformation> partitionInfo = new HashMap<>();
+        final Set<Integer> hostsOnRing = new HashSet<>();
         try {
-            partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
-        } catch (Exception e) {
-            Throwables.propagate(e);
+            partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, stateWatcher);
+        } catch (KeeperException | InterruptedException e) {
+            throw Throwables.propagate(e);
         }
 
         ImmutableSortedSet.Builder<KSafetyStats.StatsPoint> lackingReplication
                 = ImmutableSortedSet.naturalOrder();
 
         //Don't fetch the values serially do it asynchronously
-        Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
-        Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<ZKUtil.ChildrenCallback>();
+        Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<>();
+        Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<>();
         for (String partitionDir : partitionDirs) {
             String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
@@ -269,15 +219,16 @@ public class ClusterWatcher {
                 m_zk.getData(dir, false, callback, null);
                 dataCallbacks.offer(callback);
                 ZKUtil.ChildrenCallback childrenCallback = new ZKUtil.ChildrenCallback();
-                m_zk.getChildren(dir, false, childrenCallback, null);
+                m_zk.getChildren(dir, false, childrenCallback, stateWatcher);
                 childrenCallbacks.offer(childrenCallback);
             } catch (Exception e) {
-                Throwables.propagate(e);
+                throw Throwables.propagate(e);
             }
         }
         //Assume that we are ksafe
-        m_isKSafe = true;
+       boolean isKSafe = true;
         final long statTs = System.currentTimeMillis();
+        boolean partitionRemovalDetected = false;
         for (String partitionDir : partitionDirs) {
             int pid = ClusterWatcher.getPartitionFromElectionDir(partitionDir);
             PartitionInformation pinfo;
@@ -287,7 +238,6 @@ public class ClusterWatcher {
                 pinfo = new PartitionInformation(pid, false);
             }
 
-            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
             try {
                 // The data of the partition dir indicates whether the partition has finished
                 // initializing or not. If not, the replicas may still be in the process of
@@ -298,67 +248,60 @@ public class ClusterWatcher {
                 }
 
                 List<String> replicas = childrenCallbacks.poll().getChildren();
-                pinfo.m_replicas = replicas;
                 pinfo.m_partitionOnRing = partitionOnHashRing(pid);
                 if (replicas.isEmpty() && !pinfo.m_mpi) {
                     //These partitions can fail, just cleanup and remove the partition from the system
-                    if (pinfo.m_partitionOnRing && !pinfo.m_mpi) {
-                        //Add cleanup.
-                        removeAndCleanupPartition(pid);
+                    if (!pinfo.m_partitionOnRing && !pinfo.m_mpi) {
+                        //Cleanup partition not on ring.
+                        partitionRemovalDetected = true;
                         continue;
                     }
                     tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
-                    m_isKSafe = false;
+                    isKSafe = false;
                 }
                 //Record host ids for all partitions that are on the ring
                 //so they are considered for partition detection
+                final List<Integer> replicaHost = new ArrayList<>();
                 for (String replica : replicas) {
                     final String split[] = replica.split("/");
                     final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
                     final int hostId = CoreUtils.getHostIdFromHSId(hsId);
-                    List<Integer> hlist = pinfo.m_replicaHost.get(pid);
-                    if (hlist != null) {
-                        hlist.add(hostId);
-                    } else {
-                        hlist = new ArrayList<Integer>();
-                        hlist.add(hostId);
-                        pinfo.m_replicaHost.put(pid, hlist);
+                    replicaHost.add(hostId);
+                    if (pinfo.m_partitionOnRing) {
+                        hostsOnRing.add(hostId);
                     }
                 }
+                pinfo.m_replicaHost = replicaHost;
                 partitionInfo.put(pid, pinfo);
-                if (pinfo.m_partitionOnRing) {
-                    hostsOnRing.add(pinfo.m_pid);
+                if (pinfo.m_state != LeaderElector.INITIALIZING && pinfo.m_partitionOnRing) {
                     lackingReplication.add(new KSafetyStats.StatsPoint(statTs, pid, m_kfactor + 1 - replicas.size()));
                 }
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+            } catch (InterruptedException | KeeperException | NumberFormatException e) {
+                throw Throwables.propagate(e);
             }
         }
-        synchronized (m_partitionInfo) {
+        synchronized (ClusterWatcher.class) {
             m_partitionInfo = partitionInfo;
-            m_hostsOnRing = hostsOnRing;
+            m_isKSafe = isKSafe;
+            m_stats.setSafetySet(lackingReplication.build());
+            //Set to refresh next time if we had a delete pending.
+            m_needsRefresh.set(partitionRemovalDetected);
         }
-        m_stats.setSafetySet(lackingReplication.build());
-        m_needsRefresh.set(false);
-        setupWatcher();
-        dump();
         return true;
     }
 
-    private void removeAndCleanupPartition(int pid) {
-        tmLog.info("Removing and cleanup up partition info for partition " + pid);
-        try {
-            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.iv2masters, String.valueOf(pid)));
-            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.iv2appointees, String.valueOf(pid)));
-            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.leaders_initiators, "partition_" + String.valueOf(pid)));
-        } catch (Exception e) {
-            tmLog.error("Error removing partition info", e);
+    public static boolean partitionOnHashRing(int pid) {
+        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
+            return true;
         }
+        return !TheHashinator.getRanges(pid).isEmpty();
     }
 
-    private static boolean partitionOnHashRing(int pid) {
-        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) return false;
-        return !TheHashinator.getRanges(pid).isEmpty();
+    public static boolean partitionNotOnHashRing(int pid) {
+        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) {
+            return false;
+        }
+        return TheHashinator.getRanges(pid).isEmpty();
     }
 
     public static String electionDirForPartition(int partition) {

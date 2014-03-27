@@ -479,14 +479,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_partitionsToSitesAtStartupForExportInit = new ArrayList<Pair<Integer, Long>>();
             try {
                 m_kSafetyStats = new KSafetyStats();
+                ClusterConfig clusterConfig = new ClusterConfig(topo);
+                m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
                 m_cwatcher = new ClusterWatcher(getHostMessenger(), m_configuredReplicationFactor, m_kSafetyStats);
                // IV2 mailbox stuff
                 m_cartographer = new Cartographer(m_messenger, m_cwatcher);
-                ClusterConfig clusterConfig = new ClusterConfig(topo);
                 List<Integer> partitions = null;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
-                    m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
                     partitions = m_cartographer.getIv2PartitionsToReplace(m_configuredReplicationFactor,
                                                                           clusterConfig.getSitesPerHost());
                     if (partitions.size() == 0) {
@@ -498,7 +498,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
                 else {
                     m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
-                    m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
                     partitions = ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                 }
                 for (int ii = 0; ii < partitions.size(); ii++) {
@@ -670,8 +669,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_deployment.getCluster().getKfactor(),
                         m_catalogContext.cluster.getNetworkpartition(),
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"),
-                        usingCommandLog,
-                        topo, m_MPI, m_cwatcher);
+                        usingCommandLog, topo, m_MPI);
                 m_globalServiceElector.registerService(m_leaderAppointer);
             } catch (Exception e) {
                 Throwable toLog = e;

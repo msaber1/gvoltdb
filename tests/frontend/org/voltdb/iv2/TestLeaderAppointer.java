@@ -123,12 +123,11 @@ public class TestLeaderAppointer extends ZKTestBase {
     void createAppointer(boolean enablePPD) throws JSONException
     {
         KSafetyStats stats = new KSafetyStats();
-        ClusterWatcher cwatcher = new ClusterWatcher(m_hm, m_config.getPartitionCount(), stats);
 
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                 m_config.getReplicationFactor(), enablePPD,
                 null, false,
-                m_config.getTopology(m_hostIds), m_mpi, cwatcher);
+                m_config.getTopology(m_hostIds), m_mpi);
         m_dut.onReplayCompletion();
     }
 
@@ -274,12 +273,10 @@ public class TestLeaderAppointer extends ZKTestBase {
         deleteReplica(0, m_cache.pointInTimeCache().get(0));
         // create a new appointer and start it up in the replay state
         KSafetyStats stats = new KSafetyStats();
-        ClusterWatcher cwatcher = new ClusterWatcher(m_hm, m_config.getPartitionCount(), stats);
         m_dut = new LeaderAppointer(m_hm, m_config.getPartitionCount(),
                                     m_config.getReplicationFactor(), false,
                                     null, false,
-                                    m_config.getTopology(m_hostIds), m_mpi,
-                cwatcher);
+                                    m_config.getTopology(m_hostIds), m_mpi);
         m_newAppointee.set(false);
         VoltDB.ignoreCrash = true;
         boolean threw = false;

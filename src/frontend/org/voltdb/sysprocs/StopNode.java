@@ -27,8 +27,6 @@ import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltSystemProcedure;
-import static org.voltdb.VoltSystemProcedure.CNAME_HOST_ID;
-import static org.voltdb.VoltSystemProcedure.CTYPE_ID;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
@@ -58,17 +56,21 @@ public class StopNode extends VoltSystemProcedure {
             ParameterSet params,
             SystemProcedureExecutionContext context) {
         if (fragmentId == SysProcFragmentId.PF_stopNode) {
-            VoltTable result = null;
+            final VoltTable result = constructResultTable();
+            final String shid = (String) params.toArray()[0];
+            int ihid;
+            try {
+                ihid = Integer.parseInt(shid);
+            } catch (NumberFormatException nfe) {
+                return new DependencyPair(DEP_DISTRIBUTE, result);
+            }
             // Choose the lowest site ID on this host to do the killing
             // All other sites should just return empty results tables.
-            if (context.isLowestSiteId()) {
-                result = stopServerNode();
-            } else {
-                result = new VoltTable(
-                        new ColumnInfo(CNAME_HOST_ID, CTYPE_ID),
-                        new ColumnInfo("KEY", VoltType.STRING),
-                        new ColumnInfo("VALUE", VoltType.STRING));
+            int hid = VoltDB.instance().getHostMessenger().getHostId();
+            if (hid == ihid && context.isLowestSiteId()) {
+                stopServerNode(result, ihid);
             }
+
             return new DependencyPair(DEP_DISTRIBUTE, result);
         } else if (fragmentId == SysProcFragmentId.PF_stopNodeAggregate) {
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_DISTRIBUTE));
@@ -80,95 +82,64 @@ public class StopNode extends VoltSystemProcedure {
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
             String selector) throws VoltProcedure.VoltAbortException {
-        VoltTable[] results = new VoltTable[1];
-
-        // This selector provides the old @SystemInformation behavior
-        int hid = Integer.parseInt(selector);
-
-        boolean flag = VoltDB.instance().getHostMessenger().getHostId() == hid;
-        if (flag) {
-            return stopAndGetClusterStatus();
-        }
-
-        VoltTable table = constructOverviewTable();
-        table.addRow(VoltDB.instance().getHostMessenger().getHostId(), "STATUS", "UP");
-        results[0] = table;
-
-        return results;
-    }
-
-    private VoltTable[] stopAndGetClusterStatus() {
-
         VoltSystemProcedure.SynthesizedPlanFragment spf[] = null;
 
         spf = new VoltSystemProcedure.SynthesizedPlanFragment[2];
 
-        int idx = 0;
-        spf[idx] = new VoltSystemProcedure.SynthesizedPlanFragment();
-        spf[idx].fragmentId = SysProcFragmentId.PF_stopNode;
-        spf[idx].outputDepId = DEP_DISTRIBUTE;
-        spf[idx].inputDepIds = new int[]{};
-        spf[idx].multipartition = true;
-        spf[idx].parameters = ParameterSet.emptyParameterSet();
-        idx++;
+        spf[0] = new VoltSystemProcedure.SynthesizedPlanFragment();
+        spf[0].fragmentId = SysProcFragmentId.PF_stopNode;
+        spf[0].outputDepId = DEP_DISTRIBUTE;
+        spf[0].inputDepIds = new int[]{};
+        spf[0].multipartition = true;
+        spf[0].parameters = ParameterSet.fromArrayWithCopy(selector);
 
-        spf[idx] = new VoltSystemProcedure.SynthesizedPlanFragment();
-        spf[idx].fragmentId = SysProcFragmentId.PF_stopNodeAggregate;
-        spf[idx].outputDepId = DEP_AGGREGATE;
-        spf[idx].inputDepIds = new int[]{DEP_DISTRIBUTE};
-        spf[idx].multipartition = false;
-        spf[idx].parameters = ParameterSet.emptyParameterSet();
+        spf[1] = new VoltSystemProcedure.SynthesizedPlanFragment();
+        spf[1].fragmentId = SysProcFragmentId.PF_stopNodeAggregate;
+        spf[1].outputDepId = DEP_AGGREGATE;
+        spf[1].inputDepIds = new int[]{DEP_DISTRIBUTE};
+        spf[1].multipartition = false;
+        spf[1].parameters = ParameterSet.emptyParameterSet();
 
         return executeSysProcPlanFragments(spf, DEP_AGGREGATE);
     }
 
-    public static VoltTable constructOverviewTable() {
+    public static VoltTable constructResultTable() {
         return new VoltTable(
                 new ColumnInfo(VoltSystemProcedure.CNAME_HOST_ID,
                         VoltSystemProcedure.CTYPE_ID),
-                new ColumnInfo("KEY", VoltType.STRING),
-                new ColumnInfo("VALUE", VoltType.STRING));
+                new ColumnInfo("RESULT", VoltType.STRING));
     }
 
-    private VoltTable stopServerNode() {
-        final VoltTable table = constructOverviewTable();
+    private void stopServerNode(VoltTable result, int hid) {
         if (!VoltDB.instance().isSafeToSuicide()) {
-            int hid = VoltDB.instance().getHostMessenger().getHostId();
             hostLog.info("Its unsafe to shutdown node with hostId: " + hid + " StopNode is will not stop node.");
-            table.addRow(VoltDB.instance().getHostMessenger().getHostId(), "STATUS", "FORCED-TO-STAY-UP-FOR-KSAFETY");
-            return table;
+            result.addRow(VoltDB.instance().getHostMessenger().getHostId(), "FAILED");
+            return;
         }
-        table.addRow(VoltDB.instance().getHostMessenger().getHostId(), "STATUS", "STOPPING");
+        result.addRow(VoltDB.instance().getHostMessenger().getHostId(), "SUCCESS");
 
         Thread shutdownThread = new Thread() {
             @Override
             public void run() {
                 //Check if I am supposed to die and its safe to die then die.
-                if (VoltDB.instance().isSafeToSuicide()) {
-                    boolean die = false;
-                    try {
-                        die = VoltDB.instance().shutdown(this);
-                    } catch (InterruptedException e) {
-                        hostLog.error(
-                                "Exception while attempting to shutdown VoltDB from StopNode sysproc",
-                                e);
-                    }
-                    if (die) {
-                        hostLog.warn("VoltDB shutting down as requested by @StopNode command.");
-                        System.exit(0);
-                    } else {
-                        try {
-                            Thread.sleep(10000);
-                        } catch (InterruptedException e) {
-                        }
-                    }
+                boolean die = false;
+                try {
+                    Thread.sleep(5000);
+                    die = VoltDB.instance().shutdown(this);
+                } catch (InterruptedException e) {
+                    hostLog.error("Exception while attempting to shutdown VoltDB from StopNode sysproc", e);
+                }
+                if (die) {
+                    hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
+                    System.exit(0);
                 } else {
-                    //Send error.
+                    try {
+                        Thread.sleep(10000);
+                    } catch (InterruptedException e) {
+                    }
                 }
             }
         };
         shutdownThread.start();
-
-        return table;
     }
 }
