@@ -206,6 +206,8 @@ implements Runnable {
         @Override
         public synchronized void run() {
 
+            rejoinLog.info("Running StreamSnapshotDataReceiver Watchdog");
+
             Set<String> zeroPairs = new HashSet<>();
 
             synchronized (m_transferTracking) {
