@@ -212,11 +212,9 @@ implements Runnable {
                 Set<String> zeroPairs = new HashSet<>();
 
                 synchronized (m_transferTracking) {
-                    rejoinLog.info("Running StreamSnapshotDataReceiver Watchdog with tracking set size " + String.valueOf(m_transferTracking.size()));
-
                     for (Entry<String, SiteTrackingData> e : m_transferTracking.entrySet()) {
                         if (e.getValue().bytesSince == 0) {
-                            zeroPairs.add(e.getKey() + ":" + String.valueOf(e.getValue().totalBytes));
+                            zeroPairs.add(e.getKey() + " [" + String.valueOf(e.getValue().totalBytes) + "]");
                         }
                         else {
                             rejoinLog.info(String.format(
