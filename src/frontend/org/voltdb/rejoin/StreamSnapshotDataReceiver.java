@@ -208,39 +208,45 @@ implements Runnable {
         @Override
         public synchronized void run() {
 
-            Set<String> zeroPairs = new HashSet<>();
+            try {
+                Set<String> zeroPairs = new HashSet<>();
 
-            synchronized (m_transferTracking) {
-                rejoinLog.info("Running StreamSnapshotDataReceiver Watchdog with tracking set size " + String.valueOf(m_transferTracking.size()));
+                synchronized (m_transferTracking) {
+                    rejoinLog.info("Running StreamSnapshotDataReceiver Watchdog with tracking set size " + String.valueOf(m_transferTracking.size()));
 
-                for (Entry<String, SiteTrackingData> e : m_transferTracking.entrySet()) {
-                    if (e.getValue().bytesSince == 0) {
-                        zeroPairs.add(e.getKey() + ":" + String.valueOf(e.getValue().totalBytes));
+                    for (Entry<String, SiteTrackingData> e : m_transferTracking.entrySet()) {
+                        if (e.getValue().bytesSince == 0) {
+                            zeroPairs.add(e.getKey() + ":" + String.valueOf(e.getValue().totalBytes));
+                        }
+                        else {
+                            rejoinLog.info(String.format(
+                                    "Rejoin snapshot for %s received %d bytes in the past %d seconds (% recieved in total so far).",
+                                    e.getKey(),
+                                    e.getValue().bytesSince,
+                                    WATCHDOG_PERIOD_S,
+                                    e.getValue().totalBytes));
+                            e.getValue().bytesSince = 0;
+                        }
+
                     }
-                    else {
-                        rejoinLog.info(String.format(
-                                "Rejoin snapshot for %s received %d bytes in the past %d seconds (% recieved in total so far).",
-                                e.getKey(),
-                                e.getValue().bytesSince,
-                                WATCHDOG_PERIOD_S,
-                                e.getValue().totalBytes));
-                        e.getValue().bytesSince = 0;
-                    }
-
                 }
-            }
 
-            // print sites that didn't send data
-            if (!zeroPairs.isEmpty()) {
-                String list = StringUtils.join(zeroPairs, ", ");
-                rejoinLog.info(String.format(
-                        "Rejoin snapshot received no data in the past %d seconds from %s.",
-                        WATCHDOG_PERIOD_S,
-                        list));
-            }
+                // print sites that didn't send data
+                if (!zeroPairs.isEmpty()) {
+                    String list = StringUtils.join(zeroPairs, ", ");
+                    rejoinLog.info(String.format(
+                            "Rejoin snapshot received no data in the past %d seconds from %s.",
+                            WATCHDOG_PERIOD_S,
+                            list));
+                }
 
-            // schedule to run again
-            VoltDB.instance().scheduleWork(new Watchdog(), WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
+                // schedule to run again
+                VoltDB.instance().scheduleWork(new Watchdog(), WATCHDOG_PERIOD_S, -1, TimeUnit.SECONDS);
+            }
+            catch (Exception e) {
+                rejoinLog.error("Watchdog threw", e);
+                throw e;
+            }
         }
     }
 
