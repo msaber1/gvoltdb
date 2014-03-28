@@ -133,7 +133,7 @@ public class StreamSnapshotAckSender implements Runnable {
                     }
                     else {
                         rejoinLog.info(String.format(
-                                "Rejoin snapshot for %s sent %d acks in the past %d seconds (% sent in total so far).",
+                                "Rejoin snapshot for %s sent %d acks in the past %d seconds (%d sent in total so far).",
                                 e.getKey(),
                                 e.getValue().acksSince,
                                 WATCHDOG_PERIOD_S,
