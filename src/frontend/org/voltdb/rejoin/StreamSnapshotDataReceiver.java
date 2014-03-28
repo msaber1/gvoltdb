@@ -146,6 +146,8 @@ implements Runnable {
                         }
                     }
 
+                    rejoinLog.info(String.format("Added %d bytes to transferTracking for %s.", data.length, trackingKey));
+
                     // Only grab the buffer from the pool after receiving a message from the
                     // mailbox. If the buffer is grabbed before receiving the message,
                     // this thread could hold on to a buffer it may not need and other receivers
@@ -206,11 +208,11 @@ implements Runnable {
         @Override
         public synchronized void run() {
 
-            rejoinLog.info("Running StreamSnapshotDataReceiver Watchdog");
-
             Set<String> zeroPairs = new HashSet<>();
 
             synchronized (m_transferTracking) {
+                rejoinLog.info("Running StreamSnapshotDataReceiver Watchdog with tracking set size " + String.valueOf(m_transferTracking.size()));
+
                 for (Entry<String, SiteTrackingData> e : m_transferTracking.entrySet()) {
                     if (e.getValue().bytesSince == 0) {
                         zeroPairs.add(e.getKey() + ":" + String.valueOf(e.getValue().totalBytes));
@@ -222,7 +224,9 @@ implements Runnable {
                                 e.getValue().bytesSince,
                                 WATCHDOG_PERIOD_S,
                                 e.getValue().totalBytes));
+                        e.getValue().bytesSince = 0;
                     }
+
                 }
             }
 

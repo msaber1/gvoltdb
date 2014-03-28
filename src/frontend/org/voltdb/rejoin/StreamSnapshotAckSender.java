@@ -138,6 +138,7 @@ public class StreamSnapshotAckSender implements Runnable {
                                 e.getValue().acksSince,
                                 WATCHDOG_PERIOD_S,
                                 e.getValue().totalAcks));
+                        e.getValue().acksSince = 0;
                     }
                 }
             }
