@@ -35,6 +35,7 @@ import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
 import org.voltdb.StartAction;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -964,25 +965,28 @@ public class LocalCluster implements VoltServerConfig {
     public void stopSingleHost(Client client, int hostNum)
             throws InterruptedException, IOException, NoConnectionsException, ProcCallException {
         log.info("Stopping: " + hostNum);
-        client.callProcedure("@StopNode", hostNum);
+        VoltTable tab = client.callProcedure("@StopNode", hostNum).getResults()[0];
+        tab.advanceRow();
+        if (!tab.getString("RESULT").equals("SUCCESS")) {
+            System.out.println("Failed to Stop Server using @StopNode: " + tab.getString("ERR_MSG"));
+            return;
+        }
         Process proc = null;
+        //PipeToFile ptf = null;
         EEProcess eeProc = null;
+        PipeToFile ptf;
         synchronized (this) {
             proc = m_cluster.get(hostNum);
             //ptf = m_pipes.get(hostNum);
             m_cluster.set(hostNum, null);
+            ptf = m_pipes.get(hostNum);
             m_pipes.set(hostNum, null);
             if (m_eeProcs.size() > hostNum) {
                 eeProc = m_eeProcs.get(hostNum);
             }
         }
-
         if (proc != null) {
             proc.waitFor();
-        }
-
-        if (eeProc != null) {
-            eeProc.waitForShutdown();
         }
     }
 

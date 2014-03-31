@@ -49,7 +49,7 @@ import org.voltdb.VoltZK;
  * hits.
  */
 public class ClusterWatcher {
-    private static final VoltLogger tmLog = new VoltLogger("TM");
+    private static final VoltLogger tmLog = new VoltLogger("HOST");
 
     private final ZooKeeper m_zk;
     private final int m_kfactor;
@@ -78,12 +78,13 @@ public class ClusterWatcher {
         m_zk = hm.getZK();
         m_kfactor = kfactor;
         m_stats = stats;
+        m_stats.setClusterWatcher(this);
     }
 
     public void dumpToLog() {
         for (PartitionInformation pinfo : m_partitionInfo.values()) {
             StringBuilder sb = new StringBuilder();
-            sb.append("Info for Partition: ").append(pinfo.m_pid)
+            sb.append("ClusterWatcher: Info for Partition: ").append(pinfo.m_pid)
                     .append(" Partition Hosts: ").append(pinfo.m_replicaHost)
                     .append(" Partition On Ring: ").append(pinfo.m_partitionOnRing);
 
@@ -94,11 +95,15 @@ public class ClusterWatcher {
     private class StateWatcher implements Watcher {
         @Override
         public void process(final WatchedEvent event) {
-            tmLog.info("Setting refresh to true as zk watcher fired.");
+            tmLog.info("ClusterWatcher: Setting refresh to true as zk watcher fired.");
             m_needsRefresh.set(true);
         }
     }
     private final StateWatcher stateWatcher = new StateWatcher();
+
+    public boolean needsReload() {
+        return m_needsRefresh.get();
+    }
 
     public boolean refresh() {
         try {
@@ -109,7 +114,7 @@ public class ClusterWatcher {
                 }
             }).get();
         } catch (InterruptedException | ExecutionException t) {
-            tmLog.error("Error in submitting task to cluster watcher.", t);
+            tmLog.error("ClusterWatcher: Error in submitting task to cluster watcher.", t);
             return false;
         }
     }
@@ -125,7 +130,7 @@ public class ClusterWatcher {
                         if (!pinfo.m_partitionOnRing || pinfo.m_mpi) {
                             continue;
                         }
-                        if (pinfo.m_replicaHost.size() < (m_kfactor + 1)) {
+                        if (pinfo.m_replicaHost.size() <= 1) {
                             retval = false;
                             break;
                         }
@@ -138,7 +143,7 @@ public class ClusterWatcher {
                 }
             }).get();
         } catch (InterruptedException | ExecutionException t) {
-            tmLog.error("Error in isClusterKSafeAfterIDie returning cached value.", t);
+            tmLog.error("ClusterWatcher: Error in isClusterKSafeAfterIDie returning cached value.", t);
             m_needsRefresh.set(true);
             synchronized (ClusterWatcher.class) {
                 return m_isKSafe;
@@ -149,6 +154,7 @@ public class ClusterWatcher {
     // Reload partition and replica information.
     // also set watcher in th process so any changes will be then tagged for refresh
     private Boolean reload() {
+        tmLog.info("ClusterWatcher: Reloading partition information.");
         List<String> partitionDirs = null;
         final Map<Integer, PartitionInformation> partitionInfo = new HashMap<>();
         final Set<Integer> hostsOnRing = new HashSet<>();
@@ -199,6 +205,9 @@ public class ClusterWatcher {
                     pinfo.m_state = partitionState[0];
                 }
 
+                //Leave watch
+                String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
+                m_zk.getChildren(dir, stateWatcher);
                 List<String> replicas = childrenCallbacks.poll().getChildren();
                 pinfo.m_partitionOnRing = partitionOnHashRing(pid);
                 if (replicas.isEmpty() && !pinfo.m_mpi) {
@@ -208,7 +217,7 @@ public class ClusterWatcher {
                         partitionRemovalDetected = true;
                         continue;
                     }
-                    tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
+                    tmLog.fatal("ClusterWatcher: K-Safety violation: No replicas found for partition: " + pid);
                     isKSafe = false;
                 }
                 //Record host ids for all partitions that are on the ring

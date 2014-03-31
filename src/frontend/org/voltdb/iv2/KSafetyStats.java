@@ -30,10 +30,15 @@ import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 public class KSafetyStats extends StatsSource {
     private volatile NavigableSet<StatsPoint> m_kSafetySet;
+    private ClusterWatcher m_cwatcher = null;
 
     public KSafetyStats() {
         super(false);
         m_kSafetySet = ImmutableSortedSet.<StatsPoint>of();
+    }
+
+    public void setClusterWatcher(ClusterWatcher cwatcher) {
+        m_cwatcher = cwatcher;
     }
 
     public static interface Constants {
@@ -69,6 +74,9 @@ public class KSafetyStats extends StatsSource {
     @Override
     @SuppressWarnings("unchecked")
     protected Iterator<Object> getStatsRowKeyIterator(boolean interval) {
+        if (m_cwatcher != null && m_cwatcher.needsReload()) {
+            m_cwatcher.refresh();
+        }
         @SuppressWarnings("rawtypes")
         Iterator iter = m_kSafetySet.iterator();
         return (Iterator<Object>)iter;
