@@ -76,12 +76,6 @@ public class SysProcFragmentId
      */
     public static final long PF_snapshotSaveQuiesceResults = 45;
 
-    /*
-     * stop node
-     */
-    public static final long PF_stopNode = 46;
-    public static final long PF_stopNodeAggregate = 47;
-
     public static boolean isSnapshotSaveFragment(byte[] planHash) {
         long fragId = VoltSystemProcedure.hashToFragId(planHash);
         return (fragId == PF_createSnapshotTargets || fragId == PF_snapshotSaveQuiesce);
