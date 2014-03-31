@@ -362,6 +362,12 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public boolean isMpSysprocSafeToExecute(long txnId)
+    {
+        return true;
+    }
+
+    @Override
     public void startSampler()
     {
     }
