@@ -17,7 +17,7 @@
 
 package org.voltdb.iv2;
 
-import com.google.gwt.thirdparty.guava.common.base.Throwables;
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
