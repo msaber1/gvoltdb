@@ -2073,7 +2073,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         Thread shutdownThread = new Thread() {
             @Override
             public void run() {
-                //Check if I am supposed to die and its safe to die then die.
                 boolean die = false;
                 try {
                     hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");

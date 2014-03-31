@@ -120,7 +120,6 @@ public class ClusterWatcher {
                 @Override
                 public Boolean call() throws Exception {
                     reload();
-                    dumpToLog();
                     boolean retval = true;
                     for (PartitionInformation pinfo : m_partitionInfo.values()) {
                         if (!pinfo.m_partitionOnRing || pinfo.m_mpi) {
