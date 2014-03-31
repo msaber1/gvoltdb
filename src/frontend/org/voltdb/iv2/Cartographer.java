@@ -65,7 +65,6 @@ public class Cartographer extends StatsSource
     private final LeaderCacheReader m_iv2Mpi;
     private final Set<Long> m_currentSPMasters = new HashSet<Long>();
     private final HostMessenger m_hostMessenger;
-    private final ClusterWatcher m_cwatcher;
     private final ZooKeeper m_zk;
     private final Set<Integer> m_allMasters = new HashSet<Integer>();
 
@@ -159,10 +158,10 @@ public class Cartographer extends StatsSource
         }
     }
 
-    public Cartographer(HostMessenger hostMessenger, ClusterWatcher cwatcher)    {
+    public Cartographer(HostMessenger hostMessenger)
+    {
         super(false);
         m_hostMessenger = hostMessenger;
-        m_cwatcher = cwatcher;
         m_zk = hostMessenger.getZK();
         m_iv2Masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_SPIMasterCallback);
         m_iv2Mpi = new LeaderCache(m_zk, VoltZK.iv2mpi, m_MPICallback);
@@ -252,15 +251,34 @@ public class Cartographer extends StatsSource
                                    CoreUtils.hsIdToString(hsid));
     }
 
+    /**
+     * Returns the IDs of the partitions currently in the cluster.
+     * @return A list of partition IDs
+     */
+    public static List<Integer> getPartitions(ZooKeeper zk) {
+        List<Integer> partitions = new ArrayList<Integer>();
+        try {
+            List<String> children = zk.getChildren(VoltZK.leaders_initiators, null);
+            for (String child : children) {
+                partitions.add(ClusterWatcher.getPartitionFromElectionDir(child));
+            }
+        } catch (KeeperException e) {
+            VoltDB.crashLocalVoltDB("Failed to get partition IDs from ZK", true, e);
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Failed to get partition IDs from ZK", true, e);
+        }
+        return partitions;
+    }
+
     public List<Integer> getPartitions() {
-        return m_cwatcher.getPartitions();
+        return Cartographer.getPartitions(m_zk);
     }
 
     public int getPartitionCount()
     {
         // The list returned by getPartitions includes the MP PID.  Need to remove that for the
         // true partition count.
-        return m_cwatcher.getPartitionsCount() - 1;
+        return Cartographer.getPartitions(m_zk).size() - 1;
     }
 
     /**
@@ -397,11 +415,12 @@ public class Cartographer extends StatsSource
      * @return A list of partitions IDs to add to the cluster.
      * @throws JSONException
      */
-    public static List<Integer> getPartitionsToAdd(List<Integer> existingParts, JSONObject topo)
+    public static List<Integer> getPartitionsToAdd(ZooKeeper zk, JSONObject topo)
             throws JSONException
     {
         ClusterConfig  clusterConfig = new ClusterConfig(topo);
         List<Integer> newPartitions = new ArrayList<Integer>();
+        Set<Integer> existingParts = new HashSet<Integer>(getPartitions(zk));
         // Remove MPI
         existingParts.remove(MpInitiator.MP_INIT_PID);
         int partsToAdd = clusterConfig.getPartitionCount() - existingParts.size();

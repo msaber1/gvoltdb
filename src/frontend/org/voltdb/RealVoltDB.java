@@ -483,7 +483,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 m_configuredReplicationFactor = clusterConfig.getReplicationFactor();
                 m_cwatcher = new ClusterWatcher(getHostMessenger(), m_configuredReplicationFactor, m_kSafetyStats);
                // IV2 mailbox stuff
-                m_cartographer = new Cartographer(m_messenger, m_cwatcher);
+                m_cartographer = new Cartographer(m_messenger);
                 List<Integer> partitions = null;
                 if (isRejoin) {
                     m_configuredNumberOfPartitions = m_cartographer.getPartitionCount();
@@ -826,11 +826,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                                     Cartographer.class,
                                     BalancePartitionsStatistics.class,
                                     String.class,
-                                    int.class,
-                                    ClusterWatcher.class);
+                                    int.class);
                     m_elasticJoinService = (ElasticJoinService) constructor.newInstance(m_messenger, m_clientInterface,
                             m_cartographer, rebalanceStats, clSnapshotPath,
-                            m_deployment.getCluster().getKfactor(), m_cwatcher);
+                            m_deployment.getCluster().getKfactor());
                     m_elasticJoinService.updateConfig(m_catalogContext);
                 }
             } catch (Exception e) {
@@ -2067,6 +2066,33 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     @Override
     public boolean isSafeToSuicide() {
         return m_cwatcher.isClusterKSafeAfterIDie();
+    }
+
+    @Override
+    public void suicide() {
+        Thread shutdownThread = new Thread() {
+            @Override
+            public void run() {
+                //Check if I am supposed to die and its safe to die then die.
+                boolean die = false;
+                try {
+                    hostLog.warn("VoltDB node shutting down as requested by @StopNode command.");
+                    Thread.sleep(500);
+                    die = VoltDB.instance().shutdown(this);
+                } catch (InterruptedException e) {
+                    hostLog.error("Exception while attempting to shutdown VoltDB from StopNode sysproc", e);
+                }
+                if (die) {
+                    System.exit(0);
+                } else {
+                    try {
+                        Thread.sleep(10000);
+                    } catch (InterruptedException e) {
+                    }
+                }
+            }
+        };
+        shutdownThread.start();
     }
 
     /**

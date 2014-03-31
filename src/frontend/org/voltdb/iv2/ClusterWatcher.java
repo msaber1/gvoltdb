@@ -80,23 +80,21 @@ public class ClusterWatcher {
         m_stats = stats;
     }
 
-    public void dump() {
-        if (tmLog.isDebugEnabled()) {
-            for (PartitionInformation pinfo : m_partitionInfo.values()) {
-                StringBuilder sb = new StringBuilder();
-                sb.append("Info for Partition: ").append(pinfo.m_pid)
-                        .append(" Partition Hosts: ").append(pinfo.m_replicaHost)
-                        .append(" Partition On Ring: ").append(pinfo.m_partitionOnRing);
+    public void dumpToLog() {
+        for (PartitionInformation pinfo : m_partitionInfo.values()) {
+            StringBuilder sb = new StringBuilder();
+            sb.append("Info for Partition: ").append(pinfo.m_pid)
+                    .append(" Partition Hosts: ").append(pinfo.m_replicaHost)
+                    .append(" Partition On Ring: ").append(pinfo.m_partitionOnRing);
 
-                tmLog.debug(sb.toString());
-            }
+            tmLog.info(sb.toString());
         }
     }
 
     private class StateWatcher implements Watcher {
         @Override
         public void process(final WatchedEvent event) {
-            tmLog.debug("Setting refresh to true as zk watcher fired.");
+            tmLog.info("Setting refresh to true as zk watcher fired.");
             m_needsRefresh.set(true);
         }
     }
@@ -121,9 +119,8 @@ public class ClusterWatcher {
             return m_es.submit(new Callable<Boolean>() {
                 @Override
                 public Boolean call() throws Exception {
-                    if (m_needsRefresh.get()) {
-                        reload();
-                    }
+                    reload();
+                    dumpToLog();
                     boolean retval = true;
                     for (PartitionInformation pinfo : m_partitionInfo.values()) {
                         if (!pinfo.m_partitionOnRing || pinfo.m_mpi) {
@@ -146,50 +143,6 @@ public class ClusterWatcher {
             m_needsRefresh.set(true);
             synchronized (ClusterWatcher.class) {
                 return m_isKSafe;
-            }
-        }
-    }
-
-    public List<Integer> getPartitions() {
-        try {
-            return m_es.submit(new Callable<List<Integer>>() {
-                @Override
-                public List<Integer> call() throws Exception {
-                    if (m_needsRefresh.get()) {
-                        reload();
-                    }
-                    synchronized (ClusterWatcher.class) {
-                        return new ArrayList(m_partitionInfo.keySet());
-                    }
-                }
-            }).get();
-        } catch (InterruptedException | ExecutionException t) {
-            tmLog.error("Error in getPartitions returning cached value.", t);
-            m_needsRefresh.set(true);
-            synchronized (ClusterWatcher.class) {
-                return new ArrayList(m_partitionInfo.keySet());
-            }
-        }
-    }
-
-    public Integer getPartitionsCount() {
-        try {
-            return m_es.submit(new Callable<Integer>() {
-                @Override
-                public Integer call() throws Exception {
-                    if (m_needsRefresh.get()) {
-                        reload();
-                    }
-                    synchronized (ClusterWatcher.class) {
-                        return m_partitionInfo.size();
-                    }
-                }
-            }).get();
-        } catch (InterruptedException | ExecutionException t) {
-            tmLog.error("Error in getPartitionsCount returning cached value.", t);
-            m_needsRefresh.set(true);
-            synchronized (ClusterWatcher.class) {
-                return m_partitionInfo.size();
             }
         }
     }

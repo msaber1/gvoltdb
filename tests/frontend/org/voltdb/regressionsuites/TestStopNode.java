@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.util.concurrent.CountDownLatch;
 
 
 import junit.framework.Test;
@@ -37,6 +38,9 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestStopNode extends RegressionSuite
 {
+
+    static LocalCluster m_config;
+
     public TestStopNode(String name) {
         super(name);
     }
@@ -50,24 +54,38 @@ public class TestStopNode extends RegressionSuite
     class StopCallBack implements ProcedureCallback {
         final String m_expected;
         final long m_hid;
+        final CountDownLatch m_cdl;
 
-        public StopCallBack(String expected, long hid) {
+        public StopCallBack(CountDownLatch cdl, String expected, long hid) {
             m_expected = expected;
             m_hid = hid;
+            m_cdl = cdl;
         }
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            m_cdl.countDown();
+            boolean foundExpected = false;
+            String foundResult = "UNKNOWN";
+            String emsg = "";
             if (clientResponse.getStatus() == ClientResponse.SUCCESS) {
                 VoltTable tab = clientResponse.getResults()[0];
                 while (tab.advanceRow()) {
                     String status = tab.getString("RESULT");
+                    emsg = tab.getString("ERR_MSG");
                     long hid = tab.getLong("HOST_ID");
                     if (hid == m_hid) {
-                        assertEquals(m_expected, status);
-                        System.out.println("Host " + m_hid + " Matched Expected @StopNode Reslt of: " + m_expected);
+                        foundExpected = true;
+                        foundResult = status;
+                        System.out.println("Host " + m_hid
+                                + " Matched Expected @StopNode Reslt of: " + m_expected + " ERR_MSG: " + emsg);
                     }
                 }
             }
+            if (!foundExpected) {
+                System.out.println("Host " + m_hid
+                        + " Failed Expected @StopNode Result of: " + foundResult + " ERR_MSG: " + emsg);
+            }
+            assertTrue(foundExpected);
         }
 
     }
@@ -77,33 +95,28 @@ public class TestStopNode extends RegressionSuite
 
         boolean lostConnect = false;
         try {
-            client.callProcedure(new StopCallBack("SUCCESS", 0), "@StopNode", 0);
-            client.drain();
+            CountDownLatch cdl = new CountDownLatch(3);
+            client.callProcedure(new StopCallBack(cdl, "SUCCESS", 2), "@StopNode", 2);
             client.callProcedure("@SystemInformation", "overview");
-            client.callProcedure(new StopCallBack("SUCCESS", 1), "@StopNode", 1);
-            client.drain();
+            client.callProcedure(new StopCallBack(cdl, "SUCCESS", 1), "@StopNode", 1);
             client.callProcedure("@SystemInformation", "overview");
-            client.callProcedure(new StopCallBack("SUCCESS", 2), "@StopNode", 2);
-            client.drain();
+            client.callProcedure(new StopCallBack(cdl, "SUCCESS", 0), "@StopNode", 0);
             client.callProcedure("@SystemInformation", "overview");
+            cdl.await();
         } catch (Exception ex) {
             lostConnect = true;
         }
         assertFalse(lostConnect);
         try {
+            CountDownLatch cdl = new CountDownLatch(3);
             //Stop a node that should stay up
-            client.callProcedure(new StopCallBack("FAILED", 0), "@StopNode", 3);
-            client.drain();
-            //stop a already stopped node should resurn an empty table.
-            VoltTable tabl[] = client.callProcedure("@StopNode", 1).getResults();
-            System.out.println(tabl[0].toFormattedString());
-            //assertEquals(0, tabl.length);
-            client.drain();
+            client.callProcedure(new StopCallBack(cdl, "FAILED", 3), "@StopNode", 3);
+            //Stop already stopped node.
+            client.callProcedure(new StopCallBack(cdl, "FAILED", 1), "@StopNode", 1);
             //Stop a node that should stay up
-            client.callProcedure(new StopCallBack("FAILED", 0), "@StopNode", 4);
-            client.drain();
+            client.callProcedure(new StopCallBack(cdl, "FAILED", 4), "@StopNode", 4);
             VoltTable tab = client.callProcedure("@SystemInformation", "overview").getResults()[0];
-            client.drain();
+            cdl.await();
         } catch (Exception pce) {
             pce.printStackTrace();
             lostConnect = pce.getMessage().contains("was lost before a response was received");
@@ -124,14 +137,14 @@ public class TestStopNode extends RegressionSuite
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
         //Lets tolerate 3 node failures.
-        LocalCluster config = new LocalCluster("decimal-default.jar", 4, 5, 3, BackendTarget.NATIVE_EE_JNI);
-        config.setHasLocalServer(false);
-        config.setExpectedToCrash(true);
-        success = config.compile(project);
+        m_config = new LocalCluster("decimal-default.jar", 4, 5, 3, BackendTarget.NATIVE_EE_JNI);
+        m_config.setHasLocalServer(false);
+        m_config.setExpectedToCrash(true);
+        success = m_config.compile(project);
         assertTrue(success);
 
         // add this config to the set of tests to run
-        builder.addServerConfig(config);
+        builder.addServerConfig(m_config);
         return builder;
     }
 }

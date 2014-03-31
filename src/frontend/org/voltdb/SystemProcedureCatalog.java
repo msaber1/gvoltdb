@@ -144,7 +144,6 @@ public class SystemProcedureCatalog {
         builder.put("@SnapshotScan",            new Config("org.voltdb.sysprocs.SnapshotScan",             false, false, false, 0, VoltType.INVALID,   true,  false, true,  true, false));
         builder.put("@SnapshotDelete",          new Config("org.voltdb.sysprocs.SnapshotDelete",           false, false, false, 0, VoltType.INVALID,   true,  false, true,  true, false));
         builder.put("@Shutdown",                new Config("org.voltdb.sysprocs.Shutdown",                 false, false, false, 0, VoltType.INVALID,   false, false, true,  true, false));
-        builder.put("@StopNode", new Config("org.voltdb.sysprocs.StopNode", false, false, false, 0, VoltType.INVALID, false, false, true, true, false));
         builder.put("@ProfCtl",                 new Config("org.voltdb.sysprocs.ProfCtl",                  false, false, true,  0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@Statistics",              new Config("org.voltdb.sysprocs.Statistics",               false, true,  false, 0, VoltType.INVALID,   false, false, true,  true, false));
         builder.put("@SystemCatalog",           new Config("org.voltdb.sysprocs.SystemCatalog",            true,  true,  false, 0, VoltType.STRING,    false, false, true,  true, false));
