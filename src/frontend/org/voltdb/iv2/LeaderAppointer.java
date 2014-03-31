@@ -19,11 +19,13 @@ package org.voltdb.iv2;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayDeque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Queue;
 import java.util.Set;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -48,8 +50,10 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.Promotable;
 import org.voltdb.SnapshotFormat;
+import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.catalog.SnapshotSchedule;
@@ -59,9 +63,6 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
-import java.util.ArrayDeque;
-import java.util.Queue;
-import org.voltcore.zk.ZKUtil;
 
 /**
  * LeaderAppointer handles centralized appointment of partition leaders across
@@ -216,8 +217,8 @@ public class LeaderAppointer implements Promotable
                 }
             }
             else {
-                // Check for k-safety
                 Set<Integer> hostsOnRing = new HashSet<Integer>();
+                // Check for k-safety
                 if (!isClusterKSafe(hostsOnRing)) {
                     VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
                             false, null);
@@ -243,97 +244,6 @@ public class LeaderAppointer implements Promotable
             }
             m_replicas.clear();
             m_replicas.addAll(updatedHSIds);
-        }
-    }
-
-    private boolean isClusterKSafe(Set<Integer> hostsOnRing) {
-        boolean retval = true;
-        List<String> partitionDirs = null;
-
-        try {
-            partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to read partitions from ZK", true, e);
-        }
-
-        //Don't fetch the values serially do it asynchronously
-        Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
-        Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<ZKUtil.ChildrenCallback>();
-        for (String partitionDir : partitionDirs) {
-            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
-            try {
-                ZKUtil.ByteArrayCallback callback = new ZKUtil.ByteArrayCallback();
-                m_zk.getData(dir, false, callback, null);
-                dataCallbacks.offer(callback);
-                ZKUtil.ChildrenCallback childrenCallback = new ZKUtil.ChildrenCallback();
-                m_zk.getChildren(dir, false, childrenCallback, null);
-                childrenCallbacks.offer(childrenCallback);
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
-            }
-        }
-        for (String partitionDir : partitionDirs) {
-            int pid = ClusterWatcher.getPartitionFromElectionDir(partitionDir);
-
-            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
-            try {
-                // The data of the partition dir indicates whether the partition has finished
-                // initializing or not. If not, the replicas may still be in the process of
-                // adding themselves to the dir. So don't check for k-safety if that's the case.
-                byte[] partitionState = dataCallbacks.poll().getData();
-                boolean isInitializing = false;
-                if (partitionState != null && partitionState.length == 1) {
-                    isInitializing = partitionState[0] == LeaderElector.INITIALIZING;
-                }
-
-                List<String> replicas = childrenCallbacks.poll().getChildren();
-                if (pid == MpInitiator.MP_INIT_PID) {
-                    continue;
-                }
-                final boolean partitionNotOnHashRing = ClusterWatcher.partitionNotOnHashRing(pid);
-                if (!isInitializing && replicas.isEmpty()) {
-                    //These partitions can fail, just cleanup and remove the partition from the system
-                    if (partitionNotOnHashRing) {
-                        removeAndCleanupPartition(pid);
-                        continue;
-                    }
-                    tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
-                    retval = false;
-                } else if (!partitionNotOnHashRing) {
-                    //Record host ids for all partitions that are on the ring
-                    //so they are considered for partition detection
-                    for (String replica : replicas) {
-                        final String split[] = replica.split("/");
-                        final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
-                        final int hostId = CoreUtils.getHostIdFromHSId(hsId);
-                        hostsOnRing.add(hostId);
-                    }
-                }
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
-            }
-        }
-
-        return retval;
-    }
-
-    private void removeAndCleanupPartition(int pid) {
-        tmLog.info("Removing and cleanup up partition info for partition " + pid);
-        if (m_removedPartitionsAtPromotionTime != null) {
-            m_removedPartitionsAtPromotionTime.add(pid);
-            tmLog.info("Partition " + pid + " was cleaned up during LeaderAppointer promotion and should be skipped");
-        }
-        BabySitter sitter = m_partitionWatchers.remove(pid);
-        if (sitter != null) {
-            sitter.shutdown();
-        }
-        m_callbacks.remove(pid);
-        try {
-            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.iv2masters, String.valueOf(pid)));
-            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.iv2appointees, String.valueOf(pid)));
-            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.leaders_initiators, "partition_" + String.valueOf(pid)));
-        } catch (Exception e) {
-            tmLog.error("Error removing partition info", e);
         }
     }
 
@@ -394,7 +304,8 @@ public class LeaderAppointer implements Promotable
             int kfactor, boolean partitionDetectionEnabled,
             SnapshotSchedule partitionSnapshotSchedule,
             boolean usingCommandLog,
-            JSONObject topology, MpInitiator mpi)    {
+            JSONObject topology, MpInitiator mpi)
+    {
         m_hostMessenger = hm;
         m_zk = hm.getZK();
         m_kfactor = kfactor;
@@ -808,6 +719,102 @@ public class LeaderAppointer implements Promotable
         else if (!currentHosts.equals(previousHosts)) {
             writeKnownLiveNodes(currentNodes);
         }
+    }
+
+    private boolean isClusterKSafe(Set<Integer> hostsOnRing)
+    {
+        boolean retval = true;
+        List<String> partitionDirs = null;
+
+        try {
+            partitionDirs = m_zk.getChildren(VoltZK.leaders_initiators, null);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to read partitions from ZK", true, e);
+        }
+
+        //Don't fetch the values serially do it asynchronously
+        Queue<ZKUtil.ByteArrayCallback> dataCallbacks = new ArrayDeque<ZKUtil.ByteArrayCallback>();
+        Queue<ZKUtil.ChildrenCallback> childrenCallbacks = new ArrayDeque<ZKUtil.ChildrenCallback>();
+        for (String partitionDir : partitionDirs) {
+            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
+            try {
+                ZKUtil.ByteArrayCallback callback = new ZKUtil.ByteArrayCallback();
+                m_zk.getData(dir, false, callback, null);
+                dataCallbacks.offer(callback);
+                ZKUtil.ChildrenCallback childrenCallback = new ZKUtil.ChildrenCallback();
+                m_zk.getChildren(dir, false, childrenCallback, null);
+                childrenCallbacks.offer(childrenCallback);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+            }
+        }
+        for (String partitionDir : partitionDirs) {
+            int pid = ClusterWatcher.getPartitionFromElectionDir(partitionDir);
+
+            String dir = ZKUtil.joinZKPath(VoltZK.leaders_initiators, partitionDir);
+            try {
+                // The data of the partition dir indicates whether the partition has finished
+                // initializing or not. If not, the replicas may still be in the process of
+                // adding themselves to the dir. So don't check for k-safety if that's the case.
+                byte[] partitionState = dataCallbacks.poll().getData();
+                boolean isInitializing = false;
+                if (partitionState != null && partitionState.length == 1) {
+                    isInitializing = partitionState[0] == LeaderElector.INITIALIZING;
+                }
+
+                List<String> replicas = childrenCallbacks.poll().getChildren();
+                if (pid == MpInitiator.MP_INIT_PID) continue;
+                final boolean partitionNotOnHashRing = partitionNotOnHashRing(pid);
+                if (!isInitializing && replicas.isEmpty()) {
+                    //These partitions can fail, just cleanup and remove the partition from the system
+                    if (partitionNotOnHashRing) {
+                        removeAndCleanupPartition(pid);
+                        continue;
+                    }
+                    tmLog.fatal("K-Safety violation: No replicas found for partition: " + pid);
+                    retval = false;
+                } else if (!partitionNotOnHashRing) {
+                    //Record host ids for all partitions that are on the ring
+                    //so they are considered for partition detection
+                    for (String replica : replicas) {
+                        final String split[] = replica.split("/");
+                        final long hsId = Long.valueOf(split[split.length - 1].split("_")[0]);
+                        final int hostId = CoreUtils.getHostIdFromHSId(hsId);
+                        hostsOnRing.add(hostId);
+                    }
+                }
+            }
+            catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to read replicas in ZK dir: " + dir, true, e);
+            }
+        }
+
+        return retval;
+    }
+
+    private void removeAndCleanupPartition(int pid) {
+        tmLog.info("Removing and cleanup up partition info for partition " + pid);
+        if (m_removedPartitionsAtPromotionTime != null) {
+            m_removedPartitionsAtPromotionTime.add(pid);
+            tmLog.info("Partition " + pid + " was cleaned up during LeaderAppointer promotion and should be skipped");
+        }
+        BabySitter sitter = m_partitionWatchers.remove(pid);
+        if (sitter != null) {
+            sitter.shutdown();
+        }
+        m_callbacks.remove(pid);
+        try {
+            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.iv2masters, String.valueOf(pid)));
+            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.iv2appointees, String.valueOf(pid)));
+            ZKUtil.asyncDeleteRecursively(m_zk, ZKUtil.joinZKPath(VoltZK.leaders_initiators, "partition_" + String.valueOf(pid)));
+        } catch (Exception e) {
+            tmLog.error("Error removing partition info", e);
+        }
+    }
+
+    private static boolean partitionNotOnHashRing(int pid) {
+        if (TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.LEGACY) return false;
+        return TheHashinator.getRanges(pid).isEmpty();
     }
 
     /**
