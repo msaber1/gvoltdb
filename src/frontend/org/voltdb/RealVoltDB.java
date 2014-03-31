@@ -216,6 +216,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     // Yes, this is fragile having two booleans.  We could aggregate them into
     // some rejoining state enum at some point.
     volatile boolean m_rejoinDataPending = false;
+    // Since m_rejoinDataPending is set asynchronously, sites could have inconsistent
+    // view of what the value is during the execution of a sysproc. Use this and
+    // m_safeMpTxnId to prevent the race. The m_safeMpTxnId is updated once in the
+    // lifetime of the node to reflect the first MP txn that witnessed the flip of
+    // m_rejoinDataPending.
+    private final Object m_safeMpTxnIdLock = new Object();
+    private long m_lastSeenMpTxnId = Long.MIN_VALUE;
+    private long m_safeMpTxnId = Long.MAX_VALUE;
     String m_rejoinTruncationReqId = null;
 
     // Are we adding the node to the cluster instead of rejoining?
@@ -264,6 +272,25 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     @Override
     public boolean rejoinDataPending() { return m_rejoinDataPending; }
+
+    @Override
+    public boolean isMpSysprocSafeToExecute(long txnId)
+    {
+        synchronized (m_safeMpTxnIdLock) {
+            if (txnId >= m_safeMpTxnId) {
+                return true;
+            }
+
+            if (txnId > m_lastSeenMpTxnId) {
+                m_lastSeenMpTxnId = txnId;
+                if (!rejoinDataPending() && m_safeMpTxnId == Long.MAX_VALUE) {
+                    m_safeMpTxnId = txnId;
+                }
+            }
+
+            return txnId >= m_safeMpTxnId;
+        }
+    }
 
     private long m_recoveryStartTime;
 
@@ -330,6 +357,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
+            m_safeMpTxnId = Long.MAX_VALUE;
+            m_lastSeenMpTxnId = Long.MIN_VALUE;
             m_clientInterface = null;
             m_adminListener = null;
             m_commandLog = new DummyCommandLog();
@@ -873,8 +902,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                         m_myHostId = m_messenger.getHostId();
                         hostLog.info(String.format("Host id of this node is: %d", m_myHostId));
                         hostLog.info("URL of deployment info: " + m_config.m_pathToDeployment);
+                        hostLog.info("Cluster uptime: " + MiscUtils.formatUptime(getClusterUptime()));
                         logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
-
                         long nextCheck = nextCheckField.getLong(dailyRollingFileAppender);
                         scheduleWork(new DailyLogTask(),
                                 nextCheck - System.currentTimeMillis() + 30 * 1000, 0, TimeUnit.MILLISECONDS);
@@ -2530,5 +2559,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         long tableRqt = 10 * tableCount;
         long rejoinRqt = (isPro && kfactor > 0) ? 128 * sitesPerHost : 0;
         return baseRqt + tableRqt + rejoinRqt;
+    }
+
+    @Override
+    public long getClusterUptime()
+    {
+        return System.currentTimeMillis() - getHostMessenger().getInstanceId().getTimestamp();
     }
 }

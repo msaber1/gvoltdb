@@ -29,7 +29,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -358,6 +357,12 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public boolean isMpSysprocSafeToExecute(long txnId)
+    {
+        return true;
+    }
+
+    @Override
     public void startSampler()
     {
     }
@@ -532,5 +537,10 @@ public class MockVoltDB implements VoltDBInterface
     public ScheduledFuture<?> schedulePriorityWork(Runnable work,
             long initialDelay, long delay, TimeUnit unit) {
         return null;
+    }
+
+    @Override
+    public long getClusterUptime() {
+        return 0;
     }
 }

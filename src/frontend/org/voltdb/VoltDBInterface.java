@@ -62,6 +62,8 @@ public interface VoltDBInterface
      */
     public boolean shutdown(Thread mainSiteThread) throws InterruptedException;
 
+    boolean isMpSysprocSafeToExecute(long txnId);
+
     public void startSampler();
 
     public VoltDB.Configuration getConfig();
@@ -112,6 +114,11 @@ public interface VoltDBInterface
      * @return true if the VoltDB is running.
      */
     public boolean isRunning();
+
+    /**
+     * @return The number of milliseconds the cluster has been up
+     */
+    public long getClusterUptime();
 
     /**
      * Notify RealVoltDB that recovery is complete
