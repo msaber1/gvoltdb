@@ -21,6 +21,8 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
@@ -497,12 +499,18 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                                          undoQuantumToken, predicates);
     }
 
+
+    static AtomicInteger outstandingCalls = new AtomicInteger(0);
+    static AtomicLong totalCalls = new AtomicLong(0);
     @Override
     public Pair<Long, int[]> tableStreamSerializeMore(int tableId,
                                                       TableStreamType streamType,
                                                       List<BBContainer> outputBuffers) {
-        System.out.println("ee tableStreamSerializeMore start");
+        int calls = outstandingCalls.incrementAndGet();
+        long thisCallId = totalCalls.incrementAndGet();
+        System.out.println("ee tableStreamSerializeMore start: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
         System.out.flush();
+
 
         //Clear is destructive, do it before the native call
         deserializer.clear();
@@ -518,23 +526,29 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         int count;
         try {
             count = deserializer.readInt();
-            System.out.println("ee tableStreamSerializeMore count = " + String.valueOf(count));
+            System.out.println("ee tableStreamSerializeMore count = " + String.valueOf(count) + ", " + String.valueOf(thisCallId));
             System.out.flush();
             if (count > 0) {
                 positions = new int[count];
                 for (int i = 0; i < count; i++) {
                     positions[i] = deserializer.readInt();
                 }
-                System.out.println("ee tableStreamSerializeMore returning buffers");
+                calls = outstandingCalls.decrementAndGet();
+                System.out.println("ee tableStreamSerializeMore returning buffers: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
                 System.out.flush();
                 return Pair.of(remaining, positions);
             }
         } catch (final IOException ex) {
+            calls = outstandingCalls.decrementAndGet();
+            System.out.println("ee tableStreamSerializeMore throwing: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
+            System.out.flush();
+            ex.printStackTrace();
             LOG.error("Failed to deserialize position array" + ex);
             throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
         }
 
-        System.out.println("ee tableStreamSerializeMore returning empty");
+        calls = outstandingCalls.decrementAndGet();
+        System.out.println("ee tableStreamSerializeMore returning empty: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
         System.out.flush();
         return Pair.of(remaining, new int[] {0});
     }
