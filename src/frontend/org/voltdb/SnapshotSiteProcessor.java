@@ -72,6 +72,7 @@ import com.google_voltpatches.common.util.concurrent.MoreExecutors;
 public class SnapshotSiteProcessor {
 
     private static final VoltLogger SNAP_LOG = new VoltLogger("SNAPSHOT");
+    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     /** Global count of execution sites on this node performing snapshot */
     public static final Set<Object> ExecutionSitesCurrentlySnapshotting =
@@ -541,6 +542,8 @@ public class SnapshotSiteProcessor {
 
             final List<BBContainer> outputBuffers = getOutputBuffers(tableTasks, noSchedule);
             if (outputBuffers == null) {
+                rejoinLog.info("Outputbuffers was null and noSchedule=" + String.valueOf(noSchedule));
+
                 // Not enough buffers available
                 if (!noSchedule) {
                     rescheduleSnapshotWork();
