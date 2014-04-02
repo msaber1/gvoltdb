@@ -39,6 +39,8 @@ TableStreamerContext::TableStreamerContext(
     m_serializer(serializer),
     m_partitionId(partitionId)
 {
+    std::cout << "Updating predicates TableStreamerContext." << std::endl;
+    std::cout.flush();
     updatePredicates(predicateStrings);
 }
 
@@ -62,6 +64,9 @@ TableStreamerContext::TableStreamerContext(
  */
 void TableStreamerContext::updatePredicates(const std::vector<std::string> &predicateStrings)
 {
+    std::cout << "TableStreamerContext.updatePredicates" << std::endl;
+    std::cout.flush();
+
     // Parse predicate strings. The factory type determines the kind of
     // predicates that get generated.
     // Throws an exception to be handled by caller on errors.

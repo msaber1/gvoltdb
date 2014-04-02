@@ -66,6 +66,8 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
         switch (streamPtr->m_context->handleReactivation(streamType)) {
             case TableStreamerContext::ACTIVATION_SUCCEEDED:
                 streamPtr->m_context->updatePredicates(predicateStrings);
+                std::cout << "Updating predicate." << std::endl;
+                std::cout.flush();
                 found = true;
                 break;
             case TableStreamerContext::ACTIVATION_FAILED:
@@ -86,24 +88,34 @@ bool TableStreamer::activateStream(PersistentTableSurgeon &surgeon,
                     context.reset(
                         new CopyOnWriteContext(m_table, surgeon, serializer, m_partitionId,
                                                predicateStrings, m_table.activeTupleCount()));
+                    std::cout << "New TABLE_STREAM_SNAPSHOT." << std::endl;
+                    std::cout.flush();
                     break;
 
                 case TABLE_STREAM_RECOVERY:
                     context.reset(new RecoveryContext(m_table, surgeon, m_partitionId,
                                                       serializer, m_tableId));
+                    std::cout << "New TABLE_STREAM_RECOVERY." << std::endl;
+                    std::cout.flush();
                     break;
 
                 case TABLE_STREAM_ELASTIC_INDEX:
                     context.reset(new ElasticContext(m_table, surgeon, m_partitionId,
                                                      serializer, predicateStrings));
+                    std::cout << "New TABLE_STREAM_ELASTIC_INDEX." << std::endl;
+                    std::cout.flush();
                     break;
 
                 case TABLE_STREAM_ELASTIC_INDEX_READ:
                     context.reset(new ElasticIndexReadContext(m_table, surgeon, m_partitionId,
                                                               serializer, predicateStrings));
+                    std::cout << "New TABLE_STREAM_ELASTIC_INDEX_READ." << std::endl;
+                    std::cout.flush();
                     break;
 
                 case TABLE_STREAM_ELASTIC_INDEX_CLEAR:
+                    std::cout << "New TABLE_STREAM_ELASTIC_INDEX_CLEAR." << std::endl;
+                    std::cout.flush();
                     VOLT_DEBUG("Clear elastic index before materializing it.");
                     // not an error
                     break;
