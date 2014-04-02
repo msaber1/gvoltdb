@@ -501,6 +501,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public Pair<Long, int[]> tableStreamSerializeMore(int tableId,
                                                       TableStreamType streamType,
                                                       List<BBContainer> outputBuffers) {
+        System.out.println("ee tableStreamSerializeMore start");
+        System.out.flush();
+
         //Clear is destructive, do it before the native call
         deserializer.clear();
         byte[] bytes = outputBuffers != null
@@ -515,11 +518,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         int count;
         try {
             count = deserializer.readInt();
+            System.out.println("ee tableStreamSerializeMore count = " + String.valueOf(count));
+            System.out.flush();
             if (count > 0) {
                 positions = new int[count];
                 for (int i = 0; i < count; i++) {
                     positions[i] = deserializer.readInt();
                 }
+                System.out.println("ee tableStreamSerializeMore returning buffers");
+                System.out.flush();
                 return Pair.of(remaining, positions);
             }
         } catch (final IOException ex) {
@@ -527,6 +534,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
         }
 
+        System.out.println("ee tableStreamSerializeMore returning empty");
+        System.out.flush();
         return Pair.of(remaining, new int[] {0});
     }
 
