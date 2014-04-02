@@ -542,8 +542,6 @@ public class SnapshotSiteProcessor {
 
             final List<BBContainer> outputBuffers = getOutputBuffers(tableTasks, noSchedule);
             if (outputBuffers == null) {
-                rejoinLog.info("Outputbuffers was null and noSchedule=" + String.valueOf(noSchedule));
-
                 // Not enough buffers available
                 if (!noSchedule) {
                     rescheduleSnapshotWork();

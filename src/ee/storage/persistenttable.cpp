@@ -1039,6 +1039,8 @@ bool PersistentTable::activateStream(
             predicateStrings.reserve(npreds);
             for (int ipred = 0; ipred < npreds; ipred++) {
                 std::string spred = serializeIn.readTextString();
+                std::cout << "SNAPSHOT PREDICATE: " << spred << std::endl;
+                std::cout.flush();
                 predicateStrings.push_back(spred);
             }
         }
