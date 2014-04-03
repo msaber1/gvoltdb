@@ -534,7 +534,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 for (int i = 0; i < count; i++) {
                     positions[i] = deserializer.readInt();
                 }
-                String positionsStr = StringUtils.join(positions, ", ");
+
+                String[] posStrs = new String[positions.length];
+                for (int i = 0; i < positions.length; i++) {
+                    posStrs[i] = String.valueOf(positions[i]);
+                }
+
+                String positionsStr = StringUtils.join(posStrs, ", ");
 
                 calls = outstandingCalls.decrementAndGet();
                 System.out.println(String.format(
