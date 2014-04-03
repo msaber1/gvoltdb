@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -533,8 +534,12 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 for (int i = 0; i < count; i++) {
                     positions[i] = deserializer.readInt();
                 }
+                String positionsStr = StringUtils.join(positions, ", ");
+
                 calls = outstandingCalls.decrementAndGet();
-                System.out.println("ee tableStreamSerializeMore returning buffers: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
+                System.out.println(String.format(
+                        "ee tableStreamSerializeMore returning buffers with positions %s and oc: %d of %d total",
+                        positionsStr, calls, thisCallId));
                 System.out.flush();
                 return Pair.of(remaining, positions);
             }
