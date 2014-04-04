@@ -508,9 +508,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                                                       List<BBContainer> outputBuffers) {
         int calls = outstandingCalls.incrementAndGet();
         long thisCallId = totalCalls.incrementAndGet();
-        System.out.println("ee tableStreamSerializeMore start: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
-        System.out.flush();
-
+        LOG.info("ee tableStreamSerializeMore start: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
 
         //Clear is destructive, do it before the native call
         deserializer.clear();
@@ -526,8 +524,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         int count;
         try {
             count = deserializer.readInt();
-            System.out.println("ee tableStreamSerializeMore count = " + String.valueOf(count) + ", " + String.valueOf(thisCallId));
-            System.out.flush();
+            LOG.info("ee tableStreamSerializeMore count = " + String.valueOf(count) + ", " + String.valueOf(thisCallId));
             if (count > 0) {
                 positions = new int[count];
                 for (int i = 0; i < count; i++) {
@@ -547,24 +544,21 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 int pos0 = positions.length > 0 ? positions[0] : Integer.MIN_VALUE;
 
                 calls = outstandingCalls.decrementAndGet();
-                System.out.println(String.format(
+                LOG.info(String.format(
                         "ee tableStreamSerializeMore returning buffers with position %d and oc: %d of %d total",
                         pos0, calls, thisCallId));
-                System.out.flush();
                 return Pair.of(remaining, positions);
             }
         } catch (final IOException ex) {
             calls = outstandingCalls.decrementAndGet();
-            System.out.println("ee tableStreamSerializeMore throwing: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
-            System.out.flush();
+            LOG.info("ee tableStreamSerializeMore throwing: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
             ex.printStackTrace();
             LOG.error("Failed to deserialize position array" + ex);
             throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
         }
 
         calls = outstandingCalls.decrementAndGet();
-        System.out.println("ee tableStreamSerializeMore returning empty: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
-        System.out.flush();
+        LOG.info("ee tableStreamSerializeMore returning empty: " + String.valueOf(calls) + ", " + String.valueOf(thisCallId));
         return Pair.of(remaining, new int[] {0});
     }
 
