@@ -98,7 +98,7 @@ public class RejoinProducer extends JoinProducerBase {
         @Override
         public void run()
         {
-            REJOINLOG.debug(m_whoami + "informing rejoinCoordinator "
+            REJOINLOG.info(m_whoami + "informing rejoinCoordinator "
                     + CoreUtils.hsIdToString(m_coordinatorHsId)
                     + " of REPLAY_FINISHED");
             RejoinMessage replay_complete = new RejoinMessage(
@@ -133,7 +133,7 @@ public class RejoinProducer extends JoinProducerBase {
         super(partitionId, "Rejoin producer:" + partitionId + " ", taskQueue);
         m_currentlyRejoining = new AtomicBoolean(true);
         m_completionAction = new ReplayCompletionAction();
-        REJOINLOG.debug(m_whoami + "created.");
+        REJOINLOG.info(m_whoami + "created.");
     }
 
     @Override
@@ -175,6 +175,7 @@ public class RejoinProducer extends JoinProducerBase {
     protected void kickWatchdog(boolean rearm)
     {
         synchronized (RejoinProducer.class) {
+            boolean wasArmed = m_timeFuture == null;
             if (m_timeFuture != null) {
                 m_timeFuture.cancel(false);
                 m_timeFuture = null;
@@ -185,6 +186,12 @@ public class RejoinProducer extends JoinProducerBase {
                         StreamSnapshotDataTarget.DEFAULT_WRITE_TIMEOUT_MS,
                         0,
                         TimeUnit.MILLISECONDS);
+            }
+            if (wasArmed && !rearm) {
+                REJOINLOG.info("Global rejoin-side watchdog was armed.");
+            }
+            if (!wasArmed && rearm) {
+                REJOINLOG.info("Global rejoin-side watchdog was dis-armed.");
             }
         }
     }
@@ -204,7 +211,7 @@ public class RejoinProducer extends JoinProducerBase {
         long hsId = m_rejoinSiteProcessor.initialize(message.getSnapshotSourceCount(),
                                                      message.getSnapshotBufferPool());
 
-        REJOINLOG.debug(m_whoami
+        REJOINLOG.info(m_whoami
                 + "received INITIATION message. Doing rejoin"
                 + ". Source site is: "
                 + CoreUtils.hsIdToString(sourceSite)
@@ -255,7 +262,7 @@ public class RejoinProducer extends JoinProducerBase {
         if (m_rejoinSiteProcessor.isEOF() == false) {
             m_taskQueue.offer(this);
         } else {
-            REJOINLOG.debug(m_whoami + "Rejoin snapshot transfer is finished");
+            REJOINLOG.info(m_whoami + "Rejoin snapshot transfer is finished");
             m_rejoinSiteProcessor.close();
 
             Preconditions.checkNotNull(m_streamSnapshotMb);
@@ -292,11 +299,11 @@ public class RejoinProducer extends JoinProducerBase {
                 }
                 SnapshotCompletionEvent event = null;
                 try {
-                    REJOINLOG.debug(m_whoami
+                    REJOINLOG.info(m_whoami
                             + "waiting on snapshot completion monitor.");
                     event = m_snapshotCompletionMonitor.get();
                     m_completionAction.setSnapshotTxnId(event.multipartTxnId);
-                    REJOINLOG.debug(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
+                    REJOINLOG.info(m_whoami + " monitor completed. Sending SNAPSHOT_FINISHED "
                             + "and handing off to site.");
                     RejoinMessage snap_complete = new RejoinMessage(
                             m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);

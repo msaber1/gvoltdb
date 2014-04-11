@@ -104,7 +104,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
         m_ackReceiver = ackReceiver;
         m_ackReceiver.setCallback(m_targetId, this);
 
-        rejoinLog.debug(String.format("Initializing snapshot stream processor " +
+        rejoinLog.info(String.format("Initializing snapshot stream processor " +
                 "for source site id: %s, and with processorid: %d",
                 CoreUtils.hsIdToString(HSId), m_targetId));
 
@@ -416,7 +416,7 @@ implements SnapshotDataTarget, StreamSnapshotAckReceiver.AckCallback {
             if (m_schemas.containsKey(tableId)) {
                 // remove the schema once sent
                 byte[] schema = m_schemas.remove(tableId);
-                rejoinLog.debug("Sending schema for table " + tableId);
+                rejoinLog.info("Sending schema for table " + tableId);
 
                 rejoinLog.trace("Writing schema as part of this write");
                 send(StreamSnapshotMessageType.SCHEMA, tableId, schema);

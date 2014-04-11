@@ -37,6 +37,8 @@ import org.voltdb.utils.MiscUtils;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public abstract class JoinProducerBase extends SiteTasker {
+    private static final VoltLogger REJOINLOG = new VoltLogger("REJOIN");
+
     protected final int m_partitionId;
     protected final String m_whoami;
     protected final SiteTaskerQueue m_taskQueue;
@@ -68,13 +70,13 @@ public abstract class JoinProducerBase extends SiteTasker {
 
         protected void register()
         {
-            getLogger().debug(m_whoami + "registering snapshot completion action");
+            getLogger().info(m_whoami + "registering snapshot completion action");
             VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
         }
 
         private void deregister()
         {
-            getLogger().debug(m_whoami + "deregistering snapshot completion action");
+            getLogger().info(m_whoami + "deregistering snapshot completion action");
             VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
         }
 
@@ -82,7 +84,7 @@ public abstract class JoinProducerBase extends SiteTasker {
         public CountDownLatch snapshotCompleted(SnapshotCompletionEvent event)
         {
             if (event.nonce.equals(m_snapshotNonce)) {
-                getLogger().debug(m_whoami + "counting down snapshot monitor completion. "
+                getLogger().info(m_whoami + "counting down snapshot monitor completion. "
                             + "Snapshot txnId is: " + event.multipartTxnId);
                 deregister();
 
@@ -90,11 +92,12 @@ public abstract class JoinProducerBase extends SiteTasker {
                 // Once all partitions are done, all watchdogs will be canceled.
                 // In live rejoin, there may be a window between two partitions
                 //  streaming where there is no active watchdog. #TODO
+                REJOINLOG.info(m_whoami + "is disabling the global rejoin watchdog in JoinProducerBase.snapshotCompleted.");
                 kickWatchdog(false);
 
                 m_future.set(event);
             } else {
-                getLogger().debug(m_whoami
+                getLogger().info(m_whoami
                         + " observed completion of irrelevant snapshot nonce: "
                         + event.nonce);
             }
@@ -163,6 +166,7 @@ public abstract class JoinProducerBase extends SiteTasker {
                                      Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
                                      boolean requireExistingSequenceNumbers)
     {
+        REJOINLOG.info(m_whoami + "called JoinProducerBase.setJoinComplete.");
         siteConnection.setRejoinComplete(m_completionAction, exportSequenceNumbers, requireExistingSequenceNumbers);
     }
 
@@ -185,7 +189,7 @@ public abstract class JoinProducerBase extends SiteTasker {
 
     public void notifyOfSnapshotNonce(String nonce) {
         if (nonce.equals(m_snapshotNonce)) {
-            getLogger().debug("Started recording transactions after snapshot nonce " + nonce);
+            getLogger().info("Started recording transactions after snapshot nonce " + nonce);
             if (m_taskLog != null) {
                 m_taskLog.enableRecording();
             }
