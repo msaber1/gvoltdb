@@ -187,11 +187,11 @@ public class RejoinProducer extends JoinProducerBase {
                         0,
                         TimeUnit.MILLISECONDS);
             }
-            if (wasArmed && !rearm) {
-                REJOINLOG.info("Global rejoin-side watchdog was armed.");
-            }
-            if (!wasArmed && rearm) {
+            if (wasArmed && (!rearm)) {
                 REJOINLOG.info("Global rejoin-side watchdog was dis-armed.");
+            }
+            if ((!wasArmed) && rearm) {
+                REJOINLOG.info("Global rejoin-side watchdog was armed.");
             }
         }
     }
