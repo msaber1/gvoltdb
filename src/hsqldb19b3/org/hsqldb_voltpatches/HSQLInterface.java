@@ -190,6 +190,7 @@ public class HSQLInterface {
         // if it's not called for every call of getXMLCompiledStatement, that's ok;
         // it'll get called next time
         sessionProxy.sessionData.persistentStoreCollection.clearAllTables();
+        sessionProxy.clearWarnings();
 
         // clean up sql-in expressions
         fixupInStatementExpressions(xml);

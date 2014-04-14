@@ -11,8 +11,8 @@
 
 {_stringfun |= ""}
 -- There are no unary string-to-string functions supported yet.
---{_stringfun |= "LOWER"}
---{_stringfun |= "UPPER"}
+{_stringfun |= "LOWER"}
+{_stringfun |= "UPPER"}
 
 {_genericagg |= "MIN"}
 {_genericagg |= "MAX"}

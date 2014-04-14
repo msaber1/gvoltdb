@@ -15,9 +15,7 @@
 
 
 {@insertvals = "_id, _value[string], _value[string null30], _value[float]"}
--- There are no unary string-to-string functions supported yet.
-{@onefun = ""}
---{@onefun = "LOWER"}
+{@onefun = "LOWER"}
 {@optionalfn = "_stringfun"}
 
 {@updatecolumn = "DESC"}

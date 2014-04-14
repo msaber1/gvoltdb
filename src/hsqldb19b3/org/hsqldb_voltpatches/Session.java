@@ -1835,7 +1835,13 @@ public class Session implements SessionInterface {
         if (sqlWarnings == null) {
             sqlWarnings = new HsqlArrayList(true);
         }
-
+// A VoltDB extension to avoid memory waste.
+        // Only the last warning is ever asked for, so just keep overwriting any existing one.
+        else {
+            sqlWarnings.set(0, warning);
+            return;
+        }
+// End of VoltDB extension
         sqlWarnings.add(warning);
     }
 
