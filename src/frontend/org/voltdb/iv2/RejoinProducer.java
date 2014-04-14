@@ -175,7 +175,7 @@ public class RejoinProducer extends JoinProducerBase {
     protected void kickWatchdog(boolean rearm)
     {
         synchronized (RejoinProducer.class) {
-            boolean wasArmed = m_timeFuture == null;
+            boolean wasArmed = m_timeFuture != null;
             if (m_timeFuture != null) {
                 m_timeFuture.cancel(false);
                 m_timeFuture = null;
