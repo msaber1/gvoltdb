@@ -243,10 +243,14 @@ public abstract class ExpressionUtil {
         if (input == null)
         {
             return tves;
-        }
-        if (input instanceof TupleValueExpression)
-        {
+        } else if (input instanceof TupleValueExpression) {
             tves.add((TupleValueExpression) input);
+            return tves;
+        } else if (input instanceof SubqueryExpression) {
+            SubqueryExpression subqueryExpr = (SubqueryExpression) input;
+            for(AbstractExpression arg : subqueryExpr.m_args) {
+                tves.addAll(getTupleValueExpressions(arg));
+            }
             return tves;
         }
 
@@ -356,6 +360,21 @@ public abstract class ExpressionUtil {
             // of reasons and may need special casing here.
             return containsMatchingTVE(expr, tableAlias);
         }
+    }
+
+    /**
+     *  Return true/false whether an expression contains any aggregate expression
+     *
+     * @param expr
+     * @return true is expression contains an aggregate subexpression
+     */
+    public static boolean containsAggregateExpression(AbstractExpression expr) {
+        return expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_AVG) ||
+                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_COUNT) ||
+                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_COUNT_STAR) ||
+                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_MAX) ||
+                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_MIN) ||
+                expr.hasAnySubexpressionOfType(ExpressionType.AGGREGATE_SUM);
     }
 
     private static boolean containsMatchingTVE(AbstractExpression expr, String tableAlias) {

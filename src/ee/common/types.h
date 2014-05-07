@@ -316,6 +316,11 @@ enum ExpressionType {
     EXPRESSION_TYPE_OPERATOR_CASE_WHEN                       = 300,
     EXPRESSION_TYPE_OPERATOR_ALTERNATIVE                     = 301,
 
+    // -----------------------------
+    // Subquery
+    // -----------------------------
+    EXPRESSION_TYPE_SUBQUERY                        = 400,
+
 };
 
 // ------------------------------------------------------------------

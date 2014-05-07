@@ -46,11 +46,12 @@ import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 
-public class TestSubQueries extends PlannerTestCase {
+public class TestSubQueriesSubselect extends PlannerTestCase {
 
-    public void testUnsupportedSyntax() {
-        failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)", "Unsupported subquery syntax");
-    }
+    // Supported
+//    public void testUnsupportedSyntax() {
+//        failToCompile("DELETE FROM R1 WHERE A IN (SELECT A A1 FROM R1 WHERE A>1)", "Unsupported subquery syntax");
+//    }
 
     private void checkOutputSchema(AbstractPlanNode planNode, String... columns) {
         checkOutputSchema(null, planNode, columns);
@@ -918,7 +919,7 @@ public class TestSubQueries extends PlannerTestCase {
 
     @Override
     protected void setUp() throws Exception {
-        setupSchema(TestSubQueries.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
+        setupSchema(TestSubQueriesSubselect.class.getResource("testplans-subqueries-ddl.sql"), "dd", false);
         AbstractPlanNode.enableVerboseExplainForDebugging();
         AbstractExpression.enableVerboseExplainForDebugging();
     }

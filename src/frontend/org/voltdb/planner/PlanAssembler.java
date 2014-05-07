@@ -42,6 +42,7 @@ import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.SubqueryExpression;
 import org.voltdb.expressions.TupleAddressExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.ParsedSelectStmt.ParsedColInfo;
@@ -92,8 +93,8 @@ public class PlanAssembler {
         public final boolean m_orderIsDeterministic;
         public final boolean m_hasLimitOrOffset;
         public final int m_planId;
-        public ParsedResultAccumulator(boolean orderIsDeterministic, boolean hasLimitOrOffset,
-                int planId)
+
+        public ParsedResultAccumulator(boolean orderIsDeterministic, boolean hasLimitOrOffset, int planId)
         {
             m_orderIsDeterministic = orderIsDeterministic;
             m_hasLimitOrOffset  = hasLimitOrOffset;
@@ -314,19 +315,41 @@ public class PlanAssembler {
      */
     public CompiledPlan getBestCostPlan(AbstractParsedStmt parsedStmt) {
 
-        // Get the best plans for the sub-queries first
+        // Get the best plans for the FROM(SELECT...) sub-queries first
         List<StmtSubqueryScan> subqueryNodes = new ArrayList<StmtSubqueryScan>();
-        ParsedResultAccumulator subQueryResult = null;
+        ParsedResultAccumulator fromSubqueryResult = null;
         if (parsedStmt.m_joinTree != null) {
             parsedStmt.m_joinTree.extractSubQueries(subqueryNodes);
-            if ( ! subqueryNodes.isEmpty()) {
-                subQueryResult = getBestCostPlanForSubQueries(subqueryNodes);
-                if (subQueryResult == null) {
+            if ( ! subqueryNodes.isEmpty() ) {
+                fromSubqueryResult = getBestCostPlanForFromSubQueries(subqueryNodes);
+                if (fromSubqueryResult == null) {
                     // There was at least one sub-query and we should have a compiled plan for it
                     return null;
                 }
             }
         }
+
+        // Get the best plans for the expression subqueries ( EXISTS/IN (SELECT...) )
+        ParsedResultAccumulator exprSubqueryResult = null;
+        List<AbstractExpression> subqueryExprs = new ArrayList<AbstractExpression>();
+        if (parsedStmt.m_joinTree != null) {
+            AbstractExpression treeExpr = parsedStmt.m_joinTree.getAllFilters();
+            if (treeExpr != null) {
+                subqueryExprs.addAll(treeExpr.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
+            }
+        }
+        if (parsedStmt instanceof ParsedSelectStmt && ((ParsedSelectStmt)parsedStmt).having != null) {
+            subqueryExprs.addAll(
+                    ((ParsedSelectStmt)parsedStmt).having.findAllSubexpressionsOfType(ExpressionType.SUBQUERY));
+        }
+        if ( ! subqueryExprs.isEmpty() ) {
+            exprSubqueryResult = getBestCostPlanForExistsSubQueries(subqueryExprs);
+            if (exprSubqueryResult == null) {
+                // There was at least one sub-query and we should have a compiled plan for it
+                return null;
+            }
+        }
+        boolean hasSubquery = fromSubqueryResult != null || exprSubqueryResult != null;
 
         // set up the plan assembler for this statement
         setupForNewPlans(parsedStmt);
@@ -346,9 +369,13 @@ public class PlanAssembler {
         }
 
         CompiledPlan retval = m_planSelector.m_bestPlan;
-        if (subQueryResult != null && retval != null) {
-            boolean orderIsDeterministic;
-            if (subQueryResult.m_orderIsDeterministic) {
+        if (hasSubquery && retval != null) {
+            boolean orderIsDeterministic = (fromSubqueryResult != null) ?
+                    fromSubqueryResult.m_orderIsDeterministic : true;
+            orderIsDeterministic = (exprSubqueryResult != null) ?
+                    orderIsDeterministic && exprSubqueryResult.m_orderIsDeterministic :
+                    orderIsDeterministic;
+            if (orderIsDeterministic == true) {
                 orderIsDeterministic = retval.isOrderDeterministic();
             } else {
                 //TODO: this reliance on the vague isOrderDeterministicInSpiteOfUnorderedSubqueries test
@@ -366,8 +393,11 @@ public class PlanAssembler {
                 orderIsDeterministic = retval.isOrderDeterministic() &&
                         parsedStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries();
             }
-            boolean hasLimitOrOffset =
-                    subQueryResult.m_hasLimitOrOffset || retval.hasLimitOrOffset();
+            boolean hasLimitOrOffset = (fromSubqueryResult != null) ?
+                    fromSubqueryResult.m_hasLimitOrOffset : false;
+            hasLimitOrOffset = (exprSubqueryResult != null) ?
+                    hasLimitOrOffset && exprSubqueryResult.m_hasLimitOrOffset :
+                        hasLimitOrOffset;
             retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
 
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
@@ -387,12 +417,12 @@ public class PlanAssembler {
     }
 
     /**
-     * Generate the best cost plans for the immediate sub-queries of the
+     * Generate the best cost plans for the immediate FROM sub-queries of the
      * current SQL statement context.
      * @param parsedStmt - SQL context containing sub queries
      * @return ChildPlanResult
      */
-    private ParsedResultAccumulator getBestCostPlanForSubQueries(List<StmtSubqueryScan> subqueryNodes) {
+    private ParsedResultAccumulator getBestCostPlanForFromSubQueries(List<StmtSubqueryScan> subqueryNodes) {
         int nextPlanId = 0;
         boolean orderIsDeterministic = true;
         boolean hasSignificantOffsetOrLimit = false;
@@ -409,6 +439,50 @@ public class PlanAssembler {
                     (( ! parsedResult.m_orderIsDeterministic) && parsedResult.m_hasLimitOrOffset);
         }
 
+        // need to reset plan id for the entire SQL
+        m_planSelector.m_planId = nextPlanId;
+
+        return new ParsedResultAccumulator(orderIsDeterministic, hasSignificantOffsetOrLimit, nextPlanId);
+    }
+
+
+    /**
+     * Generate the best cost plans for the immediate EXISTS/IN (SELECT...) sub-queries
+     * of the current SQL statement context.
+     * @param parsedStmt - SQL context containing sub queries
+     * @return ChildPlanResult
+     */
+    private ParsedResultAccumulator getBestCostPlanForExistsSubQueries(List<AbstractExpression> subqueryExprs) {
+        int nextPlanId = 0;
+        boolean orderIsDeterministic = true;
+        boolean hasSignificantOffsetOrLimit = false;
+
+        for (AbstractExpression expr : subqueryExprs) {
+            assert(expr instanceof SubqueryExpression);
+            SubqueryExpression subqueryExpr = (SubqueryExpression) expr;
+            AbstractParsedStmt subquery = subqueryExpr.getSubquery();
+            assert(subquery != null);
+
+            ParsedResultAccumulator parsedResult =  planForParsedSubquery(subqueryExpr.getTable(), nextPlanId);
+            if (parsedResult == null) {
+                return null;
+            }
+            nextPlanId = parsedResult.m_planId;
+            orderIsDeterministic &= parsedResult.m_orderIsDeterministic;
+            // Offsets or limits in subqueries are only significant (only effect content determinism)
+            // when they apply to un-ordered subquery contents.
+            hasSignificantOffsetOrLimit |=
+                    (( ! parsedResult.m_orderIsDeterministic) && parsedResult.m_hasLimitOrOffset);
+
+            CompiledPlan bestPlan = subqueryExpr.getTable().getBestCostPlan();
+            subqueryExpr.setSubqueryNode(bestPlan.rootPlanGraph);
+            // The subquery plan must not contain Receive/Send nodes because it will be executed
+            // multiple times during the parent statement execution.
+            if (bestPlan.rootPlanGraph.hasAnyNodeOfType(PlanNodeType.SEND)) {
+                // fail the whole plan
+                return null;
+            }
+        }
         // need to reset plan id for the entire SQL
         m_planSelector.m_planId = nextPlanId;
 

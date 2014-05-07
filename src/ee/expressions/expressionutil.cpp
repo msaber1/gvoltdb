@@ -76,6 +76,27 @@ hashRangeFactory(PlannerDomValue obj) {
     return new HashRangeExpression(hashColumnValue.asInt(), ranges, static_cast<int>(rangesArray.arrayLen()));
 }
 
+/** Parse JSON parameters to create a subquery expression */
+static AbstractExpression*
+subqueryFactory(PlannerDomValue obj, const std::vector<AbstractExpression*>* args) {
+    int subqueryId = obj.valueForKey("SUBQUERY_ID").asInt();
+    std::vector<int> paramIdxs;
+    if (obj.hasNonNullKey("PARAM_IDX")) {
+        PlannerDomValue params = obj.valueForKey("PARAM_IDX");
+        int paramSize = params.arrayLen();
+        paramIdxs.reserve(paramSize);
+        if (args == NULL || args->size() != paramSize) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "subqueryFactory: parameter indexes/tve count mismatch");
+        }
+        for (int i = 0; i < paramSize; ++i) {
+            int paramIdx = params.valueAtIndex(i).asInt();
+            paramIdxs.push_back(paramIdx);
+        }
+    }
+    return new SubqueryExpression(subqueryId, paramIdxs, args);
+}
+
 /** Function static helper templated functions to vivify an optimal
     comparison class. */
 static AbstractExpression*
@@ -483,6 +504,12 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     case (EXPRESSION_TYPE_OPERATOR_ALTERNATIVE):
         ret = new OperatorAlternativeExpression(lc, rc);
         break;
+
+    // Subquery
+    case (EXPRESSION_TYPE_SUBQUERY):
+        ret = subqueryFactory(obj, args);
+        break;
+
         // must handle all known expressions in this factory
     default:
 

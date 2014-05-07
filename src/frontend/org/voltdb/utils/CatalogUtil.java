@@ -520,7 +520,7 @@ public abstract class CatalogUtil {
                 List<AbstractExpression> indexedExprs = null;
                 try {
                     indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring,
-                            new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName()));
+                            new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName(), 0));
                 } catch (JSONException e) {
                     // TODO Auto-generated catch block
                     e.printStackTrace();

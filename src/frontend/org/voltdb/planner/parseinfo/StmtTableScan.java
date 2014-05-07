@@ -34,6 +34,9 @@ public abstract class StmtTableScan {
 
     public static final int NULL_ALIAS_INDEX = -1;
 
+    // The statement id this table belongs to
+    protected int m_stmtId;
+
     // table alias
     protected String m_tableAlias = null;
 
@@ -41,8 +44,9 @@ public abstract class StmtTableScan {
     protected List<SchemaColumn> m_scanColumnsList = new ArrayList<>();
     protected Set<String> m_scanColumnNameSet = new HashSet<>();
 
-    protected StmtTableScan(String tableAlias) {
+    protected StmtTableScan(String tableAlias, int stmtId) {
         m_tableAlias = tableAlias;
+        m_stmtId = stmtId;
     }
 
     public String getTableAlias() {
@@ -61,11 +65,13 @@ public abstract class StmtTableScan {
 
     abstract public List<Index> getIndexes();
 
+    public int getStatementId() {
+        return m_stmtId;
+    }
+
     abstract public String getColumnName(int m_columnIndex);
 
-
     abstract public void processTVE(TupleValueExpression expr, String columnName);
-
 
     public void resolveTVE(TupleValueExpression expr, String columnName) {
 

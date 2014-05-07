@@ -114,6 +114,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
+    @Override
+    public int overrideId(int newId) {
+        m_id = newId++;
+        return overrideSubqueryIds(newId, m_predicate);
+    }
+
     /**
      * @return the target_table_name
      */
@@ -311,6 +317,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 m_hasSignificantOutputSchema = true;
             }
         }
+        // Generate the output schema for subqueries
+        generateSubqueryExpressionOutputSchema(m_predicate, db);
     }
 
     @Override
@@ -370,7 +378,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             limit.m_outputSchema = m_outputSchema.clone();
             limit.m_hasSignificantOutputSchema = false; // It's just another cheap knock-off
         }
-
+        // Resolve subquery expression indexes
+        resolveSubqueryExpressionColumnIndexes(m_predicate);
     }
 
     @Override

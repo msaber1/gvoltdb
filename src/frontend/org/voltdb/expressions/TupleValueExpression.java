@@ -46,6 +46,8 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected int m_tableIdx = 0;
 
     private boolean m_hasAggregate = false;
+    /** The statement id this TVE refers to */
+    private int m_origStmtId = -1;
 
     /**
      * Create a new TupleValueExpression
@@ -105,6 +107,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         clone.m_tableAlias = m_tableAlias;
         clone.m_columnName = m_columnName;
         clone.m_columnAlias = m_columnAlias;
+        clone.m_origStmtId = m_origStmtId;
         return clone;
     }
 
@@ -192,13 +195,35 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_tableIdx = idx;
     }
 
+    /**
+     *  Set the parent TVE indicator
+     * @param parentTve
+     */
+    public void setOrigStmtId(int origStmtId) {
+        m_origStmtId = origStmtId;
+    }
+
+    /**
+     * @return parent TVE indicator
+     */
+    public int getOrigStmtId() {
+        return m_origStmtId;
+    }
+
     @Override
     public boolean equals(Object obj) {
         if (obj instanceof TupleValueExpression == false) {
             return false;
         }
         TupleValueExpression expr = (TupleValueExpression) obj;
-
+        if (m_origStmtId != -1 && expr.m_origStmtId != -1) {
+            // Implying both sides have statement id set
+            // If one of the ids is not set it is considered to be a wild card
+            // matching any other id.
+            if (m_origStmtId != expr.m_origStmtId) {
+                return false;
+            }
+        }
         if ((m_tableName == null) != (expr.m_tableName == null)) {
             return false;
         }
@@ -229,7 +254,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     @Override
     public int hashCode() {
         // based on implementation of equals
-        int result = 0;
+        int result = (m_origStmtId == -1) ? 0 : m_origStmtId;
         if (m_tableName != null) {
             result += m_tableName.hashCode();
         }
@@ -284,6 +309,8 @@ public class TupleValueExpression extends AbstractValueExpression {
      * expressions.
      */
     public int resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
+        // TODO if this a TVE from a parent schema?
+        // need an access to the parent schema somehow.
         int index = inputSchema.getIndexOfTve(this);
         if (getValueType() == null && index != -1) {
             // In case of sub-queries the TVE may not have its value type and size

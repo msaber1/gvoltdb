@@ -47,8 +47,8 @@ public class StmtSubqueryScan extends StmtTableScan {
     /*
      * This 'subquery' actually is the parent query on the derived table with alias 'tableAlias'
      */
-    public StmtSubqueryScan(AbstractParsedStmt subquery, String tableAlias) {
-        super(tableAlias);
+    public StmtSubqueryScan(AbstractParsedStmt subquery, String tableAlias, int stmtId) {
+        super(tableAlias, stmtId);
         m_subquery = subquery;
         // A union or other set operator uses the output columns of its left-most leaf child statement.
         while (subquery instanceof ParsedUnionStmt) {

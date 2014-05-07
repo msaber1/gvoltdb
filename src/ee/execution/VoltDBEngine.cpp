@@ -75,6 +75,7 @@
 #include "catalog/constraint.h"
 #include "catalog/materializedviewinfo.h"
 #include "catalog/connector.h"
+#include "executors/executorutil.h"
 #include "logging/LogManager.h"
 #include "plannodes/abstractplannode.h"
 #include "plannodes/abstractscannode.h"
@@ -213,6 +214,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_currentUndoQuantum,
                                             getTopend(),
                                             &m_stringPool,
+                                            &m_staticParams,
                                             m_isELEnabled,
                                             hostname,
                                             hostId);
@@ -379,7 +381,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 {
     assert(planfragmentId != 0);
 
-    Table *cleanUpTable = NULL;
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
 
     /*
@@ -434,45 +435,27 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
     // planner guarantees that for a given plannode, all of its
     // children are positioned before it in this list, therefore
     // dependency tracking is not needed here.
-    size_t ttl = execsForFrag->list.size();
-
-    for (int ctr = 0; ctr < ttl; ++ctr) {
-        AbstractExecutor *executor = execsForFrag->list[ctr];
-        assert (executor);
-
-        if (executor->needsPostExecuteClear())
-            cleanUpTable =
-                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
-
-        try {
-            // Now call the execute method to actually perform whatever action
-            // it is that the node is supposed to do...
-            if (!executor->execute(params)) {
-                VOLT_TRACE("The Executor's execution at position '%d'"
-                           " failed for PlanFragment '%jd'",
-                           ctr, (intmax_t)planfragmentId);
-                if (cleanUpTable != NULL)
-                    cleanUpTable->deleteAllTuples(false);
-                // set this back to -1 for error handling
-                m_currentInputDepId = -1;
-                return ENGINE_ERRORCODE_ERROR;
-            }
-        } catch (const SerializableEEException &e) {
-            VOLT_TRACE("The Executor's execution at position '%d'"
-                       " failed for PlanFragment '%jd'",
-                       ctr, (intmax_t)planfragmentId);
-            if (cleanUpTable != NULL)
-                cleanUpTable->deleteAllTuples(false);
+    try {
+        std::vector<AbstractExecutor*> executorList = execsForFrag->getExecutorList();
+        int status = executeExecutionVector(executorList, params);
+        if (status != ENGINE_ERRORCODE_SUCCESS) {
+            resetReusedResultOutputBuffer();
+            VOLT_TRACE("The Executor's execution failed for PlanFragment '%jd'",
+                       (intmax_t)planfragmentId);
+            // set this back to -1 for error handling
+            m_currentInputDepId = -1;
+            return status;
+        }
+    } catch (const SerializableEEException &e) {
+            VOLT_TRACE("The Executor's execution failed for PlanFragment '%jd'",
+                       (intmax_t)planfragmentId);
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
             // set this back to -1 for error handling
             m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
-        }
     }
-    if (cleanUpTable != NULL)
-        cleanUpTable->deleteAllTuples(false);
 
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
@@ -1069,6 +1052,9 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
         m_plans.get<0>().relocate(m_plans.begin(), iter2);
         VoltDBEngine::ExecutorVector *retval = (*iter).get();
         assert(retval);
+        // update the context
+        m_executorContext->setupForExecutors(&retval->executorListMap);
+
         return retval;
     }
     else {
@@ -1120,22 +1106,7 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
         boost::shared_ptr<ExecutorVector> ev(new ExecutorVector(fragId, frag_temptable_log_limit, frag_temptable_limit, pnf));
 
         // Initialize each node!
-        for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
-             ctr < cnt; ctr++) {
-            if (!initPlanNode(fragId, pnf->getExecuteList()[ctr], &(ev->limits)))
-            {
-                char msg[1024 * 10];
-                snprintf(msg, 1024 * 10, "Failed to initialize PlanNode '%s' at position '%d' for PlanFragment '%jd'",
-                         pnf->getExecuteList()[ctr]->debug().c_str(), ctr, (intmax_t)fragId);
-                VOLT_ERROR("%s", msg);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
-            }
-        }
-
-        // Initialize the vector of executors for this planfragment, used at runtime.
-        for (int ctr = 0, cnt = (int)pnf->getExecuteList().size(); ctr < cnt; ctr++) {
-            ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutor());
-        }
+        ev->initExecutors(this);
 
         // add the plan to the back
         m_plans.get<0>().push_back(ev);
@@ -1148,6 +1119,10 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
 
         VoltDBEngine::ExecutorVector *retval = ev.get();
         assert(retval);
+
+        // update the context
+        m_executorContext->setupForExecutors(&retval->executorListMap);
+
         return retval;
     }
 
@@ -1157,7 +1132,6 @@ VoltDBEngine::ExecutorVector *VoltDBEngine::getExecutorVectorForFragmentId(const
 // -------------------------------------------------
 // Initialization Functions
 // -------------------------------------------------
-
 bool VoltDBEngine::initPlanNode(const int64_t fragId,
                                 AbstractPlanNode* node,
                                 TempTableLimits* limits)
@@ -1311,15 +1285,19 @@ string VoltDBEngine::debug(void) const {
     for (iter = m_plans.begin(); iter != m_plans.end(); iter++) {
         boost::shared_ptr<ExecutorVector> ev = *iter;
 
-        output << "Fragment ID: " << ev->fragId << ", "
-               << "Executor list size: " << ev->list.size() << ", "
-               << "Temp table memory in bytes: "
+        output << "Fragment ID: " << ev->fragId << ", ";
+        for (std::map<int, std::vector<AbstractExecutor*>* >::iterator it = ev->executorListMap.begin();
+            it != ev->executorListMap.end(); ++it) {
+           output << "Statement id:" << it->first << ", list size: " << it->second->size() << ", ";
+        }
+        output << "Temp table memory in bytes: "
                << ev->limits.getAllocated() << endl;
 
-        for (executorIter = ev->list.begin();
-             executorIter != ev->list.end();
-             executorIter++) {
-            output << (*executorIter)->getPlanNode()->debug(" ") << endl;
+        for (std::map<int, std::vector<AbstractExecutor*>* >::iterator it = ev->executorListMap.begin();
+            it != ev->executorListMap.end(); ++it) {
+            for (executorIter = it->second->begin(); executorIter != it->second->end(); executorIter++) {
+                output << (*executorIter)->getPlanNode()->debug(" ") << endl;
+            }
         }
     }
 
@@ -1774,6 +1752,41 @@ void VoltDBEngine::reportProgessToTopend() {
     if (m_tupleReportThreshold == 0) {
         VOLT_DEBUG("Interrupt query.");
         throw InterruptException("Query interrupted.");
+    }
+}
+
+void VoltDBEngine::ExecutorVector::initExecutors(VoltDBEngine* engine)
+{
+    // Initialize each node!
+    for (PlanNodeFragment::PlanNodeMapIterator it = planFragment->executeListBegin();
+        it != planFragment->executeListEnd(); ++it) {
+        assert(it->second != NULL);
+        const std::vector<AbstractPlanNode*>& executeList = *it->second;
+        auto_ptr<std::vector<AbstractExecutor*> > executorList(new std::vector<AbstractExecutor*>());
+        for (int ctr = 0, cnt = (int)executeList.size(); ctr < cnt; ctr++) {
+            if (!engine->initPlanNode(fragId, executeList[ctr], &limits))
+            {
+                char msg[1024 * 10];
+                snprintf(msg, 1024 * 10,
+                "Failed to initialize PlanNode '%s' at position '%d' in statement '%d' for PlanFragment '%jd'",
+                         executeList[ctr]->debug().c_str(), ctr, it->first, (intmax_t)fragId);
+                VOLT_ERROR("%s", msg);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+            }
+            executorList->push_back(executeList[ctr]->getExecutor());
+        }
+        executorListMap.insert(std::make_pair(it->first, executorList.get()));
+        executorList.release();
+    }
+}
+
+VoltDBEngine::ExecutorVector::~ExecutorVector()
+{
+    std::map<int, std::vector<AbstractExecutor*>* >::iterator it = executorListMap.begin();
+    while (it != executorListMap.end()) {
+        std::vector<AbstractExecutor*>* executorList = it->second;
+        executorListMap.erase(it++);
+        delete executorList;
     }
 }
 

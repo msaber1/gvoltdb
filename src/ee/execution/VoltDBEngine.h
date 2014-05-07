@@ -54,6 +54,8 @@
 
 #include <boost/ptr_container/ptr_vector.hpp>
 #include "boost/shared_ptr.hpp"
+#include "boost/shared_array.hpp"
+
 // The next #define limits the number of features pulled into the build
 // We don't use those features.
 #define BOOST_MULTI_INDEX_DISABLE_SERIALIZATION
@@ -441,7 +443,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-        bool initPlanFragment(const int64_t fragId, const std::string planNodeTree);
         bool initPlanNode(const int64_t fragId,
                           AbstractPlanNode* node,
                           TempTableLimits* limits);
@@ -478,17 +479,30 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             ExecutorVector(int64_t fragmentId,
                            int64_t logThreshold,
                            int64_t memoryLimit,
-                           PlanNodeFragment *fragment) : fragId(fragmentId), planFragment(fragment)
+                           PlanNodeFragment *fragment) :
+                           fragId(fragmentId), planFragment(fragment), executorListMap(), limits()
             {
                 limits.setLogThreshold(logThreshold);
                 limits.setMemoryLimit(memoryLimit);
             }
 
+            ~ExecutorVector();
+
             int64_t getFragId() const { return fragId; }
+
+            // Get the executors list for a given sub statement. The default statement id = 0
+            // represents the parent statement
+            std::vector<AbstractExecutor*>& getExecutorList(int stmtId = 0) {
+                assert(executorListMap.find(stmtId) != executorListMap.end());
+                return *executorListMap.find(stmtId)->second;
+            }
+
+            // Initialize executors
+            void initExecutors(VoltDBEngine* engine);
 
             const int64_t fragId;
             boost::shared_ptr<PlanNodeFragment> planFragment;
-            std::vector<AbstractExecutor*> list;
+            std::map<int, std::vector<AbstractExecutor*>* > executorListMap;
             TempTableLimits limits;
         };
 

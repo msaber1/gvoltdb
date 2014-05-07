@@ -573,6 +573,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_OPERATOR_ALTERNATIVE: {
         return "OPERATOR_ALTERNATIVE";
     }
+    case EXPRESSION_TYPE_SUBQUERY: {
+        return "SUBQUERY";
+    }
     }
     return "INVALID";
 }
@@ -651,6 +654,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_OPERATOR_CASE_WHEN;
     } else if (str == "OPERATOR_ALTERNATIVE") {
         return EXPRESSION_TYPE_OPERATOR_ALTERNATIVE;
+    } else if (str == "SUBQUERY") {
+        return EXPRESSION_TYPE_SUBQUERY;
     }
 
     return EXPRESSION_TYPE_INVALID;

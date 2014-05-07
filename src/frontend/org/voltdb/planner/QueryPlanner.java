@@ -311,7 +311,7 @@ public class QueryPlanner {
 
         // reset all the plan node ids for a given plan
         // this makes the ids deterministic
-        bestPlan.resetPlanNodeIds();
+        bestPlan.resetPlanNodeIds(1);
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
         fragmentize(bestPlan);

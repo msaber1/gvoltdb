@@ -35,8 +35,8 @@ public class StmtTargetTableScan extends StmtTableScan {
     private List<Index> m_indexes;
     private List<Column> m_columns;
 
-    public StmtTargetTableScan(Table table, String tableAlias) {
-        super(tableAlias);
+    public StmtTargetTableScan(Table table, String tableAlias, int stmtId) {
+        super(tableAlias, stmtId);
         assert (table != null);
         m_table = table;
     }

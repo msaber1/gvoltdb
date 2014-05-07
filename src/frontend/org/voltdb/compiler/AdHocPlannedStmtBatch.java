@@ -357,7 +357,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         try {
             JSONObject jobj = new JSONObject( aggplan );
             JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-            pnt.loadFromJSONArray(jarray, db);
+            pnt.loadPlanNodesFromJSONArrays(jarray, db);
 
             if( plannedStatement.core.collectorFragment != null ) {
                 //multi-partition query plan
@@ -366,7 +366,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                 //reattach plan fragments
                 jobj = new JSONObject( collplan );
                 jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
-                collpnt.loadFromJSONArray(jarray, db);
+                collpnt.loadPlanNodesFromJSONArrays(jarray, db);
                 assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
                 pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
             }

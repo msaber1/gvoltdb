@@ -325,6 +325,7 @@ public class PartitioningForStatement implements Cloneable{
     {
         TupleValueExpression tokenPartitionKey = null;
         Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
+        Set<Object> tempPartitioningValues = new HashSet<Object>();
         int unfilteredPartitionKeyCount = 0;
 
         // Iterate over the tables to collect partition columns.
