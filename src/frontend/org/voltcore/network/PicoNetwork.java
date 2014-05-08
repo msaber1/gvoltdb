@@ -92,7 +92,7 @@ import org.voltcore.utils.Pair;
  * because it doesn't try to tackle backpressure or tracking
  * multiple sockets
  */
-public class PicoNetwork implements Runnable, Connection, IOStatsIntf
+public class PicoNetwork extends WakeupRPadding implements Runnable, Connection, IOStatsIntf
 {
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
@@ -159,7 +159,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
     public void shutdownAsync() throws InterruptedException {
         m_shouldStop = true;
         if (m_thread != null) {
-            m_selector.wakeup();
+            wakeup();
         }
     }
 
@@ -406,7 +406,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
         FutureTask<Map<Long, Pair<String, long[]>>> ft = new FutureTask<Map<Long, Pair<String, long[]>>>(task);
 
         m_tasks.offer(ft);
-        m_selector.wakeup();
+        wakeup();
 
         return ft;
     }
@@ -491,7 +491,7 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
                 m_writeStream.enqueue(ds);
             }
         });
-        m_selector.wakeup();
+        wakeup();
     }
 
     public void enqueue(final ByteBuffer buf) {
@@ -501,10 +501,18 @@ public class PicoNetwork implements Runnable, Connection, IOStatsIntf
                 m_writeStream.enqueue(buf);
             }
         });
-        m_selector.wakeup();
+        wakeup();
     }
 
     boolean readyForRead() {
         return (m_key.readyOps() & SelectionKey.OP_READ) != 0 && (m_interestOps & SelectionKey.OP_READ) != 0;
+    }
+
+
+    private void wakeup() {
+        if (m_shouldWakeup != 0) {
+            unsafe.putOrderedLong(this, wakeupOffset, 0);
+            m_selector.wakeup();
+        }
     }
 }

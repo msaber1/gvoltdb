@@ -87,10 +87,38 @@ import jsr166y.ThreadLocalRandom;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool.IOStatsIntf;
+import org.voltcore.utils.Bits;
 import org.voltcore.utils.Pair;
 
+import sun.misc.Unsafe;
+
+abstract class WakeupLPadding {
+    public long p0, p1, p2, p3, p4, p5, p6;
+    public long p7, p8, p9, p10, p11, p12, p13, p14;
+}
+
+abstract class Wakeup extends WakeupLPadding {
+    protected volatile long m_shouldWakeup = 0;
+
+    protected static final Unsafe unsafe = Bits.unsafe;
+    protected static final long wakeupOffset;
+    static {
+        try {
+            wakeupOffset = unsafe.objectFieldOffset(
+                    Wakeup.class.getDeclaredField("m_shouldWakeup"));
+        } catch (Throwable t) {
+            throw new ExceptionInInitializerError(t);
+        }
+    }
+}
+
+abstract class WakeupRPadding extends Wakeup {
+    public long p15, p16, p17, p18, p19, p20, p21;
+    public long p22, p23, p24, p25, p26, p27, p28, p29;
+}
+
 /** Produces work for registered ports that are selected for read, write */
-class VoltNetwork implements Runnable, IOStatsIntf
+class VoltNetwork extends WakeupRPadding implements Runnable, IOStatsIntf
 {
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
@@ -214,7 +242,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
 
         FutureTask<Connection> ft = new FutureTask<Connection>(registerTask);
         m_tasks.offer(ft);
-        m_selector.wakeup();
+        wakeup();
 
         try {
             return ft.get();
@@ -260,7 +288,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
     Future<?> unregisterChannel (Connection c) {
         FutureTask<Object> ft = new FutureTask<Object>(getUnregisterRunnable(c), null);
         m_tasks.offer(ft);
-        m_selector.wakeup();
+        wakeup();
         return ft;
     }
 
@@ -285,7 +313,14 @@ class VoltNetwork implements Runnable, IOStatsIntf
                 }
             });
         }
-        m_selector.wakeup();
+        wakeup();
+    }
+
+    private void wakeup() {
+        if (m_shouldWakeup != 0) {
+            unsafe.putOrderedLong(this, wakeupOffset, 0);
+            m_selector.wakeup();
+        }
     }
 
     @Override
@@ -300,28 +335,34 @@ class VoltNetwork implements Runnable, IOStatsIntf
             while (m_shouldStop == false) {
                 try {
                     while (m_shouldStop == false) {
-                        final int readyKeys = m_selector.select();
+
+                        m_shouldWakeup = 1;
+
+                        Runnable task = null;
+                        boolean hadTasks = false;
+                        while ((task = m_tasks.poll()) != null) {
+                            task.run();
+                            hadTasks = true;
+                        }
+
+                        int readyKeys = 0;
+                        if (hadTasks) {
+                            readyKeys = m_selector.selectNow();
+                        } else {
+                            readyKeys = m_selector.select();
+                        }
 
                         /*
                          * Run the task queue immediately after selection to catch
                          * any tasks that weren't a result of readiness selection
                          */
-                        Runnable task = null;
+                        task = null;
                         while ((task = m_tasks.poll()) != null) {
                             task.run();
                         }
 
                         if (readyKeys > 0) {
                             optimizedInvokeCallbacks(r);
-                        }
-
-                        /*
-                         * Poll the task queue again in case new tasks were created
-                         * by invoking callbacks.
-                         */
-                        task = null;
-                        while ((task = m_tasks.poll()) != null) {
-                            task.run();
                         }
                     }
                 } catch (Throwable ex) {
@@ -531,7 +572,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
         FutureTask<Map<Long, Pair<String, long[]>>> ft = new FutureTask<Map<Long, Pair<String, long[]>>>(task);
 
         m_tasks.offer(ft);
-        m_selector.wakeup();
+        wakeup();
 
         return ft;
     }
@@ -542,7 +583,7 @@ class VoltNetwork implements Runnable, IOStatsIntf
 
     void queueTask(Runnable r) {
         m_tasks.offer(r);
-        m_selector.wakeup();
+        wakeup();
     }
 
     int numPorts() {
