@@ -174,6 +174,15 @@ public class PicoNetwork extends WakeupRPadding implements Runnable, Connection,
             m_ih.starting(this);
             m_ih.started(this);
             while (m_shouldStop == false) {
+
+                m_shouldWakeup = 1;
+
+                Runnable task = null;
+                while ((task = m_tasks.poll()) != null) {
+                    m_hadWork = true;
+                    task.run();
+                }
+
                 //Choose a non-blocking select if things are busy
                 if (m_hadWork) {
                     m_selector.selectNow();
@@ -182,7 +191,7 @@ public class PicoNetwork extends WakeupRPadding implements Runnable, Connection,
                 }
 
                 m_hadWork = false;
-                Runnable task = null;
+                task = null;
                 while ((task = m_tasks.poll()) != null) {
                     m_hadWork = true;
                     task.run();
