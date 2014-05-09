@@ -170,6 +170,28 @@ public class AggregatePlanNode extends AbstractPlanNode {
     public void generateOutputSchema(Database db)
     {
         assert(m_children.size() == 1);
+
+        // Apply a sneaky optimization to eliminate projections between
+        // table aggs of simple columns and their child scans.
+        if (getGroupByExpressionsSize() == 0) {
+            AbstractPlanNode child = m_children.get(0);
+            if (child instanceof SeqScanPlanNode) {
+                SeqScanPlanNode seqnode = (SeqScanPlanNode) child;
+                if (seqnode.getPredicate() == null) {
+                    AbstractPlanNode proj = child.getInlinePlanNode(PlanNodeType.PROJECTION);
+                    if (proj == null) {
+                        if (child.getInlinePlanNodes().size() == 0) {
+                            // A projection node on an unfiltered seqscan will produce
+                            // an unwanted temp table prior to aggregation.
+                            // We short-circuit that by eliminating the scanColumns
+                            // that motivate the inline projection.
+                            ((SeqScanPlanNode) child).clearScanColumns();
+                        }
+                    }
+                }
+            }
+        }
+
         m_children.get(0).generateOutputSchema(db);
         // aggregate's output schema is pre-determined, don't touch
         return;

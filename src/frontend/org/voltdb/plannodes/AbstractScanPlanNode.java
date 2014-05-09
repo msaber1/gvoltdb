@@ -195,6 +195,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
+    public void clearScanColumns()
+    {
+        if (m_tableScanSchema.size() != 0) {
+            m_tableScanSchema = new NodeSchema();
+        }
+    }
+
     NodeSchema getTableSchema()
     {
         return m_tableSchema;
