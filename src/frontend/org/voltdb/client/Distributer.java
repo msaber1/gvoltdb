@@ -17,6 +17,8 @@
 
 package org.voltdb.client;
 
+import io.netty_voltpatches.MPSCLQNodeRunnable;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
@@ -44,6 +46,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.locks.LockSupport;
 
 import javax.security.auth.Subject;
+
 import com.google_voltpatches.common.collect.ImmutableList;
 
 import jsr166y.ThreadLocalRandom;
@@ -533,7 +536,7 @@ class Distributer {
                 final String procName,
                 final long roundTripNanos,
                 final int clusterRoundTrip) {
-            m_connection.queueTask(new Runnable() {
+            m_connection.queueTask(new MPSCLQNodeRunnable() {
                 @Override
                 public void run() {
                     updateStats(procName, roundTripNanos, clusterRoundTrip, false, false, true);

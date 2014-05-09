@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import io.netty_voltpatches.MpscLinkedQueue;
+
 import java.util.concurrent.LinkedTransferQueue;
 import java.util.concurrent.TimeUnit;
 
@@ -26,7 +28,7 @@ import org.voltdb.StarvationTracker;
 /** SiteTaskerScheduler orders SiteTaskers for execution. */
 public class SiteTaskerQueue
 {
-    private final LinkedTransferQueue<SiteTasker> m_tasks = new LinkedTransferQueue<SiteTasker>();
+    private final MpscLinkedQueue m_tasks = new MpscLinkedQueue();
     private StarvationTracker m_starvationTracker;
 
     public boolean offer(SiteTasker task)
@@ -37,14 +39,14 @@ public class SiteTaskerQueue
     // Block on the site tasker queue.
     public SiteTasker take() throws InterruptedException
     {
-        SiteTasker task = m_tasks.poll();
+        SiteTasker task = (SiteTasker)m_tasks.poll();
         if (task == null) {
             m_starvationTracker.beginStarvation();
         } else {
             return task;
         }
         try {
-            return CoreUtils.queueSpinTake(m_tasks);
+            return (SiteTasker)CoreUtils.queueSpinTake(m_tasks);
         } finally {
             m_starvationTracker.endStarvation();
         }
@@ -53,7 +55,7 @@ public class SiteTaskerQueue
     // Non-blocking poll on the site tasker queue.
     public SiteTasker poll()
     {
-        return m_tasks.poll();
+        return (SiteTasker)m_tasks.poll();
     }
 
     public boolean isEmpty() {

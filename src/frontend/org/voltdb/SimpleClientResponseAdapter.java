@@ -20,12 +20,15 @@ package org.voltdb;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.SettableFuture;
+
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.client.ClientResponse;
+
+import io.netty_voltpatches.MPSCLQNodeRunnable;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
@@ -145,7 +148,7 @@ public class SimpleClientResponseAdapter implements Connection, WriteStream {
     }
 
     @Override
-    public void queueTask(Runnable r) {
+    public void queueTask(MPSCLQNodeRunnable r) {
         // Called when node failure happens
         r.run();
     }

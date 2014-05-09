@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import io.netty_voltpatches.MPSCLQNodeRunnable;
+
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
@@ -115,6 +117,7 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 import com.google_voltpatches.common.util.concurrent.MoreExecutors;
+
 import org.voltcore.messaging.ForeignHost;
 
 /**
@@ -1189,7 +1192,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final long initiatorHSId = jsObj.getLong(Cartographer.JSON_INITIATOR_HSID);
             for (final ClientInterfaceHandleManager cihm : m_cihm.values()) {
                 try {
-                    cihm.connection.queueTask(new Runnable() {
+                    cihm.connection.queueTask(new MPSCLQNodeRunnable() {
                         @Override
                         public void run() {
                             failOverConnection(partitionId, initiatorHSId, cihm.connection);
@@ -2289,7 +2292,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }, null);
         if (c != null) {
-            c.queueTask(ft);
+            c.queueTask(new MPSCLQNodeRunnable() {
+                @Override
+                public void run() {
+                    ft.run();
+                }
+            });
         }
 
         /*
@@ -2755,7 +2763,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public void queueTask(Runnable r) {
+        public void queueTask(MPSCLQNodeRunnable r) {
             // Called when node failure happens
             r.run();
         }

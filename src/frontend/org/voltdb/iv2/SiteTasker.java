@@ -17,13 +17,14 @@
 
 package org.voltdb.iv2;
 
+import io.netty_voltpatches.MPSCLQNode;
+
 import java.io.IOException;
 
 import org.voltdb.rejoin.TaskLog;
-
 import org.voltdb.SiteProcedureConnection;
 
-public abstract class SiteTasker {
+public abstract class SiteTasker extends MPSCLQNode{
 
     public static abstract class SiteTaskerRunnable extends SiteTasker {
         abstract void run();

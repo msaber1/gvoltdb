@@ -61,6 +61,10 @@
 
 package org.voltcore.network;
 
+import io.netty_voltpatches.MPSCLQNode;
+import io.netty_voltpatches.MPSCLQNodeRunnable;
+import io.netty_voltpatches.MpscLinkedQueue;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
@@ -101,7 +105,7 @@ public class PicoNetwork extends WakeupRPadding implements Runnable, Connection,
     private final NetworkDBBPool m_pool = new NetworkDBBPool(64);
     private final NIOReadStream m_readStream = new NIOReadStream();
     private final PicoNIOWriteStream m_writeStream = new PicoNIOWriteStream();
-    private final ConcurrentLinkedQueue<Runnable> m_tasks = new ConcurrentLinkedQueue<Runnable>();
+    private final MpscLinkedQueue m_tasks = new MpscLinkedQueue();
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private long m_messagesRead;
     private int m_interestOps = 0;
@@ -163,10 +167,6 @@ public class PicoNetwork extends WakeupRPadding implements Runnable, Connection,
         }
     }
 
-    //Track how busy the thread is and spin once
-    //if there is always work
-    private boolean m_hadWork = false;
-
     @Override
     public void run() {
         m_verbotenThreads.add(Thread.currentThread().getId());
@@ -177,23 +177,22 @@ public class PicoNetwork extends WakeupRPadding implements Runnable, Connection,
 
                 m_shouldWakeup = 1;
 
+                boolean hadWork = false;
                 Runnable task = null;
-                while ((task = m_tasks.poll()) != null) {
-                    m_hadWork = true;
+                while ((task = (Runnable)m_tasks.poll()) != null) {
+                    hadWork = true;
                     task.run();
                 }
 
                 //Choose a non-blocking select if things are busy
-                if (m_hadWork) {
+                if (hadWork) {
                     m_selector.selectNow();
                 } else {
                     m_selector.select();
                 }
 
-                m_hadWork = false;
                 task = null;
-                while ((task = m_tasks.poll()) != null) {
-                    m_hadWork = true;
+                while ((task = (Runnable)m_tasks.poll()) != null) {
                     task.run();
                 }
                 dispatchReadStream();
@@ -231,7 +230,7 @@ public class PicoNetwork extends WakeupRPadding implements Runnable, Connection,
 
     private void dispatchReadStream() throws IOException {
         if (readyForRead()) {
-            if (fillReadStream() > 0) m_hadWork = true;
+            fillReadStream();
             ByteBuffer message;
 
             /*
@@ -284,8 +283,8 @@ public class PicoNetwork extends WakeupRPadding implements Runnable, Connection,
         /*
          * Drain the write stream
          */
-        if (m_writeStream.swapAndSerializeQueuedWrites(m_pool) != 0) m_hadWork = true;
-        if (m_writeStream.drainTo(m_sc) > 0) m_hadWork = true;
+        m_writeStream.swapAndSerializeQueuedWrites(m_pool);
+        m_writeStream.drainTo(m_sc);
         if (m_writeStream.isEmpty()) {
             disableWriteSelection();
 
@@ -412,9 +411,14 @@ public class PicoNetwork extends WakeupRPadding implements Runnable, Connection,
             }
         };
 
-        FutureTask<Map<Long, Pair<String, long[]>>> ft = new FutureTask<Map<Long, Pair<String, long[]>>>(task);
+        final FutureTask<Map<Long, Pair<String, long[]>>> ft = new FutureTask<Map<Long, Pair<String, long[]>>>(task);
 
-        m_tasks.offer(ft);
+        m_tasks.add(new MPSCLQNodeRunnable() {
+            @Override
+            public void run() {
+                ft.run();
+            }
+        }, false);
         wakeup();
 
         return ft;
@@ -484,7 +488,7 @@ public class PicoNetwork extends WakeupRPadding implements Runnable, Connection,
     }
 
     @Override
-    public void queueTask(Runnable r) {
+    public void queueTask(MPSCLQNodeRunnable r) {
         throw new UnsupportedOperationException();
     }
 
@@ -494,22 +498,22 @@ public class PicoNetwork extends WakeupRPadding implements Runnable, Connection,
     }
 
     public void enqueue(final DeferredSerialization ds) {
-        m_tasks.offer(new Runnable() {
+        m_tasks.add(new MPSCLQNodeRunnable() {
             @Override
             public void run() {
                 m_writeStream.enqueue(ds);
             }
-        });
+        }, false);
         wakeup();
     }
 
     public void enqueue(final ByteBuffer buf) {
-        m_tasks.offer(new Runnable() {
+        m_tasks.add(new MPSCLQNodeRunnable() {
             @Override
             public void run() {
                 m_writeStream.enqueue(buf);
             }
-        });
+        }, false);
         wakeup();
     }
 

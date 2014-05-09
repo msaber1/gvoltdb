@@ -41,6 +41,7 @@ import static org.mockito.Mockito.reset;
 import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import io.netty_voltpatches.MPSCLQNodeRunnable;
 
 import java.io.File;
 import java.io.IOException;
@@ -158,7 +159,7 @@ public class TestClientInterface {
             @Override
             public void enqueue(DeferredSerialization ds) {responsesDS.offer(ds);}
             @Override
-            public void queueTask(Runnable r) {}
+            public void queueTask(MPSCLQNodeRunnable r) {}
         };
 
 

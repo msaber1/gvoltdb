@@ -22,6 +22,8 @@
  */
 package org.voltcore.network;
 
+import io.netty_voltpatches.MPSCLQNodeRunnable;
+
 import java.net.InetSocketAddress;
 import java.util.concurrent.Future;
 
@@ -79,7 +81,7 @@ public class MockConnection implements Connection {
     }
 
     @Override
-    public void queueTask(Runnable r) {
+    public void queueTask(MPSCLQNodeRunnable r) {
         throw new UnsupportedOperationException();
     }
 

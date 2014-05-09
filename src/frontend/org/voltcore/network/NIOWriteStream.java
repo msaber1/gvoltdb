@@ -17,6 +17,8 @@
 
 package org.voltcore.network;
 
+import io.netty_voltpatches.MPSCLQNodeRunnable;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.GatheringByteChannel;
@@ -201,7 +203,7 @@ public class NIOWriteStream extends NIOWriteStreamBase implements WriteStream {
      */
     @Override
     public void fastEnqueue(final DeferredSerialization ds) {
-        m_port.queueTask(new Runnable() {
+        m_port.queueTask(new MPSCLQNodeRunnable() {
             @Override
             public void run() {
                 synchronized (NIOWriteStream.this) {

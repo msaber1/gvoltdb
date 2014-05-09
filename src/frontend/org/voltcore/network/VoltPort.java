@@ -17,6 +17,8 @@
 
 package org.voltcore.network;
 
+import io.netty_voltpatches.MPSCLQNodeRunnable;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.SocketException;
@@ -450,7 +452,7 @@ public class VoltPort implements Connection
     }
 
     @Override
-    public void queueTask(Runnable r) {
+    public void queueTask(MPSCLQNodeRunnable r) {
         m_network.queueTask(r);
     }
 

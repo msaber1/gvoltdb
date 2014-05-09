@@ -17,6 +17,8 @@
 
 package org.voltcore.network;
 
+import io.netty_voltpatches.MPSCLQNodeRunnable;
+
 import java.util.concurrent.Future;
 import java.net.InetSocketAddress;
 
@@ -56,7 +58,7 @@ public interface Connection {
 
     long connectionId();
 
-    void queueTask(Runnable r);
+    void queueTask(MPSCLQNodeRunnable r);
 
     /**
      * Schedule the connection to be unregistered and closed

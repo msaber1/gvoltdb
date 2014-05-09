@@ -61,6 +61,8 @@
 
 package org.voltcore.network;
 
+import io.netty_voltpatches.MPSCLQNodeRunnable;
+import io.netty_voltpatches.MpscLinkedQueue;
 import io.netty_voltpatches.NinjaKeySet;
 
 import java.io.IOException;
@@ -123,7 +125,7 @@ class VoltNetwork extends WakeupRPadding implements Runnable, IOStatsIntf
     private final Selector m_selector;
     private static final VoltLogger m_logger = new VoltLogger(VoltNetwork.class.getName());
     private static final VoltLogger networkLog = new VoltLogger("NETWORK");
-    private final ConcurrentLinkedQueue<Runnable> m_tasks = new ConcurrentLinkedQueue<Runnable>();
+    private final MpscLinkedQueue m_tasks = new MpscLinkedQueue();
     private volatile boolean m_shouldStop = false;//volatile boolean is sufficient
     private final Thread m_thread;
     private final HashSet<VoltPort> m_ports = new HashSet<VoltPort>();
@@ -240,8 +242,13 @@ class VoltNetwork extends WakeupRPadding implements Runnable, IOStatsIntf
             }
         };
 
-        FutureTask<Connection> ft = new FutureTask<Connection>(registerTask);
-        m_tasks.offer(ft);
+        final FutureTask<Connection> ft = new FutureTask<Connection>(registerTask);
+        m_tasks.add(new MPSCLQNodeRunnable() {
+            @Override
+            public void run() {
+                ft.run();
+            }
+        }, false);
         wakeup();
 
         try {
@@ -286,8 +293,13 @@ class VoltNetwork extends WakeupRPadding implements Runnable, IOStatsIntf
      * @param c
      */
     Future<?> unregisterChannel (Connection c) {
-        FutureTask<Object> ft = new FutureTask<Object>(getUnregisterRunnable(c), null);
-        m_tasks.offer(ft);
+        final FutureTask<Object> ft = new FutureTask<Object>(getUnregisterRunnable(c), null);
+        m_tasks.add(new MPSCLQNodeRunnable() {
+            @Override
+            public void run() {
+                ft.run();
+            }
+        }, false);
         wakeup();
         return ft;
     }
@@ -299,19 +311,19 @@ class VoltNetwork extends WakeupRPadding implements Runnable, IOStatsIntf
     /** Set interest registrations for a port */
     void addToChangeList(final VoltPort port, final boolean runFirst) {
         if (runFirst) {
-            m_tasks.offer(new Runnable() {
+            m_tasks.add(new MPSCLQNodeRunnable() {
                 @Override
                 public void run() {
                     callPort(port);
                 }
-            });
+            }, false);
         } else {
-            m_tasks.offer(new Runnable() {
+            m_tasks.add(new MPSCLQNodeRunnable() {
                 @Override
                 public void run() {
                     installInterests(port);
                 }
-            });
+            }, false);
         }
         wakeup();
     }
@@ -340,7 +352,7 @@ class VoltNetwork extends WakeupRPadding implements Runnable, IOStatsIntf
 
                         Runnable task = null;
                         boolean hadTasks = false;
-                        while ((task = m_tasks.poll()) != null) {
+                        while ((task = (Runnable)m_tasks.poll()) != null) {
                             task.run();
                             hadTasks = true;
                         }
@@ -357,7 +369,7 @@ class VoltNetwork extends WakeupRPadding implements Runnable, IOStatsIntf
                          * any tasks that weren't a result of readiness selection
                          */
                         task = null;
-                        while ((task = m_tasks.poll()) != null) {
+                        while ((task = (Runnable)m_tasks.poll()) != null) {
                             task.run();
                         }
 
@@ -569,9 +581,14 @@ class VoltNetwork extends WakeupRPadding implements Runnable, IOStatsIntf
             }
         };
 
-        FutureTask<Map<Long, Pair<String, long[]>>> ft = new FutureTask<Map<Long, Pair<String, long[]>>>(task);
+        final FutureTask<Map<Long, Pair<String, long[]>>> ft = new FutureTask<Map<Long, Pair<String, long[]>>>(task);
 
-        m_tasks.offer(ft);
+        m_tasks.add(new MPSCLQNodeRunnable() {
+            @Override
+            public void run() {
+                ft.run();
+            }
+        }, false);
         wakeup();
 
         return ft;
@@ -581,8 +598,8 @@ class VoltNetwork extends WakeupRPadding implements Runnable, IOStatsIntf
         return m_thread.getId();
     }
 
-    void queueTask(Runnable r) {
-        m_tasks.offer(r);
+    void queueTask(MPSCLQNodeRunnable r) {
+        m_tasks.add(r, false);
         wakeup();
     }
 
