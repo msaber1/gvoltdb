@@ -219,7 +219,7 @@ public class RejoinProducer extends JoinProducerBase {
         m_mailbox.send(m_coordinatorHsId, initResp);
 
         // Start waiting for snapshot data
-        m_taskQueue.offer(this);
+        m_taskQueue.offer(new DelegatingTask(this));
     }
 
     /**
@@ -289,7 +289,7 @@ public class RejoinProducer extends JoinProducerBase {
             @Override
             public void runForRejoin(SiteProcedureConnection siteConnection, TaskLog rejoinTaskLog) throws IOException {
                 if (!m_snapshotCompletionMonitor.isDone()) {
-                    m_taskQueue.offer(this);
+                    m_taskQueue.offer(new DelegatingTask(this));
                     return;
                 }
                 SnapshotCompletionEvent event = null;

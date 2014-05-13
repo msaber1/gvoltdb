@@ -124,7 +124,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
         RejoinMessage msg = new RejoinMessage(m_mailbox.getHSId(), -1, sinkHSId);
         m_mailbox.send(m_coordinatorHsId, msg);
 
-        m_taskQueue.offer(this);
+        m_taskQueue.offer(new DelegatingTask(this));
         JOINLOG.info("P" + m_partitionId + " received initiation");
     }
 
@@ -185,7 +185,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
                     VoltDB.crashLocalVoltDB("Error waiting for snapshot to finish", true, e);
                 }
             } else {
-                m_taskQueue.offer(this);
+                m_taskQueue.offer(new DelegatingTask(this));
             }
         } else {
             // The sources are not set up yet, don't block the site,
@@ -247,7 +247,7 @@ public class ElasticJoinProducer extends JoinProducerBase implements TaskLog {
             return;
         }
 
-        m_taskQueue.offer(this);
+        m_taskQueue.offer(new DelegatingTask(this));
     }
 
     @Override

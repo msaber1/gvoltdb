@@ -106,7 +106,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
         }
         else {
             tmLog.debug("MpTTQ: repairing writes");
-            m_taskQueue.offer(task);
+            m_taskQueue.offer(new SiteTasker.DelegatingTask(task));
             currentSet = m_currentWrites;
         }
         for (Entry<Long, TransactionTask> e : currentSet.entrySet()) {
@@ -158,7 +158,7 @@ public class MpTransactionTaskQueue extends TransactionTaskQueue
             m_sitePool.doWork(task.getTxnId(), task);
         }
         else {
-            m_taskQueue.offer(task);
+            m_taskQueue.offer(new SiteTasker.DelegatingTask(task));
         }
     }
 

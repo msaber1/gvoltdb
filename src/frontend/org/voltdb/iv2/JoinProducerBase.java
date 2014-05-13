@@ -124,7 +124,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     {
         @Override
         public void run() {
-            m_taskQueue.offer(JoinProducerBase.this);
+            m_taskQueue.offer(new DelegatingTask(JoinProducerBase.this));
         }
     }
 
@@ -209,7 +209,7 @@ public abstract class JoinProducerBase extends SiteTasker {
     {
         if (sourcesReady) {
             // If we've done something meaningful, go ahead and return ourselves to the queue immediately
-            m_taskQueue.offer(this);
+            m_taskQueue.offer(new DelegatingTask(this));
         } else {
             // Otherwise, avoid spinning too aggressively, so wait a few milliseconds before requeueing
             VoltDB.instance().scheduleWork(new ReturnToTaskQueueAction(), 5, -1, TimeUnit.MILLISECONDS);

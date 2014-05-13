@@ -39,6 +39,22 @@ public abstract class SiteTasker extends MPSCLQNode{
         }
     }
 
+    public static class DelegatingTask extends SiteTasker {
+        private final SiteTasker delegate;
+        public DelegatingTask(SiteTasker delegate) {
+            this.delegate = delegate;
+        }
+
+        public void run(SiteProcedureConnection siteConnection) {
+            delegate.run(siteConnection);
+        }
+
+        public void runForRejoin(SiteProcedureConnection siteConnection,
+                TaskLog rejoinTaskLog) throws IOException {
+            delegate.runForRejoin(siteConnection, rejoinTaskLog);
+        }
+    }
+
     /**
      * Run executes the task. Run is called on the ExecutionSite thread
      * and has exclusive access to the ee. Tasks are not preempted.

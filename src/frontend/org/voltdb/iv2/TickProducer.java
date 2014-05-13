@@ -52,7 +52,7 @@ public class TickProducer extends SiteTasker implements Runnable
     @Override
     public void run()
     {
-        m_taskQueue.offer(this);
+        m_taskQueue.offer(new DelegatingTask(this));
     }
 
     @Override

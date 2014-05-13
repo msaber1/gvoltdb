@@ -75,7 +75,7 @@ class MpRoSitePool {
         }
 
         boolean offer(SiteTasker task) {
-            return m_queue.offer(task);
+            return m_queue.offer(new SiteTasker.DelegatingTask(task));
         }
 
         long getCatalogCRC() {
@@ -89,7 +89,7 @@ class MpRoSitePool {
         void shutdown() {
             m_site.startShutdown();
             // Need to unblock the site's run() loop on the take() call on the queue
-            m_queue.offer(Scheduler.m_nullTask);
+            m_queue.offer(new SiteTasker.DelegatingTask(Scheduler.m_nullTask));
         }
 
         void joinThread() {
