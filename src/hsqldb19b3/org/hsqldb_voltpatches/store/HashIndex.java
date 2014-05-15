@@ -252,7 +252,7 @@ class HashIndex {
             }
             report.append("]\n");
             report.append(" lost history length is ").append(voltDBhistoryDepth / voltDBhistoryCapacity * voltDBhistoryCapacity);
-            report.append("next reclaimedPointer is ").append(reclaimedNodePointer);
+            report.append(" next reclaimedPointer is ").append(reclaimedNodePointer);
             report.append(" next newNodePointer is ").append(newNodePointer);
             report.append(" last reset was #").append(voltDBresetCount).append(" after event ").append(voltDBlastResetEvent);
             report.append(" from ").append(voltDBresetCapacity);
