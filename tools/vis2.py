@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 from voltdbclient import *
 from operator import itemgetter, attrgetter
-import numpy
+import numpy as np
 
 STATS_SERVER = 'volt2'
 
@@ -86,9 +86,9 @@ class Plot:
         plt.grid(True)
         self.fig.autofmt_xdate()
 
-    def plot(self, x, y, color, marker_shape, legend):
-        self.ax.plot(x, y, linestyle="-", label=str(legend), color=color,
-                     marker=marker_shape, markerfacecolor=color, markersize=4)
+    def plot(self, x, y, color, marker_shape, legend, linestyle):
+        self.ax.plot(x, y, linestyle, label=legend, color=color,
+                     marker=marker_shape, markerfacecolor=color, markersize=8)
 
     def close(self):
         x_formatter = matplotlib.dates.DateFormatter("%b %d %y")
@@ -99,8 +99,8 @@ class Plot:
         y_formatter = matplotlib.ticker.ScalarFormatter(useOffset=False)
         self.ax.yaxis.set_major_formatter(y_formatter)
         ymin, ymax = plt.ylim()
-        plt.ylim((ymin-(ymax-ymin)*0.1, ymax+(ymax-ymin)*0.1))
-        plt.xlim((self.xmin.toordinal(), self.xmax.toordinal()))
+        plt.ylim((ymin-(ymax-ymin)*0.05, ymax+(ymax-ymin)*0.05))
+        plt.xlim((self.xmin.toordinal(), (self.xmax+datetime.timedelta(1)).replace(minute=0, hour=0, second=0, microsecond=0).toordinal()))
         plt.legend(prop={'size': 16}, loc=2)
         plt.savefig(self.filename, format="png", transparent=False,
                     bbox_inches="tight", pad_inches=0.2)
@@ -131,7 +131,11 @@ def plot(title, xlabel, ylabel, filename, width, height, app, data, series, mind
             u = zip(*v)
             if b not in mc:
                 mc[b] = (COLORS[len(mc.keys())%len(COLORS)], MARKERS[len(mc.keys())%len(MARKERS)])
-            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b)
+            pl.plot(u[0], u[1], mc[b][0], mc[b][1], b, '-')
+
+            if len(u[0]) > 10:
+                pl.plot(u[0], moving_average(u[1], 10), mc[b][0], None, None, ":")
+
             """
             #pl.ax.annotate(b, xy=(u[0][-1],u[1][-1]), xycoords='data',
             #        xytext=(0, 0), textcoords='offset points') #, arrowprops=dict(arrowstyle="->"))
@@ -214,6 +218,26 @@ def generate_index_file(filenames):
         rows.append(row % (i[1], i[1], i[2], i[2], i[3], i[3]))
 
     return full_content % (time.strftime("%Y/%m/%d %H:%M:%S"), ''.join(rows))
+
+def moving_average(x, n, type='simple'):
+    """
+    compute an n period moving average.
+
+    type is 'simple' | 'exponential'
+
+    """
+    x = np.asarray(x)
+    if type=='simple':
+        weights = np.ones(n)
+    else:
+        weights = np.exp(np.linspace(-1., 0., n))
+
+    weights /= weights.sum()
+
+    a =  np.convolve(x, weights, mode='full')[:len(x)]
+    a[:n-1] = None
+    return a
+
 
 def usage():
     print "Usage:"
