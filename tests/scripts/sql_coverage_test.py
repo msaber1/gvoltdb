@@ -225,6 +225,108 @@ def run_config(suite_name, config, basedir, output_dir, random_seed, report_all,
                               jni_path, output_dir, report_all)
     return success
 
+def run_query(name, config_name, submit_verbosely, testConfigKit, client=None):
+    print "Running \"run_query\":"
+    print "  name: %s" % (name)
+    result_dir = output_dir + '/' + config_name
+    statements_path = os.path.abspath(os.path.join(result_dir, "statements.data"))
+    print "  statements_path: %s" % (statements_path)
+    results_path = os.path.abspath(os.path.join(result_dir, name + ".data"))
+    print "  results_path: %s" % (results_path)
+    sys.stdout.flush()
+
+    global normalize
+    if "normalizer" in config:
+        normalize = imp.load_source("normalizer", config["normalizer"]).normalize
+        # print "DEBUG: using normalizer ", config["normalizer"], " for ", template
+    else:
+        normalize = lambda x, y: x
+        # print "DEBUG: using no normalizer for ", template
+
+    host = defaultHost
+    port = defaultPort
+    if(name == "jni"):
+        akey = "hostname"
+        if akey in testConfigKit:
+            host = testConfigKit["hostname"]
+            port = testConfigKit["hostport"]
+
+    if client == None:
+        for i in xrange(30):
+            try:
+                client = VoltQueryClient(host, port)
+                client.set_quiet(True)
+                client.set_timeout(5.0) # 5 seconds
+                break
+            except socket.error:
+                time.sleep(1)
+
+    if client == None:
+        print >> sys.stderr, "Unable to connect/create client"
+        sys.stderr.flush()
+        return -1
+
+#    for key in testConfigKits:
+#        print "999 Key = '%s', Val = '%s'" % (key, testConfigKits[key])
+    if(host != defaultHost):
+        # Flush database
+        client.onecmd("updatecatalog " + testConfigKit["testCatalog"]  + " " + testConfigKit["deploymentFile"])
+
+    statements_file = open(statements_path, "rb")
+    results_file = open(results_path, "wb")
+    while True:
+        try:
+            statement = cPickle.load(statements_file)
+        except EOFError:
+            break
+
+        try:
+            if submit_verbosely:
+                print "Submitting to backend " + name + " adhoc " + statement["SQL"]
+            client.onecmd("adhoc " + statement["SQL"])
+        except:
+            print >> sys.stderr, "Error occurred while executing '%s': %s" % \
+                (statement["SQL"], sys.exc_info()[1])
+            if(host == defaultHost):
+                # Should kill the server now
+                killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
+                killer.communicate()
+                if killer.returncode != 0:
+                    print >> sys.stderr, \
+                        "Failed to kill the server process %d" % (server.pid)
+            break
+        table = None
+        if client.response == None:
+            print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s': %s" % \
+                (statement["SQL"], sys.exc_info()[1])
+            if(host == defaultHost):
+                killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
+                killer.communicate()
+                if killer.returncode != 0:
+                    print >> sys.stderr, \
+                        "Failed to kill the server process %d" % (server.pid)
+            break
+        if client.response.tables:
+            ### print "DEBUG: got table(s) from ", statement["SQL"] ,"."
+            table = normalize(client.response.tables[0], statement["SQL"])
+            if len(client.response.tables) > 1:
+                print "WARNING: ignoring extra table(s) from result of query ?", statement["SQL"] ,"?"
+        # else:
+            # print "WARNING: returned no table(s) from ?", statement["SQL"] ,"?"
+        cPickle.dump({"Status": client.response.status,
+                      "Info": client.response.statusString,
+                      "Result": table,
+                      "Exception": str(client.response.exception)},
+                     results_file)
+    results_file.close()
+    statements_file.close()
+
+    sys.stdout.flush()
+    sys.stderr.flush()
+
+    # TODO: how to know there is something wrong in server?
+    return client
+
 def get_voltcompiler(basedir):
     key = "voltdb"
     (head, tail) = basedir.split(key)
@@ -443,25 +545,107 @@ if __name__ == "__main__":
         # testConfigKits["hostport"]
         testConfigKits = create_testConfigKits(options, basedir)
 
-    success = True
-    statistics = {}
+    # copy from run_config
+    # for key in config.iterkeys():
+    #    print "in run_config key = '%s', config[key] = '%s'" % (key, config[key])
+    #    if not os.path.isabs(config[key]):
+    #        config[key] = os.path.abspath(os.path.join(basedir, config[key]))
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    # generate SQL queries
     for config_name in configs_to_run:
-        print >> sys.stderr, "\nSQLCOVERAGE: STARTING ON CONFIG: %s\n" % config_name
+        print >> sys.stderr, "\nSQLCOVERAGE: GENERATINT QUERIES ON CONFIG: %s\n" % config_name
         report_dir = output_dir + '/' + config_name
         config = config_list.get_config(config_name)
-        if(options.hostname != None and options.hostname != defaultHost):
-            testDDL = basedir + "/" + config['ddl']
-            testProjectFile = create_projectFile(testDDL, 'test')
-            testCatalog = create_catalogFile(testConfigKits['voltcompiler'], testProjectFile, 'test')
-            # To add one more key
-            testConfigKits["testCatalog"] = testCatalog
-        result = run_config(config_name, config, basedir, report_dir, seed, options.report_all,
-                            options.generate_only, options.subversion_generation,
-                            options.report_all, args, testConfigKits)
+        for key in config.iterkeys():
+            if not os.path.isabs(config[key]):
+                config[key] = os.path.abspath(os.path.join(basedir, config[key]))
+
+        statements_path = os.path.abspath(os.path.join(report_dir, "statements.data"))
+        if not os.path.exists(report_dir):
+            os.makedirs(report_dir)
+        generator = SQLGenerator(config["schema"], config["template"], options.subversion_generation)
+        counter = 0
+        statements_file = open(statements_path, "w")
+        for i in generator.generate():
+            cPickle.dump({"id": counter, "SQL": i}, statements_file)
+            counter += 1
+        statements_file.close()
+
+        if options.generate_only or options.report_all:
+            print "Generated %d statements." % counter
+
+    if options.generate_only:
+        sys.exit(0)
+        # Claim success without running servers.
+        # return {"keyStats" : None, "mis" : 0}
+
+    success = True
+    statistics = {}
+    # start VoltDB
+    if(options.hostname != None and options.hostname != defaultHost):
+        testDDL = basedir + "/" + config['ddl']
+        testProjectFile = create_projectFile(testDDL, 'test')
+        testCatalog = create_catalogFile(testConfigKits['voltcompiler'], testProjectFile, 'test')
+        # To add one more key
+        testConfigKits["testCatalog"] = testCatalog
+    command = " ".join(args[2:])
+    command += " schema=" + os.path.basename(config['ddl'])
+    name = "jni"
+    host = defaultHost
+    port = defaultPort
+    akey = "hostname"
+    if akey in testConfigKits:
+        host = testConfigKits["hostname"]
+        port = testConfigKits["hostport"]
+    if(host == defaultHost):
+        server = subprocess.Popen(command + " backend=" + name, shell = True)
+
+    # Do queries on VoltDB
+    c = None
+    for config_name in configs_to_run:
+        print >> sys.stderr, "\nSQLCOVERAGE: STARTING QUERIES ON CONFIG: %s\n" % config_name
+        # run_query will not disconnect from the server, we need do it manually
+        c = run_query("jni", config_name, options.report_all, testConfigKits, c)
+
+    # stop server
+    # TODO: make sure everything has terminated
+    c.onecmd("shutdown")
+    server.communicate()
+    print "here"
+    sys.stdout.flush()
+
+    #TODO: check return code here?
+
+    # start HSQL
+    name = "hsqldb"
+    if(host == defaultHost):
+        server = subprocess.Popen(command + " backend=" + name, shell = True)
+
+    # Do queires and compare
+    c = None
+    for config_name in configs_to_run:
+        print >> sys.stderr, "\nSQLCOVERAGE: STARTING QUERIES ON CONFIG: %s\n" % config_name
+        report_dir = output_dir + '/' + config_name
+        hsql_path = os.path.abspath(os.path.join(report_dir, "hsql.data"))
+        jni_path = os.path.abspath(os.path.join(report_dir, "jni.data"))
+        statements_path = os.path.abspath(os.path.join(report_dir, "statements.data"))
+        c = run_query("hsql", config_name, options.report_all, testConfigKits, c)
+        global compare_results
+        compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
+        result = compare_results(config_name, seed, statements_path, hsql_path,
+                                  jni_path, report_dir, options.report_all)
         statistics[config_name] = result["keyStats"]
         statistics["seed"] = seed
         if result["mis"] != 0:
             success = False
+
+    # stop server
+    c.onecmd("shutdown")
+    server.communicate()
+
+    #TODO: check return code here?
 
     # Write the summary
     generate_summary(output_dir, statistics)
