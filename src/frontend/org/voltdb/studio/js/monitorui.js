@@ -48,6 +48,10 @@ function InitializeChart(id, chart, metric)
 		    	legend: {show: true, location: 'sw', placement: 'insideGrid', renderer: $.jqplot.EnhancedLegendRenderer, rendererOptions: {numberRows:1} }
 		    };
 			break;
+		case 'tb':
+			opt = {
+			};
+			break;
 	}
 	
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
@@ -413,6 +417,8 @@ this.RefreshMonitor = function(id, Success)
             }
 			lmax = 100;
 			break;
+		case 'tb':
+			break;
 	}
 	switch(monitor.rightMetric)
 	{
@@ -435,6 +441,8 @@ this.RefreshMonitor = function(id, Success)
 				monitor.rightPlot.series[k].label = keys[k];
             }
 			rmax = 100;
+			break;
+		case 'tb':
 			break;
 	}
 
