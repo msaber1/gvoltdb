@@ -49,11 +49,14 @@ function InitializeChart(id, chart, metric)
 		    };
 			break;
 		case 'tb':
-			opt = {
-			};
+		    opt = {
+                        seriesDefaults: { renderer: jQuery.jqplot.PieRenderer, rendererOptions: { showDataLabels: true } },
+                        legend: { show: true, location: 'e' }
+		    };
 			break;
 	}
 	
+    var data =  [ ['Heavy Industry', 12],['Retail', 9] ]; //Fake data! Need to be removed later.
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
     
     MonitorUI.Monitors[id][chart+'Plot'] = plot;
@@ -217,6 +220,7 @@ this.RefreshMonitor = function(id, Success)
 	var dataLat = latData[0];
 	var dataTPS = tpsData[0];
 	var dataIdx  = dataMem[dataMem.length-1][0]+1;
+        var dataTB = [];
 	var Mem = 0;
 	// Compute the memory statistics
 	var table = monitor.memStatsResponse.results[0].data;
@@ -273,6 +277,10 @@ this.RefreshMonitor = function(id, Success)
 		currentLatencySum += procStats[proc][1]*procStats[proc][4];
 		currentLatencyAverage += procStats[proc][4];
 	}
+
+        for(var proc in procStats)
+        dataTB.push([procStats[proc][0], (procStats[proc][1]/currentTimedTransactionCount)*100.0]);
+
 	// Compute initial latency averge. We'll compute the delta average next.
 	currentLatencyAverage = currentLatencySum / currentTimedTransactionCount;
 	
@@ -418,6 +426,7 @@ this.RefreshMonitor = function(id, Success)
 			lmax = 100;
 			break;
 		case 'tb':
+                        monitor.leftPlot.series[0].data = dataTB;
 			break;
 	}
 	switch(monitor.rightMetric)
@@ -443,13 +452,30 @@ this.RefreshMonitor = function(id, Success)
 			rmax = 100;
 			break;
 		case 'tb':
+                        monitor.leftPlot.series[0].data = dataTB;
 			break;
 	}
 
+        var left_opt;
+        if (monitor.leftMetric == 'tb') {
+               left_opt = {};
+        } 
+        else {
+               left_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
+        }
+
+        var right_opt;
+        if (monitor.rightMetric == 'tb') {
+               right_opt = {};
+        } 
+        else {
+               right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
+        }
+
 	try
 	{
-		monitor.leftPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }});
-		monitor.rightPlot.replot({clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }});
+		monitor.leftPlot.replot(left_opt);
+		monitor.rightPlot.replot(right_opt);
 	} catch (x) {}
 
 	MonitorUI.UpdateMonitorItem(id);
