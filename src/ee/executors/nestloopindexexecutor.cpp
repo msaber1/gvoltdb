@@ -108,9 +108,6 @@ bool NestLoopIndexExecutor::p_init(TempTableLimits* limits)
 
     VOLT_TRACE("<Nested Loop Index exec, INIT...> Number of searchKeys: %d \n", m_num_of_search_keys);
 
-    Table* outer_table = getInputTable();
-    assert(outer_table);
-
     IndexScanExecutor* child = dynamic_cast<IndexScanExecutor*>(inline_node->getExecutor());
     assert(child);
     PersistentTable* inner_table = dynamic_cast<PersistentTable*>(child->getTargetTable());

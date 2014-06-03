@@ -93,8 +93,7 @@ void InsertExecutor::p_initMore()
 
 bool InsertExecutor::p_execute()
 {
-    InsertPlanNode* node = dynamic_cast<InsertPlanNode*>(m_abstractNode);
-    assert(node);
+    assert(dynamic_cast<InsertPlanNode*>(m_abstractNode));
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     // Update target table reference from table delegate
