@@ -94,9 +94,11 @@ this.AddMonitor = function(tab)
     , 'memStatsCallback': function(response) {MonitorUI.Monitors[id].memStatsResponse = response;}
     , 'procStatsCallback': function(response) {MonitorUI.Monitors[id].procStatsResponse = response;}
     , 'starvStatsCallback': function(response) {MonitorUI.Monitors[id].starvStatsResponse = response;}
+    , 'latStatsCallback': function(response) {MonitorUI.Monitors[id].latStatsResponse = response;}
     , 'memStatsResponse': null
     , 'procStatsResponse': null
     , 'starvStatsResponse': null
+    , 'latStatsResponse': null
     , 'lastTimedTransactionCount': -1
     , 'lastLatencyAverage': 0.0
     , 'noTransactionCount': 0
@@ -185,6 +187,7 @@ this.RefreshMonitorData = function(id)
                 			.BeginExecute('@Statistics', ['MEMORY', 0], MonitorUI.Monitors[id].memStatsCallback)
     			            .BeginExecute('@Statistics', ['PROCEDUREPROFILE', 0], MonitorUI.Monitors[id].procStatsCallback)
     			            .BeginExecute('@Statistics', ['STARVATION', 1], MonitorUI.Monitors[id].starvStatsCallback)
+                                    .BeginExecute('@Statistics', ['LATENCY', 0], MonitorUI.Monitors[id].latStatsCallback)
     	                	.End(MonitorUI.RefreshMonitor, id);
     }
 }
@@ -192,6 +195,13 @@ this.RefreshData = function()
 {
 	for(var id in MonitorUI.Monitors)
         this.RefreshMonitorData(id);
+}
+
+function hex2a(hex) {
+    var str = '';
+    for (var i = 0; i < hex.length; i += 2)
+        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+    return str;
 }
 
 this.RefreshMonitor = function(id, Success)
@@ -271,6 +281,10 @@ this.RefreshMonitor = function(id, Success)
 		starvStats[table[j][3]] = data;
 	}
 	// Compute latency 
+        table = monitor.latStatsResponse.results[0].data;
+	var lat = table[0][4];
+        lat = hex2a(lat);
+
 	var currentTimedTransactionCount = 0.0;
     var currentLatencySum = 0.0;
     var currentLatencyAverage = 0.0;
