@@ -48,16 +48,12 @@
 
 #include "abstractjoinnode.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
 class NestLoopPlanNode : public AbstractJoinPlanNode
 {
 public:
-    NestLoopPlanNode(CatalogId id);
-    NestLoopPlanNode();
-    ~NestLoopPlanNode();
-
+    NestLoopPlanNode() { }
     virtual PlanNodeType getPlanNodeType() const;
 };
 

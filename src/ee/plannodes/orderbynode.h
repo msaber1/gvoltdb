@@ -55,17 +55,14 @@ namespace voltdb
 class OrderByPlanNode : public AbstractPlanNode
 {
 public:
-    OrderByPlanNode(CatalogId id);
-    OrderByPlanNode();
+    OrderByPlanNode() { }
     ~OrderByPlanNode();
 
     virtual PlanNodeType getPlanNodeType() const;
 
-    std::vector<AbstractExpression*>& getSortExpressions();
+    const std::vector<AbstractExpression*>& getSortExpressions() const;
 
-    void setSortDirections(std::vector<SortDirectionType>& dirs);
-    std::vector<SortDirectionType>& getSortDirections();
-    const std::vector<SortDirectionType>& getDirections() const;
+    const std::vector<SortDirectionType>& getSortDirections() const;
 
     std::string debugInfo(const std::string &spacer) const;
 

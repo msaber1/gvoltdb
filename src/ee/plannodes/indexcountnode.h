@@ -19,9 +19,9 @@
 #ifndef HSTOREINDEXCOUNTNODE_H
 #define HSTOREINDEXCOUNTNODE_H
 
-#include <string>
 #include "abstractscannode.h"
-#include "common/ValueFactory.hpp"
+
+#include <string>
 
 namespace voltdb {
 
@@ -31,59 +31,50 @@ class AbstractExpression;
  *
  */
 class IndexCountPlanNode : public AbstractScanPlanNode {
-    public:
-        IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id)
-        , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_end_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_skip_null_predicate(NULL)
-        {}
+public:
+    IndexCountPlanNode() { }
+    ~IndexCountPlanNode();
 
-        IndexCountPlanNode() : AbstractScanPlanNode()
-        , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_end_type(INDEX_LOOKUP_TYPE_EQ)
-        , m_skip_null_predicate(NULL)
-        {}
+    virtual PlanNodeType getPlanNodeType() const;
 
-        ~IndexCountPlanNode();
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXCOUNT); }
+    IndexLookupType getLookupType() const { return m_lookup_type; }
 
-        IndexLookupType getLookupType() const { return m_lookup_type; }
+    IndexLookupType getEndType() const { return m_end_type; }
 
-        IndexLookupType getEndType() const { return m_end_type; }
+    const std::string& getTargetIndexName() const { return m_target_index_name; }
 
-        const std::string& getTargetIndexName() const { return m_target_index_name; }
+    const std::vector<AbstractExpression*>& getEndKeyExpressions() const
+    { return m_endkey_expressions; }
 
-        const std::vector<AbstractExpression*>& getEndKeyExpressions() const
-        { return m_endkey_expressions; }
+    const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
+    { return m_searchkey_expressions; }
 
-        const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
-        { return m_searchkey_expressions; }
+    AbstractExpression* getSkipNullPredicate() const
+    { return m_skip_null_predicate; }
 
-        AbstractExpression* getSkipNullPredicate() const
-        { return m_skip_null_predicate; }
+    std::string debugInfo(const std::string &spacer) const;
 
-        std::string debugInfo(const std::string &spacer) const;
-
-    protected:
+protected:
         virtual void loadFromJSONObject(PlannerDomValue obj);
 
-        // This is the id of the index to reference during execution
-        std::string m_target_index_name;
+private:
+    // This is the id of the index to reference during execution
+    std::string m_target_index_name;
 
-        // TODO: Document
-        std::vector<AbstractExpression*> m_searchkey_expressions;
+    // TODO: Document
+    std::vector<AbstractExpression*> m_searchkey_expressions;
 
-        // TODO: Document
-        std::vector<AbstractExpression*> m_endkey_expressions;
+    // TODO: Document
+    std::vector<AbstractExpression*> m_endkey_expressions;
 
-        // Index Lookup Type
-        IndexLookupType m_lookup_type;
+    // Index Lookup Type
+    IndexLookupType m_lookup_type;
 
-        // Index Lookup End Type
-        IndexLookupType m_end_type;
+    // Index Lookup End Type
+    IndexLookupType m_end_type;
 
-        // count null row predicate for edge cases: reverse scan or underflow case
-        AbstractExpression* m_skip_null_predicate;
+    // count null row predicate for edge cases: reverse scan or underflow case
+    AbstractExpression* m_skip_null_predicate;
 };
 
 }

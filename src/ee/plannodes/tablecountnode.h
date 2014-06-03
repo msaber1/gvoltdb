@@ -18,30 +18,21 @@
 #ifndef HSTORETABLECOUNTNODE_H
 #define HSTORETABLECOUNTNODE_H
 
-#include "common/common.h"
 #include "abstractscannode.h"
 
 namespace voltdb {
-
-class AbstractExpression;
 
 /**
  *
  */
 class TableCountPlanNode : public AbstractScanPlanNode {
-   public:
-        TableCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            // Do nothing
-        }
-        TableCountPlanNode() : AbstractScanPlanNode() {
-            // Do nothing
-        }
+public:
+    TableCountPlanNode() { }
+    ~TableCountPlanNode() { }
 
-        ~TableCountPlanNode();
+    virtual PlanNodeType getPlanNodeType() const;
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_TABLECOUNT); }
-
-        std::string debugInfo(const std::string &spacer) const;
+    std::string debugInfo(const std::string &spacer) const;
 };
 
 }

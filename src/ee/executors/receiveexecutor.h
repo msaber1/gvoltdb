@@ -46,33 +46,20 @@
 #ifndef HSTORERECEIVEEXECUTOR_H
 #define HSTORERECEIVEEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
-#include <iostream>
 
 namespace voltdb {
-
-class UndoLog;
-class ReadWriteSet;
 
 /**
  *
  */
 class ReceiveExecutor : public AbstractExecutor {
 public:
-    ReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-    : AbstractExecutor(engine, abstract_node)
-    {
-        this->engine = engine;
-    }
-    ~ReceiveExecutor();
+    ReceiveExecutor() { }
+    ~ReceiveExecutor() { }
 protected:
-    bool p_init(AbstractPlanNode*,
-            TempTableLimits* limits);
-    bool p_execute(const NValueArray &params);
-private:
-    VoltDBEngine *engine;
+    bool p_init(TempTableLimits* limits);
+    bool p_execute();
 };
 
 }

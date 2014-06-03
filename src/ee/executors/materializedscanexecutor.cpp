@@ -33,25 +33,25 @@
 
 using namespace voltdb;
 
-bool MaterializedScanExecutor::p_init(AbstractPlanNode* abstract_node,
-                                      TempTableLimits* limits)
+bool MaterializedScanExecutor::p_init(TempTableLimits* limits)
 {
     VOLT_TRACE("init Materialized Scan Executor");
 
-    assert(dynamic_cast<MaterializedScanPlanNode*>(abstract_node));
-    assert(abstract_node->getOutputSchema().size() == 1);
+    assert(dynamic_cast<MaterializedScanPlanNode*>(m_abstractNode));
+    assert(m_abstractNode->getOutputSchema().size() == 1);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
     return true;
 }
 
-bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
+bool MaterializedScanExecutor::p_execute()
+{
     MaterializedScanPlanNode* node = dynamic_cast<MaterializedScanPlanNode*>(m_abstractNode);
     assert(node);
 
     // output table has one column
-    Table* output_table = node->getOutputTable();
+    TempTable* output_table = getTempOutputTable();
     TableTuple& tmptup = output_table->tempTuple();
     assert(output_table);
     assert ((int)output_table->columnCount() == 1);
@@ -63,9 +63,6 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
 
     AbstractExpression* rowsExpression = node->getTableRowsExpression();
     assert(rowsExpression);
-
-    // substitute params
-    rowsExpression->substitute(params);
 
     // get array nvalue
     NValue arrayNValue = rowsExpression->eval();
@@ -105,7 +102,3 @@ bool MaterializedScanExecutor::p_execute(const NValueArray &params) {
 
     return true;
 }
-
-MaterializedScanExecutor::~MaterializedScanExecutor() {
-}
-

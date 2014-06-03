@@ -64,76 +64,52 @@
 using namespace std;
 using namespace voltdb;
 
-bool UpsertExecutor::p_init(AbstractPlanNode* abstractNode,
-        TempTableLimits* limits)
+void UpsertExecutor::p_initMore()
 {
     VOLT_TRACE("init Upsert Executor");
 
-    m_node = dynamic_cast<UpsertPlanNode*>(abstractNode);
-    assert(m_node);
-    assert(m_node->getTargetTable());
-    assert(m_node->getInputTables().size() == 1);
+    UpsertPlanNode* node = dynamic_cast<UpsertPlanNode*>(m_abstractNode);
+    assert(node);
+    assert(m_input_tables.size() == 1);
 
-    setDMLCountOutputTable(limits);
+    // Target table must be a PersistentTable and must not be NULL
+    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(getTargetTable());
+    assert(persistentTarget);
 
-    // Target table can be StreamedTable or PersistentTable and must not be NULL
-    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    if ( persistentTarget == NULL ) {
-        VOLT_ERROR("Upsert is not supported for Stream table %s", m_node->getTargetTable()->name().c_str());
-    }
-
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
-    assert(m_inputTable);
+    TempTable* input_table = getTempInputTable(); //input table should be temptable
 
     m_partitionColumnIsString = false;
     m_partitionColumn = persistentTarget->partitionColumn();
     if (m_partitionColumn != -1) {
-        if (m_inputTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
+        if (input_table->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
             m_partitionColumnIsString = true;
         }
     }
 
-    m_multiPartition = m_node->isMultiPartition();
-    return true;
+    m_multiPartition = node->isMultiPartition();
 }
 
-bool UpsertExecutor::p_execute(const NValueArray &params) {
+bool UpsertExecutor::p_execute()
+{
     VOLT_DEBUG("execute Upsert Executor");
 
-    assert(m_node == dynamic_cast<UpsertPlanNode*>(m_abstractNode));
-    assert(m_node);
-    assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
-    assert(m_inputTable);
+    TempTable* input_table = m_input_tables[0].getTempTable(); //input table should be temptable
+    assert(input_table);
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     // Update target table reference from table delegate
-    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(getTargetTable());
     assert(targetTable);
 
-    TableTuple tbTuple = TableTuple(m_inputTable->schema());
+    TableTuple tbTuple = TableTuple(input_table->schema());
 
-    VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
-#ifdef DEBUG
-    //
-    // This should probably just be a warning in the future when we are
-    // running in a distributed cluster
-    //
-    if (m_inputTable->isTempTableEmpty()) {
-        VOLT_ERROR("No tuples were found in our input table '%s'",
-                m_inputTable->name().c_str());
-        return false;
-    }
-#endif
-    assert ( ! m_inputTable->isTempTableEmpty());
+    VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
+    assert ( ! input_table->isTempTableEmpty());
 
     // count the number of successful inserts
     int modifiedTuples = 0;
 
-    Table* outputTable = m_node->getOutputTable();
-    assert(outputTable);
-
-    assert (tbTuple.sizeInValues() == m_inputTable->columnCount());
-    TableIterator iterator = m_inputTable->iterator();
+    TableIterator iterator = input_table->iterator();
     while (iterator.next(tbTuple)) {
         VOLT_TRACE("Upserting tuple '%s' into target table '%s' with table schema: %s",
                 tbTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),
@@ -154,7 +130,6 @@ bool UpsertExecutor::p_execute(const NValueArray &params) {
                             tbTuple,
                             "Mispartitioned tuple in single-partition insert statement.");
                 }
-
                 continue;
             }
         }
@@ -172,7 +147,7 @@ bool UpsertExecutor::p_execute(const NValueArray &params) {
             if (!targetTable->insertTuple(tbTuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                         " target table '%s'",
-                        m_inputTable->name().c_str(),
+                        input_table->name().c_str(),
                         targetTable->name().c_str());
                 return false;
             }
@@ -192,19 +167,7 @@ bool UpsertExecutor::p_execute(const NValueArray &params) {
         modifiedTuples++;
     }
 
-    TableTuple& count_tuple = outputTable->tempTuple();
-    count_tuple.setNValue(0, ValueFactory::getBigIntValue(modifiedTuples));
-    // try to put the tuple into the output table
-    if (!outputTable->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to upsert tuple count (%d) into"
-                " output table '%s'",
-                modifiedTuples,
-                outputTable->name().c_str());
-        return false;
-    }
-
-    // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += modifiedTuples;
+    setModifiedTuples(modifiedTuples);
     VOLT_DEBUG("Finished upserting tuple");
     return true;
 }

@@ -229,6 +229,8 @@ CTX.INPUT['execution'] = """
 
 CTX.INPUT['executors'] = """
  abstractexecutor.cpp
+ abstractoperationexecutor.cpp
+ abstractscanexecutor.cpp
  aggregateexecutor.cpp
  deleteexecutor.cpp
  distinctexecutor.cpp
@@ -258,6 +260,7 @@ CTX.INPUT['expressions'] = """
  vectorexpression.cpp
  functionexpression.cpp
  tupleaddressexpression.cpp
+ parametervalueexpression.cpp
 """
 
 CTX.INPUT['plannodes'] = """

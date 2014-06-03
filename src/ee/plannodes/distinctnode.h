@@ -60,8 +60,7 @@ namespace voltdb
 class DistinctPlanNode : public AbstractPlanNode
 {
 public:
-    DistinctPlanNode(CatalogId id);
-    DistinctPlanNode();
+    DistinctPlanNode() { }
     ~DistinctPlanNode();
 
     virtual PlanNodeType getPlanNodeType() const;

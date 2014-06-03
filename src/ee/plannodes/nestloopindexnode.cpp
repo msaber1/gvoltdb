@@ -45,29 +45,8 @@
 
 #include "nestloopindexnode.h"
 
-#include "storage/table.h"
+namespace voltdb {
 
-using namespace voltdb;
+PlanNodeType NestLoopIndexPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_NESTLOOPINDEX; }
 
-NestLoopIndexPlanNode::NestLoopIndexPlanNode(CatalogId id)
-  : AbstractJoinPlanNode(id)
-{
-    // Do nothing
-}
-
-NestLoopIndexPlanNode::NestLoopIndexPlanNode()
-  : AbstractJoinPlanNode()
-{
-    // Do nothing
-}
-
-NestLoopIndexPlanNode::~NestLoopIndexPlanNode()
-{
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
-PlanNodeType NestLoopIndexPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_NESTLOOPINDEX;
 }

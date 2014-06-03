@@ -48,49 +48,37 @@
 #include "common/common.h"
 #include "common/tabletuple.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 
 using namespace voltdb;
 
 bool
-LimitExecutor::p_init(AbstractPlanNode* abstract_node,
-                      TempTableLimits* limits)
+LimitExecutor::p_init(TempTableLimits* limits)
 {
     VOLT_TRACE("init limit Executor");
 
-    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(abstract_node);
+    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
     assert(node);
 
-    //
     // Skip if we are inline
-    //
-    if (!node->isInline())
-    {
-        //
-        // Just copy the table schema of our input table
-        //
-        assert(node->getInputTables().size() == 1);
-        node->
-            setOutputTable(TableFactory::
-                           getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
-                                              limits));
+    if (node->isInline()) {
+        return true;
     }
+
+    m_state = node->getState();
+
+    // Just copy the table schema of our input table
+    setTempOutputLikeInputTable(limits);
     return true;
 }
 
-bool
-LimitExecutor::p_execute(const NValueArray &params)
+bool LimitExecutor::p_execute()
 {
-    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
-    assert(node);
-    Table* output_table = node->getOutputTable();
+    assert(dynamic_cast<LimitPlanNode*>(m_abstractNode));
+    TempTable* output_table = getTempOutputTable();
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = getInputTable();
     assert(input_table);
 
     //
@@ -98,32 +86,23 @@ LimitExecutor::p_execute(const NValueArray &params)
     // we have copy enough tuples for the limit specified by the node
     //
     TableTuple tuple(input_table->schema());
-    TableIterator iterator = input_table->iterator();
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
 
-    int tuple_ctr = 0;
-    int tuples_skipped = 0;
     int limit = -1;
     int offset = -1;
-    node->getLimitAndOffsetByReference(params, limit, offset);
+    m_state.getLimitAndOffsetByReference(m_engine, limit, offset);
+    int tuple_ctr = 0;
+    int tuples_skipped = 0;
 
-    while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
-    {
+    while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple)) {
         // TODO: need a way to skip / iterate N items.
-        if (tuples_skipped < offset)
-        {
+        if (tuples_skipped < offset) {
             tuples_skipped++;
             continue;
         }
         tuple_ctr++;
 
-        if (!output_table->insertTuple(tuple))
-        {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                       " output table '%s'",
-                       input_table->name().c_str(),
-                       output_table->name().c_str());
-            return false;
-        }
+        output_table->insertTempTuple(tuple);
     }
 
     return true;

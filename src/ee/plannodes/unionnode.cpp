@@ -43,23 +43,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
-
 #include "unionnode.h"
-#include "common/common.h"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 using namespace std;
 
 namespace voltdb {
 
-UnionPlanNode::~UnionPlanNode() {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
+PlanNodeType UnionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UNION; }
 
-std::string UnionPlanNode::debugInfo(const std::string &spacer) const {
+string UnionPlanNode::debugInfo(const string &spacer) const {
     ostringstream buffer;
     buffer << spacer << "UnionType[" << m_unionType << "]\n";
     return string(buffer.str());

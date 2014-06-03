@@ -44,23 +44,18 @@
  */
 
 #include "distinctexecutor.h"
+
 #include "common/debuglog.h"
-#include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "plannodes/distinctnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 
 #include <set>
-#include <cassert>
 
-using namespace voltdb;
+namespace voltdb {
 
-bool DistinctExecutor::p_init(AbstractPlanNode*,
-                              TempTableLimits* limits)
+bool DistinctExecutor::p_init(TempTableLimits* limits)
 {
     VOLT_DEBUG("init Distinct Executor");
     DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
@@ -68,36 +63,28 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
     //
     // Create a duplicate of input table
     //
-    if (!node->isInline()) {
-        assert(node->getInputTables().size() == 1);
-        assert(node->getInputTables()[0]->columnCount() > 0);
-        assert(node->getChildren()[0] != NULL);
-
-        node->
-            setOutputTable(TableFactory::
-                           getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
-                                              limits));
+    if (node->isInline()) {
+        return true;
     }
+    assert(m_input_tables.size() == 1);
+    assert(m_input_tables[0].getTable()->columnCount() > 0);
+
+    setTempOutputLikeInputTable(limits);
     return (true);
 }
 
-bool DistinctExecutor::p_execute(const NValueArray &params) {
+bool DistinctExecutor::p_execute() {
     DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
     assert(node);
-    Table* output_table = node->getOutputTable();
+    TempTable* output_table = getTempOutputTable();
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = getInputTable();
     assert(input_table);
 
-    TableIterator iterator = input_table->iterator();
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
     TableTuple tuple(input_table->schema());
 
-    // substitute params for distinct expression
     AbstractExpression *distinctExpression = node->getDistinctExpression();
-    distinctExpression->substitute(params);
-
     std::set<NValue, NValue::ltNValue> found_values;
     while (iterator.next(tuple)) {
         //
@@ -106,18 +93,11 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
         NValue tuple_value = distinctExpression->eval(&tuple, NULL);
         if (found_values.find(tuple_value) == found_values.end()) {
             found_values.insert(tuple_value);
-            if (!output_table->insertTuple(tuple)) {
-                VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                           " output table '%s'",
-                           input_table->name().c_str(),
-                           output_table->name().c_str());
-                return false;
-            }
+            output_table->insertTempTuple(tuple);
         }
     }
-
     return true;
 }
 
-DistinctExecutor::~DistinctExecutor() {
 }
+

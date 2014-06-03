@@ -48,27 +48,26 @@
 
 #include "executors/abstractexecutor.h"
 
+#include "plannodes/limitnode.h"
+
 namespace voltdb
 {
-    /**
-     *
-     */
-    class LimitExecutor : public AbstractExecutor
-    {
-    public:
-        LimitExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-        {
-        }
 
-        ~LimitExecutor() {
-        }
+/**
+ *
+ */
+class LimitExecutor : public AbstractExecutor
+{
+public:
+    LimitExecutor() { }
+    ~LimitExecutor() { }
+protected:
+    bool p_init(TempTableLimits* limits);
+    bool p_execute();
 
-    private:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
-    };
+private:
+    LimitPlanNode::InlineState m_state;
+};
 
 }
 

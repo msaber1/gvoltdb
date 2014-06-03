@@ -56,28 +56,22 @@ namespace voltdb
 class AbstractScanPlanNode : public AbstractPlanNode
 {
 public:
-    virtual ~AbstractScanPlanNode();
+    ~AbstractScanPlanNode();
 
-    Table* getTargetTable() const;
-    void setTargetTableDelegate(TableCatalogDelegate* tcd);
+    const std::string& getTargetTableName() const { return m_targetTableName; }
 
-    std::string getTargetTableName() const;
-    void setTargetTableName(std::string name);
+    AbstractExpression* getPredicate() const { return m_predicate; }
 
-    void setPredicate(AbstractExpression* predicate);
-    AbstractExpression* getPredicate() const;
-
-    bool isSubQuery() const {
-        return m_isSubQuery;
-    }
+    bool isSubQuery() const { return m_isSubQuery; }
 
     virtual std::string debugInfo(const std::string& spacer) const;
 
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj);
-    AbstractScanPlanNode(int32_t id);
-    AbstractScanPlanNode();
 
+    AbstractScanPlanNode() : m_predicate(NULL) { }
+
+private:
     // Target Table
     // These tables are different from the input and the output tables
     // The plannode can read in tuples from the input table(s) and

@@ -462,7 +462,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
         boolean success;
 
-        //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
+        /* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
         // IF (! DEBUG config) ...
 
         /////////////////////////////////////////////////////////////

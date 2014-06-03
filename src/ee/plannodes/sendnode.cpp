@@ -43,12 +43,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
-#include <stdexcept>
 #include "sendnode.h"
-#include "common/serializeio.h"
+
+#include <sstream>
 
 namespace voltdb {
+
+PlanNodeType SendPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_SEND; }
 
 std::string SendPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;

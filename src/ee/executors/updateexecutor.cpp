@@ -69,41 +69,27 @@
 using namespace std;
 using namespace voltdb;
 
-bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
-                            TempTableLimits* limits)
+void UpdateExecutor::p_initMore()
 {
     VOLT_TRACE("init Update Executor");
 
-    m_node = dynamic_cast<UpdatePlanNode*>(abstract_node);
-    assert(m_node);
-    assert(m_node->getInputTables().size() == 1);
-    // input table should be temptable
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]);
-    assert(m_inputTable);
+    UpdatePlanNode* node = dynamic_cast<UpdatePlanNode*>(m_abstractNode);
+    assert(node);
+    assert(m_input_tables.size() == 1);
 
     // target table should be persistenttable
-    PersistentTable*targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(getTargetTable());
     assert(targetTable);
 
-    setDMLCountOutputTable(limits);
-
-    AbstractPlanNode *child = m_node->getChildren()[0];
-    ProjectionPlanNode *proj_node = NULL;
-    if (NULL == child) {
-        VOLT_ERROR("Attempted to initialize update executor with NULL child");
-        return false;
-    }
-
-    PlanNodeType pnt = child->getPlanNodeType();
-    if (pnt == PLAN_NODE_TYPE_PROJECTION) {
-        proj_node = dynamic_cast<ProjectionPlanNode*>(child);
-    } else if (pnt == PLAN_NODE_TYPE_SEQSCAN ||
-            pnt == PLAN_NODE_TYPE_INDEXSCAN) {
+    AbstractPlanNode *child = node->getChildren()[0];
+    assert(child);
+    ProjectionPlanNode *proj_node = dynamic_cast<ProjectionPlanNode*>(child);
+    if (proj_node == NULL) {
         proj_node = dynamic_cast<ProjectionPlanNode*>(child->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-        assert(NULL != proj_node);
+        assert(proj_node);
     }
 
-    vector<string> output_column_names = proj_node->getOutputColumnNames();
+    const vector<string> output_column_names = proj_node->getOutputColumnNames();
     const vector<string> &targettable_column_names = targetTable->getColumnNames();
 
     /*
@@ -121,7 +107,6 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
 
     assert(m_inputTargetMap.size() == (output_column_names.size() - 1));
     m_inputTargetMapSize = (int)m_inputTargetMap.size();
-    m_inputTuple = TableTuple(m_inputTable->schema());
 
     // for target table related info.
     m_partitionColumn = targetTable->partitionColumn();
@@ -131,24 +116,27 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
             m_partitionColumnIsString = true;
         }
     }
-
-    return true;
 }
 
-bool UpdateExecutor::p_execute(const NValueArray &params) {
-    assert(m_inputTable);
+bool UpdateExecutor::p_execute()
+{
+    TempTable* input_table = getTempInputTable(); //input table should be temptable
+    assert(input_table);
 
     // target table should be persistenttable
-    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(getTargetTable());
     assert(targetTable);
-    TableTuple targetTuple = TableTuple(targetTable->schema());
+    TableTuple targetTuple(targetTable->schema());
 
-    VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
+    VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
     VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", targetTable->debug().c_str());
 
     // determine which indices are updated by this executor
     // iterate through all target table indices and see if they contain
     // columns mutated by this executor
+    //TODO: optimize this out of the execute code path either by completing it in the planner
+    // and serializing/deserializing a list of index names or at least doing this analysis
+    // resolving to a member list of index name strings in p_initMore.
     std::vector<TableIndex*> indexesToUpdate;
     const std::vector<TableIndex*>& allIndexes = targetTable->allIndexes();
     BOOST_FOREACH(TableIndex *index, allIndexes) {
@@ -161,17 +149,18 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
                     break;
                 }
             }
-            if (indexKeyUpdated) break;
+            if (indexKeyUpdated) {
+                break;
+            }
         }
         if (indexKeyUpdated) {
             indexesToUpdate.push_back(index);
         }
     }
 
-    assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
-    assert(targetTuple.sizeInValues() == targetTable->columnCount());
-    TableIterator input_iterator = m_inputTable->iterator();
-    while (input_iterator.next(m_inputTuple)) {
+    TableTuple input_tuple(input_table->schema());
+    TableIterator input_iterator = input_table->iterator();
+    while (input_iterator.next(input_tuple)) {
         //
         // OPTIMIZATION: Single-Sited Query Plans
         // If our beloved UpdatePlanNode is apart of a single-site query plan,
@@ -179,7 +168,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         // tuple on the target table that we will want to update. This saves us
         // the trouble of having to do an index lookup
         //
-        void *target_address = m_inputTuple.getNValue(0).castAsAddress();
+        void *target_address = input_tuple.getNValue(0).castAsAddress();
         targetTuple.move(target_address);
 
         // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
@@ -192,7 +181,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         TableTuple &tempTuple = targetTable->getTempTupleInlined(targetTuple);
         for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
             tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
-                                m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
+                                input_tuple.getNValue(m_inputTargetMap[map_ctr].first));
         }
 
         // if there is a partition column for the target table
@@ -220,23 +209,13 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
         }
     }
 
-    TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
-    count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_inputTable->tempTableTupleCount()));
-    // try to put the tuple into the output table
-    if (!m_node->getOutputTable()->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to insert tuple count (%ld) into"
-                   " output table '%s'",
-                   static_cast<long int>(m_inputTable->activeTupleCount()),
-                   m_node->getOutputTable()->name().c_str());
-        return false;
-    }
-
     VOLT_TRACE("TARGET TABLE - AFTER: %s\n", targetTable->debug().c_str());
     // TODO lets output result table here, not in result executor. same thing in
     // delete/insert
 
     // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += m_inputTable->tempTableTupleCount();
+    int64_t modifiedTuples = input_table->tempTableTupleCount();
 
+    setModifiedTuples(modifiedTuples);
     return true;
 }

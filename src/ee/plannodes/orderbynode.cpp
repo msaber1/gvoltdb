@@ -45,32 +45,16 @@
 
 #include "orderbynode.h"
 
-#include "common/types.h"
-#include "storage/table.h"
-
 #include <sstream>
-#include <stdexcept>
 #include <string>
 
 using namespace std;
-using namespace voltdb;
 
-OrderByPlanNode::OrderByPlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-    //DO NOTHING
-}
-
-OrderByPlanNode::OrderByPlanNode() : AbstractPlanNode()
-{
-    //DO NOTHING
-}
+namespace voltdb {
 
 OrderByPlanNode::~OrderByPlanNode()
 {
-    delete getOutputTable();
-    setOutputTable(NULL);
-    for (int i = 0; i < m_sortExpressions.size(); i++)
-    {
+    for (int i = 0; i < m_sortExpressions.size(); i++) {
         delete m_sortExpressions[i];
     }
 }
@@ -81,26 +65,12 @@ OrderByPlanNode::getPlanNodeType() const
     return PLAN_NODE_TYPE_ORDERBY;
 }
 
-vector<AbstractExpression*>&
-OrderByPlanNode::getSortExpressions()
+const vector<AbstractExpression*>& OrderByPlanNode::getSortExpressions() const
 {
     return m_sortExpressions;
 }
 
-void
-OrderByPlanNode::setSortDirections(vector<SortDirectionType>& dirs)
-{
-    m_sortDirections = dirs;
-}
-
-vector<SortDirectionType>&
-OrderByPlanNode::getSortDirections()
-{
-    return m_sortDirections;
-}
-
-const vector<SortDirectionType>&
-OrderByPlanNode::getDirections() const
+const vector<SortDirectionType>& OrderByPlanNode::getSortDirections() const
 {
     return m_sortDirections;
 }
@@ -146,4 +116,6 @@ OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
                                           " Does not have expression and direction.");
         }
     }
+}
+
 }

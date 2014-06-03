@@ -401,7 +401,7 @@ struct AggregateRow
 };
 
 
-bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
+bool AggregateExecutorBase::p_init(TempTableLimits* limits)
 {
     AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
     assert(node);
@@ -465,31 +465,12 @@ bool AggregateExecutorBase::p_init(AbstractPlanNode*, TempTableLimits* limits)
     return true;
 }
 
-inline void AggregateExecutorBase::executeAggBase(const NValueArray& params)
+inline void AggregateExecutorBase::executeAggBase()
 {
     m_memoryPool.purge();
     VOLT_DEBUG("started AGGREGATE");
     assert(dynamic_cast<AggregatePlanNode*>(m_abstractNode));
-    assert(m_tmpOutputTable);
-
-    // substitute params
-    BOOST_FOREACH(AbstractExpression* inputExpression, m_inputExpressions) {
-        if (inputExpression) {
-            inputExpression->substitute(params);
-        }
-    }
-    BOOST_FOREACH(AbstractExpression* groupByExpression, m_groupByExpressions) {
-        groupByExpression->substitute(params);
-    }
-    BOOST_FOREACH(AbstractExpression* outputColumnExpression, m_outputColumnExpressions) {
-        outputColumnExpression->substitute(params);
-    }
-    if (m_prePredicate != NULL && m_prePredicate->hasParameter()) {
-        m_prePredicate->substitute(params);
-    }
-    if (m_postPredicate != NULL && m_postPredicate->hasParameter()) {
-        m_postPredicate->substitute(params);
-    }
+    assert(getTempOutputTable());
 }
 
 inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTupleStorage &nextGroupByKeyStorage,
@@ -512,7 +493,7 @@ inline void AggregateExecutorBase::initGroupByKeyTuple(PoolBackedTupleStorage &n
 /// through any additional columns from the input table.
 inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
 {
-    TempTable* output_table = m_tmpOutputTable;
+    TempTable* output_table = getTempOutputTable();
     TableTuple& tmptup = output_table->tempTuple();
     // This first pass is to add all columns that were aggregated on.
     Agg** aggs = aggregateRow->m_aggregates;
@@ -562,22 +543,29 @@ inline void AggregateExecutorBase::initAggInstances(AggregateRow* aggregateRow)
     }
 }
 
+AggregateExecutorBase::~AggregateExecutorBase()
+{
+    if (m_groupByKeySchema != NULL) {
+        TupleSchema::freeTupleSchema(m_groupByKeySchema);
+    }
+}
+
 typedef boost::unordered_map<TableTuple,
                              AggregateRow*,
                              TableTupleHasher,
                              TableTupleEqualityChecker> HashAggregateMapType;
 
-bool AggregateHashExecutor::p_execute(const NValueArray& params)
+bool AggregateHashExecutor::p_execute()
 {
-    executeAggBase(params);
+    executeAggBase();
 
     HashAggregateMapType hash;
 
     VOLT_TRACE("looping..");
-    Table* input_table = m_abstractNode->getInputTables()[0];
+    Table* input_table = m_input_tables[0].getTable();
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
-    TableIterator it = input_table->iterator();
+    TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nxtTuple(input_table->schema());
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;
@@ -620,9 +608,9 @@ bool AggregateHashExecutor::p_execute(const NValueArray& params)
 }
 
 
-bool AggregateSerialExecutor::p_execute(const NValueArray& params)
+bool AggregateSerialExecutor::p_execute()
 {
-    executeAggBase(params);
+    executeAggBase();
 
     // Serial aggregates need only one row of Aggs, the "previous" input tuple for pass-through columns,
     // and the "previous" group key tuple that defines their associated group keys
@@ -633,13 +621,13 @@ bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 
     AggregateRow* aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
     boost::scoped_ptr<AggregateRow> will_finally_delete_aggregate_row(aggregateRow);
-    Table* input_table = m_abstractNode->getInputTables()[0];
+    Table* input_table = m_input_tables[0].getTable();
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     if (m_prePredicate != NULL) {
         assert(input_table->activeTupleCount() <= 1);
     }
-    TableIterator it = input_table->iterator();
+    TableIterator it = input_table->iteratorDeletingAsWeGo();
     TableTuple nxtTuple(input_table->schema());
     PoolBackedTupleStorage nextGroupByKeyStorage(m_groupByKeySchema, &m_memoryPool);
     TableTuple& nextGroupByKeyTuple = nextGroupByKeyStorage;

@@ -63,46 +63,77 @@ class VoltDBEngine;
  */
 class AbstractExecutor {
   public:
-    virtual ~AbstractExecutor();
+    virtual ~AbstractExecutor()
+    {
+        delete getTempOutputTable();
+    }
 
     /** Executors are initialized once when the catalog is loaded */
     bool init(VoltDBEngine*, TempTableLimits* limits);
 
     /** Invoke a plannode's associated executor */
-    bool execute(const NValueArray& params);
+    bool execute()
+    {
+        assert(m_abstractNode);
+        VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
+        // run the executor
+        return p_execute();
+    }
 
     /**
      * Returns the plannode that generated this executor.
      */
-    inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
+    void setPlanNode(AbstractPlanNode* node) { assert( ! m_abstractNode); m_abstractNode = node; }
+    AbstractPlanNode* getPlanNode() const { return m_abstractNode; }
 
-    inline void cleanupTempOutputTable()
+    inline void cleanupTempOutputTable() const
     {
-        if (m_tmpOutputTable) {
+        TempTable* temp_table = getTempOutputTable();
+        if (temp_table) {
             VOLT_TRACE("Clearing output table...");
-            m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
+            temp_table->deleteAllTuplesNonVirtual(false);
         }
     }
 
+    class TableReference {
+    public:
+        TableReference()
+        {
+            m_temp_table = NULL;
+            m_tcd = NULL;
+        }
+        void setTableDelegate(TableCatalogDelegate* tcd)
+        {
+            m_temp_table = NULL;
+            m_tcd = tcd;
+        }
+        void setTempTable(TempTable* temp_table)
+        {
+            m_temp_table = temp_table;
+            m_tcd = NULL;
+        }
+        Table* getTable() const;
+        TempTable* getTempTable() const { return m_temp_table; }
+    private:
+        TempTable* m_temp_table;
+        TableCatalogDelegate* m_tcd;
+    };
+
   protected:
-    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
-        m_abstractNode = abstractNode;
-        m_tmpOutputTable = NULL;
-        m_engine = engine;
-    }
+    AbstractExecutor() : m_abstractNode(NULL) { }
 
     /** Concrete executor classes implement initialization in p_init() */
-    virtual bool p_init(AbstractPlanNode*,
-                        TempTableLimits* limits) = 0;
+    virtual bool p_init(TempTableLimits* limits) = 0;
 
-    /** Concrete executor classes impelmenet execution in p_execute() */
-    virtual bool p_execute(const NValueArray& params) = 0;
+    /** Concrete executor classes implement execution in p_execute() */
+    virtual bool p_execute() = 0;
 
     /**
      * Set up a multi-column temp output table for those executors that require one.
      * Called from p_init.
      */
     void setTempOutputTable(TempTableLimits* limits, const std::string tempTableName="temp");
+    void setTempOutputLikeInputTable(TempTableLimits* limits);
 
     /**
      * Set up a single-column temp output table for DML executors that require one to return their counts.
@@ -112,26 +143,52 @@ class AbstractExecutor {
 
     // execution engine owns the plannode allocation.
     AbstractPlanNode* m_abstractNode;
-    TempTable* m_tmpOutputTable;
+
+    void setOutputTable(Table* table)
+    {
+        TempTable* asTemp = dynamic_cast<TempTable*>(table);
+        if (asTemp) {
+            m_output_table.setTempTable(asTemp);
+        } else {
+            TableCatalogDelegate* tcd = m_engine->getTableDelegate(table->name());
+            m_output_table.setTableDelegate(tcd);
+        }
+    }
+
+    void abandonOutputTable()
+    {
+        // This overrides both the TempTable and tcd pointers to prevent cleanup in ~AbstractExecutor.
+        m_output_table.setTempTable(NULL);
+    }
+
+    Table* getOutputTable() const { return m_output_table.getTable(); }
+    // Wrapping a protected member function in a protected static function allows it to be
+    // accessed more flexibly in derived classes that need to apply it to more than "this".
+    static Table* getOutputTableOf(const AbstractExecutor* not_this)
+    { return not_this->getOutputTable(); }
+
+    TempTable* getTempOutputTable() const { return m_output_table.getTempTable(); }
+
+    // Input Tables
+    // These tables are derived from the output of this node's children
+    Table* getInputTable() const
+    {
+        assert(m_input_tables.size() == 1);
+        return m_input_tables[0].getTable();
+    }
+    TempTable* getTempInputTable() const
+    {
+        assert(m_input_tables.size() == 1);
+        return m_input_tables[0].getTempTable();
+    }
+
+    std::vector<TableReference> m_input_tables;
 
     /** reference to the engine to call up to the top end */
     VoltDBEngine* m_engine;
+private:
+    TableReference m_output_table;
 };
-
-
-inline bool AbstractExecutor::execute(const NValueArray& params)
-{
-    assert(m_abstractNode);
-    VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
-
-    // substitute params for output schema
-    for (int i = 0; i < m_abstractNode->getOutputSchema().size(); i++) {
-        m_abstractNode->getOutputSchema()[i]->getExpression()->substitute(params);
-    }
-
-    // run the executor
-    return p_execute(params);
-}
 
 }
 

@@ -46,21 +46,20 @@
 #ifndef HSTORENESTLOOPINDEXEXECUTOR_H
 #define HSTORENESTLOOPINDEXEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
-#include "expressions/abstractexpression.h"
 #include "executors/abstractexecutor.h"
+#include "common/tabletuple.h"
 
+#include "plannodes/limitnode.h"
+
+#include "boost/shared_array.hpp"
+
+#include <string>
 
 namespace voltdb {
 
-class NestLoopIndexPlanNode;
-class IndexScanPlanNode;
+class AbstractExpression;
 class PersistentTable;
-class Table;
-class TempTable;
-class TableIndex;
+class TableCatalogDelegate;
 
 /**
  * Nested loop for IndexScan.
@@ -73,43 +72,37 @@ class TableIndex;
 class NestLoopIndexExecutor : public AbstractExecutor
 {
 public:
-    NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node),
-        index_values_backing_store(NULL)
-    {
-        node = NULL;
-        inline_node = NULL;
-        output_table = NULL;
-        inner_table = NULL;
-        index = NULL;
-        outer_table = NULL;
-        m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
-    }
-
-    ~NestLoopIndexExecutor();
-
-    void updateTargetTableAndIndex();
-
+    NestLoopIndexExecutor() { }
+    ~NestLoopIndexExecutor() { }
 protected:
-    bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
-    bool p_execute(const NValueArray &params);
+    bool p_init(TempTableLimits* limits);
+    bool p_execute();
+private:
+    PersistentTable* getInnerTargetTable();
 
-    NestLoopIndexPlanNode* node;
-    IndexScanPlanNode* inline_node;
     IndexLookupType m_lookupType;
-    TempTable* output_table;
-    PersistentTable* inner_table;
-    TableIndex *index;
-    TableTuple index_values;
-    Table* outer_table;
-    JoinType join_type;
-    std::vector<AbstractExpression*> m_outputExpressions;
+    std::string m_index_name;
+    JoinType m_join_type;
+    TableCatalogDelegate* m_inner_target_tcd;
+
+    // TODO: Document
+    boost::shared_array<AbstractExpression*> m_search_key_expressions;
+
+    SortDirectionType m_sort_direction;
+
+    int m_num_of_search_keys;
+    AbstractExpression* m_end_expression;
+    AbstractExpression* m_post_expression;
+    AbstractExpression* m_initial_expression;
+    // null row predicate for underflow edge case
+    AbstractExpression* m_skip_null_predicate;
+    AbstractExpression* m_prejoin_expression;
+    AbstractExpression* m_where_expression;
+    boost::shared_array<AbstractExpression*> m_output_expression_array_ptr;
     SortDirectionType m_sortDirection;
     StandAloneTupleStorage m_null_tuple;
-
-    //So valgrind doesn't report the data as lost.
-    char *index_values_backing_store;
+    StandAloneTupleStorage m_index_values;
+    LimitPlanNode::InlineState m_inlineLimitOffset;
 };
 
 }

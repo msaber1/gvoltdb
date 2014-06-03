@@ -253,17 +253,39 @@ public class TestCRUDSuite extends RegressionSuite {
             fail(error.getMessage());
         }
 
-        // JNI
+        //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
+        // IF (! DEBUG config) ...
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #1: 1 Local Site/Partition running on JNI backend
+        /////////////////////////////////////////////////////////////
+
         config = new LocalCluster("crud-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);
 
-        // CLUSTER
+        ////////////////////////////////////////////////////////////////////
+        // CONFIG #2: 1 Local Site/Partitions running on JNI backedn cluster
+        ///////////////////////////////////////////////////////////////////
+
         config = new LocalCluster("crud-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean t2 = config.compile(project);
         assertTrue(t2);
         builder.addServerConfig(config);
+
+        /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
+        /////////////////////////////////////////////////////////////
+
+        config = new LocalCluster("crud-onesite-ipc.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        boolean t1 = config.compile(project);
+        assertTrue(t1);
+        builder.addServerConfig(config);
+
+        // ... ENDIF (DEBUG config) [ FRAGILE! This is a structured comment. Do not break it. ] */
 
         return builder;
     }

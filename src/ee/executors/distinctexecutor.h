@@ -46,31 +46,19 @@
 #ifndef HSTOREDISTINCTEXECUTOR_H
 #define HSTOREDISTINCTEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
-#include "plannodes/distinctnode.h"
 
 namespace voltdb {
-
-class UndoLog;
-class ReadWriteSet;
 
 class DistinctExecutor : public AbstractExecutor
 {
 public:
-    DistinctExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
-    {
-        this->distinct_column_type = VALUE_TYPE_INVALID;
-    }
-
-    ~DistinctExecutor();
+    DistinctExecutor() { }
+    ~DistinctExecutor() { }
 
 protected:
-    bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
-    bool p_execute(const NValueArray &params);
+    bool p_init(TempTableLimits* limits);
+    bool p_execute();
 
     ValueType distinct_column_type;
 };

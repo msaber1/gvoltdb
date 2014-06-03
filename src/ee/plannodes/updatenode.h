@@ -46,9 +46,6 @@
 #ifndef HSTOREUPDATENODE_H
 #define HSTOREUPDATENODE_H
 
-#include <vector>
-#include "common/common.h"
-#include "common/debuglog.h"
 #include "abstractoperationnode.h"
 
 namespace voltdb {
@@ -57,24 +54,19 @@ namespace voltdb {
  *
  */
 class UpdatePlanNode : public AbstractOperationPlanNode {
-    public:
-        UpdatePlanNode(CatalogId id) : AbstractOperationPlanNode(id), m_updatesIndexes(false) {
-            // Do nothing
-        }
-        UpdatePlanNode() : AbstractOperationPlanNode(), m_updatesIndexes(false) {
-            // Do nothing
-        }
+public:
+    UpdatePlanNode() { }
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UPDATE); }
+    virtual PlanNodeType getPlanNodeType() const;
 
-        std::string debugInfo(const std::string &spacer) const;
+    std::string debugInfo(const std::string &spacer) const;
 
-        bool doesUpdateIndexes() { return m_updatesIndexes; }
+    bool doesUpdateIndexes() { return m_updatesIndexes; }
 
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-
-        bool m_updatesIndexes;
+protected:
+    virtual void loadFromJSONObject(PlannerDomValue obj);
+private:
+    bool m_updatesIndexes;
 };
 
 }

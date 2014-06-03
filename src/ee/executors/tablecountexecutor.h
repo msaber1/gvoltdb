@@ -19,23 +19,20 @@
 #ifndef HSTORETABLECOUNTEXECUTOR_H
 #define HSTORETABLECOUNTEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "executors/abstractexecutor.h"
+#include "executors/abstractscanexecutor.h"
 
 namespace voltdb
 {
-    class TableCountExecutor : public AbstractExecutor {
-    public:
-        TableCountExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-        {}
-        ~TableCountExecutor();
-    protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray& params);
-    };
+
+class TableCountExecutor : public AbstractScanExecutor {
+public:
+    TableCountExecutor() { }
+    ~TableCountExecutor() { }
+protected:
+    bool p_initMore(TempTableLimits* limits);
+    bool p_execute();
+};
+
 }
 
 #endif

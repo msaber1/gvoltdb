@@ -46,12 +46,11 @@
 #include "indexscanexecutor.h"
 
 #include "common/debuglog.h"
-#include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
+#include "executors/projectionexecutor.h"
 #include "expressions/abstractexpression.h"
-#include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 
 // Inline PlanNodes
@@ -59,150 +58,94 @@
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
 
-#include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
 using namespace voltdb;
 
-bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
-                               TempTableLimits* limits)
+bool IndexScanExecutor::p_initMore(TempTableLimits* limits)
 {
     VOLT_TRACE("init IndexScan Executor");
 
-    m_projectionNode = NULL;
-
-    m_node = dynamic_cast<IndexScanPlanNode*>(abstractNode);
-    assert(m_node);
-    assert(m_node->getTargetTable());
-
-    // Create output table based on output schema from the plan
-    setTempOutputTable(limits, m_node->getTargetTable()->name());
-
-    //
-    // INLINE PROJECTION
-    //
-    if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION) != NULL)
-    {
-        m_projectionNode =
-            static_cast<ProjectionPlanNode*>
-            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-
-        m_projectionExpressions =
-            new AbstractExpression*[m_node->getOutputTable()->columnCount()];
-
-        ::memset(m_projectionExpressions, 0,
-                 (sizeof(AbstractExpression*) *
-                  m_node->getOutputTable()->columnCount()));
-
-        m_projectionAllTupleArrayPtr = ExpressionUtil::convertIfAllTupleValues(m_projectionNode->getOutputColumnExpressions());
-
-        m_projectionAllTupleArray = m_projectionAllTupleArrayPtr.get();
-
-        for (int ctr = 0;
-             ctr < m_node->getOutputTable()->columnCount();
-             ctr++)
-        {
-            assert(m_projectionNode->getOutputColumnExpressions()[ctr]);
-            m_projectionExpressions[ctr] =
-              m_projectionNode->getOutputColumnExpressions()[ctr];
-        }
-    }
-
-    //
-    // Make sure that we have search keys and that they're not null
-    //
-    m_numOfSearchkeys = (int)m_node->getSearchKeyExpressions().size();
-    m_searchKeyArrayPtr =
-      boost::shared_array<AbstractExpression*>
-        (new AbstractExpression*[m_numOfSearchkeys]);
-    m_searchKeyArray = m_searchKeyArrayPtr.get();
-
-    for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
-    {
-        if (m_node->getSearchKeyExpressions()[ctr] == NULL)
-        {
-            VOLT_ERROR("The search key expression at position '%d' is NULL for"
-                       " PlanNode '%s'", ctr, m_node->debug().c_str());
-            delete [] m_projectionExpressions;
-            return false;
-        }
-        m_searchKeyArrayPtr[ctr] =
-            m_node->getSearchKeyExpressions()[ctr];
-    }
-
-    //output table should be temptable
-    m_outputTable = static_cast<TempTable*>(m_node->getOutputTable());
-    m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
-
-    Table* targetTable = m_node->getTargetTable();
+    Table* targetTable = getTargetTable();
+    assert(targetTable);
     //target table should be persistenttable
     assert(static_cast<PersistentTable*>(targetTable));
+    // Create output table based on output schema from the plan
+    setTempOutputTable(limits, targetTable->name());
 
-    TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
-    m_searchKeyBackingStore = new char[tableIndex->getKeySchema()->tupleLength()];
+    IndexScanPlanNode* node = dynamic_cast<IndexScanPlanNode*>(m_abstractNode);
+    assert(node);
 
-    // Grab the Index from our inner table
-    // We'll throw an error if the index is missing
-    VOLT_TRACE("Index key schema: '%s'", tableIndex->getKeySchema()->debug().c_str());
     //
     // Miscellanous Information
     //
-    m_lookupType = m_node->getLookupType();
-    m_sortDirection = m_node->getSortDirection();
+    m_lookupType = node->getLookupType();
+    m_sortDirection = node->getSortDirection();
+    m_end_expression = node->getEndExpression();
+    m_post_expression = node->getPredicate();
+    m_initial_expression = node->getInitialExpression();
+    m_skip_null_predicate = node->getSkipNullPredicate();
+    const std::vector<AbstractExpression*>& searchKeyExprs = node->getSearchKeyExpressions();
+    m_num_of_search_keys = (int)searchKeyExprs.size();
+    //
+    // Make sure that we have search keys and that they're not null
+    //
+    AbstractExpression** search_keys = new AbstractExpression*[m_num_of_search_keys];
+    for (int ctr = 0; ctr < m_num_of_search_keys; ctr++) {
+        if (searchKeyExprs[ctr] == NULL) {
+            VOLT_ERROR("The search key expression at position '%d' is NULL for"
+                       " PlanNode '%s'", ctr, node->debug().c_str());
+            delete [] search_keys;
+            return false;
+        }
+        search_keys[ctr] = searchKeyExprs[ctr];
+    }
+    m_search_key_array_ptr.reset(search_keys);
 
-    VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), tableIndex->getName().c_str());
+    m_index_name = node->getTargetIndexName();
+    TableIndex *tableIndex = targetTable->index(m_index_name);
+    assert(tableIndex);
+    const TupleSchema* keySchema = tableIndex->getKeySchema();
+    m_search_key.init(keySchema);
 
+    // Grab the Index from our inner table
+    // We'll throw an error if the index is missing
+    VOLT_TRACE("Index key schema: '%s'", keySchema->debug().c_str());
+    VOLT_DEBUG("IndexScan: %s.%s\n", targetTable->name().c_str(), m_index_name.c_str());
     return true;
 }
 
-bool IndexScanExecutor::p_execute(const NValueArray &params)
+bool IndexScanExecutor::p_execute()
 {
-    assert(m_node);
-    assert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
-    assert(m_outputTable);
-    assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
+    assert(dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
+
+    TempTable* output_table = getTempOutputTable();
+    assert(output_table);
+    int num_of_columns = output_table->columnCount();
+    TableTuple &temp_tuple = output_table->tempTuple();
 
     // update local target table with its most recent reference
-    Table* targetTable = m_node->getTargetTable();
-    TableIndex *tableIndex = targetTable->index(m_node->getTargetIndexName());
-    TableTuple searchKey(tableIndex->getKeySchema());
-    searchKey.moveNoHeader(m_searchKeyBackingStore);
+    Table* targetTable = getTargetTable();
 
-    assert(m_lookupType != INDEX_LOOKUP_TYPE_EQ ||
-            searchKey.getSchema()->columnCount() == m_numOfSearchkeys);
-
-    int activeNumOfSearchKeys = m_numOfSearchkeys;
+    TableIndex *tableIndex = targetTable->index(m_index_name);
+    int activeNumOfSearchKeys = m_num_of_search_keys;
     IndexLookupType localLookupType = m_lookupType;
     SortDirectionType localSortDirection = m_sortDirection;
-
-    // INLINE PROJECTION
-    // Set params to expression tree via substitute()
-    assert(m_numOfColumns == m_outputTable->columnCount());
-    if (m_projectionNode != NULL && m_projectionAllTupleArray == NULL)
-    {
-        for (int ctr = 0; ctr < m_numOfColumns; ctr++)
-        {
-            assert(m_projectionNode->getOutputColumnExpressions()[ctr]);
-            m_projectionExpressions[ctr]->substitute(params);
-            assert(m_projectionExpressions[ctr]);
-        }
-    }
-
-    //
-    // INLINE LIMIT
-    //
-    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
     //
     // SEARCH KEY
     //
+    const TupleSchema* keySchema = tableIndex->getKeySchema();
+    m_search_key.resetWithCompatibleSchema(keySchema);
+    TableTuple searchKey = m_search_key;
     searchKey.setAllNulls();
+    AbstractExpression** search_key_array = m_search_key_array_ptr.get();
+
     VOLT_TRACE("Initial (all null) search key: '%s'", searchKey.debugNoHeader().c_str());
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-        m_searchKeyArray[ctr]->substitute(params);
-        NValue candidateValue = m_searchKeyArray[ctr]->eval(NULL, NULL);
+        NValue candidateValue = search_key_array[ctr]->eval(NULL, NULL);
         try {
             searchKey.setNValue(ctr, candidateValue);
         }
@@ -267,42 +210,33 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             break;
         }
     }
-    assert((activeNumOfSearchKeys == 0) || (searchKey.getSchema()->columnCount() > 0));
+    assert(localLookupType != INDEX_LOOKUP_TYPE_EQ ||
+           keySchema->columnCount() == activeNumOfSearchKeys);
+
+    assert((activeNumOfSearchKeys == 0) || (keySchema->columnCount() > 0));
     VOLT_TRACE("Search key after substitutions: '%s'", searchKey.debugNoHeader().c_str());
-
-    //
-    // END EXPRESSION
-    //
-    AbstractExpression* end_expression = m_node->getEndExpression();
-    if (end_expression != NULL) {
-        end_expression->substitute(params);
-        VOLT_DEBUG("End Expression:\n%s", end_expression->debug(true).c_str());
+#ifdef DEBUG
+    if (m_end_expression != NULL) {
+        VOLT_DEBUG("End Expression:\n%s", m_end_expression->debug(true).c_str());
     }
 
-    //
-    // POST EXPRESSION
-    //
-    AbstractExpression* post_expression = m_node->getPredicate();
-    if (post_expression != NULL) {
-        post_expression->substitute(params);
-        VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
+    if (m_post_expression != NULL) {
+        VOLT_DEBUG("Post Expression:\n%s", m_post_expression->debug(true).c_str());
     }
 
-    // INITIAL EXPRESSION
-    AbstractExpression* initial_expression = m_node->getInitialExpression();
-    if (initial_expression != NULL) {
-        initial_expression->substitute(params);
-        VOLT_DEBUG("Initial Expression:\n%s", initial_expression->debug(true).c_str());
+    if (m_initial_expression != NULL) {
+        VOLT_DEBUG("Initial Expression:\n%s", m_initial_expression->debug(true).c_str());
     }
 
-    //
-    // SKIP NULL EXPRESSION
-    //
-    AbstractExpression* skipNullExpr = m_node->getSkipNullPredicate();
     // For reverse scan edge case NULL values and forward scan underflow case.
-    if (skipNullExpr != NULL) {
-        skipNullExpr->substitute(params);
-        VOLT_DEBUG("COUNT NULL Expression:\n%s", skipNullExpr->debug(true).c_str());
+    if (m_skip_null_predicate != NULL) {
+        VOLT_DEBUG("COUNT NULL Expression:\n%s", m_skip_null_predicate->debug(true).c_str());
+    }
+#endif
+    AbstractExpression* const* projection_expressions = NULL;
+    const int* projection_columns = getProjectionColumns();
+    if (projection_columns == NULL) {
+        projection_expressions = getProjectionExpressions();
     }
 
     ProgressMonitorProxy pmp(m_engine, this, targetTable);
@@ -344,7 +278,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             } else {
                 while (!(tuple = tableIndex->nextValue()).isNullTuple()) {
                     pmp.countdownProgress();
-                    if (initial_expression != NULL && !initial_expression->eval(&tuple, NULL).isTrue()) {
+                    if (m_initial_expression != NULL &&
+                        ! m_initial_expression->eval(&tuple, NULL).isTrue()) {
                         // just passed the first failed entry, so move 2 backward
                         tableIndex->moveToBeforePriorEntry();
                         break;
@@ -363,13 +298,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         tableIndex->moveToEnd(toStartActually);
     }
 
-    int tuple_ctr = 0;
-    int tuples_skipped = 0;     // for offset
     int limit = -1;
     int offset = -1;
-    if (limit_node != NULL) {
-        limit_node->getLimitAndOffsetByReference(params, limit, offset);
-    }
+    getLimitAndOffsetByReference(limit, offset);
+    int tuple_ctr = 0;
+    int tuples_skipped = 0;     // for offset
+
+    AbstractExpression* skipNullExprIteration = m_skip_null_predicate;
 
     //
     // We have to different nextValue() methods for different lookup types
@@ -384,72 +319,40 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         //
         // First check to eliminate the null index rows for UNDERFLOW case only
         //
-        if (skipNullExpr != NULL) {
-            if (skipNullExpr->eval(&tuple, NULL).isTrue()) {
+        if (skipNullExprIteration != NULL) {
+            if (skipNullExprIteration->eval(&tuple, NULL).isTrue()) {
                 VOLT_DEBUG("Index scan: find out null rows or columns.");
                 continue;
             } else {
-                skipNullExpr = NULL;
+                skipNullExprIteration = NULL;
             }
         }
         //
         // First check whether the end_expression is now false
         //
-        if (end_expression != NULL && !end_expression->eval(&tuple, NULL).isTrue()) {
+        if (m_end_expression != NULL && ! m_end_expression->eval(&tuple, NULL).isTrue()) {
             VOLT_TRACE("End Expression evaluated to false, stopping scan");
             break;
         }
         //
         // Then apply our post-predicate to do further filtering
         //
-        if (post_expression == NULL || post_expression->eval(&tuple, NULL).isTrue()) {
+        if (m_post_expression == NULL || m_post_expression->eval(&tuple, NULL).isTrue()) {
             //
             // INLINE OFFSET
             //
-            if (tuples_skipped < offset)
-            {
+            if (tuples_skipped < offset) {
                 tuples_skipped++;
                 continue;
             }
             tuple_ctr++;
 
-            if (m_projectionNode != NULL)
-            {
-                TableTuple &temp_tuple = m_outputTable->tempTuple();
-                if (m_projectionAllTupleArray != NULL)
-                {
-                    VOLT_TRACE("sweet, all tuples");
-                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
-                        temp_tuple.setNValue(ctr, tuple.getNValue(m_projectionAllTupleArray[ctr]));
-                    }
-                }
-                else
-                {
-                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr) {
-                        temp_tuple.setNValue(ctr, m_projectionExpressions[ctr]->eval(&tuple, NULL));
-                    }
-                }
-                m_outputTable->insertTupleNonVirtual(temp_tuple);
-            }
-            else
-                //
-                // Straight Insert
-                //
-            {
-                //
-                // Try to put the tuple into our output table
-                //
-                m_outputTable->insertTupleNonVirtual(tuple);
-            }
+            ProjectionExecutor::insertTempOutputTuple(output_table, tuple, temp_tuple, num_of_columns,
+                                                      projection_columns, projection_expressions);
             pmp.countdownProgress();
         }
     }
 
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
     return true;
-}
-
-IndexScanExecutor::~IndexScanExecutor() {
-    delete [] m_searchKeyBackingStore;
-    delete [] m_projectionExpressions;
 }

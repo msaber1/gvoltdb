@@ -43,22 +43,18 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdexcept>
-#include <sstream>
 #include "deletenode.h"
-#include "common/common.h"
-#include "common/serializeio.h"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
 
 using namespace std;
 
 namespace voltdb {
 
-void DeletePlanNode::loadFromJSONObject(PlannerDomValue obj) {
-    AbstractOperationPlanNode::loadFromJSONObject(obj);
+PlanNodeType DeletePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_DELETE; }
 
-    truncate = obj.valueForKey("TRUNCATE").asBool();
+void DeletePlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
+    AbstractOperationPlanNode::loadFromJSONObject(obj);
+    m_truncate = obj.valueForKey("TRUNCATE").asBool();
 }
 
 }

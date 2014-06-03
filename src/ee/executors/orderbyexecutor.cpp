@@ -43,50 +43,38 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
+#include "orderbyexecutor.h"
+
 #include <algorithm>
 #include <vector>
-#include "orderbyexecutor.h"
 #include "common/debuglog.h"
-#include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
 #include "plannodes/orderbynode.h"
-#include "plannodes/limitnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 
 using namespace voltdb;
 using namespace std;
 
 bool
-OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
-                        TempTableLimits* limits)
+OrderByExecutor::p_init(TempTableLimits* limits)
 {
     VOLT_TRACE("init OrderBy Executor");
 
-    OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(abstract_node);
+    OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
-    assert(node->getInputTables().size() == 1);
 
-    assert(node->getChildren()[0] != NULL);
-
-    //
-    // Our output table should look exactly like out input table
-    //
-    node->
-        setOutputTable(TableFactory::
-                       getCopiedTempTable(node->databaseId(),
-                                          node->getInputTables()[0]->name(),
-                                          node->getInputTables()[0],
-                                          limits));
+    // Our output table should look exactly like our input table
+    setTempOutputLikeInputTable(limits);
 
     // pickup an inlined limit, if one exists
-    limit_node =
-        dynamic_cast<LimitPlanNode*>(node->
-                                     getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    LimitPlanNode* limit_node =
+        static_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    if (limit_node) {
+        m_inlineLimitOffset = limit_node->getState();
+    }
 
     return true;
 }
@@ -108,18 +96,15 @@ public:
             AbstractExpression* k = m_keys[i];
             SortDirectionType dir = m_dirs[i];
             int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
-            if (dir == SORT_DIRECTION_TYPE_ASC)
-            {
+            if (dir == SORT_DIRECTION_TYPE_ASC) {
                 if (cmp < 0) return true;
                 if (cmp > 0) return false;
             }
-            else if (dir == SORT_DIRECTION_TYPE_DESC)
-            {
+            else if (dir == SORT_DIRECTION_TYPE_DESC) {
                 if (cmp < 0) return false;
                 if (cmp > 0) return true;
             }
-            else
-            {
+            else {
                 throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                               "Attempted to sort using"
                                               " SORT_DIRECTION_TYPE_INVALID");
@@ -134,31 +119,27 @@ private:
     size_t m_keyCount;
 };
 
-bool
-OrderByExecutor::p_execute(const NValueArray &params)
+bool OrderByExecutor::p_execute()
 {
     OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
     assert(node);
-    TempTable* output_table = dynamic_cast<TempTable*>(node->getOutputTable());
+    TempTable* output_table = getTempOutputTable();
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = getInputTable();
     assert(input_table);
 
-    //
-    // OPTIMIZATION: NESTED LIMIT
-    // How nice! We can also cut off our scanning with a nested limit!
-    //
+    // OPTIMIZATION: INLINED LIMIT
+    // For now, limit and offset are only applied when UNloading the sorted set,
+    // so the entire set gets sorted (needlessly).
+    // TODO: Use a "partial sorting" technique (see: https://en.wikipedia.org/wiki/Partial_sorting)
+    // when there is a limit to avoid sorting or even retaining ALL the elements.
+    // E.g. After sorting "limit + offset" tuples, discard any new tuples greater than the last,
+    // otherwise insert the new tuple and discard the last.
     int limit = -1;
     int offset = -1;
-    if (limit_node != NULL)
-    {
-        limit_node->getLimitAndOffsetByReference(params, limit, offset);
-    }
-
-    // substitute parameters in the order by expressions
-    for (int i = 0; i < node->getSortExpressions().size(); i++) {
-        node->getSortExpressions()[i]->substitute(params);
-    }
+    m_inlineLimitOffset.getLimitAndOffsetByReference(m_engine, limit, offset);
+    int tuple_ctr = 0;
+    int tuple_skipped = 0;
 
     VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
@@ -166,8 +147,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     TableTuple tuple(input_table->schema());
     vector<TableTuple> xs;
     ProgressMonitorProxy pmp(m_engine, this);
-    while (iterator.next(tuple))
-    {
+    while (iterator.next(tuple)) {
         pmp.countdownProgress();
         assert(tuple.isActive());
         xs.push_back(tuple);
@@ -177,10 +157,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     sort(xs.begin(), xs.end(), TupleComparer(node->getSortExpressions(),
                                              node->getSortDirections()));
 
-    int tuple_ctr = 0;
-    int tuple_skipped = 0;
-    for (vector<TableTuple>::iterator it = xs.begin(); it != xs.end(); it++)
-    {
+    for (vector<TableTuple>::iterator it = xs.begin(); it != xs.end(); it++) {
         //
         // Check if has gone past the offset
         //
@@ -191,7 +168,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
 
         VOLT_TRACE("\n***** Input Table PostSort:\n '%s'",
                    input_table->debug().c_str());
-        output_table->insertTupleNonVirtual(*it);
+        output_table->insertTempTuple(*it);
         pmp.countdownProgress();
         //
         // Check whether we have gone past our limit
@@ -203,7 +180,4 @@ OrderByExecutor::p_execute(const NValueArray &params)
     VOLT_TRACE("Result of OrderBy:\n '%s'", output_table->debug().c_str());
 
     return true;
-}
-
-OrderByExecutor::~OrderByExecutor() {
 }

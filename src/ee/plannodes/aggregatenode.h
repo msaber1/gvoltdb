@@ -57,7 +57,7 @@ public:
     AggregatePlanNode(PlanNodeType type) : m_type(type), m_prePredicate(NULL), m_postPredicate(NULL) { }
     ~AggregatePlanNode();
 
-    virtual PlanNodeType getPlanNodeType() const { return m_type; }
+    virtual PlanNodeType getPlanNodeType() const;
 
     const std::vector<ExpressionType> getAggregates() const { return m_aggregates; }
 
@@ -108,7 +108,7 @@ protected:
     //
     std::vector<AbstractExpression*> m_groupByExpressions;
 
-    PlanNodeType m_type; //AGGREGATE OR HASHAGGREGATE
+    const PlanNodeType m_type; // AGGREGATE OR HASHAGGREGATE
 
     // ENG-1565: for accelerating min() / max() using index purpose only
     AbstractExpression* m_prePredicate;

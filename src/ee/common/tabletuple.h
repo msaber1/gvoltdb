@@ -404,22 +404,20 @@ private:
 class StandAloneTupleStorage {
     public:
         /** Creates an uninitialized tuple */
-        StandAloneTupleStorage() :
-            m_tupleStorage(),m_tuple() {
-        }
+        StandAloneTupleStorage() : m_tupleStorage(), m_tuple() { }
 
         /** Allocates enough memory for a given schema
          * and initialies tuple to point to this memory
          */
-        explicit StandAloneTupleStorage(const TupleSchema* schema) :
-            m_tupleStorage(), m_tuple() {
-            init(schema);
-        }
+        explicit StandAloneTupleStorage(const TupleSchema* schema)
+            : m_tupleStorage(), m_tuple()
+        { init(schema); }
 
         /** Allocates enough memory for a given schema
          * and initialies tuple to point to this memory
          */
-        void init(const TupleSchema* schema) {
+        void init(const TupleSchema* schema)
+        {
             assert(schema != NULL);
             m_tupleStorage.reset(new char[schema->tupleLength() + TUPLE_HEADER_SIZE]);
             m_tuple.m_schema = schema;
@@ -428,23 +426,27 @@ class StandAloneTupleStorage {
             m_tuple.setActiveTrue();
         }
 
-        /** Operator conversion to get an access to the underline tuple.
+        /** Sometimes (like after truncate table) schemas get relocated,
+         * so dependent cached tuples need to migrate to the new copy.
+         * Just assume here that the provided schema is a copy of the old one
+         * so that the size and formatting of the contained tuple storage
+         * (typically representing null values) is still valid.
+         */
+        void resetWithCompatibleSchema(const TupleSchema* schema)
+        {
+            m_tuple.m_schema = schema;
+        }
+
+        /** Operator conversion to get an access to the underlying tuple.
          * To prevent clients from repointing the tuple to some other backing
          * storage via move()or address() calls the tuple is returned by value
          */
-        operator TableTuple () {
-            return m_tuple;
-        }
-
-        operator TableTuple () const {
-            return m_tuple;
-        }
+        operator TableTuple () { return m_tuple; }
+        operator TableTuple () const { return m_tuple; }
 
     private:
-
         boost::scoped_array<char> m_tupleStorage;
         TableTuple m_tuple;
-
 };
 
 inline TableTuple::TableTuple() :

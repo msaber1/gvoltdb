@@ -68,100 +68,78 @@
 using namespace std;
 using namespace voltdb;
 
-bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
-                              TempTableLimits* limits)
+bool NestLoopExecutor::p_init(TempTableLimits* limits)
 {
     VOLT_TRACE("init NestLoop Executor");
 
-    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(abstract_node);
+    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
     assert(node);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
+    //
+    // Pre Join Expression
+    //
+    m_preJoinPredicate = node->getPreJoinPredicate();
+    m_joinPredicate = node->getJoinPredicate();
+    m_wherePredicate = node->getWherePredicate();
+
+    m_join_type = node->getJoinType();
+    assert(m_join_type == JOIN_TYPE_INNER || m_join_type == JOIN_TYPE_LEFT);
+
     // NULL tuple for outer join
-    if (node->getJoinType() == JOIN_TYPE_LEFT) {
-        Table* inner_table = node->getInputTables()[1];
+    if (m_join_type == JOIN_TYPE_LEFT) {
+        Table* inner_table = m_input_tables[1].getTable();
         assert(inner_table);
         m_null_tuple.init(inner_table->schema());
+    }
+
+    // pickup an inlined limit, if one exists
+    LimitPlanNode* limit_node =
+        static_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    if (limit_node) {
+        m_inlineLimitOffset = limit_node->getState();
     }
 
     return true;
 }
 
 
-bool NestLoopExecutor::p_execute(const NValueArray &params) {
+bool NestLoopExecutor::p_execute()
+{
     VOLT_DEBUG("executing NestLoop...");
 
-    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
-    assert(node);
-    assert(node->getInputTables().size() == 2);
+    assert(dynamic_cast<NestLoopPlanNode*>(m_abstractNode));
+    assert(m_input_tables.size() == 2);
 
-    Table* output_table_ptr = node->getOutputTable();
-    assert(output_table_ptr);
-
-    // output table must be a temp table
-    TempTable* output_table = dynamic_cast<TempTable*>(output_table_ptr);
+    TempTable* output_table = getTempOutputTable();
     assert(output_table);
 
-    Table* outer_table = node->getInputTables()[0];
+    Table* outer_table = m_input_tables[0].getTable();
     assert(outer_table);
 
-    Table* inner_table = node->getInputTables()[1];
+    Table* inner_table = m_input_tables[1].getTable();
     assert(inner_table);
 
     VOLT_TRACE ("input table left:\n %s", outer_table->debug().c_str());
     VOLT_TRACE ("input table right:\n %s", inner_table->debug().c_str());
 
-    //
-    // Pre Join Expression
-    //
-    AbstractExpression *preJoinPredicate = node->getPreJoinPredicate();
-    if (preJoinPredicate) {
-        preJoinPredicate->substitute(params);
-        VOLT_TRACE ("Pre Join predicate: %s", preJoinPredicate == NULL ?
-                    "NULL" : preJoinPredicate->debug(true).c_str());
-    }
-    //
-    // Join Expression
-    //
-    AbstractExpression *joinPredicate = node->getJoinPredicate();
-    if (joinPredicate) {
-        joinPredicate->substitute(params);
-        VOLT_TRACE ("Join predicate: %s", joinPredicate == NULL ?
-                    "NULL" : joinPredicate->debug(true).c_str());
-    }
-    //
-    // Where Expression
-    //
-    AbstractExpression *wherePredicate = node->getWherePredicate();
-    if (wherePredicate) {
-        wherePredicate->substitute(params);
-        VOLT_TRACE ("Where predicate: %s", wherePredicate == NULL ?
-                    "NULL" : wherePredicate->debug(true).c_str());
-    }
-
-    // Join type
-    JoinType join_type = node->getJoinType();
-    assert(join_type == JOIN_TYPE_INNER || join_type == JOIN_TYPE_LEFT);
-
-    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
     int limit = -1;
     int offset = -1;
-    if (limit_node) {
-        limit_node->getLimitAndOffsetByReference(params, limit, offset);
-    }
+    m_inlineLimitOffset.getLimitAndOffsetByReference(m_engine, limit, offset);
+    int tuple_ctr = 0;
+    int tuple_skipped = 0;
 
     int outer_cols = outer_table->columnCount();
     int inner_cols = inner_table->columnCount();
-    TableTuple outer_tuple(node->getInputTables()[0]->schema());
-    TableTuple inner_tuple(node->getInputTables()[1]->schema());
+    TableTuple outer_tuple(outer_table->schema());
+    TableTuple inner_tuple(inner_table->schema());
     TableTuple &joined = output_table->tempTuple();
+    m_null_tuple.resetWithCompatibleSchema(inner_table->schema());
     TableTuple null_tuple = m_null_tuple;
 
-    TableIterator iterator0 = outer_table->iterator();
-    int tuple_ctr = 0;
-    int tuple_skipped = 0;
+    TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
     ProgressMonitorProxy pmp(m_engine, this, inner_table);
 
     while ((limit == -1 || tuple_ctr < limit) && iterator0.next(outer_tuple)) {
@@ -177,17 +155,18 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         // For outer joins if outer tuple fails pre-join predicate
         // (join expression based on the outer table only)
         // it can't match any of inner tuples
-        if (preJoinPredicate == NULL || preJoinPredicate->eval(&outer_tuple, NULL).isTrue()) {
+        if (m_preJoinPredicate == NULL || m_preJoinPredicate->eval(&outer_tuple, NULL).isTrue()) {
 
+            // By default, the delete as we go flag is false.
             TableIterator iterator1 = inner_table->iterator();
             while ((limit == -1 || tuple_ctr < limit) && iterator1.next(inner_tuple)) {
                 pmp.countdownProgress();
                 // Apply join filter to produce matches for each outer that has them,
                 // then pad unmatched outers, then filter them all
-                if (joinPredicate == NULL || joinPredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
+                if (m_joinPredicate == NULL || m_joinPredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
                     match = true;
                     // Filter the joined tuple
-                    if (wherePredicate == NULL || wherePredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
+                    if (m_wherePredicate == NULL || m_wherePredicate->eval(&outer_tuple, &inner_tuple).isTrue()) {
                         // Check if we have to skip this tuple because of offset
                         if (tuple_skipped < offset) {
                             tuple_skipped++;
@@ -196,7 +175,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                         ++tuple_ctr;
                         // Matched! Complete the joined tuple with the inner column values.
                         joined.setNValues(outer_cols, inner_tuple, 0, inner_cols);
-                        output_table->insertTupleNonVirtual(joined);
+                        output_table->insertTempTuple(joined);
                         pmp.countdownProgress();
                     }
                 }
@@ -205,9 +184,9 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         //
         // Left Outer Join
         //
-        if ((limit == -1 || tuple_ctr < limit) && join_type == JOIN_TYPE_LEFT && !match) {
+        if ((limit == -1 || tuple_ctr < limit) && m_join_type == JOIN_TYPE_LEFT && !match) {
             // Still needs to pass the filter
-            if (wherePredicate == NULL || wherePredicate->eval(&outer_tuple, &null_tuple).isTrue()) {
+            if (m_wherePredicate == NULL || m_wherePredicate->eval(&outer_tuple, &null_tuple).isTrue()) {
                 // Check if we have to skip this tuple because of offset
                 if (tuple_skipped < offset) {
                     tuple_skipped++;
@@ -215,7 +194,7 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                 }
                 ++tuple_ctr;
                 joined.setNValues(outer_cols, null_tuple, 0, inner_cols);
-                output_table->insertTupleNonVirtual(joined);
+                output_table->insertTempTuple(joined);
                 pmp.countdownProgress();
             }
         }

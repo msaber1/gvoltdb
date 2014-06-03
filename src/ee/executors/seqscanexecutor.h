@@ -46,26 +46,30 @@
 #ifndef HSTORESEQSCANEXECUTOR_H
 #define HSTORESEQSCANEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "executors/abstractexecutor.h"
-#include "execution/VoltDBEngine.h"
+#include "executors/abstractscanexecutor.h"
 
 namespace voltdb
 {
-    class UndoLog;
-    class ReadWriteSet;
 
-    class SeqScanExecutor : public AbstractExecutor {
-    public:
-        SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-        {}
-    protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray& params);
-    };
+class SeqScanExecutor : public AbstractScanExecutor {
+public:
+    SeqScanExecutor() {}
+    ~SeqScanExecutor()
+    {
+        if (m_output_is_input) {
+            // Abandon any output table that is not original to this executor.
+            // If it is "shared" with a subquery or is part of persistent storage,
+            // ~AbstractExecutor needs to be prevented from deleting it.
+            abandonOutputTable();
+        }
+    }
+protected:
+    bool p_initMore(TempTableLimits* limits);
+    bool p_execute();
+
+    bool m_output_is_input;
+};
+
 }
 
 #endif

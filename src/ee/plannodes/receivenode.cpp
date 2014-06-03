@@ -45,34 +45,18 @@
 
 #include "receivenode.h"
 
-#include "storage/table.h"
-
 #include <sstream>
 
 using namespace std;
-using namespace voltdb;
 
-ReceivePlanNode::ReceivePlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-    // Do nothing
-}
-
-ReceivePlanNode::ReceivePlanNode() : AbstractPlanNode()
-{
-    // Do nothing
-}
-
-ReceivePlanNode::~ReceivePlanNode()
-{
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
+namespace voltdb {
 
 PlanNodeType
 ReceivePlanNode::getPlanNodeType() const
 {
     return PLAN_NODE_TYPE_RECEIVE;
 }
+
 string
 ReceivePlanNode::debugInfo(const string& spacer) const
 {
@@ -94,4 +78,6 @@ void
 ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     // This space intentionally left blank.
+}
+
 }

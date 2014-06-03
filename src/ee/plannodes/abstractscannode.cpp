@@ -45,72 +45,15 @@
 
 #include "abstractscannode.h"
 
-#include "storage/table.h"
-#include "catalog/table.h"
-#include "catalog/column.h"
+#include "expressions/abstractexpression.h"
 
 using namespace std;
-using namespace voltdb;
 
-AbstractScanPlanNode::AbstractScanPlanNode(int32_t id)
-    : AbstractPlanNode(id), m_predicate(NULL)
-{
-    m_tcd = NULL;
-}
-
-AbstractScanPlanNode::AbstractScanPlanNode()
-    : AbstractPlanNode(), m_predicate(NULL)
-{
-    m_tcd = NULL;
-}
+namespace voltdb {
 
 AbstractScanPlanNode::~AbstractScanPlanNode()
 {
     delete m_predicate;
-}
-
-void
-AbstractScanPlanNode::setPredicate(AbstractExpression* predicate)
-{
-    assert(!m_predicate);
-    if (m_predicate != predicate)
-    {
-        delete m_predicate;
-    }
-    m_predicate = predicate;
-}
-
-AbstractExpression*
-AbstractScanPlanNode::getPredicate() const
-{
-    return m_predicate;
-}
-
-Table*
-AbstractScanPlanNode::getTargetTable() const
-{
-    if (m_tcd == NULL) {
-        return NULL;
-    }
-    return m_tcd->getTable();
-}
-
-void
-AbstractScanPlanNode::setTargetTableDelegate(TableCatalogDelegate* tcd)
-{
-    m_tcd = tcd;
-}
-
-string
-AbstractScanPlanNode::getTargetTableName() const
-{
-    return m_targetTableName;
-}
-
-void
-AbstractScanPlanNode::setTargetTableName(string table_name)
-{
-    m_targetTableName = table_name;
 }
 
 string
@@ -125,9 +68,8 @@ void
 AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_targetTableName = obj.valueForKey("TARGET_TABLE_NAME").asStr();
-
-    if (obj.hasNonNullKey("PREDICATE")) {
-        m_predicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PREDICATE"));
-    }
+    m_predicate = loadExpressionFromJSONObject("PREDICATE", obj);
     m_isSubQuery = obj.hasNonNullKey("SUBQUERY_INDICATOR");
+}
+
 }

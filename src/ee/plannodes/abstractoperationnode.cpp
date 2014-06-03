@@ -43,39 +43,17 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdexcept>
-#include <sstream>
 #include "abstractoperationnode.h"
-#include "common/debuglog.h"
-#include "common/serializeio.h"
-#include "storage/table.h"
-#include "catalog/table.h"
+
+#include <sstream>
 
 using namespace std;
-using namespace voltdb;
 
-AbstractOperationPlanNode::~AbstractOperationPlanNode()
-{
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
+namespace voltdb {
 
 string AbstractOperationPlanNode::getTargetTableName() const {
     return target_table_name;
 }
-Table* AbstractOperationPlanNode::getTargetTable() const {
-    if (m_tcd == NULL) {
-        return NULL;
-    }
-    return (m_tcd->getTable());
-}
-void AbstractOperationPlanNode::setTargetTableDelegate(TableCatalogDelegate * table) {
-    m_tcd = table;
-}
-void AbstractOperationPlanNode::setTargetTableName(string name) {
-    this->target_table_name = name;
-}
-
 
 string AbstractOperationPlanNode::debugInfo(const string &spacer) const {
     ostringstream buffer;
@@ -85,4 +63,6 @@ string AbstractOperationPlanNode::debugInfo(const string &spacer) const {
 
 void AbstractOperationPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
+}
+
 }

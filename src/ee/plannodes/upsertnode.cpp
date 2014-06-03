@@ -42,14 +42,14 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include <sstream>
+
 #include "upsertnode.h"
-#include "common/common.h"
-#include "common/FatalException.hpp"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
+
+PlanNodeType UpsertPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UPSERT; }
 
 void UpsertPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AbstractOperationPlanNode::loadFromJSONObject(obj);
