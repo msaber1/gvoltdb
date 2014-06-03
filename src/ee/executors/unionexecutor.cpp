@@ -219,7 +219,7 @@ void ExceptIntersectSetOperator::processTuples()
 }
 
 void ExceptIntersectSetOperator::collectTuples(Table& input_table, TupleMap& tuple_map) {
-    TableIterator iterator = input_table.iteratorDeletingAsWeGo();
+    TableIterator iterator = input_table.iterator();
     TableTuple tuple(input_table.schema());
     while (iterator.next(tuple)) {
         TupleMap::iterator mapIt = tuple_map.find(tuple);
