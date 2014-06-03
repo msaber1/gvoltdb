@@ -56,7 +56,6 @@ function InitializeChart(id, chart, metric)
 			break;
 	}
 	
-    var data =  [ ['Heavy Industry', 12],['Retail', 9] ]; //Fake data! Need to be removed later.
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
     
     MonitorUI.Monitors[id][chart+'Plot'] = plot;
@@ -105,6 +104,7 @@ this.AddMonitor = function(tab)
     , 'tpsData': [data]
     , 'memData': [data]
     , 'strData': dataStr
+    , 'tbData': []
     , 'latMax': 1
     , 'tpsMax': 1
     , 'memMax': 1
@@ -279,7 +279,7 @@ this.RefreshMonitor = function(id, Success)
 	}
 
         for(var proc in procStats)
-        dataTB.push([procStats[proc][0], (procStats[proc][1]/currentTimedTransactionCount)*100.0]);
+        	dataTB.push([procStats[proc][0], procStats[proc][2]]);
 
 	// Compute initial latency averge. We'll compute the delta average next.
 	currentLatencyAverage = currentLatencySum / currentTimedTransactionCount;
@@ -398,6 +398,7 @@ this.RefreshMonitor = function(id, Success)
 	monitor.tpsData = [dataTPS];
 	monitor.memData = [dataMem];
 	monitor.strData = strData;
+	monitor.tbData = dataTB;
 
 	monitor.tickValues = tickValues;
 	// Update the monitor graphs
@@ -469,7 +470,7 @@ this.RefreshMonitor = function(id, Success)
                right_opt = {};
         } 
         else {
-               right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
+               right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }};
         }
 
 	try
