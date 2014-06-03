@@ -46,28 +46,31 @@
 #ifndef HSTORENESTLOOPEXECUTOR_H
 #define HSTORENESTLOOPEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
+
+#include "plannodes/limitnode.h"
 
 namespace voltdb {
 
-class UndoLog;
-class ReadWriteSet;
+class AbstractExpression;
 
 /**
  *
  */
 class NestLoopExecutor : public AbstractExecutor {
-    public:
-        NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
-            AbstractExecutor(engine, abstract_node) { }
-    protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
+public:
+    NestLoopExecutor() { }
+protected:
+    bool p_init(TempTableLimits* limits);
+    bool p_execute();
 
-        StandAloneTupleStorage m_null_tuple;
+    AbstractExpression* m_preJoinPredicate;
+    AbstractExpression* m_joinPredicate;
+    AbstractExpression* m_wherePredicate;
+
+    JoinType m_join_type;
+    StandAloneTupleStorage m_null_tuple;
+    LimitPlanNode::InlineState m_inlineLimitOffset;
 };
 
 }

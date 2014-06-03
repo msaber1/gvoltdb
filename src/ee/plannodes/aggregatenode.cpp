@@ -45,22 +45,18 @@
 
 #include "aggregatenode.h"
 
-#include "common/types.h"
-#include "storage/table.h"
+#include "expressions/abstractexpression.h"
 
 #include <sstream>
-#include <stdexcept>
 
 using namespace std;
-using namespace voltdb;
+
+namespace voltdb {
+
+PlanNodeType AggregatePlanNode::getPlanNodeType() const { return m_type; }
 
 AggregatePlanNode::~AggregatePlanNode()
 {
-    if (!isInline())
-    {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
     for (int i = 0; i < m_aggregateInputExpressions.size(); i++)
     {
         delete m_aggregateInputExpressions[i];
@@ -148,20 +144,11 @@ AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
         }
     }
 
-    if (obj.hasNonNullKey("GROUPBY_EXPRESSIONS")) {
-        PlannerDomValue groupByExpressionsArray = obj.valueForKey("GROUPBY_EXPRESSIONS");
-        for (int i = 0; i < groupByExpressionsArray.arrayLen(); i++) {
-            m_groupByExpressions.push_back(AbstractExpression::buildExpressionTree(groupByExpressionsArray.valueAtIndex(i)));
-        }
-    }
+    loadExpressionsFromJSONObject(m_groupByExpressions, "GROUPBY_EXPRESSIONS", obj);
 
-    if (obj.hasNonNullKey("PRE_PREDICATE")) {
-        m_prePredicate = AbstractExpression::buildExpressionTree(obj.valueForKey("PRE_PREDICATE"));
-    }
+    m_prePredicate = loadExpressionFromJSONObject("PRE_PREDICATE", obj);
 
-    if (obj.hasNonNullKey("POST_PREDICATE")) {
-        m_postPredicate = AbstractExpression::buildExpressionTree(obj.valueForKey("POST_PREDICATE"));
-    }
+    m_postPredicate = loadExpressionFromJSONObject("POST_PREDICATE", obj);
 }
 
 void AggregatePlanNode::collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const
@@ -187,4 +174,6 @@ void
 AggregatePlanNode::setAggregateOutputColumns(vector<int> outputColumns)
 {
     m_aggregateOutputColumns = outputColumns;
+}
+
 }

@@ -18,49 +18,39 @@
 #ifndef MATERIALIZEDSCANPLANNODE_H
 #define MATERIALIZEDSCANPLANNODE_H
 
-#include "common/common.h"
 #include "abstractscannode.h"
 
 namespace voltdb {
 
-    class AbstractExpression;
+class AbstractExpression;
 
-    /**
-     * Used for SQL-IN that are accelerated with indexes.
-     * See MaterializedScanExecutor for more/eventual use.
-     */
-    class MaterializedScanPlanNode : public AbstractPlanNode {
-    public:
-        MaterializedScanPlanNode(CatalogId id) : AbstractPlanNode(id) {
-            m_tableRowsExpression = NULL;
-            m_sortDirection = SORT_DIRECTION_TYPE_INVALID;
-        }
-        MaterializedScanPlanNode() : AbstractPlanNode() {
-            m_tableRowsExpression = NULL;
-            m_sortDirection = SORT_DIRECTION_TYPE_INVALID;
-        }
+/**
+ * Used for SQL-IN that are accelerated with indexes.
+ * See MaterializedScanExecutor for more/eventual use.
+ */
+class MaterializedScanPlanNode : public AbstractPlanNode {
+public:
+    MaterializedScanPlanNode() { }
+    ~MaterializedScanPlanNode();
 
-        ~MaterializedScanPlanNode();
+    virtual PlanNodeType getPlanNodeType() const;
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_MATERIALIZEDSCAN); }
+    AbstractExpression* getTableRowsExpression() const { return m_tableRowsExpression; }
 
-        AbstractExpression* getTableRowsExpression() const
-        { return m_tableRowsExpression; }
+    SortDirectionType getSortDirection() const { return m_sortDirection; }
 
-        SortDirectionType getSortDirection() const
-        { return m_sortDirection; }
+    std::string debugInfo(const std::string &spacer) const;
 
-        std::string debugInfo(const std::string &spacer) const;
+protected:
+    virtual void loadFromJSONObject(PlannerDomValue obj);
 
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-
-        // It doesn't matter what kind of expression this is,
-        // so long as eval() returns an NValue array as opposed
-        // to the usual scalar NValues.
-        AbstractExpression* m_tableRowsExpression;
-        SortDirectionType m_sortDirection;
-    };
+private:
+    // It doesn't matter what kind of expression this is,
+    // so long as eval() returns an NValue array as opposed
+    // to the usual scalar NValues.
+    AbstractExpression* m_tableRowsExpression;
+    SortDirectionType m_sortDirection;
+};
 
 }
 

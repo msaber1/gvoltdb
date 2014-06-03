@@ -45,13 +45,11 @@
 
 #include "deleteexecutor.h"
 
-#include "common/ValueFactory.hpp"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
+#include "plannodes/deletenode.h"
 #include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "indexes/tableindex.h"
-#include "storage/tableutil.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
@@ -59,43 +57,31 @@
 #include <cassert>
 
 using namespace std;
-using namespace voltdb;
 
-bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
-                            TempTableLimits* limits)
+namespace voltdb {
+
+void DeleteExecutor::p_initMore()
 {
     VOLT_TRACE("init Delete Executor");
-
-    m_node = dynamic_cast<DeletePlanNode*>(abstract_node);
-    assert(m_node);
-    assert(m_node->getTargetTable());
-
-    setDMLCountOutputTable(limits);
-
-    m_truncate = m_node->getTruncate();
-    if (m_truncate) {
-        assert(m_node->getInputTables().size() == 0);
-        return true;
+    DeletePlanNode* node = dynamic_cast<DeletePlanNode*>(m_abstractNode);
+    assert(node);
+    if (node->getTruncate()) {
+        assert(m_input_tables.size() == 0);
+        return;
     }
-
-    assert(m_node->getInputTables().size() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
-    assert(m_inputTable);
-
-    m_inputTuple = TableTuple(m_inputTable->schema());
-    return true;
+    assert(m_input_tables.size() == 1);
 }
 
-bool DeleteExecutor::p_execute(const NValueArray &params) {
+bool DeleteExecutor::p_execute()
+{
     // target table should be persistenttable
     // update target table reference from table delegate
-    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(getTargetTable());
     assert(targetTable);
-    TableTuple targetTuple(targetTable->schema());
 
     int64_t modified_tuples = 0;
 
-    if (m_truncate) {
+    if (m_input_tables.size() == 0) {
         VOLT_TRACE("truncating table %s...", targetTable->name().c_str());
         // count the truncated tuples as deleted
         modified_tuples = targetTable->visibleTupleCount();
@@ -109,21 +95,27 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
         // actually delete all the tuples: undo by table not by each tuple.
         targetTable->truncateTable(m_engine);
     }
-    else
-    {
-        assert(m_inputTable);
-        assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
-        assert(targetTuple.sizeInValues() == targetTable->columnCount());
-        TableIterator inputIterator = m_inputTable->iterator();
-        while (inputIterator.next(m_inputTuple)) {
+    else {
+        assert(m_input_tables.size() == 1);
+        TempTable* inputTable = m_input_tables[0].getTempTable(); //input table should be temptable
+        assert(inputTable);
+        TableTuple inputTuple(inputTable->schema());
+        assert(inputTable);
+
+        TableTuple targetTuple(targetTable->schema());
+
+        TableIterator inputIterator = inputTable->iterator();
+        while (inputIterator.next(inputTuple)) {
             //
             // OPTIMIZATION: Single-Sited Query Plans
-            // If our beloved DeletePlanNode is apart of a single-site query plan,
-            // then the first column in the input table will be the address of a
-            // tuple on the target table that we will want to blow away. This saves
-            // us the trouble of having to do an index lookup
-            //
-            void *targetAddress = m_inputTuple.getNValue(0).castAsAddress();
+            // The first column in the input table will be the address of a
+            // tuple on the target table that we will want to blow away.
+            // This saves the trouble of having to do an index lookup.
+            // The downside is a temptable with a small entry for each deleted row.
+            // Maybe some day a delete executor might be able to operate as an inline
+            // operation on a scan. Care would have to be taken about not invalidating
+            // the scanning target table iterator.
+            void *targetAddress = inputTuple.getNValue(0).castAsAddress();
             targetTuple.move(targetAddress);
 
             // Delete from target table
@@ -133,7 +125,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                 return false;
             }
         }
-        modified_tuples = m_inputTable->tempTableTupleCount();
+        modified_tuples = inputTable->tempTableTupleCount();
         VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
                    (int)modified_tuples,
                    targetTable->name().c_str(),
@@ -143,17 +135,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
 
     }
 
-    TableTuple& count_tuple = m_node->getOutputTable()->tempTuple();
-    count_tuple.setNValue(0, ValueFactory::getBigIntValue(modified_tuples));
-    // try to put the tuple into the output table
-    if (!m_node->getOutputTable()->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to insert tuple count (%ld) into"
-                   " output table '%s'",
-                   static_cast<long int>(modified_tuples),
-                   m_node->getOutputTable()->name().c_str());
-        return false;
-    }
-    m_engine->m_tuplesModified += modified_tuples;
-
+    setModifiedTuples(modified_tuples);
     return true;
+}
+
 }

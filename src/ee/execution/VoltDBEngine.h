@@ -61,6 +61,7 @@
 #include <boost/multi_index/hashed_index.hpp>
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/mem_fun.hpp>
+#include <boost/multi_index/sequenced_index.hpp>
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/serializeio.h"
@@ -73,7 +74,6 @@
 #include "common/DefaultTupleSerializer.h"
 #include "common/TupleOutputStream.h"
 #include "common/TheHashinator.h"
-#include "execution/FragmentManager.h"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
 #include "logging/StdoutLogProxy.h"
@@ -188,7 +188,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int executePlanFragments(int32_t numFragments,
                                  int64_t planfragmentIds[],
-                                 int64_t intputDependencyIds[],
+                                 int64_t inputDependencyIds[],
                                  ReferenceSerializeInput &serialize_in,
                                  int64_t spHandle,
                                  int64_t lastCommittedSpHandle,
@@ -464,7 +464,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         int executePlanFragment(int64_t planfragmentId,
                                 int64_t inputDependencyId,
-                                const NValueArray &params,
                                 int64_t spHandle,
                                 int64_t lastCommittedSpHandle,
                                 int64_t uniqueId,

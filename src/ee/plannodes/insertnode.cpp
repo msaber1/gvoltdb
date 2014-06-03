@@ -43,14 +43,13 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
 #include "insertnode.h"
-#include "common/common.h"
-#include "common/FatalException.hpp"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
+
+PlanNodeType InsertPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INSERT; }
 
 void InsertPlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AbstractOperationPlanNode::loadFromJSONObject(obj);

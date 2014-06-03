@@ -19,30 +19,26 @@
 #ifndef MATERIALIZEDSCANEXECUTOR_H
 #define MATERIALIZEDSCANEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb
 {
 
-    /**
-     * Used for SQL-IN that are accelerated with indexes.
-     * A MaterializedScanExecutor fills a temp table with values
-     * from the SQL-IN-LIST expression. It is inner-joined with NLIJ
-     * to another table to make the SQL-IN fast.
-     */
-    class MaterializedScanExecutor : public AbstractExecutor {
-    public:
-        MaterializedScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
-        {}
-        ~MaterializedScanExecutor();
-    protected:
-        bool p_init(AbstractPlanNode* abstract_node,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray& params);
-    };
+/**
+ * Used for SQL-IN that are accelerated with indexes.
+ * A MaterializedScanExecutor fills a temp table with values
+ * from the SQL-IN-LIST expression. It is inner-joined with NLIJ
+ * to another table to make the SQL-IN fast.
+ */
+class MaterializedScanExecutor : public AbstractExecutor {
+public:
+    MaterializedScanExecutor() { }
+    ~MaterializedScanExecutor() { }
+protected:
+    bool p_init(TempTableLimits* limits);
+    bool p_execute();
+};
+
 }
 
 #endif // MATERIALIZEDSCANEXECUTOR_H

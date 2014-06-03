@@ -49,7 +49,6 @@
 #include "executors/abstractexecutor.h"
 
 #include "common/Pool.hpp"
-#include "common/common.h"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "expressions/abstractexpression.h"
@@ -63,21 +62,16 @@ struct AggregateRow;
 class AggregateExecutorBase : public AbstractExecutor
 {
 public:
-    AggregateExecutorBase(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AbstractExecutor(engine, abstract_node), m_groupByKeySchema(NULL),
-        m_prePredicate(NULL), m_postPredicate(NULL)
+    AggregateExecutorBase()
+        : m_groupByKeySchema(NULL)
     { }
-    ~AggregateExecutorBase()
-    {
-        if (m_groupByKeySchema != NULL) {
-            TupleSchema::freeTupleSchema(m_groupByKeySchema);
-        }
-    }
+
+    ~AggregateExecutorBase();
 
 protected:
-    virtual bool p_init(AbstractPlanNode*, TempTableLimits*);
+    virtual bool p_init(TempTableLimits*);
 
-    void executeAggBase(const NValueArray& params);
+    void executeAggBase();
 
     void initGroupByKeyTuple(PoolBackedTupleStorage &groupByKeyTuple, const TableTuple& nxtTuple);
 
@@ -102,7 +96,6 @@ protected:
     std::vector<int> m_passThroughColumns;
     Pool m_memoryPool;
     TupleSchema* m_groupByKeySchema;
-    TupleSchema* m_aggSchema;
     std::vector<ExpressionType> m_aggTypes;
     std::vector<bool> m_distinctAggs;
     std::vector<AbstractExpression*> m_groupByExpressions;
@@ -121,12 +114,11 @@ protected:
 class AggregateHashExecutor : public AggregateExecutorBase
 {
 public:
-    AggregateHashExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AggregateExecutorBase(engine, abstract_node) { }
+    AggregateHashExecutor() { }
     ~AggregateHashExecutor() { }
 
 private:
-    virtual bool p_execute(const NValueArray& params);
+    virtual bool p_execute();
 };
 
 /**
@@ -137,12 +129,11 @@ private:
 class AggregateSerialExecutor : public AggregateExecutorBase
 {
 public:
-    AggregateSerialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AggregateExecutorBase(engine, abstract_node) { }
+    AggregateSerialExecutor() { }
     ~AggregateSerialExecutor() { }
 
 private:
-    virtual bool p_execute(const NValueArray& params);
+    virtual bool p_execute();
 };
 
 }

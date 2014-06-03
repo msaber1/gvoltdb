@@ -45,28 +45,16 @@
 
 #include "distinctnode.h"
 
-#include "storage/table.h"
+#include "expressions/abstractexpression.h"
 
 #include <sstream>
-#include <stdexcept>
 
-using namespace voltdb;
 using namespace std;
 
-DistinctPlanNode::DistinctPlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-}
-
-DistinctPlanNode::DistinctPlanNode() : AbstractPlanNode()
-{
-}
+namespace voltdb {
 
 DistinctPlanNode::~DistinctPlanNode()
 {
-    if (!isInline()) {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
     delete m_distinctExpression;
 }
 
@@ -94,6 +82,8 @@ DistinctPlanNode::debugInfo(const string &spacer) const
 void
 DistinctPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    PlannerDomValue value = obj.valueForKey("DISTINCT_EXPRESSION");
-    m_distinctExpression = AbstractExpression::buildExpressionTree(value);
+    m_distinctExpression = loadExpressionFromJSONObject("DISTINCT_EXPRESSION", obj);
+    assert(m_distinctExpression);
+}
+
 }

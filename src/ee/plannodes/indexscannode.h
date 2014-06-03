@@ -46,8 +46,9 @@
 #ifndef HSTOREINDEXSCANNODE_H
 #define HSTOREINDEXSCANNODE_H
 
-#include <string>
 #include "abstractscannode.h"
+
+#include <string>
 
 namespace voltdb {
 
@@ -57,67 +58,52 @@ class AbstractExpression;
  *
  */
 class IndexScanPlanNode : public AbstractScanPlanNode {
-    public:
-        IndexScanPlanNode(CatalogId id) : AbstractScanPlanNode(id)
-            , m_end_expression(NULL)
-            , m_initial_expression(NULL)
-            , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
-            , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
-            , m_skip_null_predicate(NULL)
-        {}
+public:
+    IndexScanPlanNode() { }
+    ~IndexScanPlanNode();
+    virtual PlanNodeType getPlanNodeType() const;
 
-        IndexScanPlanNode() : AbstractScanPlanNode()
-            , m_end_expression(NULL)
-            , m_initial_expression(NULL)
-            , m_lookup_type(INDEX_LOOKUP_TYPE_EQ)
-            , m_sort_direction(SORT_DIRECTION_TYPE_INVALID)
-            , m_skip_null_predicate(NULL)
-        {}
+    IndexLookupType getLookupType() const { return m_lookup_type; }
 
-        ~IndexScanPlanNode();
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXSCAN); }
+    SortDirectionType getSortDirection() const { return m_sort_direction; }
 
-        IndexLookupType getLookupType() const { return m_lookup_type; }
+    std::string getTargetIndexName() const { return m_target_index_name; }
 
-        SortDirectionType getSortDirection() const { return m_sort_direction; }
+    AbstractExpression* getEndExpression() const { return m_end_expression; }
 
-        std::string getTargetIndexName() const { return m_target_index_name; }
+    const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
+    { return m_searchkey_expressions; }
 
-        AbstractExpression* getEndExpression() const { return m_end_expression; }
+    AbstractExpression* getInitialExpression() const { return m_initial_expression; }
 
-        const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
-        { return m_searchkey_expressions; }
+    AbstractExpression* getSkipNullPredicate() const { return m_skip_null_predicate; }
 
-        AbstractExpression* getInitialExpression() const { return m_initial_expression; }
+    std::string debugInfo(const std::string &spacer) const;
 
-        AbstractExpression* getSkipNullPredicate() const { return m_skip_null_predicate; }
+protected:
+    virtual void loadFromJSONObject(PlannerDomValue obj);
 
-        std::string debugInfo(const std::string &spacer) const;
+private:
+    // This is the id of the index to reference during execution
+    std::string m_target_index_name;
 
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-        //
-        // This is the id of the index to reference during execution
-        //
-        std::string m_target_index_name;
+    // TODO: Document
+    AbstractExpression* m_end_expression;
 
-        // TODO: Document
-        AbstractExpression* m_end_expression;
+    // TODO: Document
+    std::vector<AbstractExpression*> m_searchkey_expressions;
 
-        // TODO: Document
-        std::vector<AbstractExpression*> m_searchkey_expressions;
+    // TODO: Document
+    AbstractExpression* m_initial_expression;
 
-        // TODO: Document
-        AbstractExpression* m_initial_expression;
+    // Index Lookup Type
+    IndexLookupType m_lookup_type;
 
-        // Index Lookup Type
-        IndexLookupType m_lookup_type;
+    // Sorting Direction
+    SortDirectionType m_sort_direction;
 
-        // Sorting Direction
-        SortDirectionType m_sort_direction;
-
-        // null row predicate for underflow edge case
-        AbstractExpression* m_skip_null_predicate;
+    // null row predicate for underflow edge case
+    AbstractExpression* m_skip_null_predicate;
 };
 
 }

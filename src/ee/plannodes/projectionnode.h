@@ -49,37 +49,43 @@
 #include "expressions/abstractexpression.h"
 #include "plannodes/abstractplannode.h"
 
-namespace voltdb
-{
+#include "boost/shared_array.hpp"
+
+namespace voltdb {
 
 class ProjectionPlanNode : public AbstractPlanNode
 {
- public:
-    ProjectionPlanNode(CatalogId id);
-    ProjectionPlanNode();
-    virtual ~ProjectionPlanNode();
+public:
+    ProjectionPlanNode() { }
 
     virtual PlanNodeType getPlanNodeType() const;
 
-    void setOutputColumnNames(std::vector<std::string>& names);
-    std::vector<std::string>& getOutputColumnNames();
     const std::vector<std::string>& getOutputColumnNames() const;
 
-    void setOutputColumnTypes(std::vector<ValueType>& types);
-    std::vector<ValueType>& getOutputColumnTypes();
     const std::vector<ValueType>& getOutputColumnTypes() const;
 
-    void setOutputColumnSizes(std::vector<int32_t>& sizes);
-    std::vector<int32_t>& getOutputColumnSizes();
     const std::vector<int32_t>& getOutputColumnSizes() const;
 
-    void setOutputColumnExpressions(std::vector<AbstractExpression*>& exps);
-    std::vector<AbstractExpression*>& getOutputColumnExpressions();
     const std::vector<AbstractExpression*>& getOutputColumnExpressions() const;
 
     std::string debugInfo(const std::string& spacer) const;
 
- protected:
+    class InlineState {
+    public:
+        InlineState() {}
+        std::string debugInfo(const std::string &spacer) const;
+
+        AbstractExpression* const* getProjectionExpressions() const { return m_expression_array_ptr.get(); }
+
+        const int* getProjectionColumns() const { return m_all_column_array_ptr.get(); }
+
+        void init(ProjectionPlanNode*); // Implemented in projectionexecutor.cpp
+
+        boost::shared_array<int> m_all_column_array_ptr;
+        boost::shared_array<AbstractExpression*> m_expression_array_ptr;
+    };
+
+protected:
     virtual void loadFromJSONObject(PlannerDomValue obj);
     //
     // The node must define what the columns in the output table are
@@ -91,11 +97,9 @@ class ProjectionPlanNode : public AbstractPlanNode
 
     // indicate how to project (or replace) each column value. indices
     // are same as output table's.
-    // note that this might be a PlaceholderExpression (for substituted value)
-    // It will become ConstantValueExpression for implanted value
+    // It will contain a ConstantValueExpression or ParameterValueExpression for an implanted value
     // or TupleValueExpression for pure projection,
-    // or CalculatedValueExpression for projection with arithmetic calculation.
-    // in ProjectionPlanNode
+    // or other AbstractValueExpression for arithmetic calculations, etc.
     std::vector<AbstractExpression*> m_outputColumnExpressions;
 };
 

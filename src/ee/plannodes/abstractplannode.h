@@ -57,9 +57,10 @@
 #include <string>
 #include <vector>
 
-namespace voltdb
-{
+namespace voltdb {
+
 class AbstractExecutor;
+class AbstractExpression;
 class Table;
 class TupleSchema;
 
@@ -89,18 +90,13 @@ public:
     // DATA MEMBER METHODS
     // ------------------------------------------------------------------
     int32_t getPlanNodeId() const;
+    void setPlanNodeIdForTest(int32_t id) { m_planNodeId = id; }
 
     // currently a hack needed to initialize the executors.
     CatalogId databaseId() const { return 1; }
 
     void setExecutor(AbstractExecutor* executor);
     inline AbstractExecutor* getExecutor() const { return m_executor; }
-
-    void setInputTables(const std::vector<Table*> &val);
-    std::vector<Table*>& getInputTables();
-
-    void setOutputTable(Table* val);
-    Table *getOutputTable() const;
 
     //
     // Each sub-class will have to implement this function to return their type
@@ -156,40 +152,29 @@ public:
     std::string debug(const std::string& spacer) const;
     virtual std::string debugInfo(const std::string& spacer) const = 0;
 
-    //
-    // Generate a new PlanNodeID
-    // NOTE: Only use in debugging & testing! The catalogs will
-    // generate real ids at deployment
-    //
-    static int32_t getNextPlanNodeId() {
-        static int32_t next = 1000;
-        return next++;
-    }
-
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj) = 0;
-    AbstractPlanNode(int32_t plannode_id);
-    AbstractPlanNode();
 
-    void setPlanNodeId(int32_t plannode_id);
+    AbstractPlanNode()
+        : m_planNodeId(-1)
+        , m_executor(NULL)
+        , m_isInline(false)
+    { }
+
+    static AbstractExpression* loadExpressionFromJSONObject(const char* label,
+                                                            const PlannerDomValue& obj);
+    static void loadExpressionsFromJSONObject(std::vector<AbstractExpression*>& arrayOut,
+                                              const char* label,
+                                              const PlannerDomValue& obj);
+
+
 
     //
     // Every PlanNode will have a unique id assigned to it at compile time
     //
     int32_t m_planNodeId;
     //
-    // Output Table
-    // This is where we will write the results of the plan node's
-    // execution out to
-    //
-    Table* m_outputTable; // volatile
-    //
-    // Input Tables
-    // These tables are derived from the output of this node's children
-    //
-    std::vector<Table*> m_inputTables; // volatile
-    //
-    // A node can have multiple children and parents
+    // A node can have multiple children
     //
     std::vector<AbstractPlanNode*> m_children;
     std::vector<int32_t> m_childIds;

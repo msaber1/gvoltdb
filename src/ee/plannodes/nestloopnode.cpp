@@ -45,31 +45,8 @@
 
 #include "nestloopnode.h"
 
-#include "storage/table.h"
+namespace voltdb {
 
-using namespace voltdb;
+PlanNodeType NestLoopPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_NESTLOOP; }
 
-NestLoopPlanNode::NestLoopPlanNode(CatalogId id)
-  : AbstractJoinPlanNode(id)
-{
-    // Do nothing
-}
-
-NestLoopPlanNode::NestLoopPlanNode()
-  : AbstractJoinPlanNode()
-{
-    // Do nothing
-}
-
-NestLoopPlanNode::~NestLoopPlanNode()
-{
-    // must delete the output table that was created in the
-    // executor (and stored here in the plannode).
-    delete getOutputTable();
-}
-
-PlanNodeType
-NestLoopPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_NESTLOOP;
 }

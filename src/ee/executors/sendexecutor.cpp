@@ -45,53 +45,34 @@
 
 #include "sendexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "plannodes/sendnode.h"
 
 #include "execution/VoltDBEngine.h"
-
-#include "storage/table.h"
-#include "storage/tablefactory.h"
-#include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
-#include "storage/tableutil.h"
+#include "plannodes/sendnode.h"
 #include "storage/temptable.h"
 
 namespace voltdb {
 
-bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
-                          TempTableLimits* limits)
+bool SendExecutor::p_init(TempTableLimits*)
 {
     VOLT_TRACE("init Send Executor");
-
-    SendPlanNode* node = dynamic_cast<SendPlanNode*>(abstractNode);
-    assert(node);
-    assert(node->getInputTables().size() == 1);
-    m_inputTable = node->getInputTables()[0];
-    assert(m_inputTable);
-
-    //
-    // Just pass our input table on through...
-    //
-    node->setOutputTable(node->getInputTables()[0]);
-
+    assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
+    assert(m_input_tables.size() == 1);
     return true;
 }
 
-bool SendExecutor::p_execute(const NValueArray &params) {
+bool SendExecutor::p_execute()
+{
     VOLT_DEBUG("started SEND");
 
-    assert(m_inputTable);
+    Table* input_table = getInputTable();
+    assert(input_table);
     //m_inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!
-    if (!m_engine->send(m_inputTable)) {
-        VOLT_ERROR("Failed to send table '%s'", m_inputTable->name().c_str());
+    if (!m_engine->send(input_table)) {
+        VOLT_ERROR("Failed to send table '%s'", input_table->name().c_str());
         return false;
     }
-    VOLT_DEBUG("SEND TABLE: %s", m_inputTable->debug().c_str());
+    VOLT_DEBUG("SEND TABLE: %s", input_table->debug().c_str());
 
     return true;
 }

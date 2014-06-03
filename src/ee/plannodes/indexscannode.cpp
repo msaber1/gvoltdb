@@ -43,19 +43,15 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <stdexcept>
-#include <sstream>
 #include "indexscannode.h"
-#include "common/debuglog.h"
-#include "common/serializeio.h"
-#include "common/types.h"
-#include "common/FatalException.hpp"
+
 #include "expressions/abstractexpression.h"
-#include "catalog/table.h"
-#include "catalog/index.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
+
+PlanNodeType IndexScanPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INDEXSCAN; }
 
 IndexScanPlanNode::~IndexScanPlanNode() {
     for (int ii = 0; ii < m_searchkey_expressions.size(); ii++) {
@@ -64,8 +60,6 @@ IndexScanPlanNode::~IndexScanPlanNode() {
     delete m_end_expression;
     delete m_initial_expression;
     delete m_skip_null_predicate;
-    delete getOutputTable();
-    setOutputTable(NULL);
 }
 
 std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
@@ -95,8 +89,8 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     }
 
     buffer << spacer << "Post-Scan Expression: ";
-    if (m_predicate != NULL) {
-        buffer << "\n" << m_predicate->debug(spacer);
+    if (getPredicate()) {
+        buffer << "\n" << getPredicate()->debug(spacer);
     } else {
         buffer << "<NULL>\n";
     }
@@ -114,28 +108,13 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
 
     m_target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
 
-    if (obj.hasNonNullKey("END_EXPRESSION")) {
-        PlannerDomValue exprValue = obj.valueForKey("END_EXPRESSION");
-        m_end_expression = AbstractExpression::buildExpressionTree(exprValue);
-    }
+    m_end_expression = loadExpressionFromJSONObject("END_EXPRESSION", obj);
 
-    if (obj.hasNonNullKey("INITIAL_EXPRESSION")) {
-        PlannerDomValue exprValue = obj.valueForKey("INITIAL_EXPRESSION");
-        m_initial_expression = AbstractExpression::buildExpressionTree(exprValue);
-    }
+    m_initial_expression = loadExpressionFromJSONObject("INITIAL_EXPRESSION", obj);
 
-    if (obj.hasNonNullKey("SKIP_NULL_PREDICATE")) {
-        PlannerDomValue exprValue = obj.valueForKey("SKIP_NULL_PREDICATE");
-        m_skip_null_predicate = AbstractExpression::buildExpressionTree(exprValue);
-    }
+    m_skip_null_predicate = loadExpressionFromJSONObject("SKIP_NULL_PREDICATE", obj);
 
-    if (obj.hasNonNullKey("SEARCHKEY_EXPRESSIONS")) {
-        PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");
-        for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
-            AbstractExpression *expr = AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
-            m_searchkey_expressions.push_back(expr);
-        }
-    }
+    loadExpressionsFromJSONObject(m_searchkey_expressions, "SEARCHKEY_EXPRESSIONS", obj);
 }
 
 }

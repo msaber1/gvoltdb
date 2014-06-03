@@ -55,22 +55,16 @@ namespace voltdb {
  *
  */
 class DeletePlanNode : public AbstractOperationPlanNode {
-    public:
-        DeletePlanNode(CatalogId id) : AbstractOperationPlanNode(id) {
-            truncate = false;
-        }
-        DeletePlanNode() : AbstractOperationPlanNode() {
-            truncate = false;
-        }
+public:
+    DeletePlanNode() { }
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_DELETE); }
-        bool getTruncate() const { return truncate; }
-        void setTruncate(bool truncate) { this->truncate = truncate; }
+    virtual PlanNodeType getPlanNodeType() const;
+    bool getTruncate() const { return m_truncate; }
 
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-        /** true if all tuples are deleted. */
-        bool truncate;
+private:
+    virtual void loadFromJSONObject(PlannerDomValue obj);
+    /** true if all tuples are deleted. */
+    bool m_truncate;
 };
 
 }

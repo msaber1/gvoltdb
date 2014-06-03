@@ -43,33 +43,24 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
-#include <stdexcept>
 #include "materializenode.h"
-#include "common/common.h"
-#include "common/serializeio.h"
-#include "common/FatalException.hpp"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
 
-MaterializePlanNode::~MaterializePlanNode() {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
+PlanNodeType MaterializePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_MATERIALIZE; }
 
 std::string MaterializePlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
-    buffer << this->ProjectionPlanNode::debugInfo(spacer);
-    buffer << spacer << "batched: " << (this->batched ? "true" : "false") << "\n";
+    buffer << ProjectionPlanNode::debugInfo(spacer);
+    buffer << spacer << "batched: " << (m_batched ? "true" : "false") << "\n";
     return (buffer.str());
 }
 
 void MaterializePlanNode::loadFromJSONObject(PlannerDomValue obj) {
     ProjectionPlanNode::loadFromJSONObject(obj);
-
-    batched = obj.valueForKey("BATCHED").asBool();
+    m_batched = obj.valueForKey("BATCHED").asBool();
 }
 
 }

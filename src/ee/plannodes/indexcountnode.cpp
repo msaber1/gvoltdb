@@ -15,20 +15,15 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
-#include <stdexcept>
-#include <sstream>
 #include "indexcountnode.h"
-#include "common/debuglog.h"
-#include "common/serializeio.h"
-#include "common/types.h"
-#include "common/FatalException.hpp"
+
 #include "expressions/abstractexpression.h"
-#include "catalog/table.h"
-#include "catalog/index.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
+
+PlanNodeType IndexCountPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INDEXCOUNT; }
 
 IndexCountPlanNode::~IndexCountPlanNode() {
     for (int ii = 0; ii < m_searchkey_expressions.size(); ii++) {
@@ -38,8 +33,6 @@ IndexCountPlanNode::~IndexCountPlanNode() {
         delete m_endkey_expressions[ii];
     }
     delete m_skip_null_predicate;
-    delete getOutputTable();
-    setOutputTable(NULL);
 }
 
 std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
@@ -58,13 +51,7 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
         buffer << m_endkey_expressions[ctr]->debug(spacer);
     }
 
-    buffer << spacer << "Post-Scan Expression: ";
-    if (m_predicate != NULL) {
-        buffer << "\n" << m_predicate->debug(spacer);
-    } else {
-        buffer << "<NULL>\n";
-    }
-    return (buffer.str());
+    return buffer.str();
 }
 
 void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
@@ -78,26 +65,10 @@ void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
 
     m_target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
 
-    if (obj.hasNonNullKey("ENDKEY_EXPRESSIONS")) {
-        PlannerDomValue endKeyExprArray = obj.valueForKey("ENDKEY_EXPRESSIONS");
-        for (int i = 0; i < endKeyExprArray.arrayLen(); i++) {
-            AbstractExpression *expr =
-                AbstractExpression::buildExpressionTree(endKeyExprArray.valueAtIndex(i));
-            m_endkey_expressions.push_back(expr);
-        }
-    }
+    loadExpressionsFromJSONObject(m_endkey_expressions, "ENDKEY_EXPRESSIONS", obj);
+    loadExpressionsFromJSONObject(m_searchkey_expressions, "SEARCHKEY_EXPRESSIONS", obj);
 
-    PlannerDomValue searchKeyExprArray = obj.valueForKey("SEARCHKEY_EXPRESSIONS");
-    for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
-        AbstractExpression *expr =
-            AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
-        m_searchkey_expressions.push_back(expr);
-    }
-
-    if (obj.hasNonNullKey("SKIP_NULL_PREDICATE")) {
-        PlannerDomValue exprValue = obj.valueForKey("SKIP_NULL_PREDICATE");
-        m_skip_null_predicate = AbstractExpression::buildExpressionTree(exprValue);
-    }
+    m_skip_null_predicate = loadExpressionFromJSONObject("SKIP_NULL_PREDICATE", obj);
 }
 
 }

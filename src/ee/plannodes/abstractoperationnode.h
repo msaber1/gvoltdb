@@ -47,45 +47,27 @@
 #define HSTOREOPERATIONNODE_H
 
 #include "abstractplannode.h"
-#include "storage/TableCatalogDelegate.hpp"
 
 namespace voltdb {
-
-class Table;
 
 /**
  *
  */
 class AbstractOperationPlanNode : public AbstractPlanNode {
-    public:
-        virtual ~AbstractOperationPlanNode();
-        Table* getTargetTable() const;
-        void setTargetTableDelegate(TableCatalogDelegate * tcd);
+public:
+    ~AbstractOperationPlanNode() { }
+    std::string getTargetTableName() const;
+    virtual std::string debugInfo(const std::string &spacer) const;
+protected:
+    AbstractOperationPlanNode() { }
 
-        std::string getTargetTableName() const;
-        void setTargetTableName(std::string name);
+    virtual void loadFromJSONObject(PlannerDomValue obj);
 
-        virtual std::string debugInfo(const std::string &spacer) const;
-
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
-        AbstractOperationPlanNode(int32_t id) : AbstractPlanNode(id) {
-            m_tcd = NULL;
-            target_table_name = "NOT_SPECIFIED";
-        }
-        AbstractOperationPlanNode() : AbstractPlanNode() {
-            m_tcd = NULL;
-            target_table_name = "NOT SPECIFIED";
-        }
-
-        //
-        // Target Table
-        // These tables are different from the input and the output tables
-        // The plannode can read in tuples from the input table(s) and apply them to the target table
-        // The results of the operations will be written to the the output table
-        //
-        std::string target_table_name;
-        TableCatalogDelegate * m_tcd;
+    // Target Table
+    // These tables are different from the input and the output tables
+    // The plannode can read in tuples from the input table(s) and apply them to the target table
+    // The result counts of the operations will be written to the the output table
+    std::string target_table_name;
 };
 
 }

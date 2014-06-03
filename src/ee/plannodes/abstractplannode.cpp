@@ -47,6 +47,7 @@
 
 #include "common/TupleSchema.h"
 #include "executors/abstractexecutor.h"
+#include "expressions/abstractexpression.h"
 #include "plannodeutil.h"
 
 #include <sstream>
@@ -55,18 +56,6 @@
 
 using namespace std;
 using namespace voltdb;
-
-AbstractPlanNode::AbstractPlanNode(int32_t plannode_id)
-    : m_planNodeId(plannode_id), m_outputTable(NULL), m_executor(NULL),
-      m_isInline(false)
-{
-}
-
-AbstractPlanNode::AbstractPlanNode()
-    : m_planNodeId(-1), m_outputTable(NULL), m_executor(NULL),
-      m_isInline(false)
-{
-}
 
 AbstractPlanNode::~AbstractPlanNode()
 {
@@ -159,12 +148,6 @@ AbstractPlanNode::isInline() const
 // ------------------------------------------------------------------
 // DATA MEMBER METHODS
 // ------------------------------------------------------------------
-void
-AbstractPlanNode::setPlanNodeId(int32_t plannode_id)
-{
-    m_planNodeId = plannode_id;
-}
-
 int32_t
 AbstractPlanNode::getPlanNodeId() const
 {
@@ -175,30 +158,6 @@ void
 AbstractPlanNode::setExecutor(AbstractExecutor* executor)
 {
     m_executor = executor;
-}
-
-void
-AbstractPlanNode::setInputTables(const vector<Table*>& val)
-{
-    m_inputTables = val;
-}
-
-vector<Table*>&
-AbstractPlanNode::getInputTables()
-{
-    return m_inputTables;
-}
-
-void
-AbstractPlanNode::setOutputTable(Table* table)
-{
-    m_outputTable = table;
-}
-
-Table*
-AbstractPlanNode::getOutputTable() const
-{
-    return m_outputTable;
 }
 
 const vector<SchemaColumn*>&
@@ -441,3 +400,31 @@ AbstractPlanNode::debug(const string& spacer) const
     }
     return (buffer.str());
 }
+
+AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(const char* label,
+                                                                   const PlannerDomValue& obj)
+{
+    if (obj.hasNonNullKey(label)) {
+        return AbstractExpression::buildExpressionTree(obj.valueForKey(label));
+    }
+    return NULL;
+}
+
+void AbstractPlanNode::loadExpressionsFromJSONObject(std::vector<AbstractExpression*>& arrayOut,
+                                                     const char* label,
+                                                     const PlannerDomValue& obj)
+{
+    arrayOut.clear();
+    if ( ! obj.hasNonNullKey(label)) {
+        return;
+    }
+    PlannerDomValue searchKeyExprArray = obj.valueForKey(label);
+    for (int i = 0; i < searchKeyExprArray.arrayLen(); i++) {
+        AbstractExpression *expr =
+            AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
+        arrayOut.push_back(expr);
+    }
+}
+
+
+

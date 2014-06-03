@@ -51,17 +51,8 @@
 #include <sstream>
 
 using namespace std;
-using namespace voltdb;
 
-AbstractJoinPlanNode::AbstractJoinPlanNode(CatalogId id)
-    : AbstractPlanNode(id), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
-{
-}
-
-AbstractJoinPlanNode::AbstractJoinPlanNode()
-    : AbstractPlanNode(), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
-{
-}
+namespace voltdb {
 
 AbstractJoinPlanNode::~AbstractJoinPlanNode()
 {
@@ -117,19 +108,9 @@ AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_joinType = stringToJoin(obj.valueForKey("JOIN_TYPE").asStr());
 
-    loadPredicateFromJSONObject("PRE_JOIN_PREDICATE", obj, m_preJoinPredicate);
-    loadPredicateFromJSONObject("JOIN_PREDICATE", obj, m_joinPredicate);
-    loadPredicateFromJSONObject("WHERE_PREDICATE", obj, m_wherePredicate);
+    m_preJoinPredicate = loadExpressionFromJSONObject("PRE_JOIN_PREDICATE", obj);
+    m_joinPredicate = loadExpressionFromJSONObject("JOIN_PREDICATE", obj);
+    m_wherePredicate = loadExpressionFromJSONObject("WHERE_PREDICATE", obj);
 }
 
-
-void
-AbstractJoinPlanNode::loadPredicateFromJSONObject(const char* predicateType, const PlannerDomValue& obj, AbstractExpression*& predicate)
-{
-    if (obj.hasNonNullKey(predicateType)) {
-        predicate = AbstractExpression::buildExpressionTree(obj.valueForKey(predicateType));
-    }
-    else {
-        predicate = NULL;
-    }
 }

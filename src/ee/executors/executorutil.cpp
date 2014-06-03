@@ -46,7 +46,6 @@
 #include "executorutil.h"
 
 #include "common/debuglog.h"
-#include "common/FatalException.hpp"
 
 #include "executors/aggregateexecutor.h"
 #include "executors/deleteexecutor.h"
@@ -71,40 +70,49 @@
 
 #include <cassert>
 
-namespace voltdb {
+using namespace voltdb;
 
-AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
-                                 AbstractPlanNode* abstract_node) {
-    PlanNodeType type = abstract_node->getPlanNodeType();
+inline AbstractExecutor* constructExecutor(PlanNodeType type)
+{
     switch (type) {
-    case PLAN_NODE_TYPE_AGGREGATE: return new AggregateSerialExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_DISTINCT: return new DistinctExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateHashExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INDEXCOUNT: return new IndexCountExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_INSERT: return new InsertExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_AGGREGATE: return new AggregateSerialExecutor();
+    case PLAN_NODE_TYPE_DELETE: return new DeleteExecutor();
+    case PLAN_NODE_TYPE_DISTINCT: return new DistinctExecutor();
+    case PLAN_NODE_TYPE_HASHAGGREGATE: return new AggregateHashExecutor();
+    case PLAN_NODE_TYPE_INDEXSCAN: return new IndexScanExecutor();
+    case PLAN_NODE_TYPE_INDEXCOUNT: return new IndexCountExecutor();
+    case PLAN_NODE_TYPE_INSERT: return new InsertExecutor();
     case PLAN_NODE_TYPE_INVALID:
         VOLT_ERROR( "INVALID plan node type %d", (int) type);
         return NULL;
-    case PLAN_NODE_TYPE_LIMIT: return new LimitExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_MATERIALIZE: return new MaterializeExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_MATERIALIZEDSCAN: return new MaterializedScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_NESTLOOP: return new NestLoopExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_NESTLOOPINDEX: return new NestLoopIndexExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_ORDERBY: return new OrderByExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_PROJECTION: return new ProjectionExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_SEND: return new SendExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
-    case PLAN_NODE_TYPE_UPSERT: return new UpsertExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_LIMIT: return new LimitExecutor();
+    case PLAN_NODE_TYPE_MATERIALIZE: return new MaterializeExecutor();
+    case PLAN_NODE_TYPE_MATERIALIZEDSCAN: return new MaterializedScanExecutor();
+    case PLAN_NODE_TYPE_NESTLOOP: return new NestLoopExecutor();
+    case PLAN_NODE_TYPE_NESTLOOPINDEX: return new NestLoopIndexExecutor();
+    case PLAN_NODE_TYPE_ORDERBY: return new OrderByExecutor();
+    case PLAN_NODE_TYPE_PROJECTION: return new ProjectionExecutor();
+    case PLAN_NODE_TYPE_RECEIVE: return new ReceiveExecutor();
+    case PLAN_NODE_TYPE_SEND: return new SendExecutor();
+    case PLAN_NODE_TYPE_SEQSCAN: return new SeqScanExecutor();
+    case PLAN_NODE_TYPE_TABLECOUNT: return new TableCountExecutor();
+    case PLAN_NODE_TYPE_UNION: return new UnionExecutor();
+    case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor();
+    case PLAN_NODE_TYPE_UPSERT: return new UpsertExecutor();
     // default: Don't provide a default, let the compiler enforce complete coverage.
     }
     VOLT_ERROR( "Undefined plan node type %d", (int) type);
     return NULL;
 }
 
+AbstractExecutor* ExecutorUtil::getNewExecutor(AbstractPlanNode* node)
+{
+    PlanNodeType type = node->getPlanNodeType();
+    AbstractExecutor* executor = constructExecutor(type);
+    if (executor) {
+        node->setExecutor(executor);
+        executor->setPlanNode(node);
+    }
+    return executor;
 }
+

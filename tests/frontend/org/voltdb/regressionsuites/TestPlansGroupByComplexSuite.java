@@ -83,7 +83,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{2,1}, {2,1}, {1,1}, {1,1}, {1,1} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test duplicates, operator expression, group by primary key
@@ -92,8 +92,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{1,1,1,6}, {2,2,1,6}, {3,3,1,6}, {4,4,2,7}, {5,5,2,7} };
-            System.out.println(vt.toString());
-            validateTableOfLongs(vt, expected);
+            //* enable for debug */ System.out.println(vt.to//* enable for debug */ System.out.print       validateTableOfLongs(vt, expected);
 
             // Test function expression with group by primary key
             cr = client.callProcedure("@AdHoc", "SELECT id, id + 1, sum(wage)/2, abs(dept-3) from " + tb +
@@ -101,7 +100,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{1,2,5,2}, {2,3,10,2}, {3,4,15,2}, {4,5,20,1}, {5,6,25,1} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test order by expression column which is not in display columns
@@ -118,7 +117,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
         }
     }
@@ -146,7 +145,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{2, 90, 7, 45}, {1, 60, 8, 20} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test different group by column order, non-grouped TVE, sum for column, division
@@ -155,7 +154,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{21 ,1, 63, 30}, {46, 2, 92, 45}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test Complex Agg with functions
@@ -164,7 +163,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test sum()/count(), Addition
@@ -198,21 +197,21 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2}, {3}, {4}, {6}, {7} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept from " + tb + " ORDER BY id+dept, wage");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2}, {3}, {4}, {6}, {7} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept, wage from " + tb + " ORDER BY id+dept, wage");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {3,20}, {4,30}, {6,40}, {7,50} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // (1) Test Order by COUNT(*) without complex expression
@@ -222,7 +221,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 60} , {2, 2, 90}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -233,7 +232,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 59} , {2, 2, 89}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -244,7 +243,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test Order by without tag
@@ -253,7 +252,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 57, 4} , {2, 88, 5}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test Order by column not in Display columns
@@ -262,7 +261,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {57, 4} , {88, 5}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
         }
     }
@@ -288,7 +287,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{2, 4, 100, 140, 8, 28}, {1, 3, 60, 60, 8, 15} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test limit with complex aggregation.
@@ -297,7 +296,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{10, 8, 9, 4}, {20, 3, 3, 4}, {30, 4, 4, 4}, {40, 12, 13, 5}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test distinct limit together with complex aggregation.
@@ -306,7 +305,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{10, 8, 9, 4}, {20, 3, 3, 4}, {30, 4, 4, 4}, {40, 12, 13, 10}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
         }
     }
@@ -338,7 +337,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3}, {2, 4} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test complex group-by (normal expression) without complex aggregation.
@@ -350,7 +349,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 3}, {3, 4} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // (2) With extra aggregation expression
@@ -360,7 +359,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 5}, {1, 4} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test more complex group-by with with complex aggregation.
@@ -369,7 +368,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {0, 5}, {1, 4} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // More hard general test case with multi group by columns and complex aggs
@@ -378,7 +377,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             if (!isHSQL()) {
@@ -395,7 +394,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
                 Date time4 = dateFormat.parse("2013-09-18 00:00:00.000");
                 expected = new long[][] { {time1.getTime()*1000, 2, 10}, {time2.getTime()*1000, 4, 20},
                         {time3.getTime()*1000, 2, 40},{time4.getTime()*1000, 3, 45},};
-                System.out.println(vt.toString());
+                //* enable for debug */ System.out.println(vt.toString());
                 validateTableOfLongs(vt, expected);
             }
         }
@@ -423,7 +422,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 2}, {20, 1}, {30, 1}, {40, 1}, {50, 1} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test limit
@@ -432,7 +431,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 2}, {20, 1}, {30, 1}, {40, 2} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test distinct and limit
@@ -441,7 +440,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 2}, {20, 1}, {30, 1}, {40, 1} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -453,7 +452,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 3}, {20, 2}, {30, 2}, {40, 2}, {50, 2} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test limit
@@ -462,7 +461,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 3}, {20, 2}, {30, 2}, {40, 3}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test distinct and limit
@@ -471,7 +470,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {10, 3}, {20, 2}, {30, 2}, {40, 2} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -482,7 +481,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,2,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test Limit
@@ -491,7 +490,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test distinct and limit
@@ -500,7 +499,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,2,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
         }
     }
@@ -527,7 +526,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 6, 20}, {2, 4, 22, 35} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test order by without tag
@@ -536,7 +535,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 3, 6, 20}, {2, 4, 22, 35} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test order by without tag and not in display columns
@@ -545,7 +544,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {3, 6, 20}, {4, 22, 35} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -556,7 +555,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {0, 5, 17}, {1, 4, 10} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test order by without tag
@@ -565,7 +564,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {0, 5, 17}, {1, 4, 10} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test order by without tag and not in display columns
@@ -574,7 +573,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {5, 17}, {4, 10} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             //(3) More hard general test cases with multi group by columns and complex aggs
@@ -584,7 +583,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test order by without tag
@@ -593,7 +592,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {0,10,5,2,7}, {0,40,20,4,6}, {0,50,25,2,6}, {1,10,5,2,2}, {1,20,10,2,3}, {1,30,15,2,4} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test order by without tag and not in display columns
@@ -602,7 +601,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {10,5,2,7}, {40,20,4,6}, {50,25,2,6}, {10,5,2,2}, {20,10,2,3}, {30,15,2,4} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -626,7 +625,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2}, {3}, {4}, {6}, {7}, {8}, {9} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             cr = client.callProcedure("@AdHoc", "SELECT id+dept, wage from " + tb +
@@ -634,7 +633,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {2, 10}, {3,20}, {4,30}, {6,40}, {7,50}, {8,10}, {9,40} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -708,7 +707,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 54} , {2, 81}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -717,7 +716,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] { {1, 54, 18, 3} , {2, 81, 40, 2}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -945,7 +944,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{2, 90, 7, 45}, {1, 60, 8, 20} };
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
             // Test having
@@ -954,7 +953,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{2, 90}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -963,7 +962,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{1, 60, 8}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 
@@ -973,7 +972,7 @@ public class TestPlansGroupByComplexSuite extends RegressionSuite {
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             vt = cr.getResults()[0];
             expected = new long[][] {{1, 60}};
-            System.out.println(vt.toString());
+            //* enable for debug */ System.out.println(vt.toString());
             validateTableOfLongs(vt, expected);
 
 

@@ -43,34 +43,39 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <iostream>
 #include "seqscanexecutor.h"
+
 #include "common/debuglog.h"
-#include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
+#include "executors/projectionexecutor.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/seqscannode.h"
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
-#include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
+
+#include <iostream>
 
 using namespace voltdb;
 
-bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
-                             TempTableLimits* limits)
+bool SeqScanExecutor::p_initMore(TempTableLimits* limits)
 {
     VOLT_TRACE("init SeqScan Executor");
-
-    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(abstract_node);
+    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
     assert(node);
-    bool isSubquery = node->isSubQuery();
-    assert(isSubquery || node->getTargetTable());
-    assert((! isSubquery) || (node->getChildren().size() == 1));
+    Table* targetTable = NULL;
+    if (node->isSubQuery()) {
+        assert(node->getChildren().size() == 1);
+        targetTable = getOutputTableOf(node->getChildren()[0]->getExecutor());
+    }
+    else {
+        targetTable = getTargetTable();
+    }
+    assert(targetTable);
 
     //
     // OPTIMIZATION: If there is no predicate for this SeqScan,
@@ -80,36 +85,30 @@ bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
     // the tuples. We are guarenteed that no Executor will ever
     // modify an input table, so this operation is safe
     //
-    if (node->getPredicate() != NULL || node->getInlinePlanNodes().size() > 0) {
-        // Create output table based on output schema from the plan
-        const std::string& temp_name = (node->isSubQuery()) ?
-                node->getChildren()[0]->getOutputTable()->name():
-                node->getTargetTable()->name();
-        setTempOutputTable(limits, temp_name);
+    if (getPredicate() == NULL && node->getInlinePlanNodes().empty()) {
+        m_output_is_input = true;
+        setOutputTable(targetTable);
+        return true;
     }
-    //
-    // Otherwise create a new temp table that mirrors the
-    // output schema specified in the plan (which should mirror
-    // the output schema for any inlined projection)
-    //
-    else {
-        node->setOutputTable(isSubquery ?
-                             node->getChildren()[0]->getOutputTable() :
-                             node->getTargetTable());
-    }
+
+    m_output_is_input = false;
+    // Otherwise create a new temp table that mirrors the output schema specified in the plan
+    // (which should mirror the output schema for any inlined projection)
+    const std::string& temp_name = targetTable->name();
+    setTempOutputTable(limits, temp_name);
     return true;
 }
 
-bool SeqScanExecutor::p_execute(const NValueArray &params) {
-    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
-    assert(node);
-    Table* output_table = node->getOutputTable();
+bool SeqScanExecutor::p_execute()
+{
+    if (m_output_is_input) {
+        return true;
+    }
+    TempTable* output_table = getTempOutputTable();
     assert(output_table);
 
-    Table* input_table = (node->isSubQuery()) ?
-            node->getChildren()[0]->getOutputTable():
-            node->getTargetTable();
-
+    bool isSubquery = m_input_tables.size() > 0;
+    Table* input_table = isSubquery ? m_input_tables[0].getTable() : getTargetTable();
     assert(input_table);
 
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
@@ -124,100 +123,59 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                (int)input_table->allocatedTupleCount());
 
     //
-    // OPTIMIZATION: NESTED PROJECTION
-    //
+    // OPTIMIZATION: INLINE PROJECTION
     // Since we have the input params, we need to call substitute to
     // change any nodes in our expression tree to be ready for the
     // projection operations in execute
     //
     int num_of_columns = (int)output_table->columnCount();
-    ProjectionPlanNode* projection_node = dynamic_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
+    TableTuple &temp_tuple = output_table->tempTuple();
+
+    TableTuple tuple(input_table->schema());
+    TableIterator iterator = input_table->iteratorDeletingAsWeGo();
+
+    AbstractExpression *predicate = getPredicate();
+    if (predicate) {
+        VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
+    }
+
+    int limit = -1;
+    int offset = -1;
+    getLimitAndOffsetByReference(limit, offset);
+    int tuple_ctr = 0;
+    int tuple_skipped = 0;
+
+    AbstractExpression* const* projection_expressions = NULL;
+    const int* projection_columns = getProjectionColumns();
+    if (projection_columns == NULL) {
+        projection_expressions = getProjectionExpressions();
+    }
+
+    // Report progress on a persistent target table even if it is from a trivial "select *" subquery.
+    ProgressMonitorProxy pmp(m_engine, this, dynamic_cast<PersistentTable*>(input_table));
 
     //
-    // OPTIMIZATION: NESTED LIMIT
-    // How nice! We can also cut off our scanning with a nested limit!
+    // Just walk through the table using our iterator and apply
+    // the predicate to each tuple. For each tuple that satisfies
+    // our expression, we'll insert them into the output table.
     //
-    LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple)) {
+        VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
+                   tuple.debug(input_table->name()).c_str(), tuple_ctr,
+                   (int)input_table->activeTupleCount());
+        pmp.countdownProgress();
 
-    //
-    // OPTIMIZATION:
-    //
-    // If there is no predicate and no Projection for this SeqScan,
-    // then we have already set the node's OutputTable to just point
-    // at the TargetTable. Therefore, there is nothing we more we need
-    // to do here
-    //
-    if (node->getPredicate() != NULL || projection_node != NULL ||
-        limit_node != NULL)
-    {
-        //
-        // Just walk through the table using our iterator and apply
-        // the predicate to each tuple. For each tuple that satisfies
-        // our expression, we'll insert them into the output table.
-        //
-        TableTuple tuple(input_table->schema());
-        TableIterator iterator = input_table->iteratorDeletingAsWeGo();
-        AbstractExpression *predicate = node->getPredicate();
-
-        if (predicate)
-        {
-            VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
-        }
-
-        int limit = -1;
-        int offset = -1;
-        if (limit_node) {
-            limit_node->getLimitAndOffsetByReference(params, limit, offset);
-        }
-
-        int tuple_ctr = 0;
-        int tuple_skipped = 0;
-        TempTable* output_temp_table = dynamic_cast<TempTable*>(output_table);
-
-        ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
-        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
-        {
-            VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
-                       tuple.debug(input_table->name()).c_str(), tuple_ctr,
-                       (int)input_table->activeTupleCount());
-            pmp.countdownProgress();
-            //
-            // For each tuple we need to evaluate it against our predicate
-            //
-            if (predicate == NULL || predicate->eval(&tuple, NULL).isTrue())
-            {
-                // Check if we have to skip this tuple because of offset
-                if (tuple_skipped < offset) {
-                    tuple_skipped++;
-                    continue;
-                }
-                ++tuple_ctr;
-
-                //
-                // Nested Projection
-                // Project (or replace) values from input tuple
-                //
-                if (projection_node != NULL)
-                {
-                    TableTuple &temp_tuple = output_table->tempTuple();
-                    for (int ctr = 0; ctr < num_of_columns; ctr++)
-                    {
-                        NValue value =
-                            projection_node->
-                          getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
-                        temp_tuple.setNValue(ctr, value);
-                    }
-                    output_temp_table->insertTupleNonVirtual(temp_tuple);
-                }
-                else
-                {
-                    //
-                    // Insert the tuple into our output table
-                    //
-                    output_temp_table->insertTupleNonVirtual(tuple);
-                }
-                pmp.countdownProgress();
+        if (predicate == NULL || predicate->eval(&tuple, NULL).isTrue()) {
+            // Check if we have to skip this tuple because of offset
+            if (tuple_skipped < offset) {
+                tuple_skipped++;
+                continue;
             }
+            ++tuple_ctr;
+
+            ProjectionExecutor::insertTempOutputTuple(output_table, tuple, temp_tuple, num_of_columns,
+                                                      projection_columns, projection_expressions);
+            pmp.countdownProgress();
         }
     }
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<

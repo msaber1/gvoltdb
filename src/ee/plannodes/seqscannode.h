@@ -46,40 +46,21 @@
 #ifndef HSTORESEQSCANNODE_H
 #define HSTORESEQSCANNODE_H
 
-#include "common/common.h"
 #include "abstractscannode.h"
 
 namespace voltdb {
-
-class AbstractExpression;
 
 /**
  *
  */
 class SeqScanPlanNode : public AbstractScanPlanNode {
-   public:
-        SeqScanPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            // Do nothing
-        }
-        SeqScanPlanNode() : AbstractScanPlanNode() {
-            // Do nothing
-        }
+public:
+    SeqScanPlanNode() { }
+    ~SeqScanPlanNode() { }
 
-        /*
-         * If the output table needs to be cleared then this SeqScanNode is for an executor that created
-         * its own output table rather then forwarding a reference to the persistent table being scanned.
-         * It still isn't necessarily safe to delete the output table since an inline projection node/executor
-         * may have created the table (and will also delete it) so check if there is an inline projection node.
-         *
-         * This is a fragile approach to determining whether or not to delete the output table. Maybe
-         * it is safer to have the inline nodes be deleted first and set the output table of the
-         * enclosing plannode to NULL so the delete can be safely repeated.
-         */
-        ~SeqScanPlanNode();
+    virtual PlanNodeType getPlanNodeType() const;
 
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEQSCAN); }
-
-        std::string debugInfo(const std::string &spacer) const;
+    std::string debugInfo(const std::string &spacer) const;
 };
 
 }

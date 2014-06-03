@@ -19,66 +19,45 @@
 #ifndef HSTOREINDEXCOUNTEXECUTOR_H
 #define HSTOREINDEXCOUNTEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
-#include "executors/abstractexecutor.h"
+#include "executors/abstractscanexecutor.h"
 
 #include "boost/shared_array.hpp"
-#include "boost/unordered_set.hpp"
-#include "boost/pool/pool_alloc.hpp"
-#include <set>
-#include <memory>
+#include <string>
 
 namespace voltdb {
 
-class TempTable;
-class PersistentTable;
 class AbstractExpression;
-class IndexCountPlanNode;
 
-class IndexCountExecutor : public AbstractExecutor
+class IndexCountExecutor : public AbstractScanExecutor
 {
 public:
-    IndexCountExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
-        : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL), m_endKeyBackingStore(NULL)
-    {
-    }
-    ~IndexCountExecutor();
+    IndexCountExecutor() { }
+    ~IndexCountExecutor() { }
 
 private:
-    bool p_init(AbstractPlanNode*, TempTableLimits* limits);
-    bool p_execute(const NValueArray &params);
-
-    long countNulls(TableIndex * tableIndex, AbstractExpression * countNullExpr);
+    bool p_initMore(TempTableLimits* limits);
+    bool p_execute();
 
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
-    IndexCountPlanNode *m_node;
-    int m_numOfColumns;
-    int m_numOfSearchkeys;
-    int m_numOfEndkeys;
-
-    // Search key
-    AbstractExpression** m_searchKeyArray;
-    AbstractExpression** m_endKeyArray;
+    std::string m_index_name;
+    int m_num_of_search_keys;
+    int m_num_of_end_keys;
 
     IndexLookupType m_lookupType;
     IndexLookupType m_endType;
 
-    // IndexCount Information
-    TempTable* m_outputTable;
-
-
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
-    boost::shared_array<AbstractExpression*> m_searchKeyArrayPtr;
-    boost::shared_array<AbstractExpression*> m_endKeyArrayPtr;
+    boost::shared_array<AbstractExpression*> m_search_key_array_ptr;
+    boost::shared_array<AbstractExpression*> m_end_key_array_ptr;
 
-    // So Valgrind doesn't complain:
-    char* m_searchKeyBackingStore;
-    char* m_endKeyBackingStore;
+    AbstractExpression* m_countNULLExpr;
+
+    StandAloneTupleStorage m_search_key;
+    StandAloneTupleStorage m_end_key;
+
 };
 
 }

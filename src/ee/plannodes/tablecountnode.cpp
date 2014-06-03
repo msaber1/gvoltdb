@@ -15,26 +15,21 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <sstream>
 #include "tablecountnode.h"
-#include "common/common.h"
-#include "expressions/abstractexpression.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
 
-TableCountPlanNode::~TableCountPlanNode() {
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
+PlanNodeType TableCountPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_TABLECOUNT; }
 
-std::string TableCountPlanNode::debugInfo(const std::string &spacer) const {
+std::string TableCountPlanNode::debugInfo(const std::string &spacer) const
+{
     std::ostringstream buffer;
-    buffer << this->AbstractScanPlanNode::debugInfo(spacer);
-    assert(m_predicate == NULL);
+    buffer << AbstractScanPlanNode::debugInfo(spacer);
     std::string tmpString = isSubQuery() ? "TEMPORARY " : "";
     buffer << spacer << tmpString << "TABLE COUNT Expression: <NULL>";
-    return (buffer.str());
+    return buffer.str();
 }
 
 }

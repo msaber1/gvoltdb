@@ -50,38 +50,10 @@
 using namespace std;
 using namespace voltdb;
 
-ProjectionPlanNode::ProjectionPlanNode(CatalogId id) : AbstractPlanNode(id)
-{
-    // Do nothing
-}
-
-ProjectionPlanNode::ProjectionPlanNode() : AbstractPlanNode()
-{
-    // Do nothing
-}
-
-ProjectionPlanNode::~ProjectionPlanNode()
-{
-    delete getOutputTable();
-    setOutputTable(NULL);
-}
-
 PlanNodeType
 ProjectionPlanNode::getPlanNodeType() const
 {
     return PLAN_NODE_TYPE_PROJECTION;
-}
-
-void
-ProjectionPlanNode::setOutputColumnNames(vector<string>& names)
-{
-    m_outputColumnNames = names;
-}
-
-vector<string>&
-ProjectionPlanNode::getOutputColumnNames()
-{
-    return m_outputColumnNames;
 }
 
 const vector<string>&
@@ -90,53 +62,16 @@ ProjectionPlanNode::getOutputColumnNames() const
     return m_outputColumnNames;
 }
 
-void
-ProjectionPlanNode::setOutputColumnTypes(vector<ValueType>& types)
-{
-    m_outputColumnTypes = types;
-}
-
-vector<ValueType>&
-ProjectionPlanNode::getOutputColumnTypes()
-{
-    return m_outputColumnTypes;
-}
-
 const vector<ValueType>&
 ProjectionPlanNode::getOutputColumnTypes() const
 {
     return m_outputColumnTypes;
 }
 
-
-void ProjectionPlanNode::setOutputColumnSizes(vector<int32_t>& sizes)
-{
-    m_outputColumnSizes = sizes;
-
-}
-
-vector<int32_t>&
-ProjectionPlanNode::getOutputColumnSizes()
-{
-    return m_outputColumnSizes;
-}
-
 const vector<int32_t>&
 ProjectionPlanNode::getOutputColumnSizes() const
 {
     return m_outputColumnSizes;
-}
-
-void
-ProjectionPlanNode::setOutputColumnExpressions(vector<AbstractExpression*>& exps)
-{
-    m_outputColumnExpressions = exps;
-}
-
-vector<AbstractExpression*>&
-ProjectionPlanNode::getOutputColumnExpressions()
-{
-    return m_outputColumnExpressions;
 }
 
 const vector<AbstractExpression*>&

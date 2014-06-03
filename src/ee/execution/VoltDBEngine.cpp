@@ -71,7 +71,6 @@
 #include "catalog/columnref.h"
 #include "catalog/procedure.h"
 #include "catalog/statement.h"
-#include "catalog/planfragment.h"
 #include "catalog/constraint.h"
 #include "catalog/materializedviewinfo.h"
 #include "catalog/connector.h"
@@ -79,8 +78,8 @@
 #include "plannodes/abstractplannode.h"
 #include "plannodes/abstractscannode.h"
 #include "plannodes/plannodeutil.h"
-#include "plannodes/plannodefragment.h"
 #include "executors/executorutil.h"
+#include "executors/abstractexecutor.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
@@ -315,7 +314,7 @@ bool VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput* out) const {
 
 int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t planfragmentIds[],
-                                       int64_t intputDependencyIds[],
+                                       int64_t inputDependencyIds[],
                                        ReferenceSerializeInput &serialize_in,
                                        int64_t spHandle,
                                        int64_t lastCommittedSpHandle,
@@ -346,8 +345,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
         // success is 0 and error is 1.
         if (executePlanFragment(planfragmentIds[m_currentIndexInBatch],
-                                intputDependencyIds ? intputDependencyIds[m_currentIndexInBatch] : -1,
-                                m_staticParams,
+                                inputDependencyIds ? inputDependencyIds[m_currentIndexInBatch] : -1,
                                 spHandle,
                                 lastCommittedSpHandle,
                                 uniqueId,
@@ -370,7 +368,6 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 
 int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       int64_t inputDependencyId,
-                                      const NValueArray &params,
                                       int64_t spHandle,
                                       int64_t lastCommittedSpHandle,
                                       int64_t uniqueId,
@@ -442,7 +439,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
-            if (!executor->execute(params)) {
+            if (!executor->execute()) {
                 VOLT_TRACE("The Executor's execution at position '%d'"
                            " failed for PlanFragment '%jd'",
                            ctr, (intmax_t)planfragmentId);
@@ -1166,11 +1163,15 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId,
     assert(node->getExecutor() == NULL);
 
     // Executor is created here. An executor is *devoted* to this plannode
-    // so that it can cache anything for the plannode
-    AbstractExecutor* executor = getNewExecutor(this, node);
-    if (executor == NULL)
-        return false;
-    node->setExecutor(executor);
+    // so that it can cache anything for the plannode.
+    AbstractExecutor* executor = ExecutorUtil::getNewExecutor(node);
+    if (executor == NULL) {
+        char message[256];
+        snprintf(message, sizeof(message), "Unexpected error. "
+            "Invalid statement plan. A fragment (%jd) has an unknown plan node type (%d)",
+            (intmax_t)fragId, (int)node->getPlanNodeType());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+    }
 
     // If this PlanNode has an internal PlanNode (e.g., AbstractScanPlanNode can
     // have internal Projections), then we need to make sure that we set that

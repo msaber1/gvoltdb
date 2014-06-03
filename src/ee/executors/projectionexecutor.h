@@ -46,47 +46,56 @@
 #ifndef HSTOREPROJECTIONEXECUTOR_H
 #define HSTOREPROJECTIONEXECUTOR_H
 
-#include <vector>
-#include "boost/shared_array.hpp"
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
+
+#include "common/tabletuple.h"
+#include "expressions/abstractexpression.h"
+#include "plannodes/projectionnode.h"
+#include "storage/temptable.h"
 
 namespace voltdb {
 
 class AbstractExpression;
-class TempTable;
-class Table;
 
 /**
  *
  */
 class ProjectionExecutor : public AbstractExecutor {
-    public:
-        ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) {
-            output_table = NULL;
+public:
+    ProjectionExecutor() { }
+    ~ProjectionExecutor() { }
+
+
+    static void insertTempOutputTuple(TempTable* output_table, TableTuple& tuple, TableTuple& temp_tuple,
+                                      int num_of_columns,
+                                      const int* projection_columns,
+                                      AbstractExpression* const* projection_expressions)
+    {
+        if (projection_columns) {
+            // Project (or replace) column values from the input tuple into a temp tuple.
+            for (int ctr = 0; ctr < num_of_columns; ctr++) {
+                temp_tuple.setNValue(ctr, tuple.getNValue(projection_columns[ctr]));
+            }
+            output_table->insertTempTuple(temp_tuple);
+            return;
         }
-        ~ProjectionExecutor();
-    protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
+        if (projection_expressions) {
+            for (int ctr = 0; ctr < num_of_columns; ctr++) {
+                NValue value = projection_expressions[ctr]->eval(&tuple, NULL);
+                temp_tuple.setNValue(ctr, value);
+            }
+            output_table->insertTempTuple(temp_tuple);
+            return;
+        }
+        // Copy the input tuple directly into the result table.
+        output_table->insertTempTuple(tuple);
+    }
 
-    private:
-        TempTable* output_table;
-        Table* input_table;
-        int m_columnCount;
-        boost::shared_array<int> all_tuple_array_ptr;
-        int* all_tuple_array;
-        boost::shared_array<int> all_param_array_ptr;
-        int* all_param_array;
-        boost::shared_array<bool> needs_substitute_ptr;
-        bool *needs_substitute;
-        TableTuple tuple;
-
-        boost::shared_array<AbstractExpression*> expression_array_ptr;
-        AbstractExpression** expression_array;
+protected:
+    bool p_init(TempTableLimits* limits);
+    bool p_execute();
+private:
+    ProjectionPlanNode::InlineState m_state;
 };
 
 }

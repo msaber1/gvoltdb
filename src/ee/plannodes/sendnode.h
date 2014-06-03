@@ -46,30 +46,23 @@
 #ifndef HSTORESENDNODE_H
 #define HSTORESENDNODE_H
 
-#include <sstream>
 #include "abstractplannode.h"
-#include "common/debuglog.h"
 
 namespace voltdb {
-
-class Table;
 
 /**
  *
  */
 class SendPlanNode : public AbstractPlanNode {
-    public:
-        SendPlanNode(CatalogId id) : AbstractPlanNode(id) {
-        }
-        SendPlanNode() : AbstractPlanNode() {
-        }
-        ~SendPlanNode() {}
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_SEND); }
+public:
+    SendPlanNode() { }
+    ~SendPlanNode() { }
+    virtual PlanNodeType getPlanNodeType() const;
 
-        std::string debugInfo(const std::string &spacer) const;
+    std::string debugInfo(const std::string &spacer) const;
 
-    protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
+protected:
+    virtual void loadFromJSONObject(PlannerDomValue obj);
 };
 
 }

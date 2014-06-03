@@ -56,9 +56,8 @@ class AbstractExpression;
 class AbstractJoinPlanNode : public AbstractPlanNode
 {
 public:
-    AbstractJoinPlanNode(CatalogId id);
-    AbstractJoinPlanNode();
-    virtual ~AbstractJoinPlanNode();
+    AbstractJoinPlanNode() { }
+    ~AbstractJoinPlanNode();
 
     JoinType getJoinType() const;
 
@@ -72,9 +71,6 @@ public:
 
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj);
-
-    void loadPredicateFromJSONObject(
-        const char* predicateType, const PlannerDomValue& obj, AbstractExpression*& predicate);
 
     // This is the outer-table-only join expression. If the outer tuple fails it,
     // it may still be part of the result set (pending other filtering)

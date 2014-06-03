@@ -43,31 +43,29 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <sstream>
-#include <stdexcept>
 #include "limitnode.h"
-#include "common/serializeio.h"
+
 #include "common/ValuePeeker.hpp"
-#include "common/FatalException.hpp"
-#include "storage/table.h"
+#include "execution/VoltDBEngine.h"
+#include "expressions/abstractexpression.h"
+
+#include <sstream>
 
 namespace voltdb {
 
-LimitPlanNode::~LimitPlanNode() {
-    delete limitExpression;
-    if (!isInline()) {
-        delete getOutputTable();
-        setOutputTable(NULL);
-    }
+PlanNodeType LimitPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_LIMIT; }
+
+LimitPlanNode::~LimitPlanNode()
+{
+    delete m_state.limitExpression;
 }
 
-/*
- * This code is needed in the limit executor as well as anywhere limit
- * is inlined. Centralize it here.
- */
 void
-LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limitOut, int &offsetOut)
+LimitPlanNode::InlineState::getLimitAndOffsetByReference(VoltDBEngine* engine,
+        int &limitOut, int &offsetOut)
 {
+    const NValueArray &params = engine->getParameterContainer();
+;
     limitOut = limit;
     offsetOut = offset;
 
@@ -103,29 +101,24 @@ LimitPlanNode::getLimitAndOffsetByReference(const NValueArray &params, int &limi
 
 std::string LimitPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
-    buffer << spacer << "Limit[" << this->limit << "]\n";
-    buffer << spacer << "Offset[" << this->offset << "]\n";
+    buffer << spacer << "Limit[" << m_state.limit << "]\n";
+    buffer << spacer << "Offset[" << m_state.offset << "]\n";
     return (buffer.str());
 }
 
-void LimitPlanNode::loadFromJSONObject(PlannerDomValue obj) {
-    limit = obj.valueForKey("LIMIT").asInt();
-    offset = obj.valueForKey("OFFSET").asInt();
+void LimitPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
+    m_state.limit = obj.valueForKey("LIMIT").asInt();
+    m_state.offset = obj.valueForKey("OFFSET").asInt();
 
     if (obj.hasNonNullKey("LIMIT_PARAM_IDX")) {
-        limitParamIdx = obj.valueForKey("LIMIT_PARAM_IDX").asInt();
+        m_state.limitParamIdx = obj.valueForKey("LIMIT_PARAM_IDX").asInt();
     }
     if (obj.hasNonNullKey("OFFSET_PARAM_IDX")) {
-        offsetParamIdx = obj.valueForKey("OFFSET_PARAM_IDX").asInt();
+        m_state.offsetParamIdx = obj.valueForKey("OFFSET_PARAM_IDX").asInt();
     }
 
-    if (obj.hasNonNullKey("LIMIT_EXPRESSION")) {
-        PlannerDomValue expr = obj.valueForKey("LIMIT_EXPRESSION");
-        limitExpression = AbstractExpression::buildExpressionTree(expr);
-    }
-    else {
-        limitExpression = NULL;
-    }
+    m_state.limitExpression = loadExpressionFromJSONObject("LIMIT_EXPRESSION", obj);
 }
 
 }

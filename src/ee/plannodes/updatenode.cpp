@@ -43,23 +43,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdio>
-#include <sstream>
-#include <stdexcept>
 #include "updatenode.h"
-#include "common/serializeio.h"
-#include "common/FatalException.hpp"
+
+#include <sstream>
 
 namespace voltdb {
+
+PlanNodeType UpdatePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UPDATE; }
 
 void UpdatePlanNode::loadFromJSONObject(PlannerDomValue obj) {
     AbstractOperationPlanNode::loadFromJSONObject(obj);
     m_updatesIndexes = obj.valueForKey("UPDATES_INDEXES").asBool();
 }
 
-
 std::string UpdatePlanNode::debugInfo(const std::string &spacer) const {
-    return (std::string(""));
+    return "";
 }
 
 }

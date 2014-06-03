@@ -46,44 +46,54 @@
 #ifndef HSTORELIMITNODE_H
 #define HSTORELIMITNODE_H
 
-#include <sstream>
 #include "abstractplannode.h"
-#include "common/debuglog.h"
-#include "common/valuevector.h"
 
 namespace voltdb {
 
-class Table;
+class AbstractExpression;
+class VoltDBEngine;
 
 /**
  *
  */
 class LimitPlanNode : public AbstractPlanNode {
 public:
-    LimitPlanNode() : AbstractPlanNode(),
-    limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1)
-    {}
+    LimitPlanNode() {}
     ~LimitPlanNode();
-    virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_LIMIT); }
-
-    // evaluate possibly parameterized limit and offsets.
-    void getLimitAndOffsetByReference(const NValueArray &params, int &limit, int &offset);
+    virtual PlanNodeType getPlanNodeType() const;
 
     std::string debugInfo(const std::string &spacer) const;
 
-private:
-    virtual void loadFromJSONObject(PlannerDomValue obj);
-    int limit;
-    int offset;
-    int limitParamIdx;
-    int offsetParamIdx;
+    // Encapsulation of LimitPlanNode state handy for transfer to executor caches.
+    class InlineState {
+    public:
+        InlineState()
+            : limit(-1), offset(0), limitParamIdx(-1), offsetParamIdx(-1), limitExpression(NULL)
+        {}
 
-    /*
-     * If the query has limit and offset, the pushed-down limit node will
-     * have a limit expression of the sum of the limit parameter and the
-     * offset parameter, and offset will be 0
-     */
-    AbstractExpression* limitExpression;
+        // evaluate possibly parameterized limit and offsets.
+        void getLimitAndOffsetByReference(VoltDBEngine* engine, int &limit, int &offset);
+
+        std::string debugInfo(const std::string &spacer) const;
+
+        int limit;
+        int offset;
+        int limitParamIdx;
+        int offsetParamIdx;
+        /*
+         * If the query has limit and offset, the pushed-down limit node will
+         * have a limit expression of the sum of the limit parameter and the
+         * offset parameter, and offset will be 0
+         */
+        AbstractExpression* limitExpression;
+    };
+
+    const InlineState& getState() const { return m_state; }
+
+protected:
+    virtual void loadFromJSONObject(PlannerDomValue obj);
+private:
+    InlineState m_state;
 };
 
 }

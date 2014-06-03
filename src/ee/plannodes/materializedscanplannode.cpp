@@ -15,37 +15,38 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <sstream>
 #include "materializedscanplannode.h"
-#include "common/common.h"
+
 #include "expressions/abstractexpression.h"
-#include "storage/table.h"
+
+#include <sstream>
 
 namespace voltdb {
 
-    MaterializedScanPlanNode::~MaterializedScanPlanNode() {
-        delete getOutputTable();
-        setOutputTable(NULL);
+PlanNodeType
+MaterializedScanPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_MATERIALIZEDSCAN; }
 
-        if (m_tableRowsExpression) {
-            delete m_tableRowsExpression;
-        }
-    }
+MaterializedScanPlanNode::~MaterializedScanPlanNode()
+{
+    delete m_tableRowsExpression;
+}
 
-    std::string MaterializedScanPlanNode::debugInfo(const std::string &spacer) const {
-        std::ostringstream buffer;
-        buffer << spacer << "MATERERIALIZED SCAN Expression: <NULL>";
-        return (buffer.str());
-    }
+std::string MaterializedScanPlanNode::debugInfo(const std::string &spacer) const
+{
+    std::ostringstream buffer;
+    buffer << spacer << "MATERERIALIZED SCAN Expression: <NULL>";
+    return (buffer.str());
+}
 
-    void MaterializedScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
-        PlannerDomValue rowExpressionObj = obj.valueForKey("TABLE_DATA");
-        assert(!m_tableRowsExpression);
-        m_tableRowsExpression = AbstractExpression::buildExpressionTree(rowExpressionObj);
-        if (obj.hasNonNullKey("SORT_DIRECTION")) {
-            std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();
-            m_sortDirection = stringToSortDirection(sortDirectionString);
-        }
+void MaterializedScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
+    m_tableRowsExpression = loadExpressionFromJSONObject("TABLE_DATA", obj);
+    assert(m_tableRowsExpression);
+
+    if (obj.hasNonNullKey("SORT_DIRECTION")) {
+        std::string sortDirectionString = obj.valueForKey("SORT_DIRECTION").asStr();
+        m_sortDirection = stringToSortDirection(sortDirectionString);
     }
+}
 
 }

@@ -56,104 +56,89 @@
 
 namespace voltdb {
 
-bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
-                                 TempTableLimits* limits)
+bool MaterializeExecutor::p_init(TempTableLimits* limits)
 {
     VOLT_TRACE("init Materialize Executor");
 
-    node = dynamic_cast<MaterializePlanNode*>(abstractNode);
+    MaterializePlanNode* node = dynamic_cast<MaterializePlanNode*>(m_abstractNode);
     assert(node);
-    batched = node->isBatched();
-
-    // Construct the output table
-    m_columnCount = static_cast<int>(node->getOutputSchema().size());
-    assert(m_columnCount >= 0);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
-    // initialize local variables
-    all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(node->getOutputColumnExpressions());
-    all_param_array = all_param_array_ptr.get();
+    m_batched = node->isBatched();
 
-    needs_substitute_ptr = boost::shared_array<bool>(new bool[m_columnCount]);
-    needs_substitute = needs_substitute_ptr.get();
-
-    expression_array_ptr =
-      boost::shared_array<AbstractExpression*>(new AbstractExpression*[m_columnCount]);
-    expression_array = expression_array_ptr.get();
-
-    for (int ctr = 0; ctr < m_columnCount; ctr++) {
-        assert (node->getOutputColumnExpressions()[ctr] != NULL);
-        expression_array_ptr[ctr] = node->getOutputColumnExpressions()[ctr];
-        needs_substitute_ptr[ctr] = node->getOutputColumnExpressions()[ctr]->hasParameter();
-    }
-
-    //output table should be temptable
-    output_table = dynamic_cast<TempTable*>(node->getOutputTable());
-
-    return (true);
-}
-
-bool MaterializeExecutor::p_execute(const NValueArray &params) {
-    assert (node == dynamic_cast<MaterializePlanNode*>(m_abstractNode));
-    assert(node);
-    assert (!node->isInline()); // inline projection's execute() should not be called
-    assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
-    assert (output_table);
-    assert (m_columnCount == (int)node->getOutputColumnNames().size());
-
-    // batched insertion
-    if (batched) {
-        int paramcnt = engine->getUsedParamcnt();
-        VOLT_TRACE("batched insertion with %d params. %d for each tuple.", paramcnt, m_columnCount);
-        TableTuple &temp_tuple = output_table->tempTuple();
-        for (int i = 0, tuples = paramcnt / m_columnCount; i < tuples; ++i) {
-            for (int j = m_columnCount - 1; j >= 0; --j) {
-                temp_tuple.setNValue(j, params[i * m_columnCount + j]);
-            }
-            output_table->insertTupleNonVirtual(temp_tuple);
-        }
-        VOLT_TRACE ("Materialized :\n %s", this->output_table->debug().c_str());
+    if (m_batched) {
         return true;
     }
 
+    // initialize local variables
+    const std::vector<AbstractExpression*>& column_expressions = node->getOutputColumnExpressions();
+    m_all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(column_expressions);
 
-    // substitute parameterized values in expression trees.
-    if (all_param_array == NULL) {
-        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-            assert(expression_array[ctr]);
-            VOLT_TRACE("predicate[%d]: %s", ctr, expression_array[ctr]->debug(true).c_str());
-        }
+    if (m_all_param_array_ptr.get() != NULL) {
+        return (true);
     }
+
+    int columnCount = (int)column_expressions.size();
+    AbstractExpression** expression_array = new AbstractExpression*[columnCount];
+    for (int ctr = 0; ctr < columnCount; ctr++) {
+        assert (column_expressions[ctr] != NULL);
+        expression_array[ctr] = column_expressions[ctr];
+    }
+    m_expression_array_ptr.reset(expression_array);
+    return true;
+}
+
+bool MaterializeExecutor::p_execute()
+{
+    TempTable* output_table = getTempOutputTable();
+    TableTuple &temp_tuple = output_table->tempTuple();
+    assert (output_table);
+    int columnCount = output_table->columnCount();
+
+    // batched insertion
+    if (m_batched) {
+        int paramcnt = m_engine->getUsedParamcnt();
+        const NValueArray& params = m_engine->getParameterContainer();
+        VOLT_TRACE("batched insertion with %d params. %d for each tuple.", paramcnt, columnCount);
+        TableTuple &temp_tuple = output_table->tempTuple();
+        for (int i = 0, tuples = paramcnt / columnCount; i < tuples; ++i) {
+            for (int j = columnCount - 1; j >= 0; --j) {
+                temp_tuple.setNValue(j, params[i * columnCount + j]);
+            }
+            output_table->insertTempTuple(temp_tuple);
+        }
+        VOLT_TRACE ("Materialized :\n %s", output_table->debug().c_str());
+        return true;
+    }
+
 
     // For now a MaterializePlanNode can make at most one new tuple We
     // should think about whether we would ever want to materialize
     // more than one tuple and whether such a thing is possible with
     // the AbstractExpression scheme
-    TableTuple &temp_tuple = output_table->tempTuple();
+    int* all_param_array = m_all_param_array_ptr.get();
     if (all_param_array != NULL) {
+        const NValueArray& params = m_engine->getParameterContainer();
         VOLT_TRACE("sweet, all params\n");
-        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+        for (int ctr = columnCount - 1; ctr >= 0; --ctr) {
             temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
         }
     }
     else {
+        AbstractExpression** expression_array = m_expression_array_ptr.get();
         TableTuple dummy;
         // add the generated value to the temp tuple. it must have the
         // same value type as the output column.
-        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+        for (int ctr = columnCount - 1; ctr >= 0; --ctr) {
             temp_tuple.setNValue(ctr, expression_array[ctr]->eval(&dummy, NULL));
         }
     }
 
     // Add tuple to the output
-    output_table->insertTupleNonVirtual(temp_tuple);
-
+    output_table->insertTempTuple(temp_tuple);
     return true;
-}
-
-MaterializeExecutor::~MaterializeExecutor() {
 }
 
 }

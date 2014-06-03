@@ -48,14 +48,9 @@
 
 #include "boost/shared_ptr.hpp"
 
-#include "common/common.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
-
-class UndoLog;
-class ReadWriteSet;
 
 namespace detail {
     struct SetOperator;
@@ -65,16 +60,14 @@ namespace detail {
  *
  */
 class UnionExecutor : public AbstractExecutor {
-    public:
-        UnionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
-
-    protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
-
-    private:
-        boost::shared_ptr<detail::SetOperator> m_setOperator;
+public:
+    UnionExecutor() { }
+    ~UnionExecutor() { }
+protected:
+    bool p_init(TempTableLimits* limits);
+    bool p_execute();
+private:
+    boost::shared_ptr<detail::SetOperator> m_setOperator;
 };
 
 }
