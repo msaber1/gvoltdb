@@ -57,6 +57,9 @@ function InitializeChart(id, chart, metric)
 	}
 	
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
+    //request a redraw immediate after initialization, otherwise pie chart don't get updated 
+    plot.series[0].data = data;
+    plot.replot(opt);
     
     MonitorUI.Monitors[id][chart+'Plot'] = plot;
 }
@@ -453,7 +456,7 @@ this.RefreshMonitor = function(id, Success)
 			rmax = 100;
 			break;
 		case 'tb':
-                        monitor.leftPlot.series[0].data = dataTB;
+                        monitor.rightPlot.series[0].data = dataTB;
 			break;
 	}
 
