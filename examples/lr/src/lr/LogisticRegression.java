@@ -40,8 +40,8 @@ import lr.procedures.*;
 public class LogisticRegression
 {
     public static void main(String[] args) throws Exception {
-        double[] weights = new double[14];
-        double stepsize = 0.001;
+        double[] weights = new double[2];
+        double stepsize = 0.0001;
 
         // init client
         Client client = null;
@@ -58,7 +58,7 @@ public class LogisticRegression
         VoltTable keys = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults()[0];
 
         try {
-            for (int iter = 0; iter < 10000; iter++) {
+            for (int iter = 0; iter < 1000; iter++) {
                 for (int k = 0; k < keys.getRowCount(); k++) {
                     long key = keys.fetchRow(k).getLong(1);
                     VoltTable gt = client.callProcedure("Solve", key, weights, stepsize).getResults()[0];
@@ -67,7 +67,6 @@ public class LogisticRegression
                         // TODO: inefficient now
                         weights[i] -= gt.fetchRow(i).getDouble(0);
                     }
-                    //System.out.println("the "+k+" patition");
                     //System.out.print(gt);
                     //System.out.println();
                 }
@@ -82,9 +81,6 @@ public class LogisticRegression
         }
 
         try {
-            //System.out.println("after 1000 iteration");
-            for (int i = 0; i<weights.length; i++)
-                //System.out.println(weights[i]);
             client.close();
         } catch (InterruptedException e) {
             e.printStackTrace();

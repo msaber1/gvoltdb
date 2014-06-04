@@ -42,8 +42,8 @@ import lr.procedures.*;
 public class AsyncLogisticRegression
 {
     public static void main(String[] args) throws Exception {
-        double[] weights = new double[14];
-        double stepsize = 0.001;
+        double[] weights = new double[2];
+        double stepsize = 0.0001;
 
         // init client
         Client client = null;
@@ -61,7 +61,7 @@ public class AsyncLogisticRegression
         int patitions = keys.getRowCount();
 
         try {
-            for (int iter = 0; iter < 10000; iter++) {
+            for (int iter = 0; iter < 1000; iter++) {
                 for (int k = 0; k < patitions; k++) {
                     long key = keys.fetchRow(k).getLong(1);
                     client.callProcedure(new LRCallback(weights), "Solve", key, weights, stepsize);
