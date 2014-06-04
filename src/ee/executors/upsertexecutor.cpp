@@ -77,7 +77,6 @@ void UpsertExecutor::p_initMore()
     assert(persistentTarget);
 
     TempTable* input_table = getTempInputTable(); //input table should be temptable
-
     m_partitionColumnIsString = false;
     m_partitionColumn = persistentTarget->partitionColumn();
     if (m_partitionColumn != -1) {
@@ -100,10 +99,12 @@ bool UpsertExecutor::p_execute()
     // Update target table reference from table delegate
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(getTargetTable());
     assert(targetTable);
+    assert (targetTable->columnCount() == m_inputTable->columnCount());
+    TableTuple targetTuple = TableTuple(targetTable->schema());
 
     TableTuple tbTuple = TableTuple(input_table->schema());
 
-    VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
+    VOLT_DEBUG("INPUT TABLE: %s\n", input_table->debug().c_str());
     assert ( ! input_table->isTempTableEmpty());
 
     // count the number of successful inserts
@@ -111,13 +112,12 @@ bool UpsertExecutor::p_execute()
 
     TableIterator iterator = input_table->iterator();
     while (iterator.next(tbTuple)) {
-        VOLT_TRACE("Upserting tuple '%s' into target table '%s' with table schema: %s",
+        VOLT_DEBUG("Upserting tuple '%s' into target table '%s' with table schema: %s",
                 tbTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),
                 targetTable->schema()->debug().c_str());
 
         // if there is a partition column for the target table
         if (m_partitionColumn != -1) {
-
             // get the value for the partition column
             NValue value = tbTuple.getNValue(m_partitionColumn);
             bool isLocal = m_engine->isLocalSite(value);
@@ -128,7 +128,7 @@ bool UpsertExecutor::p_execute()
                     throw ConstraintFailureException(
                             dynamic_cast<PersistentTable*>(targetTable),
                             tbTuple,
-                            "Mispartitioned tuple in single-partition insert statement.");
+                            "Mispartitioned tuple in single-partition upsert statement.");
                 }
                 continue;
             }
@@ -153,9 +153,10 @@ bool UpsertExecutor::p_execute()
             }
         } else {
             // tuple exists already, try to update the tuple instead
-            TableTuple newTuple = TableTuple(targetTable->schema());
-            newTuple.move(tbTuple.address());
-            if (!targetTable->updateTupleWithSpecificIndexes(existsTuple, tbTuple,
+            targetTuple.move(tbTuple.address());
+            TableTuple &tempTuple = targetTable->getTempTupleInlined(targetTuple);
+
+            if (!targetTable->updateTupleWithSpecificIndexes(existsTuple, tempTuple,
                     targetTable->allIndexes())) {
                 VOLT_INFO("Failed to update existsTuple from table '%s'",
                         targetTable->name().c_str());
