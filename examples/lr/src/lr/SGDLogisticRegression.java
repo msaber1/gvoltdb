@@ -37,7 +37,7 @@ import org.voltdb.client.ProcedureCallback;
 
 import lr.procedures.*;
 
-public class LogisticRegression
+public class SGDLogisticRegression
 {
     public static void main(String[] args) throws Exception {
         double[] weights = new double[2];
@@ -58,25 +58,21 @@ public class LogisticRegression
         VoltTable keys = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults()[0];
 
         try {
-            for (int iter = 0; iter < 150; iter++) {
-                double[] grad = new double[2];
+            for (int iter = 0; iter < 1000; iter++) {
                 for (int k = 0; k < keys.getRowCount(); k++) {
                     long key = keys.fetchRow(k).getLong(1);
                     VoltTable gt = client.callProcedure("Solve", key, weights, stepsize).getResults()[0];
                     // TODO: now sync, change to async
                     for (int i = 0; i < weights.length; i++) {
                         // TODO: inefficient now
-                        //weights[i] -= gt.fetchRow(i).getDouble(0);
-                        grad[i] += gt.fetchRow(i).getDouble(0);
+                        weights[i] -= gt.fetchRow(i).getDouble(0);
                     }
                     //System.out.print(gt);
                     //System.out.println();
                 }
                 //System.out.println("after the " + iter + " iteration:");
-                for (int i =0; i < weights.length; i++){
-                    weights[i] -= grad[i];
+                for (int i =0; i < weights.length; i++)
                     System.out.print(weights[i] + "\t");
-                }
                 System.out.println();
             }
         } catch (Exception e) {

@@ -61,7 +61,7 @@ public class AsyncLogisticRegression
         int patitions = keys.getRowCount();
 
         try {
-            for (int iter = 0; iter < 1000; iter++) {
+            for (int iter = 0; iter < 150; iter++) {
                 for (int k = 0; k < patitions; k++) {
                     long key = keys.fetchRow(k).getLong(1);
                     client.callProcedure(new LRCallback(weights), "Solve", key, weights, stepsize);
