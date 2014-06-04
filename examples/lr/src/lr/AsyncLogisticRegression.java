@@ -23,6 +23,8 @@
 
 package lr;
 
+//import java.util.concurrent.CyclicBarrier;
+
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
@@ -37,7 +39,7 @@ import org.voltdb.client.ProcedureCallback;
 
 import lr.procedures.*;
 
-public class LogisticRegression
+public class AsyncLogisticRegression
 {
     public static void main(String[] args) throws Exception {
         double[] weights = new double[14];
@@ -56,21 +58,20 @@ public class LogisticRegression
         client.createConnection("localhost");
 
         VoltTable keys = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults()[0];
+        int patitions = keys.getRowCount();
 
         try {
             for (int iter = 0; iter < 10000; iter++) {
-                for (int k = 0; k < keys.getRowCount(); k++) {
+                for (int k = 0; k < patitions; k++) {
                     long key = keys.fetchRow(k).getLong(1);
-                    VoltTable gt = client.callProcedure("Solve", key, weights, stepsize).getResults()[0];
-                    // TODO: now sync, change to async
-                    for (int i = 0; i < weights.length; i++) {
-                        // TODO: inefficient now
-                        weights[i] -= gt.fetchRow(i).getDouble(0);
-                    }
+                    client.callProcedure(new LRCallback(weights), "Solve", key, weights, stepsize);
                 }
-                //System.out.println("after the " + iter + " iteration:");
+                //wait all stored procedure finished
+                client.drain();
+
                 for (int i =0; i < weights.length; i++)
                     System.out.print(weights[i] + "\t");
+
                 System.out.println();
             }
         } catch (Exception e) {
@@ -79,12 +80,34 @@ public class LogisticRegression
         }
 
         try {
-            //System.out.println("after 1000 iteration");
-            for (int i = 0; i<weights.length; i++)
-                //System.out.println(weights[i]);
             client.close();
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
     };
+
+    static class LRCallback implements ProcedureCallback {
+        public LRCallback(double[] weights) {
+            this.weights = weights;
+        }
+        @Override
+        public void clientCallback(ClientResponse response) {
+            if(response.getStatus() != ClientResponse.SUCCESS) {
+                System.err.println(response.getStatusString());
+                return;
+            }
+
+            VoltTable result = response.getResults()[0];
+            result.resetRowPosition();
+            int i = 0;
+            synchronized (weights) {
+                while (result.advanceRow()) {
+                    weights[i] -= result.getDouble(0);
+                    i++;
+                }
+            }
+        }
+
+        double[] weights;
+    }
 }

@@ -92,14 +92,16 @@ function rejoin() {
 
 # run the client that drives the example
 # TODO: run my code
-function client() {
-    init
-}
-
 function lr() {
     srccompile
     java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         lr.LogisticRegression
+}
+
+function asynclr() {
+    srccompile
+    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        lr.AsyncLogisticRegression
 }
 
 function help() {
