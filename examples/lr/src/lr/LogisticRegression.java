@@ -67,6 +67,9 @@ public class LogisticRegression
                         // TODO: inefficient now
                         weights[i] -= gt.fetchRow(i).getDouble(0);
                     }
+                    //System.out.println("the "+k+" patition");
+                    //System.out.print(gt);
+                    //System.out.println();
                 }
                 //System.out.println("after the " + iter + " iteration:");
                 for (int i =0; i < weights.length; i++)

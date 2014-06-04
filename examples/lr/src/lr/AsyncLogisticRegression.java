@@ -105,6 +105,9 @@ public class AsyncLogisticRegression
                     weights[i] -= result.getDouble(0);
                     i++;
                 }
+                //System.out.println("the "+k+" patition");
+                //System.out.print(result);
+                //System.out.println();
             }
         }
 
