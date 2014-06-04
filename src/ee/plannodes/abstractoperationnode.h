@@ -56,7 +56,8 @@ namespace voltdb {
 class AbstractOperationPlanNode : public AbstractPlanNode {
 public:
     ~AbstractOperationPlanNode() { }
-    std::string getTargetTableName() const;
+    const std::string& getTargetTableName() const { return target_table_name; }
+
     virtual std::string debugInfo(const std::string &spacer) const;
 protected:
     AbstractOperationPlanNode() { }

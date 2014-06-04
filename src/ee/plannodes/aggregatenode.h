@@ -84,15 +84,7 @@ public:
     AbstractExpression* getPostPredicate() const
     { return m_postPredicate; }
 
-    void collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const;
-
     std::string debugInfo(const std::string &spacer) const;
-
-    //
-    // Public methods used only for tests
-    //
-    void setAggregates(std::vector<ExpressionType> &aggregates);
-    void setAggregateOutputColumns(std::vector<int> outputColumns);
 
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj);

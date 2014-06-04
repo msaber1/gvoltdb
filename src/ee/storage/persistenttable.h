@@ -46,29 +46,28 @@
 #ifndef HSTOREPERSISTENTTABLE_H
 #define HSTOREPERSISTENTTABLE_H
 
-#include <string>
-#include <vector>
-#include <cassert>
-#include <iostream>
-#include <boost/scoped_ptr.hpp>
-#include <boost/shared_ptr.hpp>
+#include "storage/table.h"
+#include "common/UndoQuantumReleaseInterest.h"
+
 #include "common/types.h"
 #include "common/ids.h"
-#include "common/valuevector.h"
 #include "common/tabletuple.h"
-#include "execution/VoltDBEngine.h"
-#include "storage/CopyOnWriteIterator.h"
-#include "storage/ElasticIndex.h"
-#include "storage/table.h"
-#include "storage/TupleStreamWrapper.h"
+#include "common/ThreadLocalPool.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
 #include "storage/TableStreamerInterface.h"
-#include "storage/RecoveryContext.h"
-#include "storage/ElasticIndex.h"
 #include "storage/CopyOnWriteIterator.h"
-#include "common/UndoQuantumReleaseInterest.h"
-#include "common/ThreadLocalPool.h"
+#include "storage/ElasticIndex.h"
+#include "storage/tableiterator.h"
+
+#include <cassert>
+#include <climits>
+#include <iostream>
+#include <string>
+#include <vector>
+
+#include <boost/scoped_ptr.hpp>
+#include <boost/shared_ptr.hpp>
 
 class CompactionTest_BasicCompaction;
 class CompactionTest_CompactionWithCopyOnWrite;
@@ -93,6 +92,7 @@ class TupleOutputStreamProcessor;
 class ReferenceSerializeInput;
 class PersistentTable;
 class TableCatalogDelegate;
+class VoltDBEngine;
 
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access

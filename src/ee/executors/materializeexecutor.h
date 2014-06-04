@@ -46,9 +46,7 @@
 #ifndef HSTOREMATERIALIZEEXECUTOR_H
 #define HSTOREMATERIALIZEEXECUTOR_H
 
-#include "executors/abstractexecutor.h"
-
-#include "boost/shared_array.hpp"
+#include "executors/projectionexecutor.h"
 
 namespace voltdb {
 
@@ -57,7 +55,7 @@ class AbstractExpression;
 /**
  *
  */
-class MaterializeExecutor : public AbstractExecutor {
+class MaterializeExecutor : public ProjectionExecutor {
 public:
     MaterializeExecutor() { }
     ~MaterializeExecutor() { }
@@ -65,9 +63,9 @@ protected:
     bool p_init(TempTableLimits* limits);
     bool p_execute();
 private:
-    boost::shared_array<int> m_all_param_array_ptr;
+    const int* m_all_param_array;
     // an array[num_columns] of pointers to expression trees
-    boost::shared_array<AbstractExpression*> m_expression_array_ptr;
+    const AbstractExpression* const * m_expression_array;
     bool m_batched;
 };
 

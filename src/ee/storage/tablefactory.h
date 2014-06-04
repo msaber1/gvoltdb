@@ -46,34 +46,27 @@
 #ifndef HSTORETABLEFACTORY_H
 #define HSTORETABLEFACTORY_H
 
-#include <string>
-#include <vector>
-#include "boost/shared_ptr.hpp"
 #include "common/ids.h"
 #include "common/types.h"
-#include "common/TupleSchema.h"
-#include "common/Pool.hpp"
-#include "indexes/tableindex.h"
-#include "indexes/tableindexfactory.h"
+
+#include <climits>
+#include <string>
+#include <vector>
 
 namespace voltdb {
 
 class Table;
 class PersistentTable;
-class SerializeInput;
 class TempTable;
 class TempTableLimits;
-class TableColumn;
-class TableIndex;
-class ExecutorContext;
+class TupleSchema;
 
 class TableFactory {
 public:
     /**
-    * Creates an empty persistent table with given name, columns, PK index, other indexes, partition column, etc.
+    * Creates an empty persistent table with given name, columns, partition column, etc.
     * Every PersistentTable must be instantiated via this method.
-    * Also, columns can't be added/changed/removed after a PersistentTable
-    * instance is made. TableColumn is immutable.
+    * Also, columns can't be added/changed/removed after a PersistentTable instance is made.
     */
     static Table* getPersistentTable(
         voltdb::CatalogId databaseId,

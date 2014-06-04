@@ -49,7 +49,6 @@
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
 #include "expressions/abstractexpression.h"
-#include "expressions/expressionutil.h"
 #include "plannodes/materializenode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
@@ -63,30 +62,16 @@ bool MaterializeExecutor::p_init(TempTableLimits* limits)
     MaterializePlanNode* node = dynamic_cast<MaterializePlanNode*>(m_abstractNode);
     assert(node);
 
-    // Create output table based on output schema from the plan
-    setTempOutputTable(limits);
-
     m_batched = node->isBatched();
 
     if (m_batched) {
+        // Create output table based on output schema from the plan
+        setTempOutputTable(limits);
         return true;
     }
 
-    // initialize local variables
-    const std::vector<AbstractExpression*>& column_expressions = node->getOutputColumnExpressions();
-    m_all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(column_expressions);
-
-    if (m_all_param_array_ptr.get() != NULL) {
-        return (true);
-    }
-
-    int columnCount = (int)column_expressions.size();
-    AbstractExpression** expression_array = new AbstractExpression*[columnCount];
-    for (int ctr = 0; ctr < columnCount; ctr++) {
-        assert (column_expressions[ctr] != NULL);
-        expression_array[ctr] = column_expressions[ctr];
-    }
-    m_expression_array_ptr.reset(expression_array);
+    ProjectionExecutor::p_init(limits);
+    m_all_param_array = node->getOutputParameterIdArrayIfAllParameters();
     return true;
 }
 
@@ -118,16 +103,15 @@ bool MaterializeExecutor::p_execute()
     // should think about whether we would ever want to materialize
     // more than one tuple and whether such a thing is possible with
     // the AbstractExpression scheme
-    int* all_param_array = m_all_param_array_ptr.get();
-    if (all_param_array != NULL) {
+    if (m_all_param_array != NULL) {
         const NValueArray& params = m_engine->getParameterContainer();
         VOLT_TRACE("sweet, all params\n");
         for (int ctr = columnCount - 1; ctr >= 0; --ctr) {
-            temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
+            temp_tuple.setNValue(ctr, params[m_all_param_array[ctr]]);
         }
     }
     else {
-        AbstractExpression** expression_array = m_expression_array_ptr.get();
+        const AbstractExpression* const* expression_array = m_expression_array;
         TableTuple dummy;
         // add the generated value to the temp tuple. it must have the
         // same value type as the output column.

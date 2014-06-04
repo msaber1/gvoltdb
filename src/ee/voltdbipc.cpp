@@ -39,6 +39,9 @@
 #include "execution/VoltDBEngine.h"
 #include "storage/table.h"
 
+#include "boost/scoped_array.hpp"
+#include "boost/scoped_ptr.hpp"
+
 #include <cassert>
 #include <cstdlib>
 #include <iostream>
@@ -859,11 +862,12 @@ std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
     length = static_cast<int32_t>(ntohl(length) - sizeof(int32_t));
     assert(length > 0);
 
-    boost::scoped_array<char> planBytes(new char[length + 1]);
+    char* planBytes = new char[length + 1];
+    boost::scoped_array<char> scoped_planBytes(planBytes);
     bytes = 0;
     while (bytes != length) {
         ssize_t oldBytes = bytes;
-        bytes += read(m_fd, planBytes.get() + bytes, length - bytes);
+        bytes += read(m_fd, planBytes + bytes, length - bytes);
         if (oldBytes == bytes) {
             break;
         }
@@ -885,7 +889,7 @@ std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
     planBytes[length] = '\0';
 
     // need to return a string
-    return std::string(planBytes.get());
+    return std::string(planBytes);
 }
 
 void VoltDBIPC::crashVoltDB(voltdb::FatalException e) {
@@ -1177,13 +1181,13 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
 
     HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
     int32_t configLength = ntohl(hash->configLength);
-    boost::scoped_ptr<TheHashinator> hashinator;
+    TheHashinator* hashinator;
     switch (hashinatorType) {
     case HASHINATOR_LEGACY:
-        hashinator.reset(LegacyHashinator::newInstance(hash->data));
+        hashinator = LegacyHashinator::newInstance(hash->data);
         break;
     case HASHINATOR_ELASTIC:
-        hashinator.reset(ElasticHashinator::newInstance(hash->data, NULL, 0));
+        hashinator = ElasticHashinator::newInstance(hash->data, NULL, 0);
         break;
     default:
         try {
@@ -1192,6 +1196,8 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
             crashVoltDB(e);
         }
     }
+    boost::scoped_ptr<TheHashinator> scoped_hashinator(hashinator);
+
     void* offset = hash->data + configLength;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(hash));
     ReferenceSerializeInput serialize_in(offset, sz);
@@ -1202,8 +1208,7 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
         assert(cnt> -1);
         Pool *pool = m_engine->getStringPool();
         deserializeParameterSetCommon(cnt, serialize_in, params, pool);
-        retval =
-            hashinator->hashinate(params[0]);
+        retval = hashinator->hashinate(params[0]);
         pool->purge();
     } catch (const FatalException &e) {
         crashVoltDB(e);
@@ -1342,11 +1347,13 @@ void *eethread(void *ptr) {
 
     // requests larger than this will cause havoc.
     // cry havoc and let loose the dogs of war
-    boost::shared_array<char> data(new char[max_ipc_message_size]);
-    memset(data.get(), 0, max_ipc_message_size);
+    char* data = new char[max_ipc_message_size];
+    boost::scoped_array<char> scoped_data(data);
+    memset(data, 0, max_ipc_message_size);
 
     // instantiate voltdbipc to interface to EE.
-    boost::shared_ptr<VoltDBIPC> voltipc(new VoltDBIPC(fd));
+    VoltDBIPC* voltipc = new VoltDBIPC(fd);
+    boost::scoped_ptr<VoltDBIPC> scoped_voltipc(voltipc);
 
     // loop until the terminate/shutdown command is seen
     while (true) {
@@ -1354,7 +1361,7 @@ void *eethread(void *ptr) {
 
         // read the header
         while (bytesread < 4) {
-            std::size_t b = read(fd, data.get() + bytesread, 4 - bytesread);
+            std::size_t b = read(fd, data + bytesread, 4 - bytesread);
             if (b == 0) {
                 printf("client eof\n");
                 close(fd);
@@ -1368,18 +1375,18 @@ void *eethread(void *ptr) {
         }
 
         // read the message body in to the same data buffer
-        int msg_size = ntohl(((struct ipc_command*) data.get())->msgsize);
+        int msg_size = ntohl(((struct ipc_command*) data)->msgsize);
         //printf("Received message size %d\n", msg_size);
         if (msg_size > max_ipc_message_size) {
             max_ipc_message_size = msg_size;
-            char* newdata = new char[max_ipc_message_size];
-            memset(newdata, 0, max_ipc_message_size);
-            memcpy(newdata, data.get(), 4);
-            data.reset(newdata);
+            data = new char[max_ipc_message_size];
+            memset(data, 0, max_ipc_message_size);
+            memcpy(data, scoped_data.get(), 4);
+            scoped_data.reset(data);
         }
 
         while (bytesread < msg_size) {
-            std::size_t b = read(fd, data.get() + bytesread, msg_size - bytesread);
+            std::size_t b = read(fd, data + bytesread, msg_size - bytesread);
             if (b == 0) {
                 printf("client eof\n");
                 close(fd);
@@ -1393,7 +1400,7 @@ void *eethread(void *ptr) {
         }
 
         // dispatch the request
-        struct ipc_command *cmd = (struct ipc_command*) data.get();
+        struct ipc_command *cmd = (struct ipc_command*) data;
 
         // size at least length + command
         if (ntohl(cmd->msgsize) < sizeof(struct ipc_command)) {
@@ -1434,8 +1441,8 @@ int main(int argc, char **argv) {
         assert(eecount >= 0);
         printf("==%d==\n", eecount);
     }
-
-    boost::shared_array<pthread_t> eeThreads(new pthread_t[eecount]);
+    pthread_t* eeThreads = new pthread_t[eecount];
+    boost::scoped_array<pthread_t> scoped_eeThreads(eeThreads);
 
     // allow caller to override port with the second argument
     if (argc == 3) {

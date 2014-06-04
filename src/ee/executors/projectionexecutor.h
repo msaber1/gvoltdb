@@ -69,7 +69,7 @@ public:
     static void insertTempOutputTuple(TempTable* output_table, TableTuple& tuple, TableTuple& temp_tuple,
                                       int num_of_columns,
                                       const int* projection_columns,
-                                      AbstractExpression* const* projection_expressions)
+                                      const AbstractExpression* const* projection_expressions)
     {
         if (projection_columns) {
             // Project (or replace) column values from the input tuple into a temp tuple.
@@ -94,7 +94,7 @@ public:
 protected:
     bool p_init(TempTableLimits* limits);
     bool p_execute();
-private:
+
     ProjectionPlanNode::InlineState m_state;
 };
 

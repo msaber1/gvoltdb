@@ -45,77 +45,50 @@
 
 #include "projectionnode.h"
 
-#include "storage/table.h"
+#include "expressions/abstractexpression.h"
+#include "expressions/expressionutil.h"
+
+#include "SchemaColumn.h"
 
 using namespace std;
-using namespace voltdb;
 
-PlanNodeType
-ProjectionPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_PROJECTION;
-}
+namespace voltdb {
 
-const vector<string>&
-ProjectionPlanNode::getOutputColumnNames() const
-{
-    return m_outputColumnNames;
-}
+PlanNodeType ProjectionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_PROJECTION; }
 
-const vector<ValueType>&
-ProjectionPlanNode::getOutputColumnTypes() const
-{
-    return m_outputColumnTypes;
-}
-
-const vector<int32_t>&
-ProjectionPlanNode::getOutputColumnSizes() const
-{
-    return m_outputColumnSizes;
-}
-
-const vector<AbstractExpression*>&
-ProjectionPlanNode::getOutputColumnExpressions() const
-{
-    return m_outputColumnExpressions;
-}
-
-string
-ProjectionPlanNode::debugInfo(const string& spacer) const
+string ProjectionPlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
-    buffer << spacer << "Projection Output["
-           << m_outputColumnNames.size() << "]:\n";
-    for (int ctr = 0, cnt = (int)m_outputColumnNames.size(); ctr < cnt; ctr++)
-    {
+    buffer << spacer << "Projection Output[" << m_outputColumnNames.size() << "]:\n";
+    const AbstractExpression* const* outputExpressions = getOutputExpressionArray();
+    for (int ctr = 0, cnt = (int)m_outputColumnNames.size(); ctr < cnt; ctr++) {
         buffer << spacer << "  [" << ctr << "] ";
         buffer << "name=" << m_outputColumnNames[ctr] << " : ";
-        buffer << "size=" << m_outputColumnSizes[ctr] << " : ";
-        buffer << "type=" << getTypeName(m_outputColumnTypes[ctr]) << "\n";
-        if (m_outputColumnExpressions[ctr] != NULL)
-        {
-            buffer << m_outputColumnExpressions[ctr]->debug(spacer + "   ");
+        if (outputExpressions[ctr] != NULL) {
+            buffer << outputExpressions[ctr]->debug(spacer + "   ");
         }
-        else
-        {
-            buffer << spacer << "  " << "<NULL>" << "\n";
+        else {
+            buffer << spacer << "  <NULL>\n";
         }
     }
     return buffer.str();
 }
 
-
-void
-ProjectionPlanNode::loadFromJSONObject(PlannerDomValue obj)
+void ProjectionPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    // XXX-IZZY move this to init at some point
-    for (int ii = 0; ii < getOutputSchema().size(); ii++)
-    {
+    for (int ii = 0; ii < getOutputSchema().size(); ii++) {
         SchemaColumn* outputColumn = getOutputSchema()[ii];
         m_outputColumnNames.push_back(outputColumn->getColumnName());
-        AbstractExpression* expr = outputColumn->getExpression();
-        m_outputColumnTypes.push_back(expr->getValueType());
-        m_outputColumnSizes.push_back(expr->getValueSize());
-        m_outputColumnExpressions.push_back(expr);
     }
+}
+
+const int* ProjectionPlanNode::getOutputColumnIdArrayIfAllColumns() const
+{
+    int columnCount = (int)getOutputSchema().size();
+    int* result = ExpressionUtil::convertIfAllTupleValues(getOutputExpressionArray(), columnCount);
+    const_cast<ProjectionPlanNode*>(this)->
+        m_outputColumnIds.reset(result); // cache for memory management purposes.
+    return result;
+}
+
 }

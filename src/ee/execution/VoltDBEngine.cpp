@@ -76,13 +76,12 @@
 #include "catalog/connector.h"
 #include "logging/LogManager.h"
 #include "plannodes/abstractplannode.h"
-#include "plannodes/abstractscannode.h"
-#include "plannodes/plannodeutil.h"
 #include "executors/executorutil.h"
 #include "executors/abstractexecutor.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/constraintutil.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
@@ -1177,7 +1176,7 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId,
     // have internal Projections), then we need to make sure that we set that
     // internal node's executor as well
     if (node->getInlinePlanNodes().size() > 0) {
-        map<PlanNodeType, AbstractPlanNode*>::iterator internal_it;
+        map<PlanNodeType, AbstractPlanNode*>::const_iterator internal_it;
         for (internal_it = node->getInlinePlanNodes().begin();
              internal_it != node->getInlinePlanNodes().end(); internal_it++) {
             AbstractPlanNode* inline_node = internal_it->second;

@@ -62,7 +62,7 @@ public:
 
     AbstractExpression* getPredicate() const { return m_predicate; }
 
-    bool isSubQuery() const { return m_isSubQuery; }
+    bool isSubQuery() const { return m_isSubquery; }
 
     virtual std::string debugInfo(const std::string& spacer) const;
 
@@ -85,7 +85,7 @@ private:
     //
     AbstractExpression* m_predicate;
     // True if this scan represents a sub query
-    bool m_isSubQuery;
+    bool m_isSubquery;
 };
 
 }

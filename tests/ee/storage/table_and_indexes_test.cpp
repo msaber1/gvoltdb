@@ -32,11 +32,12 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "common/tabletuple.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
-#include "indexes/tableindex.h"
 
 using namespace voltdb;
 using namespace std;
@@ -47,7 +48,7 @@ class TableAndIndexTest : public Test {
             engine = new ExecutorContext(0, 0, NULL, NULL, NULL, NULL, false, "", 0);
             mem = 0;
 
-            vector<voltdb::ValueType> districtColumnTypes;
+            vector<ValueType> districtColumnTypes;
             vector<int32_t> districtColumnLengths;
             vector<bool> districtColumnAllowNull(11, true);
             districtColumnAllowNull[0] = false;
@@ -73,7 +74,7 @@ class TableAndIndexTest : public Test {
                                                     districtIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
                                                     true, false, districtTupleSchema);
 
-            vector<voltdb::ValueType> warehouseColumnTypes;
+            vector<ValueType> warehouseColumnTypes;
             vector<int32_t> warehouseColumnLengths;
             vector<bool> warehouseColumnAllowNull(9, true);
             warehouseColumnAllowNull[0] = false;
@@ -96,7 +97,7 @@ class TableAndIndexTest : public Test {
                                                      warehouseIndex1ColumnIndices, TableIndex::simplyIndexColumns(),
                                                      true, true, warehouseTupleSchema);
 
-            vector<voltdb::ValueType> customerColumnTypes;
+            vector<ValueType> customerColumnTypes;
             vector<int32_t> customerColumnLengths;
             vector<bool> customerColumnAllowNull(21, true);
             customerColumnAllowNull[0] = false;
@@ -172,9 +173,10 @@ class TableAndIndexTest : public Test {
                     "C_BALANCE", "C_YTD_PAYMENT", "C_PAYMENT_CNT", "C_DELIVERY_CNT", "C_DATA" };
             const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
 
-            districtTable = voltdb::TableFactory::getPersistentTable(0, "DISTRICT", districtTupleSchema, districtColumnNames, 0);
-
-            TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(districtIndex1Scheme);
+            districtTable =
+                TableFactory::getPersistentTable(0, "DISTRICT", 
+                                                 districtTupleSchema, districtColumnNames, 0);
+            TableIndex *pkeyIndex = TableIndexFactory::getInstance(districtIndex1Scheme);
             assert(pkeyIndex);
             districtTable->addIndex(pkeyIndex);
             districtTable->setPrimaryKeyIndex(pkeyIndex);
@@ -186,15 +188,13 @@ class TableAndIndexTest : public Test {
                 districtTable->addIndex(index);
             }
 
-            districtTempTable = dynamic_cast<TempTable*>(
-                TableFactory::getCopiedTempTable(0, "DISTRICT TEMP", districtTable,
-                                                 &limits));
+            districtTempTable =
+                TableFactory::getCopiedTempTable(0, "DISTRICT TEMP", districtTable, &limits);
 
-            warehouseTable = voltdb::TableFactory::getPersistentTable(0, "WAREHOUSE",
-                                                                      warehouseTupleSchema, warehouseColumnNames,
-                                                                      0, false, false);
-
-            pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(warehouseIndex1Scheme);
+            warehouseTable = TableFactory::getPersistentTable(0, "WAREHOUSE",
+                                                              warehouseTupleSchema, warehouseColumnNames,
+                                                              0, false, false);
+            pkeyIndex = TableIndexFactory::getInstance(warehouseIndex1Scheme);
             assert(pkeyIndex);
             warehouseTable->addIndex(pkeyIndex);
             warehouseTable->setPrimaryKeyIndex(pkeyIndex);
@@ -206,15 +206,13 @@ class TableAndIndexTest : public Test {
                 warehouseTable->addIndex(index);
             }
 
-            warehouseTempTable =  dynamic_cast<TempTable*>(
-                TableFactory::getCopiedTempTable(0, "WAREHOUSE TEMP", warehouseTable,
-                                                 &limits));
+            warehouseTempTable =
+                TableFactory::getCopiedTempTable(0, "WAREHOUSE TEMP", warehouseTable, &limits);
 
-            customerTable = voltdb::TableFactory::getPersistentTable(0, "CUSTOMER",
-                                                                     customerTupleSchema, customerColumnNames,
-                                                                     0, false, false);
-
-            pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(customerIndex1Scheme);
+            customerTable = TableFactory::getPersistentTable(0, "CUSTOMER",
+                                                             customerTupleSchema, customerColumnNames,
+                                                             0, false, false);
+            pkeyIndex = TableIndexFactory::getInstance(customerIndex1Scheme);
             assert(pkeyIndex);
             customerTable->addIndex(pkeyIndex);
             customerTable->setPrimaryKeyIndex(pkeyIndex);
@@ -226,9 +224,8 @@ class TableAndIndexTest : public Test {
                 customerTable->addIndex(index);
             }
 
-            customerTempTable =  dynamic_cast<TempTable*>(
-                TableFactory::getCopiedTempTable(0, "CUSTOMER TEMP", customerTable,
-                                                 &limits));
+            customerTempTable =
+                TableFactory::getCopiedTempTable(0, "CUSTOMER TEMP", customerTable, &limits);
         }
 
         ~TableAndIndexTest() {

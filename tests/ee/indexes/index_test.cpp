@@ -182,7 +182,7 @@ public:
                                              schema, columnNames,
                                              -1, false, false));
 
-        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
+        TableIndex *pkeyIndex = TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
         table->addIndex(pkeyIndex);
         table->setPrimaryKeyIndex(pkeyIndex);
@@ -316,7 +316,7 @@ public:
         m_engine->updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
         table = dynamic_cast<PersistentTable*>(TableFactory::getPersistentTable(database_id, (const string)"test_table", schema, columnNames));
 
-        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(pkeyScheme);
+        TableIndex *pkeyIndex = TableIndexFactory::getInstance(pkeyScheme);
         assert(pkeyIndex);
         table->addIndex(pkeyIndex);
         table->setPrimaryKeyIndex(pkeyIndex);

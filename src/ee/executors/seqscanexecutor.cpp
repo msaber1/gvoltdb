@@ -145,7 +145,7 @@ bool SeqScanExecutor::p_execute()
     int tuple_ctr = 0;
     int tuple_skipped = 0;
 
-    AbstractExpression* const* projection_expressions = NULL;
+    const AbstractExpression* const* projection_expressions = NULL;
     const int* projection_columns = getProjectionColumns();
     if (projection_columns == NULL) {
         projection_expressions = getProjectionExpressions();

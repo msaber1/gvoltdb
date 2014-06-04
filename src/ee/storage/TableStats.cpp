@@ -22,6 +22,8 @@
 #include "common/tabletuple.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
+
+#include <climits>
 #include <vector>
 #include <string>
 #include <math.h>

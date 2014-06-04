@@ -23,7 +23,6 @@
 
 using namespace voltdb;
 using namespace std;
-using boost::shared_ptr;
 
 typedef boost::shared_ptr<CompactingStringPool> PoolPtrType;
 typedef boost::unordered_map<size_t, PoolPtrType> MapType;

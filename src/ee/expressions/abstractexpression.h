@@ -46,7 +46,6 @@
 #ifndef HSTOREABSTRACTEXPRESSION_H
 #define HSTOREABSTRACTEXPRESSION_H
 
-#include "boost/shared_ptr.hpp"
 #include "common/types.h"
 #include "common/PlannerDomValue.h"
 

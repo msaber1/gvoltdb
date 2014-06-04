@@ -51,6 +51,7 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
+#include "expressions/abstractexpression.h"
 #include "plannodes/orderbynode.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"

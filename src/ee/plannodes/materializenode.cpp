@@ -45,22 +45,35 @@
 
 #include "materializenode.h"
 
+#include "expressions/expressionutil.h"
+
 #include <sstream>
 
 namespace voltdb {
 
 PlanNodeType MaterializePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_MATERIALIZE; }
 
-std::string MaterializePlanNode::debugInfo(const std::string &spacer) const {
+std::string MaterializePlanNode::debugInfo(const std::string &spacer) const
+{
     std::ostringstream buffer;
     buffer << ProjectionPlanNode::debugInfo(spacer);
     buffer << spacer << "batched: " << (m_batched ? "true" : "false") << "\n";
     return (buffer.str());
 }
 
-void MaterializePlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void MaterializePlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
     ProjectionPlanNode::loadFromJSONObject(obj);
     m_batched = obj.valueForKey("BATCHED").asBool();
+}
+
+const int* MaterializePlanNode::getOutputParameterIdArrayIfAllParameters() const
+{
+    int colCount = (int)getOutputSchema().size();
+    int* result = ExpressionUtil::convertIfAllParameterValues(getOutputExpressionArray(), colCount);
+    const_cast<MaterializePlanNode*>(this)->
+        m_outputParameterIds.reset(result); // cache for memory management purposes.
+    return result;
 }
 
 }

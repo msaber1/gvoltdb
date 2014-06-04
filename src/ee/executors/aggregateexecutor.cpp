@@ -442,7 +442,7 @@ bool AggregateExecutorBase::p_init(TempTableLimits* limits)
     m_aggTypes = node->getAggregates();
     m_distinctAggs = node->getDistinctAggregates();
     m_groupByExpressions = node->getGroupByExpressions();
-    node->collectOutputExpressions(m_outputColumnExpressions);
+    m_outputColumnExpressions = node->getOutputExpressionArray();
     m_aggregateOutputColumns = node->getAggregateOutputColumns();
     m_prePredicate = node->getPrePredicate();
     m_postPredicate = node->getPostPredicate();

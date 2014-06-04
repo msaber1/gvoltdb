@@ -59,11 +59,11 @@
 #include "common/ValueFactory.hpp"
 #include "common/SerializableEEException.h"
 #include "common/tabletuple.h"
+#include "execution/VoltDBEngine.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/tablefactory.h"
 #include "storage/persistenttable.h"
-#include "indexes/tableindex.h"
-#include "execution/VoltDBEngine.h"
-
 
 using std::string;
 using std::vector;
@@ -88,25 +88,25 @@ public:
     }
 
 protected:
-    voltdb::Table* table;
-    voltdb::CatalogId database_id;
-    voltdb::VoltDBEngine m_engine;
+    Table* table;
+    CatalogId database_id;
+    VoltDBEngine m_engine;
 
     char *m_exceptionBuffer;
 
-    std::vector<std::string> columnNames;
-    std::vector<voltdb::ValueType> columnTypes;
-    std::vector<int32_t> columnSizes;
-    std::vector<bool> columnNullables;
+    vector<string> columnNames;
+    vector<ValueType> columnTypes;
+    vector<int32_t> columnSizes;
+    vector<bool> columnNullables;
 
-    void addColumn(const char* name, voltdb::ValueType type, uint16_t size, bool allow_null) {
+    void addColumn(const char* name, ValueType type, uint16_t size, bool allow_null) {
         columnNames.push_back(name);
         columnTypes.push_back(type);
         columnSizes.push_back(size);
         columnNullables.push_back(allow_null);
     };
 
-    void setTable(voltdb::TableIndexScheme *pkey = NULL) {
+    void setTable(TableIndexScheme *pkey = NULL) {
         assert (columnNames.size() == columnTypes.size());
         assert (columnTypes.size() == columnSizes.size());
         assert (columnSizes.size() == columnNullables.size());
@@ -116,14 +116,14 @@ protected:
         }
         table = TableFactory::getPersistentTable(this->database_id, "test_table", schema, columnNames);
         if (pkey) {
-            TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(*pkey);
+            TableIndex *pkeyIndex = TableIndexFactory::getInstance(*pkey);
             assert(pkeyIndex);
             table->addIndex(pkeyIndex);
             table->setPrimaryKeyIndex(pkeyIndex);
         }
     };
 
-    void setTable(voltdb::TableIndexScheme &pkey) {
+    void setTable(TableIndexScheme &pkey) {
         setTable(&pkey);
     };
 };
@@ -137,7 +137,7 @@ TEST_F(ConstraintTest, NotNull) {
         char name[16];
         snprintf(name, 16, "col%02d", ctr);
         addColumn(name, VALUE_TYPE_BIGINT,
-                  NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT),
+                  NValue::getTupleStorageSize(VALUE_TYPE_BIGINT),
                   allow_null[ctr]);
     }
     setTable();
@@ -153,10 +153,10 @@ TEST_F(ConstraintTest, NotNull) {
                 for (int ctr3 = 0; ctr3 <= 1; ctr3++) {
                     TableTuple &tuple = this->table->tempTuple();
                     tuple.setAllNulls();
-                    if (ctr0) tuple.setNValue(0, voltdb::ValueFactory::getBigIntValue(value++));
-                    if (ctr1) tuple.setNValue(1, voltdb::ValueFactory::getBigIntValue(value++));
-                    if (ctr2) tuple.setNValue(2, voltdb::ValueFactory::getBigIntValue(value++));
-                    if (ctr3) tuple.setNValue(3, voltdb::ValueFactory::getBigIntValue(value++));
+                    if (ctr0) tuple.setNValue(0, ValueFactory::getBigIntValue(value++));
+                    if (ctr1) tuple.setNValue(1, ValueFactory::getBigIntValue(value++));
+                    if (ctr2) tuple.setNValue(2, ValueFactory::getBigIntValue(value++));
+                    if (ctr3) tuple.setNValue(3, ValueFactory::getBigIntValue(value++));
 
                     bool expected = (ctr0 + ctr1 + ctr2 == 3);
                     bool threwException = false;
@@ -187,16 +187,16 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
                   allow_null[ctr]);
     }
 
-    std::vector<int> pkey_column_indices;
+    vector<int> pkey_column_indices;
     pkey_column_indices.push_back(0);
-    TableIndexScheme pkey("idx_pkey", voltdb::BALANCED_TREE_INDEX,
+    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
                           pkey_column_indices, TableIndex::simplyIndexColumns(),
                           true, true, NULL);
 
     setTable(pkey);
 
     for (int64_t ctr = 0; ctr < NUM_OF_TUPLES; ctr++) {
-        voltdb::TableTuple &tuple = this->table->tempTuple();
+        TableTuple &tuple = this->table->tempTuple();
         tuple.setAllNulls();
         tuple.setNValue(0, ValueFactory::getBigIntValue(ctr));
         tuple.setNValue(1, ValueFactory::getBigIntValue(ctr));
@@ -223,7 +223,7 @@ TEST_F(ConstraintTest, UniqueOneColumnNotNull) {
             //
             // Even if we change just one value that isn't the primary key, it should still fail!
             //
-            tuple.setNValue(1, voltdb::ValueFactory::getBigIntValue(ctr + ctr));
+            tuple.setNValue(1, ValueFactory::getBigIntValue(ctr + ctr));
             EXPECT_EQ(false, this->table->insertTuple(tuple));
         } catch (SerializableEEException &e) {
             exceptionThrown = true;
@@ -247,9 +247,9 @@ TEST_F(ConstraintTest, UniqueOneColumnAllowNull) {
                   NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
     }
 
-    std::vector<int> pkey_column_indices;
+    vector<int> pkey_column_indices;
     pkey_column_indices.push_back(0);
-    voltdb::TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
+    TableIndexScheme pkey("idx_pkey", BALANCED_TREE_INDEX,
                                   pkey_column_indices, TableIndex::simplyIndexColumns(),
                                   true, true, NULL);
 
@@ -303,7 +303,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnNotNull) {
         addColumn(name, VALUE_TYPE_BIGINT, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
     }
 
-    std::vector<int> pkey_column_indices;
+    vector<int> pkey_column_indices;
     pkey_column_indices.push_back(0);
     pkey_column_indices.push_back(2);
     pkey_column_indices.push_back(3);
@@ -349,7 +349,7 @@ TEST_F(ConstraintTest, UniqueTwoColumnAllowNull) {
         addColumn(name, VALUE_TYPE_BIGINT, NValue::getTupleStorageSize(VALUE_TYPE_BIGINT), allow_null[ctr]);
     }
 
-    std::vector<int> pkey_column_indices;
+    vector<int> pkey_column_indices;
     pkey_column_indices.push_back(0);
     pkey_column_indices.push_back(2);
     pkey_column_indices.push_back(3);

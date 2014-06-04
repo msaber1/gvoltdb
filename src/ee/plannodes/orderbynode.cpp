@@ -45,6 +45,8 @@
 
 #include "orderbynode.h"
 
+#include "expressions/abstractexpression.h"
+
 #include <sstream>
 #include <string>
 

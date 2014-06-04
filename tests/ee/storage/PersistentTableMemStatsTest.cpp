@@ -32,10 +32,11 @@
 #include "common/NValue.hpp"
 #include "common/ValueFactory.hpp"
 #include "execution/VoltDBEngine.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
-#include "indexes/tableindex.h"
 
 using namespace std;
 using namespace voltdb;
@@ -92,7 +93,7 @@ public:
         m_table = dynamic_cast<PersistentTable*>(
             TableFactory::getPersistentTable(0, "Foo", m_tableSchema, m_columnNames, 0));
 
-        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
         m_table->addIndex(pkeyIndex);
         m_table->setPrimaryKeyIndex(pkeyIndex);

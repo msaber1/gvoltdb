@@ -72,7 +72,7 @@ protected:
     const int* getProjectionColumns() const
     { return m_inlineProjection.getProjectionColumns(); }
 
-    AbstractExpression* const* getProjectionExpressions() const
+    const AbstractExpression* const* getProjectionExpressions() const
     { return m_inlineProjection.getProjectionExpressions(); }
 
     AbstractExpression* getPredicate() const { return m_predicate; }

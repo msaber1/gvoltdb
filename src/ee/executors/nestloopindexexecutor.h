@@ -51,7 +51,7 @@
 
 #include "plannodes/limitnode.h"
 
-#include "boost/shared_array.hpp"
+#include "boost/scoped_array.hpp"
 
 #include <string>
 
@@ -86,7 +86,7 @@ private:
     TableCatalogDelegate* m_inner_target_tcd;
 
     // TODO: Document
-    boost::shared_array<AbstractExpression*> m_search_key_expressions;
+    boost::scoped_array<AbstractExpression*> m_search_key_array_ptr;
 
     SortDirectionType m_sort_direction;
 
@@ -98,7 +98,7 @@ private:
     AbstractExpression* m_skip_null_predicate;
     AbstractExpression* m_prejoin_expression;
     AbstractExpression* m_where_expression;
-    boost::shared_array<AbstractExpression*> m_output_expression_array_ptr;
+    const AbstractExpression* const* m_output_expression_array;
     SortDirectionType m_sortDirection;
     StandAloneTupleStorage m_null_tuple;
     StandAloneTupleStorage m_index_values;

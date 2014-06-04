@@ -51,17 +51,15 @@ using namespace std;
 
 namespace voltdb {
 
-string AbstractOperationPlanNode::getTargetTableName() const {
-    return target_table_name;
-}
-
-string AbstractOperationPlanNode::debugInfo(const string &spacer) const {
+string AbstractOperationPlanNode::debugInfo(const string &spacer) const
+{
     ostringstream buffer;
-    buffer << spacer << "TargetTable[" << this->target_table_name << "]\n";
-    return (buffer.str());
+    buffer << spacer << "TargetTable[" << target_table_name << "]\n";
+    return buffer.str();
 }
 
-void AbstractOperationPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void AbstractOperationPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
     target_table_name = obj.valueForKey("TARGET_TABLE_NAME").asStr();
 }
 

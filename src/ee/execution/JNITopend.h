@@ -17,7 +17,7 @@
 
 #ifndef JNITOPEND_H_
 #define JNITOPEND_H_
-#include "boost/shared_array.hpp"
+
 #include "common/Topend.h"
 #include "common/FatalException.hpp"
 #include "common/Pool.hpp"

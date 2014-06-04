@@ -30,6 +30,7 @@
 #include "common/ValueFactory.hpp"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/constraintutil.h"
 #include "storage/MaterializedViewMetadata.h"
 #include "storage/persistenttable.h"

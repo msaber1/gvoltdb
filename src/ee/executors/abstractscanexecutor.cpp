@@ -68,7 +68,7 @@ bool AbstractScanExecutor::p_init(TempTableLimits* limits)
     ProjectionPlanNode* projection_node =
         static_cast<ProjectionPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
     if (projection_node != NULL) {
-        m_inlineProjection.init(projection_node);
+        m_inlineProjection.initProjectionState(projection_node);
     }
 
     if (node->isSubQuery()) {

@@ -17,8 +17,11 @@
 
 #include "SchemaColumn.h"
 
+#include "expressions/abstractexpression.h"
+
 using namespace std;
-using namespace voltdb;
+
+namespace voltdb {
 
 SchemaColumn::SchemaColumn(PlannerDomValue colObject, int idx)
 {
@@ -64,14 +67,4 @@ SchemaColumn::~SchemaColumn()
     delete m_expression;
 }
 
-string
-SchemaColumn::getColumnName() const
-{
-    return m_columnName;
-}
-
-AbstractExpression*
-SchemaColumn::getExpression()
-{
-    return m_expression;
 }

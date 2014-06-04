@@ -22,6 +22,7 @@
  */
 
 #include "harness.h"
+#include "common/executorcontext.hpp"
 #include "common/TupleSchema.h"
 #include "common/types.h"
 #include "common/NValue.hpp"
@@ -32,13 +33,15 @@
 #include "common/TupleOutputStreamProcessor.h"
 #include "execution/VoltDBEngine.h"
 #include "expressions/expressions.h"
+#include "indexes/tableindex.h"
+#include "indexes/tableindexfactory.h"
 #include "storage/persistenttable.h"
 #include "storage/tablefactory.h"
 #include "storage/tableutil.h"
-#include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/TableStreamerContext.h"
+#include "storage/TableStreamer.h"
 #include "storage/ElasticScanner.h"
 #include "storage/ElasticContext.h"
 #include "stx/btree_set.h"
@@ -137,7 +140,7 @@ public:
         m_tuplesDeleted = 0;
         m_tuplesInsertedInLastUndo = 0;
         m_tuplesDeletedInLastUndo = 0;
-        m_engine = new voltdb::VoltDBEngine();
+        m_engine = new VoltDBEngine();
         int partitionCount = 1;
         m_engine->initialize(1,1, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY);
         m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
@@ -152,30 +155,30 @@ public:
         m_columnNames.push_back("8");
         m_columnNames.push_back("9");
 
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_INTEGER);
+        m_tableSchemaTypes.push_back(VALUE_TYPE_INTEGER);
+        m_tableSchemaTypes.push_back(VALUE_TYPE_INTEGER);
 
         //Filler columns
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
-        m_tableSchemaTypes.push_back(voltdb::VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(VALUE_TYPE_BIGINT);
+        m_tableSchemaTypes.push_back(VALUE_TYPE_BIGINT);
 
         m_tupleWidth = (sizeof(int32_t) * 2) + (sizeof(int64_t) * 7);
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_INTEGER));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
 
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
-        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(voltdb::VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
+        m_tableSchemaColumnSizes.push_back(NValue::getTupleStorageSize(VALUE_TYPE_BIGINT));
 
         m_tableSchemaAllowNull.push_back(false);
         m_tableSchemaAllowNull.push_back(false);
@@ -218,30 +221,30 @@ public:
 
     void initTable(int nparts_, int tableAllocationTargetSize) {
         m_npartitions = nparts_;
-        m_tableSchema = voltdb::TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
+        m_tableSchema = TupleSchema::createTupleSchemaForTest(m_tableSchemaTypes,
                                                                m_tableSchemaColumnSizes,
                                                                m_tableSchemaAllowNull);
 
-        voltdb::TableIndexScheme indexScheme("primaryKeyIndex",
-                                             voltdb::BALANCED_TREE_INDEX,
+        TableIndexScheme indexScheme("primaryKeyIndex",
+                                             BALANCED_TREE_INDEX,
                                              m_primaryKeyIndexColumns,
                                              TableIndex::simplyIndexColumns(),
                                              true, true, m_tableSchema);
-        std::vector<voltdb::TableIndexScheme> indexes;
+        std::vector<TableIndexScheme> indexes;
 
-        m_table = dynamic_cast<voltdb::PersistentTable*>(
-                voltdb::TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema,
+        m_table = dynamic_cast<PersistentTable*>(
+                TableFactory::getPersistentTable(m_tableId, "Foo", m_tableSchema,
                                                          m_columnNames, 0, false, false,
                                                          tableAllocationTargetSize));
 
-        TableIndex *pkeyIndex = TableIndexFactory::TableIndexFactory::getInstance(indexScheme);
+        TableIndex *pkeyIndex = TableIndexFactory::getInstance(indexScheme);
         assert(pkeyIndex);
         m_table->addIndex(pkeyIndex);
         m_table->setPrimaryKeyIndex(pkeyIndex);
 
         TableTuple tuple(m_table->schema());
         size_t i = 0;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        TableIterator& iterator = m_table->iterator();
         while (iterator.next(tuple)) {
             int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
             m_values.push_back(value);
@@ -315,8 +318,8 @@ public:
     }
 
     void doRandomUpdate(PersistentTable *table, T_ValueSet *setFrom = NULL, T_ValueSet *setTo = NULL) {
-        voltdb::TableTuple tuple(table->schema());
-        voltdb::TableTuple tempTuple = table->tempTuple();
+        TableTuple tuple(table->schema());
+        TableTuple tempTuple = table->tempTuple();
         if (tableutil::getRandomTuple(table, tuple)) {
             tempTuple.copy(tuple);
             int value = ::rand();
@@ -389,7 +392,7 @@ public:
         }
 
         size_t numTuples = 0;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             if (tuple.isDirty()) {
@@ -412,7 +415,7 @@ public:
     }
 
     void getTableValueSet(T_ValueSet &set) {
-        voltdb::TableIterator& iterator = m_table->iterator();
+        TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
@@ -643,7 +646,7 @@ public:
         // Check for dirty tuples.
         context("check dirty");
         int numTuples = 0;
-        voltdb::TableIterator &iterator = m_table->iterator();
+        TableIterator &iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             if (tuple.isDirty()) {
@@ -738,7 +741,7 @@ public:
 
     void checkIndex(const std::string &tag, ElasticIndex *index, StreamPredicateList &predicates, bool directKey) {
         ASSERT_NE(NULL, index);
-        voltdb::TableIterator& iterator = m_table->iterator();
+        TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         T_ValueSet accepted;
         T_ValueSet rejected;
@@ -918,12 +921,12 @@ public:
                 new ReferenceSerializeInput(m_predicateBuffer, predicateOutput.position()));
     }
 
-    voltdb::ElasticContext *getElasticContext() {
-        voltdb::TableStreamer *streamer = dynamic_cast<voltdb::TableStreamer*>(m_table->m_tableStreamer.get());
+    ElasticContext *getElasticContext() {
+        TableStreamer *streamer = dynamic_cast<TableStreamer*>(m_table->m_tableStreamer.get());
         if (streamer != NULL) {
-            BOOST_FOREACH(voltdb::TableStreamer::StreamPtr &streamPtr, streamer->m_streams) {
+            BOOST_FOREACH(TableStreamer::StreamPtr &streamPtr, streamer->m_streams) {
                 if (streamPtr->m_streamType == TABLE_STREAM_ELASTIC_INDEX) {
-                    voltdb::ElasticContext *context = dynamic_cast<ElasticContext*>(streamPtr->m_context.get());
+                    ElasticContext *context = dynamic_cast<ElasticContext*>(streamPtr->m_context.get());
                     if (context != NULL) {
                         return context;
                     }
@@ -933,12 +936,12 @@ public:
         return NULL;
     }
 
-    voltdb::ElasticIndex *getElasticIndex() {
+    ElasticIndex *getElasticIndex() {
         return m_table->m_surgeon.m_index.get();
     }
 
     bool setElasticIndexTuplesPerCall(size_t nTuplesPerCall) {
-        voltdb::ElasticContext *context = getElasticContext();
+        ElasticContext *context = getElasticContext();
         if (context != NULL) {
             context->setTuplesPerCall(nTuplesPerCall);
             return true;
@@ -952,7 +955,7 @@ public:
         ASSERT_TRUE(ok);
 
         // Force index streaming to need multiple streamMore() calls.
-        voltdb::ElasticContext *context = getElasticContext();
+        ElasticContext *context = getElasticContext();
         ASSERT_NE(NULL, context);
         bool success = setElasticIndexTuplesPerCall(20);
         ASSERT_TRUE(success);
@@ -1083,11 +1086,11 @@ public:
         ASSERT_EQ(expected,activated);
     }
 
-    voltdb::VoltDBEngine *m_engine;
-    voltdb::TupleSchema *m_tableSchema;
-    voltdb::PersistentTable *m_table;
+    VoltDBEngine *m_engine;
+    TupleSchema *m_tableSchema;
+    PersistentTable *m_table;
     std::vector<std::string> m_columnNames;
-    std::vector<voltdb::ValueType> m_tableSchemaTypes;
+    std::vector<ValueType> m_tableSchemaTypes;
     std::vector<int32_t> m_tableSchemaColumnSizes;
     std::vector<bool> m_tableSchemaAllowNull;
     std::vector<int> m_primaryKeyIndexColumns;
@@ -1137,11 +1140,11 @@ TEST_F(CopyOnWriteTest, CopyOnWriteIterator) {
     int tupleCount = TUPLE_COUNT;
     addRandomUniqueTuples( m_table, tupleCount);
 
-    voltdb::TableIterator& iterator = m_table->iterator();
+    TableIterator& iterator = m_table->iterator();
     TBMap blocks(getTableData());
     getBlocksPendingSnapshot().swap(getBlocksNotPendingSnapshot());
     getBlocksPendingSnapshotLoad().swap(getBlocksNotPendingSnapshotLoad());
-    voltdb::CopyOnWriteIterator COWIterator(m_table, &getSurgeon(), blocks);
+    CopyOnWriteIterator COWIterator(m_table, &getSurgeon(), blocks);
     TableTuple tuple(m_table->schema());
     TableTuple COWTuple(m_table->schema());
 
@@ -1244,7 +1247,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
@@ -1311,7 +1314,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
     m_engine->getExecutorContext()->setupForPlanFragments(m_engine->getCurrentUndoQuantum(), 0, 0, 0);
     for (int qq = 0; qq < NUM_REPETITIONS; qq++) {
         T_ValueSet originalTuples;
-        voltdb::TableIterator& iterator = m_table->iterator();
+        TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
             const std::pair<T_ValueSet::iterator, bool> p =
@@ -1425,7 +1428,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
         context("precalculate");
 
         // Map original tuples to expected partitions.
-        voltdb::TableIterator& iterator = m_table->iterator();
+        TableIterator& iterator = m_table->iterator();
         int partCol = m_table->partitionColumn();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
@@ -1589,7 +1592,7 @@ public:
         m_test.m_shuffles.insert(*reinterpret_cast<const int64_t*>(sourceTuple.address() + 1));
     }
 
-    virtual TableStreamerInterface* cloneForTruncatedTable(voltdb::PersistentTableSurgeon&) {
+    virtual TableStreamerInterface* cloneForTruncatedTable(PersistentTableSurgeon&) {
         return NULL;
     }
 

@@ -53,6 +53,7 @@ bool IndexCountExecutor::p_initMore(TempTableLimits* limits)
     if (m_num_of_search_keys != 0) {
         m_lookupType = node->getLookupType();
         AbstractExpression** search_key_array = new AbstractExpression*[m_num_of_search_keys];
+        m_search_key_array_ptr.reset(search_key_array);
         for (int ctr = 0; ctr < m_num_of_search_keys; ctr++) {
             if (search_exprs_vector[ctr] == NULL) {
                 VOLT_ERROR("The search key expression at position '%d' is NULL for PlanNode '%s'",
@@ -61,7 +62,6 @@ bool IndexCountExecutor::p_initMore(TempTableLimits* limits)
             }
             search_key_array[ctr] = search_exprs_vector[ctr];
         }
-        m_search_key_array_ptr.reset(search_key_array);
     }
 
     const std::vector<AbstractExpression*>& end_exprs_vector = node->getEndKeyExpressions();
@@ -69,6 +69,7 @@ bool IndexCountExecutor::p_initMore(TempTableLimits* limits)
     if (m_num_of_end_keys != 0) {
         m_endType = node->getEndType();
         AbstractExpression** end_key_array = new AbstractExpression*[m_num_of_end_keys];
+        m_end_key_array_ptr.reset(end_key_array);
         for (int ctr = 0; ctr < m_num_of_end_keys; ctr++) {
             if (end_exprs_vector[ctr] == NULL) {
                 VOLT_ERROR("The end key expression at position '%d' is NULL for PlanNode '%s'",
@@ -77,7 +78,6 @@ bool IndexCountExecutor::p_initMore(TempTableLimits* limits)
             }
             end_key_array[ctr] = end_exprs_vector[ctr];
         }
-        m_end_key_array_ptr.reset(end_key_array);
     }
 
     // Miscellanous Information

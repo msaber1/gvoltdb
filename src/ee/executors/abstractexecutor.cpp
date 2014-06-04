@@ -46,8 +46,8 @@
 #include "abstractexecutor.h"
 
 #include "execution/VoltDBEngine.h"
-#include "plannodes/abstractoperationnode.h"
-#include "plannodes/abstractscannode.h"
+#include "plannodes/abstractplannode.h"
+#include "plannodes/SchemaColumn.h"
 #include "storage/tablefactory.h"
 #include "storage/TableCatalogDelegate.hpp"
 
@@ -61,18 +61,14 @@ bool AbstractExecutor::init(VoltDBEngine* engine, TempTableLimits* limits)
     m_engine = engine;
     assert (m_abstractNode);
 
-    //
-    // Grab the input tables directly from this node's children
-    //
-    std::vector<AbstractPlanNode*>& children = m_abstractNode->getChildren();
-    for (int ctr = 0, cnt = static_cast<int>(children.size());
-         ctr < cnt;
-         ctr++) {
+    // Grab the input tables directly from this node's children's executor's output tables
+    const std::vector<AbstractPlanNode*>& children = m_abstractNode->getChildren();
+    for (int ctr = 0, cnt = static_cast<int>(children.size()); ctr < cnt; ctr++) {
         const TableReference& table = children[ctr]->getExecutor()->m_output_table;
         m_input_tables.push_back(table);
     }
 
-    // Call the p_init() method on our derived class
+    // Call the p_init() method on the derived class
     if (!p_init(limits)) {
         return false;
     }

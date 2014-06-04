@@ -19,6 +19,7 @@
 #include "common/ids.h"
 #include "common/tabletuple.h"
 #include "common/TupleSchema.h"
+#include "indexes/IndexStats.h"
 #include "storage/PersistentTableStats.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"

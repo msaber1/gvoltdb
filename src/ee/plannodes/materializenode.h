@@ -48,6 +48,8 @@
 
 #include "projectionnode.h"
 
+#include "boost/scoped_array.hpp"
+
 namespace voltdb {
 
 /**
@@ -71,11 +73,14 @@ public:
 
     std::string debugInfo(const std::string &spacer) const;
 
+    const int* getOutputParameterIdArrayIfAllParameters() const;
+
     bool isBatched() const { return m_batched; }
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj);
 private:
     bool m_batched;
+    boost::scoped_array<int> m_outputParameterIds;
 };
 
 }

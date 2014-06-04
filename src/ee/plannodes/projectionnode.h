@@ -49,7 +49,7 @@
 #include "expressions/abstractexpression.h"
 #include "plannodes/abstractplannode.h"
 
-#include "boost/shared_array.hpp"
+#include "boost/scoped_array.hpp"
 
 namespace voltdb {
 
@@ -60,29 +60,30 @@ public:
 
     virtual PlanNodeType getPlanNodeType() const;
 
-    const std::vector<std::string>& getOutputColumnNames() const;
-
-    const std::vector<ValueType>& getOutputColumnTypes() const;
-
-    const std::vector<int32_t>& getOutputColumnSizes() const;
+    const std::vector<std::string>& getOutputColumnNames() const { return m_outputColumnNames; }
 
     const std::vector<AbstractExpression*>& getOutputColumnExpressions() const;
 
     std::string debugInfo(const std::string& spacer) const;
 
+    const int* getOutputColumnIdArrayIfAllColumns() const;
+
     class InlineState {
     public:
+        friend class ProjectionPlanNode;
         InlineState() {}
         std::string debugInfo(const std::string &spacer) const;
 
-        AbstractExpression* const* getProjectionExpressions() const { return m_expression_array_ptr.get(); }
+        const AbstractExpression* const* getProjectionExpressions() const
+        { return m_expression_array; }
 
-        const int* getProjectionColumns() const { return m_all_column_array_ptr.get(); }
+        const int* getProjectionColumns() const { return m_all_column_array; }
 
-        void init(ProjectionPlanNode*); // Implemented in projectionexecutor.cpp
+        void initProjectionState(ProjectionPlanNode*); // Implemented in projectionexecutor.cpp
 
-        boost::shared_array<int> m_all_column_array_ptr;
-        boost::shared_array<AbstractExpression*> m_expression_array_ptr;
+    private:
+        const AbstractExpression* const* m_expression_array;
+        const int* m_all_column_array;
     };
 
 protected:
@@ -92,15 +93,7 @@ protected:
     // going to look like
     //
     std::vector<std::string> m_outputColumnNames;
-    std::vector<ValueType> m_outputColumnTypes;
-    std::vector<int32_t> m_outputColumnSizes;
-
-    // indicate how to project (or replace) each column value. indices
-    // are same as output table's.
-    // It will contain a ConstantValueExpression or ParameterValueExpression for an implanted value
-    // or TupleValueExpression for pure projection,
-    // or other AbstractValueExpression for arithmetic calculations, etc.
-    std::vector<AbstractExpression*> m_outputColumnExpressions;
+    boost::scoped_array<int> m_outputColumnIds;
 };
 
 }

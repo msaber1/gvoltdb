@@ -499,39 +499,37 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
     return ret;
 }
 
-boost::shared_array<int>
-ExpressionUtil::convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressions)
+int* ExpressionUtil::convertIfAllTupleValues(const AbstractExpression* const* expressions, int count)
 {
-    size_t cnt = expressions.size();
-    boost::shared_array<int> ret(new int[cnt]);
-    for (int i = 0; i < cnt; ++i) {
-        voltdb::TupleValueExpression* casted=
-          dynamic_cast<voltdb::TupleValueExpression*>(expressions[i]);
+    int* result = new int[count];
+    for (int i = 0; i < count; ++i) {
+        const TupleValueExpression* casted = dynamic_cast<const TupleValueExpression*>(expressions[i]);
         if (casted == NULL) {
-            return boost::shared_array<int>();
+            delete[] result;
+            return NULL;
         }
-        ret[i] = casted->getColumnId();
+        result[i] = casted->getColumnId();
     }
-    return ret;
+    return result;
 }
 
-boost::shared_array<int>
-ExpressionUtil::convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions)
+int* ExpressionUtil::convertIfAllParameterValues(const AbstractExpression* const* expressions,
+                                                  int count)
 {
-    size_t cnt = expressions.size();
-    boost::shared_array<int> ret(new int[cnt]);
-    for (int i = 0; i < cnt; ++i) {
-        voltdb::ParameterValueExpression *casted =
-          dynamic_cast<voltdb::ParameterValueExpression*>(expressions[i]);
+    int* result = new int[count];
+    for (int i = 0; i < count; ++i) {
+        const ParameterValueExpression* casted = dynamic_cast<const ParameterValueExpression*>(expressions[i]);
         if (casted == NULL) {
-            return boost::shared_array<int>();
+            delete[] result;
+            return NULL;
         }
-        ret[i] = casted->getParameterId();
+        result[i] = casted->getParameterId();
     }
-    return ret;
+    return result;
 }
 
-void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& indexed_exprs, const std::string& jsonarraystring)
+void ExpressionUtil::loadIndexedExprsFromJson(std::vector<AbstractExpression*>& indexed_exprs,
+                                              const std::string& jsonarraystring)
 {
     PlannerDomRoot domRoot(jsonarraystring.c_str());
     PlannerDomValue expressionsArray = domRoot.rootObject();

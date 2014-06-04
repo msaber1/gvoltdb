@@ -47,7 +47,6 @@
 #define HSTORETABLEITERATOR_H
 
 #include <cassert>
-#include "boost/shared_ptr.hpp"
 #include "common/tabletuple.h"
 #include "table.h"
 #include "storage/TupleIterator.h"
@@ -60,12 +59,12 @@ class PersistentTable;
 /**
  * Iterator for table which neglects deleted tuples.
  * TableIterator is a small and copiable object.
- * You can copy it, not passing a pointer of it.
+ * You can copy it, not passing a pointer to it.
  *
  * This class should be a virtual interface or should
  * be templated on the underlying table data iterator.
  * Either change requires some updating of the iterators
- * that are persvasively stack allocated...
+ * that are pervasively stack allocated...
  *
  */
 class TableIterator : public TupleIterator {

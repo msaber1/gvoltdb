@@ -69,7 +69,7 @@ class AbstractPlanNode;
 class PlanNodeFragment {
 
   public:
-    PlanNodeFragment();
+    PlanNodeFragment() { }
     virtual ~PlanNodeFragment();
 
     // construct a new fragment from the catalog's serialization
@@ -83,14 +83,10 @@ class PlanNodeFragment {
     bool constructTree(AbstractPlanNode *node);
 
     // first node in serialization order
-    AbstractPlanNode * getRootNode() {
-        return m_planNodes.front();
-    }
+    AbstractPlanNode * getRootNode() { return m_planNodes.front(); }
 
     // the list of plannodes in execution order
-    inline const std::vector<AbstractPlanNode*>& getExecuteList() const {
-        return m_executionList;
-    }
+    const std::vector<AbstractPlanNode*>& getExecuteList() const { return m_executionList; }
 
     // true if this plan fragment contains a delete plan node.  Used
     // as part of the horrible ENG-1333 hack.
@@ -107,8 +103,6 @@ class PlanNodeFragment {
     // reads execute list from plannodelist json objects
     void loadFromJSONObject(PlannerDomValue obj);
 
-    // serialized java type: org.voltdb.plannodes.PlanNode[List|Tree]
-    std::string m_serializedType;
     // translate id from catalog to pointer to plannode
     std::map<CatalogId, AbstractPlanNode*> m_idToNodeMap;
     // pointers to nodes in execution order
@@ -119,9 +113,6 @@ class PlanNodeFragment {
     std::vector<std::pair< int, voltdb::ValueType> > parameters;
 };
 
-
 }
-
-
 
 #endif

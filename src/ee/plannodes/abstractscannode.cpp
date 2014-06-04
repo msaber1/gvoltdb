@@ -69,7 +69,7 @@ AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_targetTableName = obj.valueForKey("TARGET_TABLE_NAME").asStr();
     m_predicate = loadExpressionFromJSONObject("PREDICATE", obj);
-    m_isSubQuery = obj.hasNonNullKey("SUBQUERY_INDICATOR");
+    m_isSubquery = obj.hasNonNullKey("SUBQUERY_INDICATOR");
 }
 
 }

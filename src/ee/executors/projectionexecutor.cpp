@@ -46,7 +46,6 @@
 #include "projectionexecutor.h"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
-#include "expressions/expressionutil.h"
 #include "plannodes/projectionnode.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
@@ -64,7 +63,7 @@ bool ProjectionExecutor::p_init(TempTableLimits* limits)
     setTempOutputTable(limits);
 
     // initialize local variables
-    m_state.init(node);
+    m_state.initProjectionState(node);
     return true;
 }
 
@@ -80,7 +79,7 @@ bool ProjectionExecutor::p_execute()
 
     VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
 
-    AbstractExpression* const* projection_expressions = NULL;
+    const AbstractExpression* const* projection_expressions = NULL;
     const int* projection_columns = m_state.getProjectionColumns();
     if (projection_columns == NULL) {
         projection_expressions = m_state.getProjectionExpressions();
@@ -100,22 +99,10 @@ bool ProjectionExecutor::p_execute()
     return true;
 }
 
-void ProjectionPlanNode::InlineState::init(ProjectionPlanNode* projection_node)
+void ProjectionPlanNode::InlineState::initProjectionState(ProjectionPlanNode* projection_node)
 {
-    const std::vector<voltdb::AbstractExpression*>&
-        projection_expr_vector = projection_node->getOutputColumnExpressions();
-
-    m_all_column_array_ptr = ExpressionUtil::convertIfAllTupleValues(projection_expr_vector);
-
-    if (m_all_column_array_ptr.get() == NULL) {
-        int num_of_columns = (int)projection_expr_vector.size();
-        AbstractExpression** projection_expressions = new AbstractExpression*[num_of_columns];
-        for (int ctr = 0; ctr < num_of_columns; ctr++) {
-            assert(projection_expr_vector[ctr]);
-            projection_expressions[ctr] = projection_expr_vector[ctr];
-        }
-        m_expression_array_ptr.reset(projection_expressions);
-    }
+    m_expression_array = projection_node->getOutputExpressionArray();
+    m_all_column_array = projection_node->getOutputColumnIdArrayIfAllColumns();
 }
 
 }

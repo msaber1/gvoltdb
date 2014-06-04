@@ -48,7 +48,7 @@
 
 #include "executors/abstractscanexecutor.h"
 
-#include "boost/shared_array.hpp"
+#include "boost/scoped_array.hpp"
 
 namespace voltdb {
 
@@ -69,7 +69,7 @@ private:
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;
     int m_num_of_search_keys;
-    boost::shared_array<AbstractExpression*> m_search_key_array_ptr;
+    boost::scoped_array<AbstractExpression*> m_search_key_array_ptr;
     StandAloneTupleStorage m_search_key;
     AbstractExpression* m_end_expression;
     AbstractExpression* m_post_expression;

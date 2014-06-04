@@ -18,7 +18,6 @@
 #ifndef ELASTICSCANNER_H_
 #define ELASTICSCANNER_H_
 
-#include <boost/shared_ptr.hpp>
 #include "storage/TupleIterator.h"
 #include "storage/TupleBlock.h"
 

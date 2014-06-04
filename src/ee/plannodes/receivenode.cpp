@@ -45,6 +45,9 @@
 
 #include "receivenode.h"
 
+#include "expressions/abstractexpression.h"
+#include "SchemaColumn.h"
+
 #include <sstream>
 
 using namespace std;

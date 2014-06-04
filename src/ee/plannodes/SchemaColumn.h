@@ -19,14 +19,13 @@
 
 #include "common/types.h"
 #include "common/PlannerDomValue.h"
-#include "expressions/abstractexpression.h"
-
-#include "boost/shared_ptr.hpp"
 
 #include <string>
 
 namespace voltdb
 {
+
+class AbstractExpression;
 
 /**
  * Convenience class to deserialize a SchemaColumn object from the JSON
@@ -41,11 +40,10 @@ public:
     SchemaColumn(PlannerDomValue colObject, int idx);
     ~SchemaColumn();
 
-    std::string getColumnName() const;
+    const std::string& getColumnName() const { return m_columnName; }
 
-    // SchemaColumn retains responsibility for the deletion of
-    // the expression
-    AbstractExpression* getExpression();
+    // SchemaColumn retains responsibility for the deletion of the expression
+    AbstractExpression* getExpression() const { return m_expression; }
 
 private:
     std::string m_tableName;

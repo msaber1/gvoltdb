@@ -57,12 +57,10 @@ PlanNodeType AggregatePlanNode::getPlanNodeType() const { return m_type; }
 
 AggregatePlanNode::~AggregatePlanNode()
 {
-    for (int i = 0; i < m_aggregateInputExpressions.size(); i++)
-    {
+    for (int i = 0; i < m_aggregateInputExpressions.size(); i++) {
         delete m_aggregateInputExpressions[i];
     }
-    for (int i = 0; i < m_groupByExpressions.size(); i++)
-    {
+    for (int i = 0; i < m_groupByExpressions.size(); i++) {
         delete m_groupByExpressions[i];
     }
     delete m_prePredicate;
@@ -73,9 +71,7 @@ string AggregatePlanNode::debugInfo(const string &spacer) const {
     ostringstream buffer;
     buffer << spacer << "\nAggregates["
            << (int) m_aggregates.size() << "]: {";
-    for (int ctr = 0, cnt = (int) m_aggregates.size();
-         ctr < cnt; ctr++)
-    {
+    for (int ctr = 0, cnt = (int) m_aggregates.size(); ctr < cnt; ctr++) {
         buffer << spacer << "type="
                << expressionToString(m_aggregates[ctr]) << "\n";
         buffer << spacer << "distinct="
@@ -149,31 +145,6 @@ AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
     m_prePredicate = loadExpressionFromJSONObject("PRE_PREDICATE", obj);
 
     m_postPredicate = loadExpressionFromJSONObject("POST_PREDICATE", obj);
-}
-
-void AggregatePlanNode::collectOutputExpressions(std::vector<AbstractExpression*>& outputColumnExpressions) const
-{
-    const std::vector<SchemaColumn*>& outputSchema = getOutputSchema();
-    size_t size = outputSchema.size();
-    outputColumnExpressions.resize(size);
-    for (int ii = 0; ii < size; ii++) {
-        SchemaColumn* outputColumn = outputSchema[ii];
-        outputColumnExpressions[ii] = outputColumn->getExpression();
-    }
-}
-
-// definitions of public test methods
-
-void
-AggregatePlanNode::setAggregates(vector<ExpressionType> &aggregates)
-{
-    m_aggregates = aggregates;
-}
-
-void
-AggregatePlanNode::setAggregateOutputColumns(vector<int> outputColumns)
-{
-    m_aggregateOutputColumns = outputColumns;
 }
 
 }

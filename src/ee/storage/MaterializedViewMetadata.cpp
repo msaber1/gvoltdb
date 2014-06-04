@@ -34,7 +34,7 @@
 #include "indexes/tableindex.h"
 #include "storage/persistenttable.h"
 #include "boost/foreach.hpp"
-#include "boost/shared_array.hpp"
+#include "boost/scoped_array.hpp"
 
 namespace voltdb {
 
@@ -163,10 +163,11 @@ AbstractExpression* MaterializedViewMetadata::parsePredicate(catalog::Materializ
     }
     assert (hexString.length() % 2 == 0);
     int bufferLength = (int)hexString.size() / 2 + 1;
-    boost::shared_array<char> buffer(new char[bufferLength]);
-    catalog::Catalog::hexDecodeString(hexString, buffer.get());
+    char* buffer = new char[bufferLength];
+    boost::scoped_array<char> scoped_buffer(buffer);
+    catalog::Catalog::hexDecodeString(hexString, buffer);
 
-    PlannerDomRoot domRoot(buffer.get());
+    PlannerDomRoot domRoot(buffer);
     if (domRoot.isNull()) {
         return NULL;
     }

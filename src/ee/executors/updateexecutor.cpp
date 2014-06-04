@@ -43,10 +43,6 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cassert>
-#include <boost/scoped_ptr.hpp>
-#include <boost/foreach.hpp>
-
 #include "updateexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -65,6 +61,10 @@
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 #include "storage/ConstraintFailureException.h"
+
+#include <boost/foreach.hpp>
+
+#include <cassert>
 
 using namespace std;
 using namespace voltdb;

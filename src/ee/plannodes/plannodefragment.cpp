@@ -53,17 +53,11 @@
 
 using namespace std;
 
-using namespace voltdb;
-
-PlanNodeFragment::PlanNodeFragment()
-{
-    m_serializedType = "org.voltdb.plannodes.PlanNodeList";
-}
+namespace voltdb {
 
 PlanNodeFragment::PlanNodeFragment(AbstractPlanNode *root_node)
 {
-    m_serializedType = "org.voltdb.plannodes.PlanNodeList";
-    if (constructTree(root_node) != true) {
+    if ( ! constructTree(root_node)) {
         throwFatalException("Failed to construct plan fragment");
     }
 }
@@ -121,9 +115,8 @@ PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
     for (std::vector< AbstractPlanNode* >::const_iterator node = pnf->m_planNodes.begin();
          node != pnf->m_planNodes.end(); ++node) {
         const std::vector<CatalogId> childIds = (*node)->getChildIds();
-        std::vector<AbstractPlanNode*> &children = (*node)->getChildren();
         for (int zz = 0; zz < childIds.size(); zz++) {
-            children.push_back(pnf->m_idToNodeMap[childIds[zz]]);
+            (*node)->addChild(pnf->m_idToNodeMap[childIds[zz]]);
         }
     }
     pnf->loadFromJSONObject(obj);
@@ -156,15 +149,12 @@ PlanNodeFragment::loadFromJSONObject(PlannerDomValue obj)
 bool PlanNodeFragment::hasDelete() const
 {
     bool has_delete = false;
-    for (int ii = 0; ii < m_planNodes.size(); ii++)
-    {
-        if (m_planNodes[ii]->getPlanNodeType() == PLAN_NODE_TYPE_DELETE)
-        {
+    for (int ii = 0; ii < m_planNodes.size(); ii++) {
+        if (m_planNodes[ii]->getPlanNodeType() == PLAN_NODE_TYPE_DELETE) {
             has_delete = true;
             break;
         }
-        if (m_planNodes[ii]->getInlinePlanNode(PLAN_NODE_TYPE_DELETE) != NULL)
-        {
+        if (m_planNodes[ii]->getInlinePlanNode(PLAN_NODE_TYPE_DELETE) != NULL) {
             has_delete = true;
             break;
         }
@@ -181,4 +171,6 @@ std::string PlanNodeFragment::debug() {
     buffer << "Execute Tree:\n";
     buffer << getRootNode()->debug(true);
     return (buffer.str());
+}
+
 }

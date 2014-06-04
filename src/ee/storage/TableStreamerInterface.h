@@ -18,7 +18,6 @@
 #ifndef TABLE_STREAMER_INTERFACE_H
 #define TABLE_STREAMER_INTERFACE_H
 
-#include <boost/shared_ptr.hpp>
 #include "common/types.h"
 #include "storage/TupleBlock.h"
 #include "storage/TableStreamerContext.h"

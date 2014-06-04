@@ -49,53 +49,26 @@
 #include "executors/abstractexecutor.h"
 #include "expressions/abstractexpression.h"
 #include "plannodeutil.h"
+#include "SchemaColumn.h"
 
 #include <sstream>
 #include <stdexcept>
 #include <string>
 
 using namespace std;
-using namespace voltdb;
+
+namespace voltdb {
 
 AbstractPlanNode::~AbstractPlanNode()
 {
     delete m_executor;
     map<PlanNodeType, AbstractPlanNode*>::iterator iter;
-    for (iter = m_inlineNodes.begin(); iter != m_inlineNodes.end(); iter++)
-    {
+    for (iter = m_inlineNodes.begin(); iter != m_inlineNodes.end(); iter++) {
         delete (*iter).second;
     }
-    for (int i = 0; i < m_outputSchema.size(); i++)
-    {
+    for (int i = 0; i < m_outputSchema.size(); i++) {
         delete m_outputSchema[i];
     }
-}
-
-// ------------------------------------------------------------------
-// CHILDREN + PARENTS METHODS
-// ------------------------------------------------------------------
-void
-AbstractPlanNode::addChild(AbstractPlanNode* child)
-{
-    m_children.push_back(child);
-}
-
-vector<AbstractPlanNode*>&
-AbstractPlanNode::getChildren()
-{
-    return m_children;
-}
-
-vector<int32_t>&
-AbstractPlanNode::getChildIds()
-{
-    return m_childIds;
-}
-
-const vector<AbstractPlanNode*>&
-AbstractPlanNode::getChildren() const
-{
-    return m_children;
 }
 
 // ------------------------------------------------------------------
@@ -114,12 +87,10 @@ AbstractPlanNode::getInlinePlanNode(PlanNodeType type) const
     map<PlanNodeType, AbstractPlanNode*>::const_iterator lookup =
         m_inlineNodes.find(type);
     AbstractPlanNode* ret = NULL;
-    if (lookup != m_inlineNodes.end())
-    {
+    if (lookup != m_inlineNodes.end()) {
         ret = lookup->second;
     }
-    else
-    {
+    else {
         VOLT_TRACE("No internal PlanNode with type '%s' is available for '%s'",
                    planNodeToString(type).c_str(),
                    this->debug().c_str());
@@ -127,39 +98,9 @@ AbstractPlanNode::getInlinePlanNode(PlanNodeType type) const
     return ret;
 }
 
-map<PlanNodeType, AbstractPlanNode*>&
-AbstractPlanNode::getInlinePlanNodes()
-{
-    return m_inlineNodes;
-}
-
-const map<PlanNodeType, AbstractPlanNode*>&
-AbstractPlanNode::getInlinePlanNodes() const
-{
-    return m_inlineNodes;
-}
-
-bool
-AbstractPlanNode::isInline() const
-{
-    return m_isInline;
-}
-
 // ------------------------------------------------------------------
 // DATA MEMBER METHODS
 // ------------------------------------------------------------------
-int32_t
-AbstractPlanNode::getPlanNodeId() const
-{
-    return m_planNodeId;
-}
-
-void
-AbstractPlanNode::setExecutor(AbstractExecutor* executor)
-{
-    m_executor = executor;
-}
-
 const vector<SchemaColumn*>&
 AbstractPlanNode::getOutputSchema() const
 {
@@ -236,8 +177,7 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls) const
     vector<bool> columnAllowNull(schema_size, allowNulls);
     vector<bool> columnInBytes;
 
-    for (int i = 0; i < schema_size; i++)
-    {
+    for (int i = 0; i < schema_size; i++) {
         //TODO: SchemaColumn is a sad little class that holds an expression pointer,
         // a column name that only really comes in handy in one quirky special case,
         // (see UpdateExecutor::p_init) and a bunch of other stuff that doesn't get used.
@@ -255,6 +195,25 @@ AbstractPlanNode::generateTupleSchema(bool allowNulls) const
     return schema;
 }
 
+const AbstractExpression* const* AbstractPlanNode::getOutputExpressionArray() const
+{
+    AbstractExpression** output_expression_array = m_outputExpressionArray.get();
+    if (output_expression_array) {
+        return output_expression_array;
+    }
+
+    const vector<SchemaColumn*>& outputSchema = getOutputSchema();
+    int columnCount = (int)outputSchema.size();
+    output_expression_array = new AbstractExpression*[columnCount];
+    for (int ii = 0; ii < columnCount; ii++) {
+        output_expression_array[ii] = outputSchema[ii]->getExpression();
+    }
+    // Caching the result for later memory management requires a physical update which
+    // logically does not change the abstract state of the object, so just cast away the const.
+    const_cast<AbstractPlanNode*>(this)->
+        m_outputExpressionArray.reset(output_expression_array);
+    return output_expression_array;
+}
 
 TupleSchema*
 AbstractPlanNode::generateDMLCountTupleSchema()
@@ -268,7 +227,6 @@ AbstractPlanNode::generateDMLCountTupleSchema()
             columnAllowNull, columnInBytes);
     return schema;
 }
-
 
 
 // ----------------------------------------------------
@@ -353,15 +311,15 @@ string
 AbstractPlanNode::debug() const
 {
     ostringstream buffer;
-    buffer << planNodeToString(this->getPlanNodeType())
-           << "[" << this->getPlanNodeId() << "]";
+    buffer << planNodeToString(getPlanNodeType())
+           << "[" << getPlanNodeId() << "]";
     return buffer.str();
 }
 
 string
 AbstractPlanNode::debug(bool traverse) const
 {
-    return (traverse ? this->debug(string("")) : this->debug());
+    return (traverse ? debug(string("")) : debug());
 }
 
 string
@@ -374,14 +332,12 @@ AbstractPlanNode::debug(const string& spacer) const
     //
     // Inline PlanNodes
     //
-    if (!m_inlineNodes.empty())
-    {
+    if (!m_inlineNodes.empty()) {
         buffer << info_spacer << "Inline Plannodes: "
                << m_inlineNodes.size() << "\n";
         string internal_spacer = info_spacer + "  ";
         map<PlanNodeType, AbstractPlanNode*>::const_iterator it;
-        for (it = m_inlineNodes.begin(); it != m_inlineNodes.end(); it++)
-        {
+        for (it = m_inlineNodes.begin(); it != m_inlineNodes.end(); it++) {
             buffer << info_spacer << "Inline "
                    << planNodeToString(it->second->getPlanNodeType())
                    << ":\n";
@@ -392,9 +348,7 @@ AbstractPlanNode::debug(const string& spacer) const
     // Traverse the tree
     //
     string child_spacer = spacer + "  ";
-    for (int ctr = 0, cnt = static_cast<int>(m_children.size());
-         ctr < cnt; ctr++)
-    {
+    for (int ctr = 0, cnt = static_cast<int>(m_children.size()); ctr < cnt; ctr++) {
         buffer << child_spacer << m_children[ctr]->getPlanNodeType() << "\n";
         buffer << m_children[ctr]->debug(child_spacer);
     }
@@ -426,5 +380,4 @@ void AbstractPlanNode::loadExpressionsFromJSONObject(std::vector<AbstractExpress
     }
 }
 
-
-
+}

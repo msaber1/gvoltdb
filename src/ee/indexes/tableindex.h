@@ -46,17 +46,15 @@
 #ifndef HSTORETABLEINDEX_H
 #define HSTORETABLEINDEX_H
 
-#include <vector>
-#include <string>
-#include "boost/shared_ptr.hpp"
-#include "boost/tuple/tuple.hpp"
 #include "common/ids.h"
 #include "common/types.h"
-#include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "common/TupleSchema.h"
 #include "indexes/IndexStats.h"
 #include "common/ThreadLocalPool.h"
+
+#include <string>
+#include <vector>
 
 namespace voltdb {
 

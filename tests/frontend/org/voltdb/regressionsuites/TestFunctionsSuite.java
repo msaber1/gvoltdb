@@ -400,26 +400,26 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "select * from P1, R2 where P1.ID = R2.ID AND ABS(P1.NUM) > 0");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.out.println(r);
+        //* enable for debug */ System.out.println(r);
         assertEquals(8, r.getRowCount());
 
         cr = client.callProcedure("@AdHoc", "select * from P1, R2 where P1.ID = R2.ID AND ABS(P1.NUM+0) > 0");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.out.println(r);
+        //* enable for debug */ System.out.println(r);
         assertEquals(8, r.getRowCount());
 
         // These next queries fail in 3.5 with a runtime type exception about unrecognized type related?/similar? to ENG-5004?
         cr = client.callProcedure("@AdHoc", "select count(*) from P1, R2 where P1.ID = R2.ID AND ABS(R2.NUM+0) > 0");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.out.println(r);
+        //* enable for debug */ System.out.println(r);
         assertEquals(8, r.asScalarLong());
 
         cr = client.callProcedure("@AdHoc", "select count(*) from P1, R2 where P1.ID = R2.ID AND ABS(R2.NUM) > 0");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.out.println(r);
+        //* enable for debug */ System.out.println(r);
         assertEquals(8, r.asScalarLong());
         // */
 
@@ -513,7 +513,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("@AdHoc", "SELECT ABS(ID) AS ENG3196 FROM R1 ORDER BY (ID) LIMIT 5;");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.out.println("DEBUG ENG-3196: " + r);
+        //* enable for debug */ System.out.println("DEBUG ENG-3196: " + r);
         long resultCount = r.getRowCount();
         assertEquals(5, resultCount);
         r.advanceRow();
@@ -817,7 +817,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             cr = client.callProcedure("DUMP_TIMESTAMP_STRING_PATHS");
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             r = cr.getResults()[0];
-            System.out.println(r);
+            //* enable for debug */ System.out.println(r);
         }
 
         System.out.println("STARTING test Extract");
@@ -989,7 +989,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         r = cr.getResults()[0];
         r.advanceRow();
         columnIndex = 0;
-        //System.out.println("Result: " + r);
+        //* enable for debug */ System.out.println("Result: " + r);
 
         EXPECTED_YEAR = 1956;
         result = r.getLong(columnIndex++);
@@ -1793,7 +1793,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         System.out.println("STARTING test of FROM VARCHAR CAST");
         Client client = getClient();
         insertNumbersViaVarChar(client, values, values.length);
-        System.out.println("VALIDATING result of 'FROM VARCHAR' CAST via results of 'TO VARCHAR' CASTS");
+        //* enable for debug */ System.out.println("VALIDATING result of 'FROM VARCHAR' CAST via results of 'TO VARCHAR' CASTS");
         subtestVarCharCasts(client);
         System.out.println("ENDING test of FROM VARCHAR CAST");
     }
@@ -3161,9 +3161,11 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 
-        // CONFIG #1: Local Site/Partitions running on JNI backend
+        //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
+        // IF (! DEBUG config) ...
+
+        // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        // alternative to enable for debugging */ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
@@ -3175,6 +3177,21 @@ public class TestFunctionsSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         // no clustering tests for functions
+
+        /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
+        /////////////////////////////////////////////////////////////
+
+        config = new LocalCluster("sqlfeatures-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        // build the jarfile
+        success = config.compile(project);
+        assert(success);
+        // add this config to the set of tests to run
+        builder.addServerConfig(config);
+
+        // ... ENDIF (DEBUG config) [ FRAGILE! This is a structured comment. Do not break it. ] */
 
         return builder;
     }

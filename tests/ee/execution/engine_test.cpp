@@ -55,22 +55,13 @@
 #include <boost/shared_ptr.hpp>
 #include "harness.h"
 #include "common/common.h"
-#include "expressions/abstractexpression.h"
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
-#include "plannodes/abstractplannode.h"
-#include "indexes/tableindex.h"
 #include "storage/table.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
-#include "storage/temptable.h"
 #include "storage/tableutil.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
 #include "catalog/table.h"
 #include "catalog/database.h"
-#include "catalog/constraint.h"
 
 using namespace std;
 using namespace voltdb;
@@ -188,7 +179,6 @@ class ExecutionEngineTest : public Test {
         catalog::Catalog *catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
         catalog::Cluster *cluster;
         catalog::Database *database;
-        catalog::Constraint *constraint;
 
         Table* warehouse_table;
         Table* stock_table;

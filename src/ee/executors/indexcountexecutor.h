@@ -21,7 +21,7 @@
 
 #include "executors/abstractscanexecutor.h"
 
-#include "boost/shared_array.hpp"
+#include "boost/scoped_array.hpp"
 #include <string>
 
 namespace voltdb {
@@ -50,8 +50,8 @@ private:
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
-    boost::shared_array<AbstractExpression*> m_search_key_array_ptr;
-    boost::shared_array<AbstractExpression*> m_end_key_array_ptr;
+    boost::scoped_array<AbstractExpression*> m_search_key_array_ptr;
+    boost::scoped_array<AbstractExpression*> m_end_key_array_ptr;
 
     AbstractExpression* m_countNULLExpr;
 

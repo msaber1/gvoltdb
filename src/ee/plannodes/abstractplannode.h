@@ -46,12 +46,12 @@
 #ifndef HSTOREPLANNODE_H
 #define HSTOREPLANNODE_H
 
-#include "SchemaColumn.h"
-
 #include "catalog/database.h"
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/PlannerDomValue.h"
+
+#include "boost/scoped_array.hpp"
 
 #include <map>
 #include <string>
@@ -61,6 +61,7 @@ namespace voltdb {
 
 class AbstractExecutor;
 class AbstractExpression;
+class SchemaColumn;
 class Table;
 class TupleSchema;
 
@@ -72,30 +73,29 @@ public:
     // ------------------------------------------------------------------
     // CHILDREN + PARENTS METHODS
     // ------------------------------------------------------------------
-    void addChild(AbstractPlanNode* child);
-    std::vector<AbstractPlanNode*>& getChildren();
-    std::vector<int32_t>& getChildIds();
-    const std::vector<AbstractPlanNode*>& getChildren() const;
+    void addChild(AbstractPlanNode* child) { m_children.push_back(child); }
+    const std::vector<int32_t>& getChildIds() { return m_childIds; }
+    const std::vector<AbstractPlanNode*>& getChildren() const { return m_children; }
 
     // ------------------------------------------------------------------
     // INLINE PLANNODE METHODS
     // ------------------------------------------------------------------
     void addInlinePlanNode(AbstractPlanNode* inline_node);
     AbstractPlanNode* getInlinePlanNode(PlanNodeType type) const;
-    std::map<PlanNodeType, AbstractPlanNode*>& getInlinePlanNodes();
-    const std::map<PlanNodeType, AbstractPlanNode*>& getInlinePlanNodes() const;
-    bool isInline() const;
+    const std::map<PlanNodeType, AbstractPlanNode*>& getInlinePlanNodes() const { return m_inlineNodes; }
+
+    bool isInline() const { return m_isInline; }
 
     // ------------------------------------------------------------------
     // DATA MEMBER METHODS
     // ------------------------------------------------------------------
-    int32_t getPlanNodeId() const;
+    int32_t getPlanNodeId() const { return m_planNodeId; }
     void setPlanNodeIdForTest(int32_t id) { m_planNodeId = id; }
 
     // currently a hack needed to initialize the executors.
     CatalogId databaseId() const { return 1; }
 
-    void setExecutor(AbstractExecutor* executor);
+    void setExecutor(AbstractExecutor* executor) { m_executor = executor; }
     inline AbstractExecutor* getExecutor() const { return m_executor; }
 
     //
@@ -110,6 +110,7 @@ public:
      * order in this vector.
      */
     const std::vector<SchemaColumn*>& getOutputSchema() const;
+    const voltdb::AbstractExpression* const* getOutputExpressionArray() const;
 
     /**
      * Get the output number of columns -- strictly for use with plannode
@@ -201,6 +202,7 @@ private:
     // -- MIGHT come in handy?
     int m_validOutputColumnCount;
     std::vector<SchemaColumn*> m_outputSchema;
+    boost::scoped_array<AbstractExpression*> m_outputExpressionArray;
 };
 
 }

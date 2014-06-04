@@ -73,21 +73,13 @@ bool NestLoopIndexExecutor::p_init(TempTableLimits* limits)
     m_join_type = node->getJoinType();
     m_prejoin_expression = node->getPreJoinPredicate();
     m_where_expression = node->getWherePredicate();
-
-    const std::vector<SchemaColumn*>& output_schema = node->getOutputSchema();
+    m_output_expression_array = node->getOutputExpressionArray();
 
     // We need exactly one input table and a target table
     assert(m_input_tables.size() == 1);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
-
-    int columnCount = getTempOutputTable()->columnCount();
-    AbstractExpression** output_expression_array = new AbstractExpression*[columnCount];
-    for (int ii = 0; ii < columnCount; ii++) {
-        output_expression_array[ii] = output_schema[ii]->getExpression();
-    }
-    m_output_expression_array_ptr.reset(output_expression_array);
 
     IndexScanPlanNode* inline_node =
         dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
@@ -97,9 +89,16 @@ bool NestLoopIndexExecutor::p_init(TempTableLimits* limits)
     //
     // Make sure that we actually have search keys
     //
-    m_num_of_search_keys = (int)inline_node->getSearchKeyExpressions().size();
+    const std::vector<AbstractExpression*>& search_keys = inline_node->getSearchKeyExpressions();
+    m_num_of_search_keys = (int)search_keys.size();
+    AbstractExpression** search_key_array = new AbstractExpression*[m_num_of_search_keys];
+    for (int ctr = 0; ctr < m_num_of_search_keys; ctr++) {
+        search_key_array[ctr] = search_keys[ctr];
+    }
+    m_search_key_array_ptr.reset(search_key_array);
     m_lookupType = inline_node->getLookupType();
     m_sortDirection = inline_node->getSortDirection();
+    m_inner_target_tcd = m_engine->getTableDelegate(inline_node->getTargetTableName());
     m_index_name = inline_node->getTargetIndexName();
     m_end_expression = inline_node->getEndExpression();
     m_post_expression = inline_node->getPredicate();
@@ -137,7 +136,7 @@ bool NestLoopIndexExecutor::p_init(TempTableLimits* limits)
 #ifdef DEBUG
     for (int ctr = 0; ctr < m_num_of_search_keys; ctr++) {
         VOLT_TRACE("Search Key[%d]:\n%s",
-                   ctr, inline_node->getSearchKeyExpressions()[ctr]->debug(true).c_str());
+                   ctr, search_keys[ctr]->debug(true).c_str());
     }
     if (m_end_expression) {
         VOLT_TRACE("End Expression:\n%s", m_end_expression->debug(true).c_str());
@@ -218,8 +217,9 @@ bool NestLoopIndexExecutor::p_execute()
     TableTuple null_tuple = m_null_tuple;
     int num_of_inner_cols = (m_join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
+    AbstractExpression** search_key_array = m_search_key_array_ptr.get();
 
-    AbstractExpression** output_expression_array = m_output_expression_array_ptr.get();
+    const AbstractExpression* const* output_expression_array = m_output_expression_array;
 
     ProgressMonitorProxy pmp(m_engine, this, inner_table);
     VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
@@ -256,7 +256,7 @@ bool NestLoopIndexExecutor::p_execute()
             for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
                 // in a normal index scan, params would be substituted here,
                 // but this scan fills in params outside the loop
-                NValue candidateValue = m_search_key_expressions[ctr]->eval(&outer_tuple, NULL);
+                NValue candidateValue = search_key_array[ctr]->eval(&outer_tuple, NULL);
                 try {
                     searchKey.setNValue(ctr, candidateValue);
                 }
@@ -271,15 +271,11 @@ bool NestLoopIndexExecutor::p_execute()
                         throw e;
                     }
 
-                    // handle the case where this is a comparison, rather than equality match
-                    // comparison is the only place where the executor might return matching tuples
+                    // Handle the case where this is a comparison, rather than an equality match.
+                    // A comparison is the only place where the executor might return matching tuples
                     // e.g. TINYINT < 1000 should return all values
                     if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
                         (ctr == (activeNumOfSearchKeys - 1))) {
-
-                        // sanity check that there is at least one EQ column
-                        // or else the join wouldn't work, right?
-                        assert(activeNumOfSearchKeys > 1);
 
                         if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
                             if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||

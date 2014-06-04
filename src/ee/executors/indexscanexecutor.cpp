@@ -92,17 +92,16 @@ bool IndexScanExecutor::p_initMore(TempTableLimits* limits)
     //
     // Make sure that we have search keys and that they're not null
     //
-    AbstractExpression** search_keys = new AbstractExpression*[m_num_of_search_keys];
+    AbstractExpression** search_key_array = new AbstractExpression*[m_num_of_search_keys];
+    m_search_key_array_ptr.reset(search_key_array);
     for (int ctr = 0; ctr < m_num_of_search_keys; ctr++) {
         if (searchKeyExprs[ctr] == NULL) {
             VOLT_ERROR("The search key expression at position '%d' is NULL for"
                        " PlanNode '%s'", ctr, node->debug().c_str());
-            delete [] search_keys;
             return false;
         }
-        search_keys[ctr] = searchKeyExprs[ctr];
+        search_key_array[ctr] = searchKeyExprs[ctr];
     }
-    m_search_key_array_ptr.reset(search_keys);
 
     m_index_name = node->getTargetIndexName();
     TableIndex *tableIndex = targetTable->index(m_index_name);
@@ -233,7 +232,7 @@ bool IndexScanExecutor::p_execute()
         VOLT_DEBUG("COUNT NULL Expression:\n%s", m_skip_null_predicate->debug(true).c_str());
     }
 #endif
-    AbstractExpression* const* projection_expressions = NULL;
+    const AbstractExpression* const* projection_expressions = NULL;
     const int* projection_columns = getProjectionColumns();
     if (projection_columns == NULL) {
         projection_expressions = getProjectionExpressions();

@@ -100,7 +100,7 @@ protected:
     std::vector<bool> m_distinctAggs;
     std::vector<AbstractExpression*> m_groupByExpressions;
     std::vector<AbstractExpression*> m_inputExpressions;
-    std::vector<AbstractExpression*> m_outputColumnExpressions;
+    const AbstractExpression* const* m_outputColumnExpressions;
     std::vector<int> m_aggregateOutputColumns;
     AbstractExpression* m_prePredicate;    // ENG-1565: for enabling max() using index purpose only
     AbstractExpression* m_postPredicate;

@@ -23,6 +23,7 @@
 #include "storage/CopyOnWriteContext.h"
 #include "storage/ElasticContext.h"
 #include "storage/ElasticIndexReadContext.h"
+#include "storage/RecoveryContext.h"
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "logging/LogManager.h"

@@ -46,9 +46,10 @@
 #ifndef HSTOREPLANNODEUTIL_H
 #define HSTOREPLANNODEUTIL_H
 
-#include <string>
 #include "common/common.h"
 #include "plannodes/abstractplannode.h"
+
+#include <string>
 
 namespace plannodeutil {
 
