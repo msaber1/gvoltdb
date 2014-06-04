@@ -40,8 +40,10 @@ import lr.procedures.*;
 public class LogisticRegression
 {
     public static void main(String[] args) throws Exception {
-        double[] weights = new double[2];
+        int dim = 3;
+        double[] weights = new double[dim];
         double stepsize = 0.0001;
+        double lambda = 0.01;
 
         // init client
         Client client = null;
@@ -59,7 +61,7 @@ public class LogisticRegression
 
         try {
             for (int iter = 0; iter < 150; iter++) {
-                double[] grad = new double[2];
+                double[] grad = new double[dim];
                 for (int k = 0; k < keys.getRowCount(); k++) {
                     long key = keys.fetchRow(k).getLong(1);
                     VoltTable gt = client.callProcedure("Solve", key, weights, stepsize).getResults()[0];
@@ -74,7 +76,7 @@ public class LogisticRegression
                 }
                 //System.out.println("after the " + iter + " iteration:");
                 for (int i =0; i < weights.length; i++){
-                    weights[i] -= grad[i];
+                    weights[i] -= grad[i] + 0.5 * lambda * weights[i];
                     System.out.print(weights[i] + "\t");
                 }
                 System.out.println();

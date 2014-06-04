@@ -42,8 +42,10 @@ import lr.procedures.*;
 public class AsyncLogisticRegression
 {
     public static void main(String[] args) throws Exception {
-        double[] weights = new double[2];
+        int dim = 3;
+        double[] weights = new double[dim];
         double stepsize = 0.0001;
+        double lambda = 0.01;
 
         // init client
         Client client = null;
@@ -62,15 +64,18 @@ public class AsyncLogisticRegression
 
         try {
             for (int iter = 0; iter < 150; iter++) {
+                double[] grad = new double[dim];
                 for (int k = 0; k < patitions; k++) {
                     long key = keys.fetchRow(k).getLong(1);
-                    client.callProcedure(new LRCallback(weights), "Solve", key, weights, stepsize);
+                    client.callProcedure(new LRCallback(grad), "Solve", key, weights, stepsize);
                 }
                 //wait all stored procedure finished
                 client.drain();
 
-                for (int i =0; i < weights.length; i++)
+                for (int i =0; i < weights.length; i++) {
+                    weights[i] -= grad[i] + 0.5 * lambda * weights[i];
                     System.out.print(weights[i] + "\t");
+                }
 
                 System.out.println();
             }
@@ -87,8 +92,8 @@ public class AsyncLogisticRegression
     };
 
     static class LRCallback implements ProcedureCallback {
-        public LRCallback(double[] weights) {
-            this.weights = weights;
+        public LRCallback(double[] grad) {
+            this.grad = grad;
         }
         @Override
         public void clientCallback(ClientResponse response) {
@@ -100,9 +105,9 @@ public class AsyncLogisticRegression
             VoltTable result = response.getResults()[0];
             result.resetRowPosition();
             int i = 0;
-            synchronized (weights) {
+            synchronized (grad) {
                 while (result.advanceRow()) {
-                    weights[i] -= result.getDouble(0);
+                    grad[i] += result.getDouble(0);
                     i++;
                 }
                 //System.out.println("the "+k+" patition");
@@ -111,6 +116,6 @@ public class AsyncLogisticRegression
             }
         }
 
-        double[] weights;
+        double[] grad;
     }
 }

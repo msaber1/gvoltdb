@@ -58,8 +58,9 @@ public class Solve extends VoltProcedure
         {
             // the first field is id, skip it
             int flag = (int)row.getLong(1);
-            for (int i=0; i<len; i++)
-                data[i] = row.getDouble(i+2);
+            data[0] = 1;
+            for (int i=1; i<len; i++)
+                data[i] = row.getDouble(i+1);
 
             double t = (sigmoid(flag, weights, data)) - 1.0;
             t = (flag == 1) ? t : -t;

@@ -40,7 +40,8 @@ import lr.procedures.*;
 public class SGDLogisticRegression
 {
     public static void main(String[] args) throws Exception {
-        double[] weights = new double[2];
+        int dim = 3;
+        double[] weights = new double[dim];
         double stepsize = 0.0001;
 
         // init client
@@ -58,7 +59,7 @@ public class SGDLogisticRegression
         VoltTable keys = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults()[0];
 
         try {
-            for (int iter = 0; iter < 1000; iter++) {
+            for (int iter = 0; iter < 150; iter++) {
                 for (int k = 0; k < keys.getRowCount(); k++) {
                     long key = keys.fetchRow(k).getLong(1);
                     VoltTable gt = client.callProcedure("Solve", key, weights, stepsize).getResults()[0];
