@@ -105,7 +105,7 @@ function sync-benchmark() {
     java -classpath obj:$APPCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         kvbench.SyncBenchmark \
         --displayinterval=5 \
-        --duration=120 \
+        --duration=3600 \
         --servers=localhost \
         --poolsize=100000 \
         --preload=true \
