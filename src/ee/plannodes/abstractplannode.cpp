@@ -355,7 +355,7 @@ AbstractPlanNode::debug(const string& spacer) const
 }
 
 AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(const char* label,
-                                                                   const PlannerDomValue& obj)
+                                                                   PlannerDomValue obj)
 {
     if (obj.hasNonNullKey(label)) {
         return AbstractExpression::buildExpressionTree(obj.valueForKey(label));
@@ -365,7 +365,7 @@ AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(const char* l
 
 void AbstractPlanNode::loadExpressionsFromJSONObject(std::vector<AbstractExpression*>& arrayOut,
                                                      const char* label,
-                                                     const PlannerDomValue& obj)
+                                                     PlannerDomValue obj)
 {
     arrayOut.clear();
     if ( ! obj.hasNonNullKey(label)) {

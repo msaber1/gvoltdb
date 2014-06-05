@@ -153,16 +153,33 @@ public:
     std::string debug(const std::string& spacer) const;
     virtual std::string debugInfo(const std::string& spacer) const = 0;
 
+    // Replacement/wrapper for AbtractExpression* that saves the trouble of defining a
+    // non-trivial destructor in the plannode class just to propagate deletion to
+    // data member expression objects. The memory management only applies to the final value
+    // of the expression member.
+    // It is not intended to support multiple resets with implied deletes like scoped_ptr, etc.
+    // Assign it a value only once or take responsibility for deleting a value before overwriting it.
     struct OwnedExpression {
+        // The destructor implements the critical behavior of this class.
         ~OwnedExpression() { delete m_expression; }
+
+        // The rest is just for compatibility/dressing.
         OwnedExpression(AbstractExpression* in = NULL) : m_expression(in) { }
-        void operator=(AbstractExpression* in) { m_expression = in; }
+        void operator=(AbstractExpression* in) { assert( ! m_expression); m_expression = in; }
         operator AbstractExpression*() const { return m_expression; }
-        AbstractExpression* operator->() const { return m_expression; }
+        AbstractExpression* operator->() const { assert(m_expression); return m_expression; }
+    private:
         AbstractExpression* m_expression;
     };
 
+    // Replacement/wrapper for vector<AbtractExpression* that saves the trouble of defining a destructor
+    // just to propagate deletion to the elements of the member vector (expression objects).
+    // The memory management operates only on the final state of the member vector.
+    // Assign/push each element only once or take responsibility for deleting an element
+    // before overwriting it.
     struct VectorOfOwnedExpression : public std::vector<AbstractExpression*> {
+        // The destructor implements the critical behavior of this class.
+        // All other behavior is exactly as implemented in std::vector.
         ~VectorOfOwnedExpression()
         {
             size_t ii = size();
@@ -181,11 +198,9 @@ protected:
         , m_isInline(false)
     { }
 
-    static AbstractExpression* loadExpressionFromJSONObject(const char* label,
-                                                            const PlannerDomValue& obj);
+    static AbstractExpression* loadExpressionFromJSONObject(const char* label, PlannerDomValue obj);
     static void loadExpressionsFromJSONObject(std::vector<AbstractExpression*>& arrayOut,
-                                              const char* label,
-                                              const PlannerDomValue& obj);
+                                              const char* label, PlannerDomValue obj);
 
 
 
