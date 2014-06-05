@@ -1602,7 +1602,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
 
-        /* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
+        //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
         // IF (! DEBUG config) ...
 
         // CONFIG #1: Local Site/Partition running on JNI backend
