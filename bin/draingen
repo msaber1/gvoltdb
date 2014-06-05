@@ -126,7 +126,7 @@ done
 CLASSPATH=${CLASSPATH}
 
 # run it
-export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Djava.library.path=/Users/akhanzode/projects/voltdb/voltdb -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
+export CMDVAL="$JAVA -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/tmp -Djava.awt.headless=true $JAVA_HEAP_MAX $VOLTDB_OPTS -Djava.library.path=$VOLTDB_VOLTDB -Dlog4j.configuration=file://${LOG4J_CONFIG_PATH} "
 export CMDVAL=$CMDVAL"-classpath $CLASSPATH org.voltdb.export.PushSpecificGeneration"
 #echo $CMDVAL "$@"
 exec $CMDVAL "$@"
