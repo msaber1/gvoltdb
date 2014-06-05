@@ -99,7 +99,7 @@ bool UpsertExecutor::p_execute()
     // Update target table reference from table delegate
     PersistentTable* targetTable = dynamic_cast<PersistentTable*>(getTargetTable());
     assert(targetTable);
-    assert (targetTable->columnCount() == m_inputTable->columnCount());
+    assert (targetTable->columnCount() == input_table->columnCount());
     TableTuple targetTuple = TableTuple(targetTable->schema());
 
     TableTuple tbTuple = TableTuple(input_table->schema());

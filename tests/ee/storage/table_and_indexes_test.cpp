@@ -174,7 +174,7 @@ class TableAndIndexTest : public Test {
             const vector<string> customerColumnNames(customerColumnNamesArray, customerColumnNamesArray + 21 );
 
             districtTable =
-                TableFactory::getPersistentTable(0, "DISTRICT", 
+                TableFactory::getPersistentTable(0, "DISTRICT",
                                                  districtTupleSchema, districtColumnNames, 0);
             TableIndex *pkeyIndex = TableIndexFactory::getInstance(districtIndex1Scheme);
             assert(pkeyIndex);
