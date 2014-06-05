@@ -111,7 +111,7 @@ bool MaterializeExecutor::p_execute()
         }
     }
     else {
-        const AbstractExpression* const* expression_array = m_expression_array;
+        const AbstractExpression* const* expression_array = m_state.getProjectionExpressions();
         TableTuple dummy;
         // add the generated value to the temp tuple. it must have the
         // same value type as the output column.

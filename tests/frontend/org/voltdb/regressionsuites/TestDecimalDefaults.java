@@ -81,12 +81,35 @@ public class TestDecimalDefaults extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalCluster config = new LocalCluster("decimal-default.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config;
+
+        //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
+        // IF (! DEBUG config) ...
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
+        /////////////////////////////////////////////////////////////
+
+        config = new LocalCluster("decimal-default.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
+
+        /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("decimal-default.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        // build the jarfile
+        success = config.compile(project);
+        assert(success);
+        // add this config to the set of tests to run
+        builder.addServerConfig(config);
+
+        // ... ENDIF (DEBUG config) [ FRAGILE! This is a structured comment. Do not break it. ] */
 
         return builder;
     }

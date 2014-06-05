@@ -550,7 +550,7 @@ public class TestSubQueries extends PlannerTestCase {
         assertTrue(pn instanceof HashAggregatePlanNode);
         pn = pn.getChild(0);
         assertTrue(pn instanceof SeqScanPlanNode);
-        checkSeqScanSubSelects(pn, "T1", "A", "SC");
+        checkSeqScanSubSelects(pn, "T1", "A", "SC", "MD");
         pn = pn.getChild(0);
         assertTrue(pn instanceof ProjectionPlanNode);
         pn = pn.getChild(0);

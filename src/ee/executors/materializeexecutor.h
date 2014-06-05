@@ -64,8 +64,6 @@ protected:
     bool p_execute();
 private:
     const int* m_all_param_array;
-    // an array[num_columns] of pointers to expression trees
-    const AbstractExpression* const * m_expression_array;
     bool m_batched;
 };
 
