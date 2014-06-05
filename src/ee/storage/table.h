@@ -113,6 +113,16 @@ class Table {
   public:
     virtual ~Table();
 
+    // Implement a crude form of valgrind-lite memory validation.
+    // Clobber freed Table (header) memory to trip up anything trying to use it later.
+    void operator delete(void * pTable)
+    {
+        // 0xdb is a randomly chosen non-zero non-ascii character value
+        // that is difficult to mistake as valid data (not null, not positive, not ascii).
+        ::memset(pTable, 0xdb, sizeof(Table));
+        delete (char*)pTable;
+    }
+
     /*
      * Table lifespan can be managed bya reference count. The
      * reference is trivial to maintain since it is only accessed by
