@@ -54,14 +54,9 @@ using namespace std;
 
 namespace voltdb {
 
-PlanNodeType
-ReceivePlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_RECEIVE;
-}
+PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_RECEIVE; }
 
-string
-ReceivePlanNode::debugInfo(const string& spacer) const
+string ReceivePlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
     buffer << spacer << "Incoming Table Columns["
@@ -77,10 +72,9 @@ ReceivePlanNode::debugInfo(const string& spacer) const
     return (buffer.str());
 }
 
-void
-ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
+void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    // This space intentionally left blank.
+    /* This space intentionally left blank. */
 }
 
 }

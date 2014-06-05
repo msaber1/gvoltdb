@@ -47,8 +47,6 @@
 
 #include "abstractplannode.h"
 
-#include <vector>
-
 namespace voltdb
 {
 
@@ -56,26 +54,27 @@ class OrderByPlanNode : public AbstractPlanNode
 {
 public:
     OrderByPlanNode() { }
-    ~OrderByPlanNode();
+    ~OrderByPlanNode() { }
 
     virtual PlanNodeType getPlanNodeType() const;
 
-    const std::vector<AbstractExpression*>& getSortExpressions() const;
+    const std::vector<AbstractExpression*>& getSortExpressions() const { return m_sort_expressions; }
 
-    const std::vector<SortDirectionType>& getSortDirections() const;
+    const std::vector<SortDirectionType>& getSortDirections() const { return m_sort_directions; }
 
     std::string debugInfo(const std::string &spacer) const;
 
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj);
 
-    std::vector<AbstractExpression*> m_sortExpressions;
+private:
+    VectorOfOwnedExpression m_sort_expressions;
     /**
      * Sort Directions
      * If true, sort in ASC order
      * If false, sort in DESC order
      */
-    std::vector<SortDirectionType> m_sortDirections;
+    std::vector<SortDirectionType> m_sort_directions;
 };
 
 }

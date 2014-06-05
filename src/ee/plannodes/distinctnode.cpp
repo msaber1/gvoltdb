@@ -45,33 +45,15 @@
 
 #include "distinctnode.h"
 
-#include "expressions/abstractexpression.h"
-
 #include <sstream>
 
 using namespace std;
 
 namespace voltdb {
 
-DistinctPlanNode::~DistinctPlanNode()
-{
-    delete m_distinctExpression;
-}
+PlanNodeType DistinctPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_DISTINCT; }
 
-PlanNodeType
-DistinctPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_DISTINCT;
-}
-
-AbstractExpression*
-DistinctPlanNode::getDistinctExpression() const
-{
-    return m_distinctExpression;
-}
-
-string
-DistinctPlanNode::debugInfo(const string &spacer) const
+string DistinctPlanNode::debugInfo(const string &spacer) const
 {
     ostringstream buffer;
     buffer << spacer << "DistinctExpression["
@@ -79,8 +61,7 @@ DistinctPlanNode::debugInfo(const string &spacer) const
     return buffer.str();
 }
 
-void
-DistinctPlanNode::loadFromJSONObject(PlannerDomValue obj)
+void DistinctPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_distinctExpression = loadExpressionFromJSONObject("DISTINCT_EXPRESSION", obj);
     assert(m_distinctExpression);

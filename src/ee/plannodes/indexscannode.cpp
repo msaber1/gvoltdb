@@ -45,24 +45,14 @@
 
 #include "indexscannode.h"
 
-#include "expressions/abstractexpression.h"
-
 #include <sstream>
 
 namespace voltdb {
 
 PlanNodeType IndexScanPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INDEXSCAN; }
 
-IndexScanPlanNode::~IndexScanPlanNode() {
-    for (int ii = 0; ii < m_searchkey_expressions.size(); ii++) {
-        delete m_searchkey_expressions[ii];
-    }
-    delete m_end_expression;
-    delete m_initial_expression;
-    delete m_skip_null_predicate;
-}
-
-std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
+std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const
+{
     std::ostringstream buffer;
     buffer << AbstractScanPlanNode::debugInfo(spacer);
     buffer << spacer << "TargetIndexName[" << m_target_index_name << "]\n";
@@ -70,8 +60,8 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     buffer << spacer << "SortDirection[" << m_sort_direction << "]\n";
 
     buffer << spacer << "SearchKey Expressions:\n";
-    for (int ctr = 0, cnt = (int)m_searchkey_expressions.size(); ctr < cnt; ctr++) {
-        buffer << m_searchkey_expressions[ctr]->debug(spacer);
+    for (int ctr = 0, cnt = (int)m_search_key_expressions.size(); ctr < cnt; ctr++) {
+        buffer << m_search_key_expressions[ctr]->debug(spacer);
     }
 
     buffer << spacer << "End Expression: ";
@@ -97,7 +87,8 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const {
     return (buffer.str());
 }
 
-void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
+void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
     AbstractScanPlanNode::loadFromJSONObject(obj);
 
     std::string lookupTypeString = obj.valueForKey("LOOKUP_TYPE").asStr();
@@ -114,7 +105,7 @@ void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj) {
 
     m_skip_null_predicate = loadExpressionFromJSONObject("SKIP_NULL_PREDICATE", obj);
 
-    loadExpressionsFromJSONObject(m_searchkey_expressions, "SEARCHKEY_EXPRESSIONS", obj);
+    loadExpressionsFromJSONObject(m_search_key_expressions, "SEARCHKEY_EXPRESSIONS", obj);
 }
 
 }

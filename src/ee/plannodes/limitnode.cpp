@@ -47,7 +47,6 @@
 
 #include "common/ValuePeeker.hpp"
 #include "execution/VoltDBEngine.h"
-#include "expressions/abstractexpression.h"
 
 #include <sstream>
 
@@ -60,8 +59,7 @@ LimitPlanNode::~LimitPlanNode()
     delete m_state.limitExpression;
 }
 
-void
-LimitPlanNode::InlineState::getLimitAndOffsetByReference(VoltDBEngine* engine,
+void LimitPlanNode::InlineState::getLimitAndOffsetByReference(VoltDBEngine* engine,
         int &limitOut, int &offsetOut)
 {
     const NValueArray &params = engine->getParameterContainer();

@@ -54,9 +54,8 @@ namespace voltdb
 class AggregatePlanNode : public AbstractPlanNode
 {
 public:
-    AggregatePlanNode(PlanNodeType type) : m_type(type), m_prePredicate(NULL), m_postPredicate(NULL) { }
-    ~AggregatePlanNode();
-
+    AggregatePlanNode(PlanNodeType type) : m_type(type) { }
+    ~AggregatePlanNode() { }
     virtual PlanNodeType getPlanNodeType() const;
 
     const std::vector<ExpressionType> getAggregates() const { return m_aggregates; }
@@ -78,34 +77,31 @@ public:
     const std::vector<AbstractExpression*>& getGroupByExpressions() const
     { return m_groupByExpressions; }
 
-    AbstractExpression* getPrePredicate() const
-    { return m_prePredicate; }
+    AbstractExpression* getPrePredicate() const { return m_prePredicate; }
 
-    AbstractExpression* getPostPredicate() const
-    { return m_postPredicate; }
+    AbstractExpression* getPostPredicate() const { return m_postPredicate; }
 
     std::string debugInfo(const std::string &spacer) const;
 
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj);
-
+private:
     std::vector<ExpressionType> m_aggregates;
     std::vector<bool> m_distinctAggregates;
     std::vector<int> m_aggregateOutputColumns;
-    std::vector<AbstractExpression*> m_aggregateInputExpressions;
-    std::vector<AbstractExpression*> m_outputColumnExpressions;
+    VectorOfOwnedExpression m_aggregateInputExpressions;
 
     //
     // What columns to group by on
     //
-    std::vector<AbstractExpression*> m_groupByExpressions;
+    VectorOfOwnedExpression m_groupByExpressions;
 
     const PlanNodeType m_type; // AGGREGATE OR HASHAGGREGATE
 
     // ENG-1565: for accelerating min() / max() using index purpose only
-    AbstractExpression* m_prePredicate;
+    OwnedExpression m_prePredicate;
 
-    AbstractExpression* m_postPredicate;
+    OwnedExpression m_postPredicate;
 };
 
 }

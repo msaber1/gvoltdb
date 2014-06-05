@@ -45,8 +45,6 @@
 
 #include "aggregatenode.h"
 
-#include "expressions/abstractexpression.h"
-
 #include <sstream>
 
 using namespace std;
@@ -54,18 +52,6 @@ using namespace std;
 namespace voltdb {
 
 PlanNodeType AggregatePlanNode::getPlanNodeType() const { return m_type; }
-
-AggregatePlanNode::~AggregatePlanNode()
-{
-    for (int i = 0; i < m_aggregateInputExpressions.size(); i++) {
-        delete m_aggregateInputExpressions[i];
-    }
-    for (int i = 0; i < m_groupByExpressions.size(); i++) {
-        delete m_groupByExpressions[i];
-    }
-    delete m_prePredicate;
-    delete m_postPredicate;
-}
 
 string AggregatePlanNode::debugInfo(const string &spacer) const {
     ostringstream buffer;
@@ -99,8 +85,7 @@ string AggregatePlanNode::debugInfo(const string &spacer) const {
     return buffer.str();
 }
 
-void
-AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
+void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     PlannerDomValue aggregateColumnsArray = obj.valueForKey("AGGREGATE_COLUMNS");
     for (int i = 0; i < aggregateColumnsArray.arrayLen(); i++) {

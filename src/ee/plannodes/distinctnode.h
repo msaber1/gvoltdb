@@ -47,12 +47,7 @@
 
 #include "plannodes/abstractplannode.h"
 
-#include "common/debuglog.h"
-#include "common/ids.h"
-#include "common/types.h"
-
 #include <string>
-#include <vector>
 
 namespace voltdb
 {
@@ -61,17 +56,17 @@ class DistinctPlanNode : public AbstractPlanNode
 {
 public:
     DistinctPlanNode() { }
-    ~DistinctPlanNode();
-
+    ~DistinctPlanNode() { }
     virtual PlanNodeType getPlanNodeType() const;
 
-    AbstractExpression* getDistinctExpression() const;
+    AbstractExpression* getDistinctExpression() const { return m_distinctExpression; }
 
     std::string debugInfo(const std::string& spacer) const;
 
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj);
-    AbstractExpression* m_distinctExpression;
+private:
+    OwnedExpression m_distinctExpression;
 };
 
 }

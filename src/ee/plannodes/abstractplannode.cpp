@@ -47,7 +47,6 @@
 
 #include "common/TupleSchema.h"
 #include "executors/abstractexecutor.h"
-#include "expressions/abstractexpression.h"
 #include "plannodeutil.h"
 #include "SchemaColumn.h"
 

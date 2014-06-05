@@ -45,41 +45,12 @@
 
 #include "abstractjoinnode.h"
 
-#include "expressions/abstractexpression.h"
-
 #include <stdexcept>
 #include <sstream>
 
 using namespace std;
 
 namespace voltdb {
-
-AbstractJoinPlanNode::~AbstractJoinPlanNode()
-{
-    delete m_preJoinPredicate;
-    delete m_joinPredicate;
-    delete m_wherePredicate;
-}
-
-JoinType AbstractJoinPlanNode::getJoinType() const
-{
-    return m_joinType;
-}
-
-AbstractExpression* AbstractJoinPlanNode::getPreJoinPredicate() const
-{
-    return m_preJoinPredicate;
-}
-
-AbstractExpression* AbstractJoinPlanNode::getJoinPredicate() const
-{
-    return m_joinPredicate;
-}
-
-AbstractExpression* AbstractJoinPlanNode::getWherePredicate() const
-{
-    return m_wherePredicate;
-}
 
 string AbstractJoinPlanNode::debugInfo(const string& spacer) const
 {

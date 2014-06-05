@@ -31,7 +31,7 @@ class AbstractExpression;
 class MaterializedScanPlanNode : public AbstractPlanNode {
 public:
     MaterializedScanPlanNode() { }
-    ~MaterializedScanPlanNode();
+    ~MaterializedScanPlanNode() { }
 
     virtual PlanNodeType getPlanNodeType() const;
 
@@ -48,7 +48,7 @@ private:
     // It doesn't matter what kind of expression this is,
     // so long as eval() returns an NValue array as opposed
     // to the usual scalar NValues.
-    AbstractExpression* m_tableRowsExpression;
+    OwnedExpression m_tableRowsExpression;
     SortDirectionType m_sortDirection;
 };
 

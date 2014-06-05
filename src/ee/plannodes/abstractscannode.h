@@ -56,7 +56,7 @@ namespace voltdb
 class AbstractScanPlanNode : public AbstractPlanNode
 {
 public:
-    ~AbstractScanPlanNode();
+    ~AbstractScanPlanNode() { }
 
     const std::string& getTargetTableName() const { return m_targetTableName; }
 
@@ -69,7 +69,7 @@ public:
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj);
 
-    AbstractScanPlanNode() : m_predicate(NULL) { }
+    AbstractScanPlanNode() { }
 
 private:
     // Target Table
@@ -83,7 +83,7 @@ private:
     //
     // This is the predicate used to filter out tuples during the scan
     //
-    AbstractExpression* m_predicate;
+    OwnedExpression m_predicate;
     // True if this scan represents a sub query
     bool m_isSubquery;
 };

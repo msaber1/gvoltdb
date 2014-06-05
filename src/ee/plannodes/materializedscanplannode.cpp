@@ -17,19 +17,12 @@
 
 #include "materializedscanplannode.h"
 
-#include "expressions/abstractexpression.h"
-
 #include <sstream>
 
 namespace voltdb {
 
 PlanNodeType
 MaterializedScanPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_MATERIALIZEDSCAN; }
-
-MaterializedScanPlanNode::~MaterializedScanPlanNode()
-{
-    delete m_tableRowsExpression;
-}
 
 std::string MaterializedScanPlanNode::debugInfo(const std::string &spacer) const
 {

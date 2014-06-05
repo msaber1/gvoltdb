@@ -46,12 +46,8 @@ public:
     AbstractExpression* getExpression() const { return m_expression; }
 
 private:
-    std::string m_tableName;
     std::string m_columnName;
-    std::string m_columnAlias;
     AbstractExpression* m_expression;
-    ValueType m_type;
-    int32_t m_size;
 };
 
 }

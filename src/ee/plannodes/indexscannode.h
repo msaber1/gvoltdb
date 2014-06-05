@@ -60,7 +60,8 @@ class AbstractExpression;
 class IndexScanPlanNode : public AbstractScanPlanNode {
 public:
     IndexScanPlanNode() { }
-    ~IndexScanPlanNode();
+    ~IndexScanPlanNode() { }
+
     virtual PlanNodeType getPlanNodeType() const;
 
     IndexLookupType getLookupType() const { return m_lookup_type; }
@@ -72,7 +73,7 @@ public:
     AbstractExpression* getEndExpression() const { return m_end_expression; }
 
     const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
-    { return m_searchkey_expressions; }
+    { return m_search_key_expressions; }
 
     AbstractExpression* getInitialExpression() const { return m_initial_expression; }
 
@@ -88,13 +89,13 @@ private:
     std::string m_target_index_name;
 
     // TODO: Document
-    AbstractExpression* m_end_expression;
+    OwnedExpression m_end_expression;
 
     // TODO: Document
-    std::vector<AbstractExpression*> m_searchkey_expressions;
+    VectorOfOwnedExpression m_search_key_expressions;
 
     // TODO: Document
-    AbstractExpression* m_initial_expression;
+    OwnedExpression m_initial_expression;
 
     // Index Lookup Type
     IndexLookupType m_lookup_type;
@@ -103,7 +104,7 @@ private:
     SortDirectionType m_sort_direction;
 
     // null row predicate for underflow edge case
-    AbstractExpression* m_skip_null_predicate;
+    OwnedExpression m_skip_null_predicate;
 };
 
 }

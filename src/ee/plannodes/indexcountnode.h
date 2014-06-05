@@ -33,7 +33,7 @@ class AbstractExpression;
 class IndexCountPlanNode : public AbstractScanPlanNode {
 public:
     IndexCountPlanNode() { }
-    ~IndexCountPlanNode();
+    ~IndexCountPlanNode() { }
 
     virtual PlanNodeType getPlanNodeType() const;
 
@@ -44,10 +44,10 @@ public:
     const std::string& getTargetIndexName() const { return m_target_index_name; }
 
     const std::vector<AbstractExpression*>& getEndKeyExpressions() const
-    { return m_endkey_expressions; }
+    { return m_end_key_expressions; }
 
     const std::vector<AbstractExpression*>& getSearchKeyExpressions() const
-    { return m_searchkey_expressions; }
+    { return m_search_key_expressions; }
 
     AbstractExpression* getSkipNullPredicate() const
     { return m_skip_null_predicate; }
@@ -55,17 +55,17 @@ public:
     std::string debugInfo(const std::string &spacer) const;
 
 protected:
-        virtual void loadFromJSONObject(PlannerDomValue obj);
+    virtual void loadFromJSONObject(PlannerDomValue obj);
 
 private:
     // This is the id of the index to reference during execution
     std::string m_target_index_name;
 
     // TODO: Document
-    std::vector<AbstractExpression*> m_searchkey_expressions;
+    VectorOfOwnedExpression m_search_key_expressions;
 
     // TODO: Document
-    std::vector<AbstractExpression*> m_endkey_expressions;
+    VectorOfOwnedExpression m_end_key_expressions;
 
     // Index Lookup Type
     IndexLookupType m_lookup_type;
@@ -74,7 +74,7 @@ private:
     IndexLookupType m_end_type;
 
     // count null row predicate for edge cases: reverse scan or underflow case
-    AbstractExpression* m_skip_null_predicate;
+    OwnedExpression m_skip_null_predicate;
 };
 
 }

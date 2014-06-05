@@ -45,8 +45,6 @@
 
 #include "orderbynode.h"
 
-#include "expressions/abstractexpression.h"
-
 #include <sstream>
 #include <string>
 
@@ -54,46 +52,22 @@ using namespace std;
 
 namespace voltdb {
 
-OrderByPlanNode::~OrderByPlanNode()
-{
-    for (int i = 0; i < m_sortExpressions.size(); i++) {
-        delete m_sortExpressions[i];
-    }
-}
+PlanNodeType OrderByPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_ORDERBY; }
 
-PlanNodeType
-OrderByPlanNode::getPlanNodeType() const
-{
-    return PLAN_NODE_TYPE_ORDERBY;
-}
-
-const vector<AbstractExpression*>& OrderByPlanNode::getSortExpressions() const
-{
-    return m_sortExpressions;
-}
-
-const vector<SortDirectionType>& OrderByPlanNode::getSortDirections() const
-{
-    return m_sortDirections;
-}
-
-string
-OrderByPlanNode::debugInfo(const string& spacer) const
+string OrderByPlanNode::debugInfo(const string& spacer) const
 {
     ostringstream buffer;
-    buffer << spacer << "SortColumns[" << m_sortExpressions.size() << "]\n";
-    for (int ctr = 0, cnt = (int)m_sortExpressions.size(); ctr < cnt; ctr++)
+    buffer << spacer << "SortColumns[" << m_sort_expressions.size() << "]\n";
+    for (int ctr = 0, cnt = (int)m_sort_expressions.size(); ctr < cnt; ctr++)
     {
         buffer << spacer << "  [" << ctr << "] "
-               << m_sortExpressions[ctr]->debug()
-               << "::" << m_sortDirections[ctr] << "\n";
+               << m_sort_expressions[ctr]->debug()
+               << "::" << m_sort_directions[ctr] << "\n";
     }
     return buffer.str();
-
 }
 
-void
-OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
+void OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     PlannerDomValue sortColumnsArray = obj.valueForKey("SORT_COLUMNS");
 
@@ -104,12 +78,12 @@ OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
         if (sortColumn.hasNonNullKey("SORT_DIRECTION")) {
             hasDirection = true;
             std::string sortDirectionStr = sortColumn.valueForKey("SORT_DIRECTION").asStr();
-            m_sortDirections.push_back(stringToSortDirection(sortDirectionStr));
+            m_sort_directions.push_back(stringToSortDirection(sortDirectionStr));
         }
         if (sortColumn.hasNonNullKey("SORT_EXPRESSION")) {
             hasExpression = true;
             PlannerDomValue exprDom = sortColumn.valueForKey("SORT_EXPRESSION");
-            m_sortExpressions.push_back(AbstractExpression::buildExpressionTree(exprDom));
+            m_sort_expressions.push_back(AbstractExpression::buildExpressionTree(exprDom));
         }
 
         if (!(hasExpression && hasDirection)) {

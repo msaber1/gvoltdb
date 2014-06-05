@@ -45,27 +45,18 @@
 
 #include "abstractscannode.h"
 
-#include "expressions/abstractexpression.h"
-
 using namespace std;
 
 namespace voltdb {
 
-AbstractScanPlanNode::~AbstractScanPlanNode()
-{
-    delete m_predicate;
-}
-
-string
-AbstractScanPlanNode::debugInfo(const string &spacer) const
+string AbstractScanPlanNode::debugInfo(const string &spacer) const
 {
     ostringstream buffer;
     buffer << spacer << "TargetTable[" << m_targetTableName << "]\n";
     return buffer.str();
 }
 
-void
-AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
+void AbstractScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_targetTableName = obj.valueForKey("TARGET_TABLE_NAME").asStr();
     m_predicate = loadExpressionFromJSONObject("PREDICATE", obj);

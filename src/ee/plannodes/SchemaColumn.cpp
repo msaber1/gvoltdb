@@ -25,10 +25,6 @@ namespace voltdb {
 
 SchemaColumn::SchemaColumn(PlannerDomValue colObject, int idx)
 {
-    if (colObject.hasKey("TABLE_NAME")) {
-        m_tableName = colObject.valueForKey("TABLE_NAME").asStr();
-    }
-
     if (colObject.hasKey("COLUMN_NAME")) {
         m_columnName = colObject.valueForKey("COLUMN_NAME").asStr();
     }
@@ -37,19 +33,6 @@ SchemaColumn::SchemaColumn(PlannerDomValue colObject, int idx)
         char tmpName[6]; // 1024
         std::snprintf(tmpName, sizeof(tmpName), "C%d", idx);
         m_columnName = std::string(tmpName);
-    }
-
-    if (colObject.hasKey("COLUMN_ALIAS")) {
-        m_columnAlias = colObject.valueForKey("COLUMN_ALIAS").asStr();
-    }
-
-    if (colObject.hasKey("TYPE")) {
-        string colObjectTypeString = colObject.valueForKey("TYPE").asStr();
-        m_type = stringToValue(colObjectTypeString);
-    }
-
-    if (colObject.hasKey("SIZE")) {
-        m_size = colObject.valueForKey("SIZE").asInt();
     }
 
     m_expression = NULL;

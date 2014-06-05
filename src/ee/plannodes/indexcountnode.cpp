@@ -17,23 +17,11 @@
 
 #include "indexcountnode.h"
 
-#include "expressions/abstractexpression.h"
-
 #include <sstream>
 
 namespace voltdb {
 
 PlanNodeType IndexCountPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_INDEXCOUNT; }
-
-IndexCountPlanNode::~IndexCountPlanNode() {
-    for (int ii = 0; ii < m_searchkey_expressions.size(); ii++) {
-        delete m_searchkey_expressions[ii];
-    }
-    for (int ii = 0; ii < m_endkey_expressions.size(); ii++) {
-        delete m_endkey_expressions[ii];
-    }
-    delete m_skip_null_predicate;
-}
 
 std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
     std::ostringstream buffer;
@@ -42,13 +30,13 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
     buffer << spacer << "IndexLookupType[" << m_lookup_type << "]\n";
 
     buffer << spacer << "SearchKey Expressions:\n";
-    for (int ctr = 0, cnt = (int)m_searchkey_expressions.size(); ctr < cnt; ctr++) {
-        buffer << m_searchkey_expressions[ctr]->debug(spacer);
+    for (int ctr = 0, cnt = (int)m_search_key_expressions.size(); ctr < cnt; ctr++) {
+        buffer << m_search_key_expressions[ctr]->debug(spacer);
     }
 
     buffer << spacer << "EndKey Expressions:\n";
-    for (int ctr = 0, cnt = (int)m_endkey_expressions.size(); ctr < cnt; ctr++) {
-        buffer << m_endkey_expressions[ctr]->debug(spacer);
+    for (int ctr = 0, cnt = (int)m_end_key_expressions.size(); ctr < cnt; ctr++) {
+        buffer << m_end_key_expressions[ctr]->debug(spacer);
     }
 
     return buffer.str();
@@ -65,8 +53,8 @@ void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
 
     m_target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
 
-    loadExpressionsFromJSONObject(m_endkey_expressions, "ENDKEY_EXPRESSIONS", obj);
-    loadExpressionsFromJSONObject(m_searchkey_expressions, "SEARCHKEY_EXPRESSIONS", obj);
+    loadExpressionsFromJSONObject(m_end_key_expressions, "ENDKEY_EXPRESSIONS", obj);
+    loadExpressionsFromJSONObject(m_search_key_expressions, "SEARCHKEY_EXPRESSIONS", obj);
 
     m_skip_null_predicate = loadExpressionFromJSONObject("SKIP_NULL_PREDICATE", obj);
 }

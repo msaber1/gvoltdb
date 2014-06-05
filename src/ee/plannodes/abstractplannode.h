@@ -50,6 +50,7 @@
 #include "common/ids.h"
 #include "common/types.h"
 #include "common/PlannerDomValue.h"
+#include "expressions/abstractexpression.h"
 
 #include "boost/scoped_array.hpp"
 
@@ -60,7 +61,6 @@
 namespace voltdb {
 
 class AbstractExecutor;
-class AbstractExpression;
 class SchemaColumn;
 class Table;
 class TupleSchema;
@@ -153,6 +153,25 @@ public:
     std::string debug(const std::string& spacer) const;
     virtual std::string debugInfo(const std::string& spacer) const = 0;
 
+    struct OwnedExpression {
+        ~OwnedExpression() { delete m_expression; }
+        OwnedExpression(AbstractExpression* in = NULL) : m_expression(in) { }
+        void operator=(AbstractExpression* in) { m_expression = in; }
+        operator AbstractExpression*() const { return m_expression; }
+        AbstractExpression* operator->() const { return m_expression; }
+        AbstractExpression* m_expression;
+    };
+
+    struct VectorOfOwnedExpression : public std::vector<AbstractExpression*> {
+        ~VectorOfOwnedExpression()
+        {
+            size_t ii = size();
+            while (ii--) {
+                delete (*this)[ii];
+            }
+        }
+    };
+
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj) = 0;
 
@@ -202,6 +221,7 @@ private:
     // -- MIGHT come in handy?
     int m_validOutputColumnCount;
     std::vector<SchemaColumn*> m_outputSchema;
+    // These expressions are owned by the SchemaColumns. Only the array is owned by this.
     boost::scoped_array<AbstractExpression*> m_outputExpressionArray;
 };
 
