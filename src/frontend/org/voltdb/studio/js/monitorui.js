@@ -2,6 +2,7 @@
 
 var IMonitorUI = (function(){
 
+this.json = null;
 this.Speed = 'pau';
 this.Interval = null;
 this.Monitors = {};
@@ -15,13 +16,19 @@ function InitializeChart(id, chart, metric)
 	var opt = null;
 	switch(metric)
 	{
+//		case 'lat':
+//		    opt = {
+//		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:'%.2f'} } },
+//		    	series: [{showMarker:false, color:'Lime', yaxis:'y2axis', lineWidth: 1.5, shadow: false}],
+//		    	grid: { shadow:false, background:'#000', borderWidth: 1, borderColor: 'DarkGreen', gridLineColor:'DarkGreen'}
+//		    };
+//			break;
 		case 'lat':
 		    opt = {
-		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:'%.2f'} } },
-		    	series: [{showMarker:false, color:'Lime', yaxis:'y2axis', lineWidth: 1.5, shadow: false}],
-		    	grid: { shadow:false, background:'#000', borderWidth: 1, borderColor: 'DarkGreen', gridLineColor:'DarkGreen'}
+			axes: { xaxis: { showTicks: true } }, 
+			seriesDefaults: { renderer: jQuery.jqplot.BarRenderer, rendererOptions: { showDataLabels: true } }
 		    };
-			break;
+			break;    
 		case 'tps':
 		    opt = {
 		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:"%'d"} } },
@@ -94,11 +101,9 @@ this.AddMonitor = function(tab)
     , 'memStatsCallback': function(response) {MonitorUI.Monitors[id].memStatsResponse = response;}
     , 'procStatsCallback': function(response) {MonitorUI.Monitors[id].procStatsResponse = response;}
     , 'starvStatsCallback': function(response) {MonitorUI.Monitors[id].starvStatsResponse = response;}
-    , 'latStatsCallback': function(response) {MonitorUI.Monitors[id].latStatsResponse = response;}
     , 'memStatsResponse': null
     , 'procStatsResponse': null
     , 'starvStatsResponse': null
-    , 'latStatsResponse': null
     , 'lastTimedTransactionCount': -1
     , 'lastLatencyAverage': 0.0
     , 'noTransactionCount': 0
@@ -117,6 +122,7 @@ this.AddMonitor = function(tab)
     , 'tickValues': tickValues
     , 'partitionCount': partitionCount
     , 'siteCount': siteCount
+    , 'latTemp': null
     };
 
     InitializeChart(id, 'left', 'lat');
@@ -187,7 +193,6 @@ this.RefreshMonitorData = function(id)
                 			.BeginExecute('@Statistics', ['MEMORY', 0], MonitorUI.Monitors[id].memStatsCallback)
     			            .BeginExecute('@Statistics', ['PROCEDUREPROFILE', 0], MonitorUI.Monitors[id].procStatsCallback)
     			            .BeginExecute('@Statistics', ['STARVATION', 1], MonitorUI.Monitors[id].starvStatsCallback)
-                                    .BeginExecute('@Statistics', ['LATENCY', 0], MonitorUI.Monitors[id].latStatsCallback)
     	                	.End(MonitorUI.RefreshMonitor, id);
     }
 }
@@ -197,11 +202,22 @@ this.RefreshData = function()
         this.RefreshMonitorData(id);
 }
 
-function hex2a(hex) {
-    var str = '';
-    for (var i = 0; i < hex.length; i += 2)
-        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-    return str;
+function hex2a(id)
+{
+	$.ajax({
+   		type: 'GET',
+    		url: 'http://10.10.182.112:8090/decompressHistogram/api/decompress?callback=?',
+   		async: false,
+    		jsonpCallback: 'get_histogram',
+    		contentType: "application/json",
+    		dataType: 'jsonp',
+    		success: function(json) {
+       			MonitorUI.json = json;
+    		},
+    		error: function(e) {
+       			console.log(e.message);
+    		}
+	});
 }
 
 this.RefreshMonitor = function(id, Success)
@@ -281,9 +297,16 @@ this.RefreshMonitor = function(id, Success)
 		starvStats[table[j][3]] = data;
 	}
 	// Compute latency 
-        table = monitor.latStatsResponse.results[0].data;
-	var lat = table[0][4];
-        lat = hex2a(lat);
+        hex2a(id);
+	table = MonitorUI.json;
+	var xData = [];
+	dataLat = []; 
+	for(var j=0;j<table.length;j++)
+	{
+		xData.push(table[j].latency);
+		dataLat.push(table[j].count);
+	}
+	dataLat = [dataLat];	
 
 	var currentTimedTransactionCount = 0.0;
     var currentLatencySum = 0.0;
@@ -306,26 +329,26 @@ this.RefreshMonitor = function(id, Success)
 		var delta = currentTimedTransactionCount - monitor.lastTimedTransactionCount;
 		dataTPS = dataTPS.slice(1);
 		dataTPS.push([dataIdx, delta*1000.0 / (currentTimerTick - monitor.lastTimerTick)]);
-		dataLat = dataLat.slice(1);
-                if (delta == 0)
-		{
-			if (monitor.noTransactionCount < 5)
-			{
-				dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
-				monitor.noTransactionCount++;
-			}
-			else
-			{
-				dataLat.push([dataIdx,0]);
-			}
-		}
-		else
-		{
-			var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
-			var delta_latency = latency_val / delta;
-			dataLat.push([dataIdx,delta_latency/1000000.0]);
-			monitor.noTransactionCount = 0;
-		}
+//		dataLat = dataLat.slice(1);
+//                if (delta == 0)
+//		{
+//			if (monitor.noTransactionCount < 5)
+//			{
+//				dataLat.push([dataIdx,currentLatencyAverage/1000000.0]);
+//				monitor.noTransactionCount++;
+//			}
+//			else
+//			{
+//				dataLat.push([dataIdx,0]);
+//			}
+//		}
+//		else
+//		{
+//			var latency_val = currentLatencySum - (monitor.lastLatencyAverage * monitor.lastTimedTransactionCount);
+//			var delta_latency = latency_val / delta;
+//			dataLat.push([dataIdx,delta_latency/1000000.0]);
+//			monitor.noTransactionCount = 0;
+//		}
 	}
 	// Update procedure statistics table
 	if ($('#stats-' + id + ' tbody tr').size() == Object.size(procStats))
@@ -421,11 +444,17 @@ this.RefreshMonitor = function(id, Success)
 	// Update the monitor graphs
 	var lmax = 1;
 	var rmax = 1;
+	var left_opt;
+	var right_opt;
 	switch(monitor.leftMetric)
 	{
+//		case 'lat':
+//			monitor.leftPlot.series[0].data = dataLat;
+//			lmax = rymax;
+//			break;
 		case 'lat':
 			monitor.leftPlot.series[0].data = dataLat;
-			lmax = rymax;
+			left_opt = { clear:true, resetAxes: true, axes: { xaxis: { showTicks: true, ticks:xData } } };
 			break;
 		case 'tps':
 			monitor.leftPlot.series[0].data = dataTPS;
@@ -445,13 +474,18 @@ this.RefreshMonitor = function(id, Success)
 			break;
 		case 'tb':
                         monitor.leftPlot.series[0].data = dataTB;
+			left_opt = {};
 			break;
 	}
 	switch(monitor.rightMetric)
 	{
+//		case 'lat':
+//			monitor.rightPlot.series[0].data = dataLat;
+//			rmax = rymax;
+//			break;
 		case 'lat':
 			monitor.rightPlot.series[0].data = dataLat;
-			rmax = rymax;
+			right_opt = { clear:true, resetAxes: true, axes: { xaxis: { showTicks: true, ticks:xData } } };
 			break;
 		case 'tps':
 			monitor.rightPlot.series[0].data = dataTPS;
@@ -471,22 +505,16 @@ this.RefreshMonitor = function(id, Success)
 			break;
 		case 'tb':
                         monitor.rightPlot.series[0].data = dataTB;
+			right_opt = {};
 			break;
 	}
 
-        var left_opt;
-        if (monitor.leftMetric == 'tb') {
-               left_opt = {};
-        } 
-        else {
+        
+        if (monitor.leftMetric != 'tb' && monitor.leftMetric != 'lat') {
                left_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
         }
 
-        var right_opt;
-        if (monitor.rightMetric == 'tb') {
-               right_opt = {};
-        } 
-        else {
+        if (monitor.rightMetric != 'tb' && monitor.rightMetric != 'lat') {
                right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }};
         }
 
