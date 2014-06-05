@@ -25,8 +25,9 @@ function InitializeChart(id, chart, metric)
 //			break;
 		case 'lat':
 		    opt = {
-			axes: { xaxis: { showTicks: true } }, 
-			seriesDefaults: { renderer: jQuery.jqplot.BarRenderer, rendererOptions: { showDataLabels: true } }
+			axes: { xaxis: { ticks: MonitorUI.Monitors[id]['latDataX'], showTicks: true, renderer: $.jqplot.CategoryAxisRenderer }, 
+                                yaxis: { pad: 1.05 } }, 
+			seriesDefaults: { renderer: jQuery.jqplot.BarRenderer, rendererOptions: { showDataLabels: true, fillToZero: true } }
 		    };
 			break;    
 		case 'tps':
@@ -110,7 +111,8 @@ this.AddMonitor = function(tab)
     , 'lastTimerTick': -1
     , 'leftMetric': 'lat'
     , 'rightMetric': 'tps'
-    , 'latData': [data]
+    , 'latDataX': []
+    , 'latData': [[]]
     , 'tpsData': [data]
     , 'memData': [data]
     , 'strData': dataStr
@@ -213,9 +215,6 @@ function hex2a(id)
     		dataType: 'jsonp',
     		success: function(json) {
        			MonitorUI.json = json;
-    		},
-    		error: function(e) {
-       			console.log(e.message);
     		}
 	});
 }
@@ -304,9 +303,8 @@ this.RefreshMonitor = function(id, Success)
 	for(var j=0;j<table.length;j++)
 	{
 		xData.push(table[j].latency);
-		dataLat.push(table[j].count);
-	}
-	dataLat = [dataLat];	
+		dataLat.push([table[j].latency, table[j].count]);
+	}	
 
 	var currentTimedTransactionCount = 0.0;
     var currentLatencySum = 0.0;
@@ -417,8 +415,8 @@ this.RefreshMonitor = function(id, Success)
 	{
 		if (lymax < dataMem[j][1])
 			lymax = dataMem[j][1];
-		if (rymax < dataLat[j][1])
-			rymax = dataLat[j][1];
+//		if (rymax < dataLat[j][1])
+//			rymax = dataLat[j][1];
 		if (ry2max < dataTPS[j][1])
 			ry2max = dataTPS[j][1];
 	}
@@ -435,6 +433,7 @@ this.RefreshMonitor = function(id, Success)
 	monitor.strMax = 100;
 	
 	monitor.latData = [dataLat];
+	monitor.latDataX = xData;
 	monitor.tpsData = [dataTPS];
 	monitor.memData = [dataMem];
 	monitor.strData = strData;
@@ -454,7 +453,10 @@ this.RefreshMonitor = function(id, Success)
 //			break;
 		case 'lat':
 			monitor.leftPlot.series[0].data = dataLat;
-			left_opt = { clear:true, resetAxes: true, axes: { xaxis: { showTicks: true, ticks:xData } } };
+			left_opt = { clear: true, resetAxes: true,
+                                     axes: { xaxis: { showTicks: true, ticks:xData }, 
+                                             yaxis: { pad: 1.05, min: 0 } 
+	                                   }};
 			break;
 		case 'tps':
 			monitor.leftPlot.series[0].data = dataTPS;
@@ -485,7 +487,10 @@ this.RefreshMonitor = function(id, Success)
 //			break;
 		case 'lat':
 			monitor.rightPlot.series[0].data = dataLat;
-			right_opt = { clear:true, resetAxes: true, axes: { xaxis: { showTicks: true, ticks:xData } } };
+			right_opt = { clear: true, resetAxes: true,
+                                     axes: { xaxis: { showTicks: true, ticks:xData }, 
+                                             yaxis: { pad: 1.05, min: 0 } 
+	                                   }};
 			break;
 		case 'tps':
 			monitor.rightPlot.series[0].data = dataTPS;
@@ -522,7 +527,9 @@ this.RefreshMonitor = function(id, Success)
 	{
 		monitor.leftPlot.replot(left_opt);
 		monitor.rightPlot.replot(right_opt);
-	} catch (x) {}
+	} catch (x) {
+                var test;
+        }
 
 	MonitorUI.UpdateMonitorItem(id);
 	monitor.lastTimerTick = currentTimerTick;
