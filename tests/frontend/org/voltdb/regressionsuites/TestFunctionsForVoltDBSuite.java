@@ -1602,27 +1602,36 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         project.addStmtProcedure("TestDecodeNullTimestamp", "select DECODE(tm, NULL, 'null tm', tm) from R3 where id = ?");
 
+        /* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
+        // IF (! DEBUG config) ...
+
         // CONFIG #1: Local Site/Partition running on JNI backend
-        config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("functionsforvolt-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
         // CONFIG #2: Local Site/Partitions running on JNI backend
-        config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
-/*
-
-        // CONFIG #2: HSQL -- disabled, the functions being tested are not HSQL compatible
-        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        config = new LocalCluster("functionsforvolt-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
-*/
-        // no clustering tests for functions
+        // CONFIG #3: HSQL -- disabled, the functions being tested are not HSQL compatible
+
+        /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("functionsforvolt-ipc.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        // build the jarfile
+        success = config.compile(project);
+        assertTrue(success);
+        // add this config to the set of tests to run
+        builder.addServerConfig(config);
+
+        // ... ENDIF (DEBUG config) [ FRAGILE! This is a structured comment. Do not break it. ] */
 
         return builder;
     }

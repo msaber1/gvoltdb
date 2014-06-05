@@ -238,6 +238,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
     static public junit.framework.Test suite()
     {
         VoltServerConfig config = null;
+        boolean success;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
                 TestLimitOffsetSuite.class);
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -252,20 +253,39 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         project.addStmtProcedure("LimitAI", "SELECT * FROM A ORDER BY I LIMIT ? OFFSET ?;");
         project.addStmtProcedure("LimitBI", "SELECT * FROM B ORDER BY I LIMIT ? OFFSET ?;");
 
-        // local
+        //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
+        // IF (! DEBUG config) ...
+
+        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
         config = new LocalCluster("testlimitoffset-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
-        // Cluster
+        // CONFIG #2: 1 Cluster running on JNI backend
         config = new LocalCluster("testlimitoffset-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        if (!config.compile(project)) fail();
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
-        // HSQL for baseline
+        // Config #3: HSQL for baseline
         config = new LocalCluster("testlimitoffset-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        if (!config.compile(project)) fail();
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
+
+        /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
+
+        // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
+        config = new LocalCluster("testlimitoffset-ipc.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        // build the jarfile
+        success = config.compile(project);
+        assertTrue(success);
+        // add this config to the set of tests to run
+        builder.addServerConfig(config);
+
+        // ... ENDIF (DEBUG config) [ FRAGILE! This is a structured comment. Do not break it. ] */
+
         return builder;
     }
 }

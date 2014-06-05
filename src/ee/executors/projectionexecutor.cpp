@@ -99,10 +99,4 @@ bool ProjectionExecutor::p_execute()
     return true;
 }
 
-void ProjectionPlanNode::InlineState::initProjectionState(ProjectionPlanNode* projection_node)
-{
-    m_expression_array = projection_node->getOutputExpressionArray();
-    m_all_column_array = projection_node->getOutputColumnIdArrayIfAllColumns();
-}
-
 }

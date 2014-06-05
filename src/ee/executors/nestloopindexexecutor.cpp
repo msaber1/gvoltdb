@@ -114,7 +114,10 @@ bool NestLoopIndexExecutor::p_init(TempTableLimits* limits)
 
     // NULL tuple for outer join
     if (m_join_type == JOIN_TYPE_LEFT) {
-        Table* inner_output_table = child->getOutputTable();
+        // It is unusual to have to write to the m_input_tables this late in AbstractExecutor.init,
+        // but putting the inline child index scan's unused pseudo-output-table has the desired
+        // effect of sizing/shaping the null tuple.
+        Table* inner_output_table = appendInlineInputTable(child);
         assert(inner_output_table);
         m_null_tuple.init(inner_output_table->schema());
     }
@@ -178,25 +181,27 @@ bool NestLoopIndexExecutor::p_execute()
     TempTable* output_table = getTempOutputTable();
     assert(output_table);
 
+    // outer_table is the input table that has tuples to be iterated
+    Table* outer_table = m_input_tables[0].getTable();
+    assert (outer_table);
+
     PersistentTable* inner_table = getInnerTargetTable();
     assert(inner_table);
 
     TableIndex* index = inner_table->index(m_index_name);
     assert(index);
 
+    VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
+               outer_table->debug().c_str(), inner_table->debug().c_str());
+
     // NULL tuple for outer join
     if (m_join_type == JOIN_TYPE_LEFT) {
-        m_null_tuple.resetWithCompatibleSchema(inner_table->schema());
+        Table* inner_output_table = m_input_tables[1].getTable();
+        m_null_tuple.resetWithCompatibleSchema(inner_output_table->schema());
     }
 
     m_index_values.resetWithCompatibleSchema(index->getKeySchema());
     TableTuple searchKey = m_index_values;
-
-    //outer_table is the input table that have tuples to be iterated
-    Table* outer_table = getInputTable();
-    assert (outer_table);
-    VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
-               outer_table->debug().c_str(), inner_table->debug().c_str());
 
     int limit = -1;
     int offset = -1;
@@ -215,7 +220,7 @@ bool NestLoopIndexExecutor::p_execute()
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     TableTuple &join_tuple = output_table->tempTuple();
     TableTuple null_tuple = m_null_tuple;
-    int num_of_inner_cols = (m_join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
+    int num_of_inner_cols = (m_join_type == JOIN_TYPE_LEFT) ? null_tuple.sizeInValues() : 0;
 
     AbstractExpression** search_key_array = m_search_key_array_ptr.get();
 

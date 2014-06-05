@@ -65,7 +65,7 @@ LimitPlanNode::InlineState::getLimitAndOffsetByReference(VoltDBEngine* engine,
         int &limitOut, int &offsetOut)
 {
     const NValueArray &params = engine->getParameterContainer();
-;
+
     limitOut = limit;
     offsetOut = offset;
 

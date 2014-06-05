@@ -79,7 +79,7 @@ public:
 
         const int* getProjectionColumns() const { return m_all_column_array; }
 
-        void initProjectionState(ProjectionPlanNode*); // Implemented in projectionexecutor.cpp
+        void initProjectionState(ProjectionPlanNode*);
 
     private:
         const AbstractExpression* const* m_expression_array;

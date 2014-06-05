@@ -176,10 +176,19 @@ class AbstractExecutor {
         assert(m_input_tables.size() == 1);
         return m_input_tables[0].getTable();
     }
+
     TempTable* getTempInputTable() const
     {
         assert(m_input_tables.size() == 1);
         return m_input_tables[0].getTempTable();
+    }
+
+    Table* appendInlineInputTable(AbstractExecutor* child)
+    {
+        assert(m_input_tables.size() == 1);
+        const TableReference& tableRef = child->m_output_table;
+        m_input_tables.push_back(tableRef);
+        return tableRef.getTable();
     }
 
     std::vector<TableReference> m_input_tables;

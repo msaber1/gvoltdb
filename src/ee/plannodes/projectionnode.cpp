@@ -91,4 +91,15 @@ const int* ProjectionPlanNode::getOutputColumnIdArrayIfAllColumns() const
     return result;
 }
 
+void ProjectionPlanNode::InlineState::initProjectionState(ProjectionPlanNode* projection_node)
+{
+    if (projection_node) {
+        m_expression_array = projection_node->getOutputExpressionArray();
+        m_all_column_array = projection_node->getOutputColumnIdArrayIfAllColumns();
+    } else {
+        m_expression_array = NULL;
+        m_all_column_array = NULL;
+    }
+}
+
 }
