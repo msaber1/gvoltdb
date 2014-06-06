@@ -134,7 +134,7 @@ public class StandaloneExportManager
              * Do all the work to switch to a new generation in the thread for the processor
              * of the old generation
              */
-            StandaloneExportDataProcessor proc = m_processor.get();
+            final StandaloneExportDataProcessor proc = m_processor.get();
             if (proc == null) {
                 VoltDB.crashLocalVoltDB("No export data processor found", true, null);
             }
@@ -142,7 +142,10 @@ public class StandaloneExportManager
                 @Override
                 public void run() {
                     try {
-                        rollToNextGeneration(m_generation);
+                        if (rollToNextGeneration(m_generation)) {
+                            proc.shutdown();
+                            System.exit(0);
+                        }
                     } catch (RuntimeException e) {
                         exportLog.error("Error rolling to next export generation", e);
                     } catch (Exception e) {
@@ -157,7 +160,7 @@ public class StandaloneExportManager
 
     }
 
-    private void rollToNextGeneration(StandaloneExportGeneration drainedGeneration) throws Exception {
+    private boolean rollToNextGeneration(StandaloneExportGeneration drainedGeneration) throws Exception {
         StandaloneExportDataProcessor newProcessor = null;
         StandaloneExportDataProcessor oldProcessor = null;
         boolean doexit = false;
@@ -202,9 +205,14 @@ public class StandaloneExportManager
         if (oldProcessor != null) {
             oldProcessor.shutdown();
         }
-        if (doexit) {
-            System.exit(0);
+        try {
+            //We close and delete regardless
+            drainedGeneration.closeAndDelete();
+        } catch (IOException e) {
+            e.printStackTrace();
+            exportLog.error(e);
         }
+        return doexit;
     }
 
     /**
