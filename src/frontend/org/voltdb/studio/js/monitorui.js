@@ -109,10 +109,10 @@ this.AddMonitor = function(tab)
     , 'lastLatencyAverage': 0.0
     , 'noTransactionCount': 0
     , 'lastTimerTick': -1
-    , 'leftMetric': 'lat'
+    , 'leftMetric': 'mem'
     , 'rightMetric': 'tps'
     , 'latDataX': []
-    , 'latData': [[]]
+    , 'latData': []
     , 'tpsData': [data]
     , 'memData': [data]
     , 'strData': dataStr
@@ -127,7 +127,7 @@ this.AddMonitor = function(tab)
     , 'latTemp': null
     };
 
-    InitializeChart(id, 'left', 'lat');
+    InitializeChart(id, 'left', 'mem');
     InitializeChart(id, 'right', 'tps');
 
     if(MonitorUI.Interval == null)
@@ -303,7 +303,7 @@ this.RefreshMonitor = function(id, Success)
 	for(var j=0;j<table.length;j++)
 	{
 		xData.push(table[j].latency);
-		dataLat.push([table[j].latency, table[j].count]);
+		dataLat.push([j, table[j].count]);
 	}	
 
 	var currentTimedTransactionCount = 0.0;
@@ -454,7 +454,7 @@ this.RefreshMonitor = function(id, Success)
 		case 'lat':
 			monitor.leftPlot.series[0].data = dataLat;
 			left_opt = { clear: true, resetAxes: true,
-                                     axes: { xaxis: { showTicks: true, ticks:xData }, 
+                                     axes: { xaxis: { showTicks: true, ticks:xData, max: xData[xData.length - 1] }, 
                                              yaxis: { pad: 1.05, min: 0 } 
 	                                   }};
 			break;
@@ -487,8 +487,8 @@ this.RefreshMonitor = function(id, Success)
 //			break;
 		case 'lat':
 			monitor.rightPlot.series[0].data = dataLat;
-			right_opt = { clear: true, resetAxes: true,
-                                     axes: { xaxis: { showTicks: true, ticks:xData }, 
+			right_opt = { clear:true, resetAxes: true,
+                                     axes: { xaxis: { showTicks: true, ticks:xData, max: xData[xData.length - 1] }, 
                                              yaxis: { pad: 1.05, min: 0 } 
 	                                   }};
 			break;
