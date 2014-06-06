@@ -19,14 +19,15 @@ function InitializeChart(id, chart, metric)
 		case 'lat':
 		    var seriesStr = [];
 		    for(var j=0;j<4;j++)
-			seriesStr.push({showMarker:false, color:'Lime', yaxis:'y2axis', lineWidth: 1.5, shadow: false, label: (j+1)+" nines"})
+		    	seriesStr.push({label: (j+2)+" nines"});
 		    opt = {
-		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:'%.2f'} } },
-		    	series: seriesStr,
+		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:"%d"} } },
+		    	seriesDefaults: { showMarker:false, yaxis:'y2axis', lineWidth: 2, shadow: false },
+			series: seriesStr,
 		    	grid: { shadow:false, background:'#000', borderWidth: 1, borderColor: 'DarkGreen', gridLineColor:'DarkGreen'},
-			legend: {show: true, location: 'sw', placement: 'insideGrid', renderer: $.jqplot.EnhancedLegendRenderer, rendererOptions: {numberRows:1} }
+		    	legend: {show: true, location: 'sw', placement: 'insideGrid', renderer: $.jqplot.EnhancedLegendRenderer, rendererOptions: {numberRows:1} }
 		    };
-//			break;
+			break;
 //		case 'lat':
 //		    opt = {
 //			axes: { xaxis: { ticks: MonitorUI.Monitors[id]['latDataX'], showTicks: true, renderer: $.jqplot.CategoryAxisRenderer }, 
@@ -69,10 +70,13 @@ function InitializeChart(id, chart, metric)
 	}
 	
     var plot = $.jqplot(chart+'chart-'+id,data,opt);
-    //request a redraw immediate after initialization, otherwise pie chart don't get updated 
-    plot.series[0].data = data;
-    plot.replot(opt);
-    
+    //request a redraw immediate after initialization, otherwise pie chart don't get updated
+    if(metric == 'tb')
+    { 
+        plot.series[0].data = data;
+        plot.replot(opt);
+    }    
+
     MonitorUI.Monitors[id][chart+'Plot'] = plot;
 }
 this.ChangeChartMetric = function(id,chart,metric)
@@ -113,7 +117,7 @@ this.AddMonitor = function(tab)
     , 'lastLatencyAverage': 0.0
     , 'noTransactionCount': 0
     , 'lastTimerTick': -1
-    , 'leftMetric': 'mem'
+    , 'leftMetric': 'lat'
     , 'rightMetric': 'tps'
     , 'latData': [data, data, data, data]
     , 'tpsData': [data]
@@ -129,7 +133,7 @@ this.AddMonitor = function(tab)
     , 'siteCount': siteCount
     };
 
-    InitializeChart(id, 'left', 'mem');
+    InitializeChart(id, 'left', 'lat');
     InitializeChart(id, 'right', 'tps');
 
     if(MonitorUI.Interval == null)
@@ -453,7 +457,7 @@ this.RefreshMonitor = function(id, Success)
 			for(var k=0;k<4;k++)
             		{
 				monitor.leftPlot.series[k].data = latData[k];
-				monitor.leftPlot.series[k].label = (j+1)+" nines";
+				monitor.leftPlot.series[k].label = (k+2)+" nines";
             		}
 			lmax = rymax;
 			break;
@@ -491,7 +495,7 @@ this.RefreshMonitor = function(id, Success)
 			for(var k=0;k<4;k++)
             		{
 				monitor.rightPlot.series[k].data = latData[k];
-				monitor.rightPlot.series[k].label = (j+1)+" nines";
+				monitor.rightPlot.series[k].label = (k+2)+" nines";
             		}
 			rmax = rymax;
 			break;
