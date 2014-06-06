@@ -16,20 +16,24 @@ function InitializeChart(id, chart, metric)
 	var opt = null;
 	switch(metric)
 	{
+		case 'lat':
+		    var seriesStr = [];
+		    for(var j=0;j<4;j++)
+			seriesStr.push({showMarker:false, color:'Lime', yaxis:'y2axis', lineWidth: 1.5, shadow: false, label: (j+1)+" nines"})
+		    opt = {
+		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:'%.2f'} } },
+		    	series: seriesStr,
+		    	grid: { shadow:false, background:'#000', borderWidth: 1, borderColor: 'DarkGreen', gridLineColor:'DarkGreen'},
+			legend: {show: true, location: 'sw', placement: 'insideGrid', renderer: $.jqplot.EnhancedLegendRenderer, rendererOptions: {numberRows:1} }
+		    };
+//			break;
 //		case 'lat':
 //		    opt = {
-//		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:'%.2f'} } },
-//		    	series: [{showMarker:false, color:'Lime', yaxis:'y2axis', lineWidth: 1.5, shadow: false}],
-//		    	grid: { shadow:false, background:'#000', borderWidth: 1, borderColor: 'DarkGreen', gridLineColor:'DarkGreen'}
+//			axes: { xaxis: { ticks: MonitorUI.Monitors[id]['latDataX'], showTicks: true, renderer: $.jqplot.CategoryAxisRenderer }, 
+//                               yaxis: { pad: 1.05 } }, 
+//			seriesDefaults: { renderer: jQuery.jqplot.BarRenderer, rendererOptions: { showDataLabels: true, fillToZero: true } }
 //		    };
-//			break;
-		case 'lat':
-		    opt = {
-			axes: { xaxis: { ticks: MonitorUI.Monitors[id]['latDataX'], showTicks: true, renderer: $.jqplot.CategoryAxisRenderer }, 
-                                yaxis: { pad: 1.05 } }, 
-			seriesDefaults: { renderer: jQuery.jqplot.BarRenderer, rendererOptions: { showDataLabels: true, fillToZero: true } }
-		    };
-			break;    
+//			break;    
 		case 'tps':
 		    opt = {
 		    	axes: { xaxis: { showTicks: false, min:0, max:120, ticks: tickValues }, y2axis: { min: 0, max: max, numberTicks: 5, tickOptions:{formatString:"%'d"} } },
@@ -111,8 +115,7 @@ this.AddMonitor = function(tab)
     , 'lastTimerTick': -1
     , 'leftMetric': 'mem'
     , 'rightMetric': 'tps'
-    , 'latDataX': []
-    , 'latData': []
+    , 'latData': [data, data, data, data]
     , 'tpsData': [data]
     , 'memData': [data]
     , 'strData': dataStr
@@ -124,7 +127,6 @@ this.AddMonitor = function(tab)
     , 'tickValues': tickValues
     , 'partitionCount': partitionCount
     , 'siteCount': siteCount
-    , 'latTemp': null
     };
 
     InitializeChart(id, 'left', 'mem');
@@ -204,7 +206,7 @@ this.RefreshData = function()
         this.RefreshMonitorData(id);
 }
 
-function hex2a(id)
+function GetLatencyStats()
 {
 	$.ajax({
    		type: 'GET',
@@ -245,7 +247,6 @@ this.RefreshMonitor = function(id, Success)
 	var strData = monitor.strData;
 	
 	var dataMem = memData[0];
-	var dataLat = latData[0];
 	var dataTPS = tpsData[0];
 	var dataIdx  = dataMem[dataMem.length-1][0]+1;
         var dataTB = [];
@@ -256,7 +257,6 @@ this.RefreshMonitor = function(id, Success)
 		Mem += table[j][3]*1.0/1048576.0;
 	dataMem = dataMem.slice(1);
 	dataMem.push([dataIdx, Mem]);
-	var Lat = 0;
 	var TPS = 0;
 	var procStats = {};
     // Compute procedure statistics 
@@ -296,14 +296,14 @@ this.RefreshMonitor = function(id, Success)
 		starvStats[table[j][3]] = data;
 	}
 	// Compute latency 
-        hex2a(id);
+        GetLatencyStats();
 	table = MonitorUI.json;
-	var xData = [];
-	dataLat = []; 
-	for(var j=0;j<table.length;j++)
+	for(var j=0;j<4;j++)
 	{
-		xData.push(table[j].latency);
-		dataLat.push([j, table[j].count]);
+		var dataLat = latData[j];
+		dataLat = dataLat.slice(1);		
+		dataLat.push([dataIdx, table[j].latency]);
+		latData[j] = dataLat;
 	}	
 
 	var currentTimedTransactionCount = 0.0;
@@ -415,10 +415,13 @@ this.RefreshMonitor = function(id, Success)
 	{
 		if (lymax < dataMem[j][1])
 			lymax = dataMem[j][1];
-//		if (rymax < dataLat[j][1])
-//			rymax = dataLat[j][1];
 		if (ry2max < dataTPS[j][1])
 			ry2max = dataTPS[j][1];
+		for(var i=0; i<4;i++)
+		{
+			if (rymax < latData[i][j][1])
+				rymax = latData[i][j][1];
+		}
 	}
 	ry2max = Math.ceil(ry2max/1000)*1000;
 	var tickValues = [];
@@ -432,8 +435,7 @@ this.RefreshMonitor = function(id, Success)
 	monitor.memMax = lymax;
 	monitor.strMax = 100;
 	
-	monitor.latData = [dataLat];
-	monitor.latDataX = xData;
+	monitor.latData = latData;
 	monitor.tpsData = [dataTPS];
 	monitor.memData = [dataMem];
 	monitor.strData = strData;
@@ -447,17 +449,21 @@ this.RefreshMonitor = function(id, Success)
 	var right_opt;
 	switch(monitor.leftMetric)
 	{
+		case 'lat':
+			for(var k=0;k<4;k++)
+            		{
+				monitor.leftPlot.series[k].data = latData[k];
+				monitor.leftPlot.series[k].label = (j+1)+" nines";
+            		}
+			lmax = rymax;
+			break;
 //		case 'lat':
 //			monitor.leftPlot.series[0].data = dataLat;
-//			lmax = rymax;
+//			left_opt = { clear: true, resetAxes: true,
+//                                   axes: { xaxis: { showTicks: true, ticks:xData, max: xData[xData.length - 1] }, 
+//                                             yaxis: { pad: 1.05, min: 0 } 
+//	                                   }};
 //			break;
-		case 'lat':
-			monitor.leftPlot.series[0].data = dataLat;
-			left_opt = { clear: true, resetAxes: true,
-                                     axes: { xaxis: { showTicks: true, ticks:xData, max: xData[xData.length - 1] }, 
-                                             yaxis: { pad: 1.05, min: 0 } 
-	                                   }};
-			break;
 		case 'tps':
 			monitor.leftPlot.series[0].data = dataTPS;
 			lmax = ry2max;
@@ -481,17 +487,21 @@ this.RefreshMonitor = function(id, Success)
 	}
 	switch(monitor.rightMetric)
 	{
+		case 'lat':
+			for(var k=0;k<4;k++)
+            		{
+				monitor.rightPlot.series[k].data = latData[k];
+				monitor.rightPlot.series[k].label = (j+1)+" nines";
+            		}
+			rmax = rymax;
+			break;
 //		case 'lat':
 //			monitor.rightPlot.series[0].data = dataLat;
-//			rmax = rymax;
+//			right_opt = { clear:true, resetAxes: true,
+//                                     axes: { xaxis: { showTicks: true, ticks:xData, max: xData[xData.length - 1] }, 
+//                                             yaxis: { pad: 1.05, min: 0 } 
+//	                                   }};
 //			break;
-		case 'lat':
-			monitor.rightPlot.series[0].data = dataLat;
-			right_opt = { clear:true, resetAxes: true,
-                                     axes: { xaxis: { showTicks: true, ticks:xData, max: xData[xData.length - 1] }, 
-                                             yaxis: { pad: 1.05, min: 0 } 
-	                                   }};
-			break;
 		case 'tps':
 			monitor.rightPlot.series[0].data = dataTPS;
 			rmax = ry2max;
@@ -515,11 +525,11 @@ this.RefreshMonitor = function(id, Success)
 	}
 
         
-        if (monitor.leftMetric != 'tb' && monitor.leftMetric != 'lat') {
+        if (monitor.leftMetric != 'tb') {
                left_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: lmax, numberTicks: 5 } }};
         }
 
-        if (monitor.rightMetric != 'tb' && monitor.rightMetric != 'lat') {
+        if (monitor.rightMetric != 'tb') {
                right_opt = {clear:true, resetAxes: true, axes: { xaxis: { showTicks: false, min:dataIdx-120, max:dataIdx, ticks:tickValues }, y2axis: { min: 0, max: rmax, numberTicks: 5 } }};
         }
 
