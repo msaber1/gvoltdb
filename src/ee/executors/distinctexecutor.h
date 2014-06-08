@@ -59,8 +59,6 @@ public:
 protected:
     bool p_init(TempTableLimits* limits);
     bool p_execute();
-
-    ValueType distinct_column_type;
 };
 
 }

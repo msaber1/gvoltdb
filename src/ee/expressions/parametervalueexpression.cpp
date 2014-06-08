@@ -46,24 +46,25 @@
 #include "parametervalueexpression.h"
 
 #include "common/debuglog.h"
-#include "common/valuevector.h"
 #include "common/executorcontext.hpp"
+#include "common/valuevector.h"
 #include "execution/VoltDBEngine.h"
 
 namespace voltdb {
 
-    ParameterValueExpression::ParameterValueExpression(int value_idx)
-        : AbstractExpression(EXPRESSION_TYPE_VALUE_PARAMETER),
-        m_valueIdx(value_idx), m_paramValue()
-    {
-        VOLT_TRACE("ParameterValueExpression %d", value_idx);
-        ExecutorContext* context = ExecutorContext::getExecutorContext();
-        VoltDBEngine* engine = context->getEngine();
-        assert(engine != NULL);
-        NValueArray& params = engine->getParameterContainer();
-        assert(value_idx < params.size());
-        m_paramValue = &params[value_idx];
-    };
+ParameterValueExpression::ParameterValueExpression(int value_idx)
+    : AbstractExpression(EXPRESSION_TYPE_VALUE_PARAMETER)
+    , m_valueIdx(value_idx)
+{
+    VOLT_TRACE("ParameterValueExpression %d", value_idx);
+    ExecutorContext* context = ExecutorContext::getExecutorContext();
+    assert(context != NULL);
+    VoltDBEngine* engine = context->getEngine();
+    assert(engine != NULL);
+    NValueArray& params = engine->getParameterContainer();
+    assert(value_idx < params.size());
+    m_paramValue = &params[value_idx];
+};
 
 }
 

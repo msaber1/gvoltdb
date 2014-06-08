@@ -42,18 +42,13 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include <vector>
-#include <string>
-#include <stack>
+
 #include "nestloopexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
-#include "expressions/tuplevalueexpression.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 #include "plannodes/nestloopnode.h"
@@ -65,8 +60,7 @@
 #include <unistd.h>
 #endif
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
 bool NestLoopExecutor::p_init(TempTableLimits* limits)
 {
@@ -200,5 +194,7 @@ bool NestLoopExecutor::p_execute()
         }
     }
 
-    return (true);
+    return true;
+}
+
 }

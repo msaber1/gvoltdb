@@ -59,8 +59,7 @@
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
 bool NestLoopIndexExecutor::p_init(TempTableLimits* limits)
 {
@@ -138,8 +137,7 @@ bool NestLoopIndexExecutor::p_init(TempTableLimits* limits)
 
 #ifdef DEBUG
     for (int ctr = 0; ctr < m_num_of_search_keys; ctr++) {
-        VOLT_TRACE("Search Key[%d]:\n%s",
-                   ctr, search_keys[ctr]->debug(true).c_str());
+        VOLT_TRACE("Search Key[%d]:\n%s", ctr, search_keys[ctr]->debug(true).c_str());
     }
     if (m_end_expression) {
         VOLT_TRACE("End Expression:\n%s", m_end_expression->debug(true).c_str());
@@ -491,4 +489,6 @@ bool NestLoopIndexExecutor::p_execute()
 PersistentTable* NestLoopIndexExecutor::getInnerTargetTable()
 {
     return dynamic_cast<PersistentTable*>(m_inner_target_tcd->getTable());
+}
+
 }

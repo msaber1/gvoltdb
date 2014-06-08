@@ -45,8 +45,6 @@
 
 #include "sendexecutor.h"
 
-
-#include "execution/VoltDBEngine.h"
 #include "plannodes/sendnode.h"
 #include "storage/temptable.h"
 

@@ -45,37 +45,27 @@
 
 #include "abstractjoinnode.h"
 
-#include <stdexcept>
 #include <sstream>
-
-using namespace std;
 
 namespace voltdb {
 
-string AbstractJoinPlanNode::debugInfo(const string& spacer) const
+std::string AbstractJoinPlanNode::debugInfo(const std::string& spacer) const
 {
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << spacer << "JoinType[" << m_joinType << "]\n";
-    if (m_preJoinPredicate != NULL)
-    {
-        buffer << spacer << "Pre-Join Predicate\n";
-        buffer << m_preJoinPredicate->debug(spacer);
+    if (m_preJoinPredicate != NULL) {
+        buffer << spacer << "Pre-Join Predicate\n" << m_preJoinPredicate->debug(spacer);
     }
-    if (m_joinPredicate != NULL)
-    {
-        buffer << spacer << "Join Predicate\n";
-        buffer << m_joinPredicate->debug(spacer);
+    if (m_joinPredicate != NULL) {
+        buffer << spacer << "Join Predicate\n" << m_joinPredicate->debug(spacer);
     }
-    if (m_wherePredicate != NULL)
-    {
-        buffer << spacer << "Where Predicate\n";
-        buffer << m_wherePredicate->debug(spacer);
+    if (m_wherePredicate != NULL) {
+        buffer << spacer << "Where Predicate\n" << m_wherePredicate->debug(spacer);
     }
-    return (buffer.str());
+    return buffer.str();
 }
 
-void
-AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
+void AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
     m_joinType = stringToJoin(obj.valueForKey("JOIN_TYPE").asStr());
 

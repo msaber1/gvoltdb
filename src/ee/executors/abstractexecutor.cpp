@@ -47,14 +47,12 @@
 
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
-#include "plannodes/SchemaColumn.h"
 #include "storage/tablefactory.h"
 #include "storage/TableCatalogDelegate.hpp"
 
 #include <vector>
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
 bool AbstractExecutor::init(VoltDBEngine* engine, TempTableLimits* limits)
 {
@@ -69,29 +67,25 @@ bool AbstractExecutor::init(VoltDBEngine* engine, TempTableLimits* limits)
     }
 
     // Call the p_init() method on the derived class
-    if (!p_init(limits)) {
-        return false;
-    }
-    return true;
+    return p_init(limits);
 }
 
 /**
  * Set up a multi-column temp output table for those executors that require one.
  * Called from p_init.
  */
-void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
+void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, std::string tempTableName)
+{
     assert(limits);
-    TupleSchema* schema = m_abstractNode->generateTupleSchema(true);
-    int column_count = (int)m_abstractNode->getOutputSchema().size();
-    std::vector<std::string> column_names(column_count);
-    assert(column_count >= 1);
-    for (int ctr = 0; ctr < column_count; ctr++) {
-        column_names[ctr] = m_abstractNode->getOutputSchema()[ctr]->getColumnName();
-    }
+    std::pair<TupleSchema*, const std::vector<std::string>*> config =
+            m_abstractNode->generateTupleSchema();
+    TupleSchema* schema = config.first;
+    const std::vector<std::string>* column_names = config.second;
+    assert(column_names);
     m_output_table.setTempTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
                                                            tempTableName,
                                                            schema,
-                                                           column_names,
+                                                           *column_names,
                                                            limits));
 }
 
@@ -110,7 +104,7 @@ void AbstractExecutor::setTempOutputLikeInputTable(TempTableLimits* limits)
  * Called from p_init.
  */
 void AbstractExecutor::setDMLCountOutputTable(TempTableLimits* limits) {
-    static const string tempTableName("temp");
+    static const std::string tempTableName("temp");
     TupleSchema* schema = m_abstractNode->generateDMLCountTupleSchema();
     const std::vector<std::string> columnNames(1, "modified_tuples");
     m_output_table.setTempTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
@@ -126,4 +120,6 @@ Table* AbstractExecutor::TableReference::getTable() const
         return m_tcd->getTable();
     }
     return m_temp_table; // may be null.
+}
+
 }

@@ -53,8 +53,8 @@ void IndexCountPlanNode::loadFromJSONObject(PlannerDomValue obj) {
 
     m_target_index_name = obj.valueForKey("TARGET_INDEX_NAME").asStr();
 
-    loadExpressionsFromJSONObject(m_end_key_expressions, "ENDKEY_EXPRESSIONS", obj);
     loadExpressionsFromJSONObject(m_search_key_expressions, "SEARCHKEY_EXPRESSIONS", obj);
+    loadExpressionsFromJSONObject(m_end_key_expressions, "ENDKEY_EXPRESSIONS", obj);
 
     m_skip_null_predicate = loadExpressionFromJSONObject("SKIP_NULL_PREDICATE", obj);
 }

@@ -44,11 +44,11 @@
  */
 
 #include "receiveexecutor.h"
+
 #include "common/debuglog.h"
-#include "execution/VoltDBEngine.h"
 #include "plannodes/receivenode.h"
 
-using namespace voltdb;
+namespace voltdb {
 
 bool ReceiveExecutor::p_init(TempTableLimits* limits)
 {
@@ -66,9 +66,10 @@ bool ReceiveExecutor::p_execute()
     // iterate dependencies stored in the frontend and union them into the output_table.
     // todo: should pass the transaction's string pool through
     // as the underlying table loader would use it.
-    int loadedDeps = 0;
-    do {
-        loadedDeps = m_engine->loadNextDependency(output_table);
-    } while (loadedDeps > 0);
+    while (m_engine->loadNextDependency(output_table) > 0) {
+        // continue
+    }
     return true;
+}
+
 }

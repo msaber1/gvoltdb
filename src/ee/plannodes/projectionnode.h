@@ -60,10 +60,6 @@ public:
 
     virtual PlanNodeType getPlanNodeType() const;
 
-    const std::vector<std::string>& getOutputColumnNames() const { return m_outputColumnNames; }
-
-    const std::vector<AbstractExpression*>& getOutputColumnExpressions() const;
-
     std::string debugInfo(const std::string& spacer) const;
 
     const int* getOutputColumnIdArrayIfAllColumns() const;
@@ -88,11 +84,6 @@ public:
 
 protected:
     virtual void loadFromJSONObject(PlannerDomValue obj);
-    //
-    // The node must define what the columns in the output table are
-    // going to look like
-    //
-    std::vector<std::string> m_outputColumnNames;
     boost::scoped_array<int> m_outputColumnIds;
 };
 

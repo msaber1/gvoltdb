@@ -44,7 +44,7 @@
  */
 
 #include "projectionexecutor.h"
-#include "common/debuglog.h"
+
 #include "common/tabletuple.h"
 #include "plannodes/projectionnode.h"
 #include "storage/tableiterator.h"
@@ -95,7 +95,7 @@ bool ProjectionExecutor::p_execute()
                               projection_columns, projection_expressions);
         VOLT_TRACE("OUTPUT TABLE: %s\n", output_table->debug().c_str());
     }
-    VOLT_TRACE("PROJECTED TABLE: %s\n", output_table->debug().c_str());
+    //VOLT_TRACE("PROJECTED TABLE: %s\n", output_table->debug().c_str());
     return true;
 }
 

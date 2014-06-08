@@ -45,15 +45,8 @@
 
 #include "abstractscanexecutor.h"
 
-#include "common/ValueFactory.hpp"
-#include "common/tabletuple.h"
-#include "execution/VoltDBEngine.h"
 #include "plannodes/abstractscannode.h"
-#include "storage/table.h"
-#include "storage/tableiterator.h"
-#include "storage/temptable.h"
-
-using namespace std;
+#include "plannodes/limitnode.h"
 
 namespace voltdb {
 

@@ -64,7 +64,6 @@ public:
 protected:
     bool p_init(TempTableLimits* limits);
     bool p_execute();
-
 private:
     LimitPlanNode::InlineState m_state;
 };

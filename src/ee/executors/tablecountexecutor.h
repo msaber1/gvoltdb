@@ -21,8 +21,7 @@
 
 #include "executors/abstractscanexecutor.h"
 
-namespace voltdb
-{
+namespace voltdb {
 
 class TableCountExecutor : public AbstractScanExecutor {
 public:

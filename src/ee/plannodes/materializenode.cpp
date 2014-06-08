@@ -69,7 +69,7 @@ void MaterializePlanNode::loadFromJSONObject(PlannerDomValue obj)
 
 const int* MaterializePlanNode::getOutputParameterIdArrayIfAllParameters() const
 {
-    int colCount = (int)getOutputSchema().size();
+    int colCount = getValidOutputColumnCount();
     int* result = ExpressionUtil::convertIfAllParameterValues(getOutputExpressionArray(), colCount);
     const_cast<MaterializePlanNode*>(this)->
         m_outputParameterIds.reset(result); // cache for memory management purposes.

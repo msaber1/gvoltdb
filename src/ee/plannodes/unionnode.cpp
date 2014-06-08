@@ -47,21 +47,20 @@
 
 #include <sstream>
 
-using namespace std;
-
 namespace voltdb {
 
 PlanNodeType UnionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_UNION; }
 
-string UnionPlanNode::debugInfo(const string &spacer) const {
-    ostringstream buffer;
+std::string UnionPlanNode::debugInfo(const std::string &spacer) const
+{
+    std::ostringstream buffer;
     buffer << spacer << "UnionType[" << m_unionType << "]\n";
-    return string(buffer.str());
+    return buffer.str();
 }
 
 void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    string unionTypeStr = obj.valueForKey("UNION_TYPE").asStr();
+    std::string unionTypeStr = obj.valueForKey("UNION_TYPE").asStr();
     if (unionTypeStr == "UNION") {
         m_unionType = UNION_TYPE_UNION;
     } else if (unionTypeStr == "UNION_ALL") {

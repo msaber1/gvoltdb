@@ -47,13 +47,11 @@
 
 #include <sstream>
 
-using namespace std;
-
 namespace voltdb {
 
-string AbstractOperationPlanNode::debugInfo(const string &spacer) const
+std::string AbstractOperationPlanNode::debugInfo(const std::string &spacer) const
 {
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << spacer << "TargetTable[" << target_table_name << "]\n";
     return buffer.str();
 }

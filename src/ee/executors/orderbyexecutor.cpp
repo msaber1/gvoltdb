@@ -45,9 +45,6 @@
 
 #include "orderbyexecutor.h"
 
-#include <algorithm>
-#include <vector>
-#include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
@@ -56,8 +53,10 @@
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 
-using namespace voltdb;
-using namespace std;
+#include <algorithm>
+#include <vector>
+
+namespace voltdb {
 
 bool
 OrderByExecutor::p_init(TempTableLimits* limits)
@@ -83,8 +82,8 @@ OrderByExecutor::p_init(TempTableLimits* limits)
 class TupleComparer
 {
 public:
-    TupleComparer(const vector<AbstractExpression*>& keys,
-                  const vector<SortDirectionType>& dirs)
+    TupleComparer(const std::vector<AbstractExpression*>& keys,
+                  const std::vector<SortDirectionType>& dirs)
         : m_keys(keys), m_dirs(dirs), m_keyCount(keys.size())
     {
         assert(keys.size() == dirs.size());
@@ -92,8 +91,7 @@ public:
 
     bool operator()(TableTuple ta, TableTuple tb)
     {
-        for (size_t i = 0; i < m_keyCount; ++i)
-        {
+        for (size_t i = 0; i < m_keyCount; ++i) {
             AbstractExpression* k = m_keys[i];
             SortDirectionType dir = m_dirs[i];
             int cmp = k->eval(&ta, NULL).compare(k->eval(&tb, NULL));
@@ -115,8 +113,8 @@ public:
     }
 
 private:
-    const vector<AbstractExpression*>& m_keys;
-    const vector<SortDirectionType>& m_dirs;
+    const std::vector<AbstractExpression*>& m_keys;
+    const std::vector<SortDirectionType>& m_dirs;
     size_t m_keyCount;
 };
 
@@ -146,7 +144,7 @@ bool OrderByExecutor::p_execute()
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
-    vector<TableTuple> xs;
+    std::vector<TableTuple> xs;
     ProgressMonitorProxy pmp(m_engine, this);
     while (iterator.next(tuple)) {
         pmp.countdownProgress();
@@ -158,7 +156,7 @@ bool OrderByExecutor::p_execute()
     sort(xs.begin(), xs.end(), TupleComparer(node->getSortExpressions(),
                                              node->getSortDirections()));
 
-    for (vector<TableTuple>::iterator it = xs.begin(); it != xs.end(); it++) {
+    for (std::vector<TableTuple>::iterator it = xs.begin(); it != xs.end(); it++) {
         //
         // Check if has gone past the offset
         //
@@ -181,4 +179,6 @@ bool OrderByExecutor::p_execute()
     VOLT_TRACE("Result of OrderBy:\n '%s'", output_table->debug().c_str());
 
     return true;
+}
+
 }

@@ -46,7 +46,7 @@
 #ifndef HSTOREABSTRACTEXPRESSION_H
 #define HSTOREABSTRACTEXPRESSION_H
 
-#include "common/types.h"
+#include "common/common.h"
 #include "common/PlannerDomValue.h"
 
 #include <string>
@@ -54,9 +54,6 @@
 
 namespace voltdb {
 
-class SerializeInput;
-class SerializeOutput;
-class NValue;
 class TableTuple;
 
 /**
@@ -68,14 +65,11 @@ class TableTuple;
 // Base class for all expression nodes
 // ------------------------------------------------------------------
 class AbstractExpression {
-  public:
+public:
     /** destroy this node and all children */
     virtual ~AbstractExpression();
 
     virtual NValue eval(const TableTuple *tuple1 = NULL, const TableTuple *tuple2 = NULL) const = 0;
-
-    /** return true if self or descendent should be substitute()'d */
-    virtual bool hasParameter() const;
 
     /* debugging methods - some various ways to create a sring
        describing the expression tree */
@@ -137,21 +131,16 @@ class AbstractExpression {
         return m_right;
     }
 
-  protected:
+protected:
     AbstractExpression();
     AbstractExpression(ExpressionType type);
     AbstractExpression(ExpressionType type,
                        AbstractExpression *left,
                        AbstractExpression *right);
 
-  private:
-    static AbstractExpression* buildExpressionTree_recurse(PlannerDomValue obj);
-    bool initParamShortCircuits();
-
-  protected:
     AbstractExpression *m_left, *m_right;
+private:
     ExpressionType m_type;
-    bool m_hasParameter;
     ValueType m_valueType;
     int m_valueSize;
     bool m_inBytes;

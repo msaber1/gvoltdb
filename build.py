@@ -285,7 +285,6 @@ CTX.INPUT['plannodes'] = """
  plannodeutil.cpp
  projectionnode.cpp
  receivenode.cpp
- SchemaColumn.cpp
  sendnode.cpp
  seqscannode.cpp
  unionnode.cpp

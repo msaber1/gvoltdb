@@ -56,8 +56,7 @@ namespace voltdb {
 class UpsertExecutor : public AbstractOperationExecutor
 {
 public:
-    UpsertExecutor()
-    {}
+    UpsertExecutor() { }
 
 protected:
     void p_initMore();

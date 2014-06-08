@@ -32,6 +32,7 @@
 #include <ucontext.h>
 
 namespace voltdb {
+
 FatalException::FatalException(std::string message,
                                const char *filename, unsigned long lineno,
                                std::string backtrace_path)
@@ -145,13 +146,13 @@ const char* FatalLogicError::what() const throw()
 // Reset either or both of these control variables from the debugger to dynamically
 // control the error responses that depend on them.
 int control_assert_or_throw_fatal_or_crash_123 =
-    /* assert             */ 1;  //default
-    // throw fatal                            *-/ 2;
-    // crash on the spot                      */ 3;
-int control_ignore_or_throw_fatal_or_crash_123 =
-    /* fall through to throw something softer */ 1;  //default
-    // throw fatal        *-/ 2;
+    /* assert             */ 1;  //default <- break up the * and / to override
+    // throw fatal        */ 2;
     // crash on the spot  */ 3;
+int control_ignore_or_throw_fatal_or_crash_123 =
+    /* fall through to throw something softer */ 1;  //default <- break up the * and / to override
+    // throw fatal                            */ 2;
+    // crash on the spot                      */ 3;
 
 
 }

@@ -60,46 +60,29 @@ namespace voltdb {
 // AbstractExpression
 // ------------------------------------------------------------------
 AbstractExpression::AbstractExpression()
-    : m_left(NULL), m_right(NULL),
-      m_type(EXPRESSION_TYPE_INVALID),
-      m_hasParameter(true)
-{
-}
+    : m_left(NULL)
+    , m_right(NULL)
+    , m_type(EXPRESSION_TYPE_INVALID)
+{ }
 
 AbstractExpression::AbstractExpression(ExpressionType type)
-    : m_left(NULL), m_right(NULL),
-      m_type(type),
-      m_hasParameter(true)
-{
-}
+    : m_left(NULL)
+    , m_right(NULL)
+    , m_type(type)
+{ }
 
 AbstractExpression::AbstractExpression(ExpressionType type,
                                        AbstractExpression* left,
                                        AbstractExpression* right)
-    : m_left(left), m_right(right),
-      m_type(type),
-      m_hasParameter(true)
-{
-}
+    : m_left(left)
+    , m_right(right)
+    , m_type(type)
+{ }
 
 AbstractExpression::~AbstractExpression()
 {
     delete m_left;
     delete m_right;
-}
-
-bool
-AbstractExpression::hasParameter() const
-{
-    if (m_left && m_left->hasParameter())
-        return true;
-    return (m_right && m_right->hasParameter());
-}
-
-bool
-AbstractExpression::initParamShortCircuits()
-{
-    return (m_hasParameter = hasParameter());
 }
 
 std::string
@@ -110,7 +93,7 @@ AbstractExpression::debug() const
     }
     std::ostringstream buffer;
     //buffer << "Expression[" << expressionutil::getTypeName(getExpressionType()) << "]";
-    buffer << "Expression[" << expressionToString(getExpressionType()) << ", " << getExpressionType() << "]";
+    buffer << "Expression[" << expressionToString(getExpressionType()) << "==" << getExpressionType() << "]";
     return (buffer.str());
 }
 
@@ -151,17 +134,6 @@ AbstractExpression::debug(const std::string &spacer) const
 AbstractExpression*
 AbstractExpression::buildExpressionTree(PlannerDomValue obj)
 {
-    AbstractExpression * exp =
-      AbstractExpression::buildExpressionTree_recurse(obj);
-
-    if (exp)
-        exp->initParamShortCircuits();
-    return exp;
-}
-
-AbstractExpression*
-AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
-{
     // build a tree recursively from the bottom upwards.
     // when the expression node is instantiated, its type,
     // value and child types will have been discovered.
@@ -200,11 +172,11 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
     try {
         if (obj.hasNonNullKey("LEFT")) {
             PlannerDomValue leftValue = obj.valueForKey("LEFT");
-            left_child = AbstractExpression::buildExpressionTree_recurse(leftValue);
+            left_child = AbstractExpression::buildExpressionTree(leftValue);
         }
         if (obj.hasNonNullKey("RIGHT")) {
             PlannerDomValue rightValue = obj.valueForKey("RIGHT");
-            right_child = AbstractExpression::buildExpressionTree_recurse(rightValue);
+            right_child = AbstractExpression::buildExpressionTree(rightValue);
         }
 
         // NULL argsVector corresponds to a missing ARGS value
@@ -215,7 +187,7 @@ AbstractExpression::buildExpressionTree_recurse(PlannerDomValue obj)
             argsVector = new std::vector<AbstractExpression*>();
             for (int i = 0; i < argsArray.arrayLen(); i++) {
                 PlannerDomValue argValue = argsArray.valueAtIndex(i);
-                AbstractExpression* argExpr = AbstractExpression::buildExpressionTree_recurse(argValue);
+                AbstractExpression* argExpr = AbstractExpression::buildExpressionTree(argValue);
                 argsVector->push_back(argExpr);
             }
         }

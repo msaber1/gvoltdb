@@ -387,7 +387,7 @@ int main(int argc, char **argv)
     if (argc > 1) {
         input = new ifstream(argv[1]);
         if (!input->good()) {
-            cerr << "Couln't open file specified." << endl;
+            cerr << "Couldn't open file specified (" << argv[1] << ")." << endl;
             exit(-1);
         }
     }

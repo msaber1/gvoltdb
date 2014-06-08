@@ -70,9 +70,9 @@
 
 #include <cassert>
 
-using namespace voltdb;
+namespace voltdb {
 
-inline AbstractExecutor* constructExecutor(PlanNodeType type)
+inline static AbstractExecutor* constructExecutor(PlanNodeType type)
 {
     switch (type) {
     case PLAN_NODE_TYPE_AGGREGATE: return new AggregateSerialExecutor();
@@ -116,3 +116,4 @@ AbstractExecutor* ExecutorUtil::getNewExecutor(AbstractPlanNode* node)
     return executor;
 }
 
+}

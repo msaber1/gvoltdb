@@ -16,7 +16,7 @@
  */
 
 #include "tablecountexecutor.h"
-#include "common/debuglog.h"
+
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "common/ValueFactory.hpp"
@@ -25,9 +25,7 @@
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 
-#include <iostream>
-
-using namespace voltdb;
+namespace voltdb {
 
 bool TableCountExecutor::p_initMore(TempTableLimits* limits)
 {
@@ -36,11 +34,10 @@ bool TableCountExecutor::p_initMore(TempTableLimits* limits)
     assert(dynamic_cast<TableCountPlanNode*>(m_abstractNode));
     assert(dynamic_cast<TableCountPlanNode*>(m_abstractNode)->isSubQuery() || getTargetTable());
     assert(dynamic_cast<TableCountPlanNode*>(m_abstractNode)->getPredicate() == NULL);
-    assert(m_abstractNode->getOutputSchema().size() == 1);
+    assert(m_abstractNode->getValidOutputColumnCount() == 1);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
-
     return true;
 }
 
@@ -77,4 +74,6 @@ bool TableCountExecutor::p_execute()
     VOLT_DEBUG("\n%s\n", output_table->debug().c_str());
     VOLT_DEBUG("Finished Table Counting");
     return true;
+}
+
 }

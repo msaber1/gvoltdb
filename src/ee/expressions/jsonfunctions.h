@@ -18,16 +18,15 @@
 #ifndef JSONFUNCTIONS_H_
 #define JSONFUNCTIONS_H_
 
+#include "common/NValue.hpp"
+
+#include <jsoncpp/jsoncpp.h>
+
 #include <cassert>
 #include <cstring>
 #include <string>
 #include <sstream>
 #include <algorithm>
-
-#include <jsoncpp/jsoncpp.h>
-#include <jsoncpp/jsoncpp-forwards.h>
-
-#include "common/NValue.hpp"
 
 namespace voltdb {
 

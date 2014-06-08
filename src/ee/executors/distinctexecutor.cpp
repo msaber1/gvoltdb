@@ -74,7 +74,8 @@ bool DistinctExecutor::p_init(TempTableLimits* limits)
     return (true);
 }
 
-bool DistinctExecutor::p_execute() {
+bool DistinctExecutor::p_execute()
+{
     DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
     assert(node);
     TempTable* output_table = getTempOutputTable();
@@ -101,4 +102,3 @@ bool DistinctExecutor::p_execute() {
 }
 
 }
-

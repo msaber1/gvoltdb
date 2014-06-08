@@ -45,8 +45,6 @@
 
 #include "deletenode.h"
 
-using namespace std;
-
 namespace voltdb {
 
 PlanNodeType DeletePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_DELETE; }

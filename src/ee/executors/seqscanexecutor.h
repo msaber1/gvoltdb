@@ -53,7 +53,7 @@ namespace voltdb
 
 class SeqScanExecutor : public AbstractScanExecutor {
 public:
-    SeqScanExecutor() {}
+    SeqScanExecutor() { }
     ~SeqScanExecutor()
     {
         if (m_output_is_input) {

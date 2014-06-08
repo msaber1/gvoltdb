@@ -43,15 +43,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-
-#include <stdexcept>
-#include <sstream>
-#include "common/FatalException.hpp"
 #include "plannodefragment.h"
-#include "catalog/catalog.h"
+
+#include "common/FatalException.hpp"
 #include "abstractplannode.h"
 
-using namespace std;
+#include <sstream>
 
 namespace voltdb {
 
@@ -62,7 +59,8 @@ PlanNodeFragment::PlanNodeFragment(AbstractPlanNode *root_node)
     }
 }
 
-bool PlanNodeFragment::constructTree(AbstractPlanNode* node) {
+bool PlanNodeFragment::constructTree(AbstractPlanNode* node)
+{
     if (m_idToNodeMap.find(node->getPlanNodeId()) == m_idToNodeMap.end()) {
         m_planNodes.push_back(node);
         m_idToNodeMap[node->getPlanNodeId()] = node;
@@ -76,14 +74,14 @@ bool PlanNodeFragment::constructTree(AbstractPlanNode* node) {
     return true;
 }
 
-PlanNodeFragment::~PlanNodeFragment() {
+PlanNodeFragment::~PlanNodeFragment()
+{
     for (int ii = 0; ii < m_planNodes.size(); ii++) {
         delete m_planNodes[ii];
     }
 }
 
-PlanNodeFragment *
-PlanNodeFragment::createFromCatalog(const string value)
+PlanNodeFragment* PlanNodeFragment::createFromCatalog(const std::string& value)
 {
     //cout << "DEBUG PlanNodeFragment::createFromCatalog: value.size() == " << value.size() << endl;
     //cout << "DEBUG PlanNodeFragment::createFromCatalog: value == " << value << endl;
@@ -97,7 +95,8 @@ PlanNodeFragment::createFromCatalog(const string value)
 PlanNodeFragment *
 PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
 {
-    auto_ptr<PlanNodeFragment> pnf(new PlanNodeFragment());
+    PlanNodeFragment* pnf = new PlanNodeFragment();
+    std::auto_ptr<PlanNodeFragment> guard(pnf);
 
     // read and construct plannodes from json object
     PlannerDomValue planNodesArray = obj.valueForKey("PLAN_NODES");
@@ -121,10 +120,9 @@ PlanNodeFragment::fromJSONObject(PlannerDomValue obj)
     }
     pnf->loadFromJSONObject(obj);
 
-    PlanNodeFragment *retval = pnf.get();
-    pnf.release();
-    assert(retval);
-    return retval;
+    guard.release();
+    assert(pnf);
+    return pnf;
 }
 
 void
@@ -169,7 +167,7 @@ std::string PlanNodeFragment::debug() {
         buffer << "   [" << ctr << "]: " << m_executionList[ctr]->debug() << "\n";
     }
     buffer << "Execute Tree:\n";
-    buffer << getRootNode()->debug(true);
+    buffer << getRootNode()->debugTree();
     return (buffer.str());
 }
 

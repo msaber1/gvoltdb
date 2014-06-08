@@ -73,7 +73,7 @@ class PlanNodeFragment {
     virtual ~PlanNodeFragment();
 
     // construct a new fragment from the catalog's serialization
-    static PlanNodeFragment * createFromCatalog(const std::string);
+    static PlanNodeFragment * createFromCatalog(const std::string&);
 
     // construct a new fragment from a serialized json object
     static PlanNodeFragment* fromJSONObject(PlannerDomValue obj);

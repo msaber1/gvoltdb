@@ -45,9 +45,7 @@
 
 #include "indexscanexecutor.h"
 
-#include "common/debuglog.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
 #include "executors/projectionexecutor.h"
 #include "expressions/abstractexpression.h"
@@ -62,7 +60,7 @@
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
-using namespace voltdb;
+namespace voltdb {
 
 bool IndexScanExecutor::p_initMore(TempTableLimits* limits)
 {
@@ -81,8 +79,8 @@ bool IndexScanExecutor::p_initMore(TempTableLimits* limits)
     //
     // Miscellanous Information
     //
-    m_lookupType = node->getLookupType();
-    m_sortDirection = node->getSortDirection();
+    m_lookup_type = node->getLookupType();
+    m_sort_direction = node->getSortDirection();
     m_end_expression = node->getEndExpression();
     m_post_expression = node->getPredicate();
     m_initial_expression = node->getInitialExpression();
@@ -130,8 +128,8 @@ bool IndexScanExecutor::p_execute()
 
     TableIndex *tableIndex = targetTable->index(m_index_name);
     int activeNumOfSearchKeys = m_num_of_search_keys;
-    IndexLookupType localLookupType = m_lookupType;
-    SortDirectionType localSortDirection = m_sortDirection;
+    IndexLookupType localLookupType = m_lookup_type;
+    SortDirectionType localSortDirection = m_sort_direction;
 
     //
     // SEARCH KEY
@@ -354,4 +352,6 @@ bool IndexScanExecutor::p_execute()
 
     VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
     return true;
+}
+
 }

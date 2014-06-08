@@ -46,30 +46,26 @@
 #include "receivenode.h"
 
 #include "expressions/abstractexpression.h"
-#include "SchemaColumn.h"
 
 #include <sstream>
-
-using namespace std;
 
 namespace voltdb {
 
 PlanNodeType ReceivePlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_RECEIVE; }
 
-string ReceivePlanNode::debugInfo(const string& spacer) const
+std::string ReceivePlanNode::debugInfo(const std::string& spacer) const
 {
-    ostringstream buffer;
-    buffer << spacer << "Incoming Table Columns["
-           << getOutputSchema().size() << "]:\n";
-    for (int ctr = 0, cnt = (int)getOutputSchema().size(); ctr < cnt; ctr++)
-    {
-        SchemaColumn* col = getOutputSchema()[ctr];
+    const std::vector<std::string>& column_names = getOutputColumnNames();
+    const AbstractExpression* const* outputExpressions = getOutputExpressionArray();
+    std::ostringstream buffer;
+    buffer << spacer << "Incoming Table Columns[" << getValidOutputColumnCount() << "]:\n";
+    for (int ctr = 0, cnt = (int)column_names.size(); ctr < cnt; ctr++) {
         buffer << spacer << "  [" << ctr << "] ";
-        buffer << "name=" << col->getColumnName() << " : ";
-        buffer << "size=" << col->getExpression()->getValueSize() << " : ";
-        buffer << "type=" << col->getExpression()->getValueType() << "\n";
+        buffer << "name=" << column_names[ctr] << " : ";
+        buffer << "size=" << outputExpressions[ctr]->getValueSize() << " : ";
+        buffer << "type=" << outputExpressions[ctr]->getValueType() << "\n";
     }
-    return (buffer.str());
+    return buffer.str();
 }
 
 void ReceivePlanNode::loadFromJSONObject(PlannerDomValue obj)

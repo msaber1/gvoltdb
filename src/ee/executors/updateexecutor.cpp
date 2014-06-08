@@ -44,20 +44,12 @@
  */
 
 #include "updateexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/ValueFactory.hpp"
-#include "common/ValuePeeker.hpp"
-#include "common/types.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
-#include "plannodes/updatenode.h"
-#include "plannodes/projectionnode.h"
-#include "storage/table.h"
-#include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
+#include "plannodes/projectionnode.h"
+#include "plannodes/updatenode.h"
 #include "storage/tableiterator.h"
-#include "storage/tableutil.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 #include "storage/ConstraintFailureException.h"
@@ -66,8 +58,7 @@
 
 #include <cassert>
 
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
 void UpdateExecutor::p_initMore()
 {
@@ -89,8 +80,8 @@ void UpdateExecutor::p_initMore()
         assert(proj_node);
     }
 
-    const vector<string> output_column_names = proj_node->getOutputColumnNames();
-    const vector<string> &targettable_column_names = targetTable->getColumnNames();
+    const std::vector<std::string> output_column_names = proj_node->getOutputColumnNames();
+    const std::vector<std::string> &targettable_column_names = targetTable->getColumnNames();
 
     /*
      * The first output column is the tuple address expression and it isn't part of our output so we skip
@@ -99,7 +90,7 @@ void UpdateExecutor::p_initMore()
     for (int ii = 1; ii < output_column_names.size(); ii++) {
         for (int jj=0; jj < targettable_column_names.size(); ++jj) {
             if (targettable_column_names[jj].compare(output_column_names[ii]) == 0) {
-                m_inputTargetMap.push_back(pair<int,int>(ii, jj));
+                m_inputTargetMap.push_back(std::pair<int,int>(ii, jj));
                 break;
             }
         }
@@ -218,4 +209,6 @@ bool UpdateExecutor::p_execute()
 
     setModifiedTuples(modifiedTuples);
     return true;
+}
+
 }

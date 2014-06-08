@@ -66,8 +66,8 @@ protected:
     bool p_execute();
 private:
     std::string m_index_name;
-    IndexLookupType m_lookupType;
-    SortDirectionType m_sortDirection;
+    IndexLookupType m_lookup_type;
+    SortDirectionType m_sort_direction;
     int m_num_of_search_keys;
     boost::scoped_array<AbstractExpression*> m_search_key_array_ptr;
     StandAloneTupleStorage m_search_key;

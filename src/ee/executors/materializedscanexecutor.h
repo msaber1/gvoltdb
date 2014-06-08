@@ -15,7 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-
 #ifndef MATERIALIZEDSCANEXECUTOR_H
 #define MATERIALIZEDSCANEXECUTOR_H
 

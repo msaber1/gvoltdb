@@ -124,10 +124,6 @@ public:
         delete m_child;
     }
 
-    virtual bool hasParameter() const {
-        return m_child->hasParameter();
-    }
-
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert (m_child);
         return (m_child->eval(tuple1, tuple2)).callUnary<F>();
@@ -155,16 +151,6 @@ public:
             delete m_args[i];
         }
         delete &m_args;
-    }
-
-    virtual bool hasParameter() const {
-        for (size_t i = 0; i < m_args.size(); i++) {
-            assert(m_args[i]);
-            if (m_args[i]->hasParameter()) {
-                return true;
-            }
-        }
-        return false;
     }
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {

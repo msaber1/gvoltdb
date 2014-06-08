@@ -48,7 +48,7 @@
 
 #include "executors/abstractoperationexecutor.h"
 
-#include <utility>
+#include <utility> // for std::pair
 #include <vector>
 
 namespace voltdb {
@@ -57,7 +57,6 @@ class UpdateExecutor : public AbstractOperationExecutor
 {
 public:
     UpdateExecutor() { }
-
 protected:
     void p_initMore();
     bool p_execute();

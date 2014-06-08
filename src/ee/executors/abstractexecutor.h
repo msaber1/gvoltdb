@@ -132,7 +132,7 @@ class AbstractExecutor {
      * Set up a multi-column temp output table for those executors that require one.
      * Called from p_init.
      */
-    void setTempOutputTable(TempTableLimits* limits, const std::string tempTableName="temp");
+    void setTempOutputTable(TempTableLimits* limits, std::string tempTableName="temp");
     void setTempOutputLikeInputTable(TempTableLimits* limits);
 
     /**

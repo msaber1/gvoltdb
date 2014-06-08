@@ -48,21 +48,18 @@
 #include <sstream>
 #include <string>
 
-using namespace std;
-
 namespace voltdb {
 
 PlanNodeType OrderByPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_ORDERBY; }
 
-string OrderByPlanNode::debugInfo(const string& spacer) const
+std::string OrderByPlanNode::debugInfo(const std::string& spacer) const
 {
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << spacer << "SortColumns[" << m_sort_expressions.size() << "]\n";
     for (int ctr = 0, cnt = (int)m_sort_expressions.size(); ctr < cnt; ctr++)
     {
         buffer << spacer << "  [" << ctr << "] "
-               << m_sort_expressions[ctr]->debug()
-               << "::" << m_sort_directions[ctr] << "\n";
+               << m_sort_expressions[ctr]->debug() << "::" << m_sort_directions[ctr] << "\n";
     }
     return buffer.str();
 }

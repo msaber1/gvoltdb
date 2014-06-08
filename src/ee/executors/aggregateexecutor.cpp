@@ -47,7 +47,6 @@
 
 #include "common/ValueFactory.hpp"
 #include "common/common.h"
-#include "common/debuglog.h"
 #include "common/SerializableEEException.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
@@ -60,7 +59,6 @@
 
 #include <algorithm>
 #include <limits>
-#include <set>
 #include <stdint.h>
 #include <utility>
 
@@ -421,7 +419,7 @@ bool AggregateExecutorBase::p_init(TempTableLimits* limits)
      * through from the input table. Do this extra work here rather then
      * serialize yet more data.
      */
-    std::vector<bool> outputColumnsResultingFromAggregates(node->getOutputSchema().size(), false);
+    std::vector<bool> outputColumnsResultingFromAggregates(node->getValidOutputColumnCount(), false);
     std::vector<int> aggregateOutputColumns = node->getAggregateOutputColumns();
     BOOST_FOREACH(int aOC, aggregateOutputColumns) {
         outputColumnsResultingFromAggregates[aOC] = true;
@@ -513,7 +511,7 @@ inline bool AggregateExecutorBase::insertOutputTuple(AggregateRow* aggregateRow)
     }
     bool inserted = false;
     if (m_postPredicate == NULL || m_postPredicate->eval(&tmptup, NULL).isTrue()) {
-        output_table->insertTupleNonVirtual(tmptup);
+        output_table->insertTempTuple(tmptup);
         inserted = true;
     }
 

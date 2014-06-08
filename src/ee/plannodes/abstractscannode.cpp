@@ -45,13 +45,11 @@
 
 #include "abstractscannode.h"
 
-using namespace std;
-
 namespace voltdb {
 
-string AbstractScanPlanNode::debugInfo(const string &spacer) const
+std::string AbstractScanPlanNode::debugInfo(const std::string &spacer) const
 {
-    ostringstream buffer;
+    std::ostringstream buffer;
     buffer << spacer << "TargetTable[" << m_targetTableName << "]\n";
     return buffer.str();
 }

@@ -52,8 +52,6 @@
 #include "storage/TableCatalogDelegate.hpp"
 #include "storage/temptable.h"
 
-using namespace std;
-
 namespace voltdb {
 
 bool AbstractOperationExecutor::p_init(TempTableLimits* limits)

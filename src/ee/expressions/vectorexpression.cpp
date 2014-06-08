@@ -45,17 +45,6 @@ public:
         m_inList.free();
     }
 
-    virtual bool hasParameter() const
-    {
-        for (size_t i = 0; i < m_args.size(); i++) {
-            assert(m_args[i]);
-            if (m_args[i]->hasParameter()) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const
     {
         //TODO: Could make this vector a member, if the memory management implications

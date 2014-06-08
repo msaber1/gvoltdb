@@ -47,17 +47,14 @@
 
 #include <sstream>
 
-using namespace std;
-
 namespace voltdb {
 
 PlanNodeType DistinctPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_DISTINCT; }
 
-string DistinctPlanNode::debugInfo(const string &spacer) const
+std::string DistinctPlanNode::debugInfo(const std::string &spacer) const
 {
-    ostringstream buffer;
-    buffer << spacer << "DistinctExpression["
-           << this->m_distinctExpression->debug() << "]\n";
+    std::ostringstream buffer;
+    buffer << spacer << "DistinctExpression[" << m_distinctExpression->debug() << "]\n";
     return buffer.str();
 }
 

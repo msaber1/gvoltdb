@@ -448,8 +448,12 @@ protected:
 
   private:
     int32_t m_refcount;
-    ThreadLocalPool m_tlPool;
     int m_compactionThreshold;
+
+    // This unreferenced stateless member acts as a counted reference to keep the ThreadLocalPool alive
+    // while this table is alive.
+    // This only matters under test conditions when there is no VoltDBEngine alive to do that job.
+    ThreadLocalPool m_tlPool;
 };
 
 }

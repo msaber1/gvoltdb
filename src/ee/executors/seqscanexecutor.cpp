@@ -45,7 +45,6 @@
 
 #include "seqscanexecutor.h"
 
-#include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
@@ -60,7 +59,7 @@
 
 #include <iostream>
 
-using namespace voltdb;
+namespace voltdb {
 
 bool SeqScanExecutor::p_initMore(TempTableLimits* limits)
 {
@@ -124,9 +123,6 @@ bool SeqScanExecutor::p_execute()
 
     //
     // OPTIMIZATION: INLINE PROJECTION
-    // Since we have the input params, we need to call substitute to
-    // change any nodes in our expression tree to be ready for the
-    // projection operations in execute
     //
     int num_of_columns = (int)output_table->columnCount();
     TableTuple &temp_tuple = output_table->tempTuple();
@@ -185,4 +181,6 @@ bool SeqScanExecutor::p_execute()
     VOLT_DEBUG("Finished Seq scanning");
 
     return true;
+}
+
 }

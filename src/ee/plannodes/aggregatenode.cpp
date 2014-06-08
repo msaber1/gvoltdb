@@ -47,36 +47,27 @@
 
 #include <sstream>
 
-using namespace std;
-
 namespace voltdb {
 
 PlanNodeType AggregatePlanNode::getPlanNodeType() const { return m_type; }
 
-string AggregatePlanNode::debugInfo(const string &spacer) const {
-    ostringstream buffer;
-    buffer << spacer << "\nAggregates["
-           << (int) m_aggregates.size() << "]: {";
+std::string AggregatePlanNode::debugInfo(const std::string &spacer) const
+{
+    std::ostringstream buffer;
+    buffer << spacer << "\nAggregates[" << m_aggregates.size() << "]: {";
     for (int ctr = 0, cnt = (int) m_aggregates.size(); ctr < cnt; ctr++) {
-        buffer << spacer << "type="
-               << expressionToString(m_aggregates[ctr]) << "\n";
-        buffer << spacer << "distinct="
-               << m_distinctAggregates[ctr] << "\n";
-        buffer << spacer << "outcol="
-               << m_aggregateOutputColumns[ctr] << "\n";
-        buffer << spacer << "expr="
-               << (m_aggregateInputExpressions[ctr] ?
-                   m_aggregateInputExpressions[ctr]->debug(spacer) :
-                   "null")
-               << "\n";
+        buffer << spacer << "type=" << expressionToString(m_aggregates[ctr]) << "\n";
+        buffer << spacer << "distinct=" << m_distinctAggregates[ctr] << "\n";
+        buffer << spacer << "outcol=" << m_aggregateOutputColumns[ctr] << "\n";
+        buffer << spacer << "expr=" << (m_aggregateInputExpressions[ctr] ?
+                                        m_aggregateInputExpressions[ctr]->debug(spacer) :
+                                        "null") << "\n";
     }
     buffer << spacer << "}";
 
     buffer << spacer << "\nGroupByExpressions[";
-    string add = "";
-    for (int ctr = 0, cnt = (int) m_groupByExpressions.size();
-         ctr < cnt; ctr++)
-    {
+    std::string add = "";
+    for (int ctr = 0, cnt = (int) m_groupByExpressions.size(); ctr < cnt; ctr++) {
         buffer << spacer << m_groupByExpressions[ctr]->debug(spacer);
         add = ", ";
     }
@@ -96,7 +87,8 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
         bool containsExpression = false;
         if (aggregateColumnValue.hasNonNullKey("AGGREGATE_TYPE")) {
             containsType = true;
-            string aggregateColumnTypeString = aggregateColumnValue.valueForKey("AGGREGATE_TYPE").asStr();
+            std::string aggregateColumnTypeString =
+                aggregateColumnValue.valueForKey("AGGREGATE_TYPE").asStr();
             m_aggregates.push_back(stringToExpression(aggregateColumnTypeString));
         }
         if (aggregateColumnValue.hasNonNullKey("AGGREGATE_DISTINCT")) {

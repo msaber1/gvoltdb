@@ -44,17 +44,15 @@
  */
 
 #include "limitexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/tabletuple.h"
 #include "plannodes/limitnode.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
 
-using namespace voltdb;
+namespace voltdb {
 
-bool
-LimitExecutor::p_init(TempTableLimits* limits)
+bool LimitExecutor::p_init(TempTableLimits* limits)
 {
     VOLT_TRACE("init limit Executor");
 
@@ -104,6 +102,7 @@ bool LimitExecutor::p_execute()
 
         output_table->insertTempTuple(tuple);
     }
-
     return true;
+}
+
 }

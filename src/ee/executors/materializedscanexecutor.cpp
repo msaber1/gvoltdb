@@ -15,30 +15,26 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
-#include <set>
 #include "materializedscanexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
-#include "common/ValueFactory.hpp"
 #include "common/StlFriendlyNValue.h"
 #include "expressions/abstractexpression.h"
 #include "plannodes/materializedscanplannode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
 
-using namespace voltdb;
+#include <vector>
+
+namespace voltdb {
 
 bool MaterializedScanExecutor::p_init(TempTableLimits* limits)
 {
     VOLT_TRACE("init Materialized Scan Executor");
 
     assert(dynamic_cast<MaterializedScanPlanNode*>(m_abstractNode));
-    assert(m_abstractNode->getOutputSchema().size() == 1);
+    assert(m_abstractNode->getValidOutputColumnCount() == 1);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
@@ -101,4 +97,6 @@ bool MaterializedScanExecutor::p_execute()
     VOLT_DEBUG("Finished Materializing a Table");
 
     return true;
+}
+
 }

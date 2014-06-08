@@ -46,8 +46,6 @@
 #ifndef HSTORETABLEINDEX_H
 #define HSTORETABLEINDEX_H
 
-#include "common/ids.h"
-#include "common/types.h"
 #include "common/tabletuple.h"
 #include "common/TupleSchema.h"
 #include "indexes/IndexStats.h"
@@ -475,12 +473,14 @@ protected:
     IndexStats m_stats;
 
 private:
-
     // This should always/only be required for unique key indexes used for primary keys.
     virtual TableIndex *cloneEmptyNonCountingTreeIndex() const {
         throwFatalException("Primary key index discovered to be non-unique or missing a cloneEmptyTreeIndex implementation.");
     }
 
+    // This unreferenced stateless member acts as a counted reference to keep the ThreadLocalPool alive
+    // while this index is alive.
+    // This only matters under test conditions when there is no VoltDBEngine alive to do that job.
     ThreadLocalPool m_tlPool;
 };
 

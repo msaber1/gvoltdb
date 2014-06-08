@@ -53,10 +53,7 @@
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
-#include <vector>
 #include <cassert>
-
-using namespace std;
 
 namespace voltdb {
 

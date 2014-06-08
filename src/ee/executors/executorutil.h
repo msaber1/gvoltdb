@@ -47,8 +47,10 @@
 #define HSTOREEXECUTORUTIL_H
 
 namespace voltdb {
+
 class AbstractExecutor;
 class AbstractPlanNode;
+
 class ExecutorUtil {
 public:
     static AbstractExecutor* getNewExecutor(AbstractPlanNode* abstract_node);

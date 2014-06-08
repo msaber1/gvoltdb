@@ -57,6 +57,7 @@
 #include <map>
 #include <string>
 #include <vector>
+#include <utility>
 
 namespace voltdb {
 
@@ -98,25 +99,24 @@ public:
     void setExecutor(AbstractExecutor* executor) { m_executor = executor; }
     inline AbstractExecutor* getExecutor() const { return m_executor; }
 
-    //
     // Each sub-class will have to implement this function to return their type
     // This is better than having to store redundant types in all the objects
-    //
     virtual PlanNodeType getPlanNodeType() const = 0;
 
+    /** return this or the child node that originally defined the output schema for this plan node. */
+    const AbstractPlanNode* getSchemaDefiner() const;
+
     /**
-     * Get the output columns that make up the output schema for
-     * this plan node.  The column order is implicit in their
-     * order in this vector.
+     * Get the output columns that make up the output schema for this plan node.
+     * The column order is implicit in their order in this vector.
      */
-    const std::vector<SchemaColumn*>& getOutputSchema() const;
-    const voltdb::AbstractExpression* const* getOutputExpressionArray() const;
+    const std::vector<std::string>& getOutputColumnNames() const { return m_outputColumnNames; }
+    const AbstractExpression* const* getOutputExpressionArray() const
+    { return m_outputExpressionArray.get(); }
 
     /**
      * Get the output number of columns -- strictly for use with plannode
      * classes that "project" a new output schema (vs. passing one up from a child).
-     * This is cleaner than using "getOutputSchema().size()" in such cases, such as Projection nodes,
-     * when m_outputSchema and m_validOutputColumnCount are known to be valid and in agreement.
      */
     int getValidOutputColumnCount() const
     {
@@ -128,13 +128,9 @@ public:
     /**
      * Convenience method:
      * Generate a TupleSchema based on the contents of the output schema
-     * from the plan
-     *
-     * @param allowNulls whether or not the generated schema should
-     * permit null values in the output columns.
-     *TODO: -- This is always passed true, so deprecate it?
+     * from the plan and fetch the corresponding column names.
      */
-    TupleSchema* generateTupleSchema(bool allowNulls=true) const;
+    std::pair<TupleSchema*, const std::vector<std::string>*> generateTupleSchema() const;
 
     /**
      * Convenience method:
@@ -149,7 +145,8 @@ public:
 
     // Debugging convenience methods
     std::string debug() const;
-    std::string debug(bool traverse) const;
+    std::string debugTree() const;
+    //std::string debug(bool traverse) const;
     std::string debug(const std::string& spacer) const;
     virtual std::string debugInfo(const std::string& spacer) const = 0;
 
@@ -198,6 +195,7 @@ protected:
         , m_isInline(false)
     { }
 
+    void loadOutputSchemaFromJSONObject(PlannerDomValue obj);
     static AbstractExpression* loadExpressionFromJSONObject(const char* label, PlannerDomValue obj);
     static void loadExpressionsFromJSONObject(std::vector<AbstractExpression*>& arrayOut,
                                               const char* label, PlannerDomValue obj);
@@ -230,13 +228,16 @@ private:
     static const int SCHEMA_UNDEFINED_SO_GET_FROM_INLINE_PROJECTION = -1;
     static const int SCHEMA_UNDEFINED_SO_GET_FROM_CHILD = -2;
 
-    // This is mostly used to hold one of the SCHEMA_UNDEFINED_SO_GET_FROM_ flags
-    // or some/any non-negative value indicating that m_outputSchema is valid.
-    // the fact that it also matches the size of m_outputSchema -- when it is valid
-    // -- MIGHT come in handy?
+    // This is used as a column count but also to hold one of the SCHEMA_UNDEFINED_SO_GET_FROM_ flags
+    // when the output schema is not defined at this level.
     int m_validOutputColumnCount;
-    std::vector<SchemaColumn*> m_outputSchema;
-    // These expressions are owned by the SchemaColumns. Only the array is owned by this.
+
+    std::vector<std::string> m_outputColumnNames;
+    // The same "select" expressions are stored in the vector of owned expressions for memory management
+    // and in the scoped array for quick run-time iteration.
+    // ProjectionPlanNode and MaterializePlanNode further optimize the special cases of all
+    // TupleValueExpressions and all ParameterValueExpressions, respectively.
+    VectorOfOwnedExpression m_outputColumnExpressions;
     boost::scoped_array<AbstractExpression*> m_outputExpressionArray;
 };
 

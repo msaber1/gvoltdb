@@ -89,7 +89,7 @@ std::string TableIndex::debug() const
         buffer << " -> " << indexed_expressions.size() << " expressions[";
         for (int ctr = 0; ctr < indexed_expressions.size(); ctr++) {
             buffer << add << ctr << "th entry=" << indexed_expressions[ctr]->debug()
-                   << " type=(" << voltdb::valueToString(m_keySchema->columnType(ctr)) << ")";
+                   << " type=(" << m_keySchema->columnType(ctr) << ")";
             add = ", ";
         }
         buffer << "] -> Base Columns[";
@@ -99,8 +99,7 @@ std::string TableIndex::debug() const
     add = "";
     for (int ctr = 0; ctr < column_indices_vector.size(); ctr++) {
         buffer << add << ctr << "th entry=" << column_indices_vector[ctr]
-               << "th (" << voltdb::valueToString(m_keySchema->columnType(ctr))
-               << ") column in parent table";
+               << "th column, type=(" << m_keySchema->columnType(ctr) << "), in parent table";
         add = ", ";
     }
     buffer << "] --- size: " << getSize();

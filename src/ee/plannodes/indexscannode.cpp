@@ -84,7 +84,7 @@ std::string IndexScanPlanNode::debugInfo(const std::string &spacer) const
     } else {
         buffer << "<NULL>\n";
     }
-    return (buffer.str());
+    return buffer.str();
 }
 
 void IndexScanPlanNode::loadFromJSONObject(PlannerDomValue obj)

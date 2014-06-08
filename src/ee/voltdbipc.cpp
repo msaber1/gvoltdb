@@ -1181,7 +1181,7 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
 
     HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
     int32_t configLength = ntohl(hash->configLength);
-    TheHashinator* hashinator;
+    TheHashinator* hashinator = NULL;
     switch (hashinatorType) {
     case HASHINATOR_LEGACY:
         hashinator = LegacyHashinator::newInstance(hash->data);

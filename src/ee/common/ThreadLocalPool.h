@@ -36,9 +36,10 @@ struct voltdb_pool_allocator_new_delete
 
 /**
  * A wrapper around a set of pools that are local to the current thread.
- * An instance of the thread local pool must be maintained somewhere in the thread to ensure initialization
- * and destruction of the thread local pools. Creating multiple instances is fine, it is reference counted. The thread local
- * instance of pools will be freed once the last ThreadLocalPool reference in the thread is destructed.
+ * An instance of ThreadLocalPool must be maintained somewhere in the thread to ensure initialization
+ * and destruction of the thread local pools.
+ * Creating multiple instances is fine, it is reference counted.
+ * The thread local set of pools is freed with the thread's last ThreadLocalPool reference.
  */
 class ThreadLocalPool {
 public:

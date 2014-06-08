@@ -43,19 +43,15 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "boost/unordered_set.hpp"
-#include "boost/unordered_map.hpp"
-
 #include "unionexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "plannodes/unionnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
+
+#include "boost/unordered_set.hpp"
+#include "boost/unordered_map.hpp"
 
 namespace voltdb {
 

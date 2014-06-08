@@ -652,9 +652,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         DefaultTupleSerializer m_tupleSerializer;
 
-        ThreadLocalPool m_tlPool;
-
         int32_t m_compactionThreshold;
+
+        // This stateless member acts as a counted reference to keep the ThreadLocalPool alive
+        // just while this VoltDBEngine is alive. That simplifies valgrind-compliant process shutdown.
+        ThreadLocalPool m_tlPool;
 };
 
 inline void VoltDBEngine::resetReusedResultOutputBuffer(const size_t headerSize) {

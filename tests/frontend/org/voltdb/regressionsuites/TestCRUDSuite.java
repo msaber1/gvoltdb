@@ -253,7 +253,8 @@ public class TestCRUDSuite extends RegressionSuite {
             fail(error.getMessage());
         }
 
-        //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
+        //* <-- Change this comment to 'block style' to toggle over to a single-server IPC DEBUG config.
+        // [ FRAGILE! That was a structured comment. Do not break it. ]
         // IF (! DEBUG config) ...
 
         /////////////////////////////////////////////////////////////

@@ -62,10 +62,7 @@ struct AggregateRow;
 class AggregateExecutorBase : public AbstractExecutor
 {
 public:
-    AggregateExecutorBase()
-        : m_groupByKeySchema(NULL)
-    { }
-
+    AggregateExecutorBase() : m_groupByKeySchema(NULL) { }
     ~AggregateExecutorBase();
 
 protected:

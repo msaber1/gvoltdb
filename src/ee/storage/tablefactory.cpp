@@ -121,11 +121,12 @@ void TableFactory::initCommon(
             TupleSchema *schema,
             const std::vector<std::string> &columnNames,
             const bool ownsTupleSchema,
-            const int32_t compactionThreshold) {
+            const int32_t compactionThreshold)
+{
 
     assert(table != NULL);
     assert(schema != NULL);
-    assert(columnNames.size() != 0);
+    DEBUG_ASSERT_OR_THROW_OR_CRASH(columnNames.size() != 0, " for table: " << name);
 
     table->m_databaseId = databaseId;
     table->m_name = name;
@@ -135,10 +136,10 @@ void TableFactory::initCommon(
 
 void TableFactory::configureStats(voltdb::CatalogId databaseId,
                                   std::string name,
-                                  Table *table) {
+                                  Table *table)
+{
     // initialize stats for the table
-    table->getTableStats()->configure(name + " stats",
-                                      databaseId);
+    table->getTableStats()->configure(name + " stats", databaseId);
 }
 
 }

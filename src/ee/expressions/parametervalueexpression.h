@@ -46,8 +46,6 @@
 #ifndef HSTOREPARAMETERVALUEEXPRESSION_H
 #define HSTOREPARAMETERVALUEEXPRESSION_H
 
-#include "common/NValue.hpp"
-
 #include "expressions/abstractexpression.h"
 
 #include <vector>
@@ -70,29 +68,24 @@ public:
         m_valueIdx(value_idx), m_paramValue(paramValue) {
     }
 
-    voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const
+    {
         assert(m_paramValue != NULL);
         return *m_paramValue;
     }
 
-    bool hasParameter() const {
-        // this class represents a parameter.
-        return true;
-    }
-
-    std::string debugInfo(const std::string &spacer) const {
+    std::string debugInfo(const std::string &spacer) const
+    {
         std::ostringstream buffer;
-        buffer << spacer << "OptimizedParameter[" << this->m_valueIdx << "]\n";
-        return (buffer.str());
+        buffer << spacer << "OptimizedParameter[" << m_valueIdx << "]\n";
+        return buffer.str();
     }
 
-    int getParameterId() const {
-        return this->m_valueIdx;
-    }
+    int getParameterId() const { return m_valueIdx; }
 
   private:
     int m_valueIdx;
-    voltdb::NValue* m_paramValue;
+    NValue* m_paramValue;
 };
 
 }

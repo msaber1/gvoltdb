@@ -469,22 +469,34 @@ bool isIntegralType(ValueType type);
 NValue getRandomValue(ValueType type);
 
 std::string valueToString(ValueType type);
-ValueType stringToValue(std::string str );
+ValueType stringToValue(std::string str);
+template<class T> T& operator<<(T& stream, ValueType type)
+{ return stream << valueToString(type); }
 
 std::string joinToString(JoinType type);
-JoinType stringToJoin(std::string str );
+JoinType stringToJoin(std::string str);
+template<class T> T& operator<<(T& stream, JoinType type)
+{ return stream << joinToString(type); }
 
 std::string sortDirectionToString(SortDirectionType type);
-SortDirectionType stringToSortDirection(std::string str );
+SortDirectionType stringToSortDirection(std::string str);
+template<class T> T& operator<<(T& stream, SortDirectionType type)
+{ return stream << sortDirectionToString(type); }
 
 std::string planNodeToString(PlanNodeType type);
-PlanNodeType stringToPlanNode(std::string str );
+PlanNodeType stringToPlanNode(std::string str);
+template<class T> T& operator<<(T& stream, PlanNodeType type)
+{ return stream << planNodeToString(type); }
 
 std::string expressionToString(ExpressionType type);
-ExpressionType stringToExpression(std::string str );
+ExpressionType stringToExpression(std::string str);
+template<class T> T& operator<<(T& stream, ExpressionType type)
+{ return stream << expressionToString(type); }
 
 std::string indexLookupToString(IndexLookupType type);
-IndexLookupType stringToIndexLookup(std::string str );
+IndexLookupType stringToIndexLookup(std::string str);
+template<class T> T& operator<<(T& stream, IndexLookupType type)
+{ return stream << indexLookupToString(type); }
 
 int64_t getMaxTypeValue (ValueType type);
 

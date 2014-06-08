@@ -48,10 +48,8 @@
 #include "common/TupleSchema.h"
 #include "executors/abstractexecutor.h"
 #include "plannodeutil.h"
-#include "SchemaColumn.h"
 
 #include <sstream>
-#include <stdexcept>
 #include <string>
 
 using namespace std;
@@ -65,43 +63,32 @@ AbstractPlanNode::~AbstractPlanNode()
     for (iter = m_inlineNodes.begin(); iter != m_inlineNodes.end(); iter++) {
         delete (*iter).second;
     }
-    for (int i = 0; i < m_outputSchema.size(); i++) {
-        delete m_outputSchema[i];
-    }
 }
 
 // ------------------------------------------------------------------
 // INLINE PLANNODE METHODS
 // ------------------------------------------------------------------
-void
-AbstractPlanNode::addInlinePlanNode(AbstractPlanNode* inline_node)
+void AbstractPlanNode::addInlinePlanNode(AbstractPlanNode* inline_node)
 {
     m_inlineNodes[inline_node->getPlanNodeType()] = inline_node;
     inline_node->m_isInline = true;
 }
 
-AbstractPlanNode*
-AbstractPlanNode::getInlinePlanNode(PlanNodeType type) const
+AbstractPlanNode* AbstractPlanNode::getInlinePlanNode(PlanNodeType type) const
 {
-    map<PlanNodeType, AbstractPlanNode*>::const_iterator lookup =
-        m_inlineNodes.find(type);
-    AbstractPlanNode* ret = NULL;
+    map<PlanNodeType, AbstractPlanNode*>::const_iterator lookup = m_inlineNodes.find(type);
     if (lookup != m_inlineNodes.end()) {
-        ret = lookup->second;
+        return lookup->second;
     }
-    else {
-        VOLT_TRACE("No internal PlanNode with type '%s' is available for '%s'",
-                   planNodeToString(type).c_str(),
-                   this->debug().c_str());
-    }
-    return ret;
+    VOLT_TRACE("No internal PlanNode with type '%s' is available for '%s'",
+               planNodeToString(type).c_str(), debug().c_str());
+    return NULL;
 }
 
 // ------------------------------------------------------------------
 // DATA MEMBER METHODS
 // ------------------------------------------------------------------
-const vector<SchemaColumn*>&
-AbstractPlanNode::getOutputSchema() const
+const AbstractPlanNode* AbstractPlanNode::getSchemaDefiner() const
 {
     // Test for a valid output schema defined at this plan node.
     // 1-or-more column output schemas are always valid.
@@ -109,7 +96,7 @@ AbstractPlanNode::getOutputSchema() const
     // but SHOULD be for certain edge cases.
     // So, leave that door open, at least here.
     if (m_validOutputColumnCount >= 0) {
-        return m_outputSchema;
+        return this;
     }
     // If m_validOutputColumnCount indicates with its magic (negative) value
     // that this node does not actually define its own output schema,
@@ -133,7 +120,7 @@ AbstractPlanNode::getOutputSchema() const
                                            "Incorrect output schema source for plannode:\n" << debug(""));
             DEBUG_ASSERT_OR_THROW_OR_CRASH((schema_definer->m_validOutputColumnCount >= 0),
                                            "Missing output schema for inline projection:\n" << debug(""));
-            return schema_definer->m_outputSchema;
+            return schema_definer;
         }
 
         // A child node is another possible output schema source, but may take some digging.
@@ -150,7 +137,7 @@ AbstractPlanNode::getOutputSchema() const
             DEBUG_ASSERT_OR_THROW_OR_CRASH((schema_definer != NULL),
                                            "Incorrect output schema source for plannode:\n" << debug(""));
             if (schema_definer->m_validOutputColumnCount >= 0) {
-                return schema_definer->m_outputSchema;
+                return schema_definer;
             }
 
             // The child is no more an output schema definer than its parent, keep searching.
@@ -164,58 +151,32 @@ AbstractPlanNode::getOutputSchema() const
     throwFatalLogicErrorStreamed("No valid output schema defined for plannode:\n" << debug(""));
 }
 
-TupleSchema*
-AbstractPlanNode::generateTupleSchema(bool allowNulls) const
+std::pair<TupleSchema*, const std::vector<std::string>*> AbstractPlanNode::generateTupleSchema() const
 {
     // Get the effective output schema.
     // In general, this may require a search.
-    const vector<SchemaColumn*>& outputSchema = getOutputSchema();
-    int schema_size = static_cast<int>(outputSchema.size());
+    const AbstractPlanNode* schema_definer = getSchemaDefiner();
+    int schema_size = schema_definer->m_validOutputColumnCount;
+    const AbstractExpression* const* column_exprs = schema_definer->getOutputExpressionArray();
     vector<voltdb::ValueType> columnTypes;
     vector<int32_t> columnSizes;
-    vector<bool> columnAllowNull(schema_size, allowNulls);
+    vector<bool> columnAllowNull(schema_size, true);
     vector<bool> columnInBytes;
 
-    for (int i = 0; i < schema_size; i++) {
-        //TODO: SchemaColumn is a sad little class that holds an expression pointer,
-        // a column name that only really comes in handy in one quirky special case,
-        // (see UpdateExecutor::p_init) and a bunch of other stuff that doesn't get used.
-        // Someone should put that class out of our misery.
-        SchemaColumn* col = outputSchema[i];
-        AbstractExpression * expr = col->getExpression();
+    for (int ii = 0; ii < schema_size; ii++) {
+        const AbstractExpression * expr = column_exprs[ii];
         columnTypes.push_back(expr->getValueType());
         columnSizes.push_back(expr->getValueSize());
         columnInBytes.push_back(expr->getInBytes());
     }
 
     TupleSchema* schema =
-        TupleSchema::createTupleSchema(columnTypes, columnSizes,
-                                       columnAllowNull, columnInBytes);
-    return schema;
+        TupleSchema::createTupleSchema(columnTypes, columnSizes, columnAllowNull, columnInBytes);
+    return std::pair<TupleSchema*,
+                     const std::vector<std::string>*>(schema, &(schema_definer->m_outputColumnNames));
 }
 
-const AbstractExpression* const* AbstractPlanNode::getOutputExpressionArray() const
-{
-    AbstractExpression** output_expression_array = m_outputExpressionArray.get();
-    if (output_expression_array) {
-        return output_expression_array;
-    }
-
-    const vector<SchemaColumn*>& outputSchema = getOutputSchema();
-    int columnCount = (int)outputSchema.size();
-    output_expression_array = new AbstractExpression*[columnCount];
-    for (int ii = 0; ii < columnCount; ii++) {
-        output_expression_array[ii] = outputSchema[ii]->getExpression();
-    }
-    // Caching the result for later memory management requires a physical update which
-    // logically does not change the abstract state of the object, so just cast away the const.
-    const_cast<AbstractPlanNode*>(this)->
-        m_outputExpressionArray.reset(output_expression_array);
-    return output_expression_array;
-}
-
-TupleSchema*
-AbstractPlanNode::generateDMLCountTupleSchema()
+TupleSchema* AbstractPlanNode::generateDMLCountTupleSchema()
 {
     // Assuming the expected output schema here saves the expense of hard-coding it into each DML plan.
     vector<voltdb::ValueType> columnTypes(1, VALUE_TYPE_BIGINT);
@@ -231,21 +192,12 @@ AbstractPlanNode::generateDMLCountTupleSchema()
 // ----------------------------------------------------
 //  Serialization Functions
 // ----------------------------------------------------
-AbstractPlanNode*
-AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
+AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
+{
+    std::string typeString = obj.valueForKey("PLAN_NODE_TYPE").asStr();
 
-    string typeString = obj.valueForKey("PLAN_NODE_TYPE").asStr();
-
-    //FIXME: EVEN if this leak guard is warranted --
-    // like we EXPECT to be catching plan deserialization exceptions
-    // and our biggest concern will be the memory this may leak? --
-    // we don't need to be mediating all the node
-    // pointer dereferences through the smart pointer.
-    // Why not just get() it and forget it until .release() time?
-    // As is, it just makes single-step debugging awkward.
-    std::auto_ptr<AbstractPlanNode> node(
-        plannodeutil::getEmptyPlanNode(stringToPlanNode(typeString)));
-
+    AbstractPlanNode* node = plannodeutil::getEmptyPlanNode(stringToPlanNode(typeString));
+    std::auto_ptr<AbstractPlanNode> nodeGuard(node);
     node->m_planNodeId = obj.valueForKey("ID").asInt();
 
     if (obj.hasKey("INLINE_NODES")) {
@@ -272,12 +224,7 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
     // Output schema are optional -- when they can be determined by a child's copy.
     if (obj.hasKey("OUTPUT_SCHEMA")) {
         PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
-        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
-            PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
-            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
-            node->m_outputSchema.push_back(outputColumn);
-        }
-        node->m_validOutputColumnCount = static_cast<int>(node->m_outputSchema.size());
+        node->loadOutputSchemaFromJSONObject(outputSchemaArray);
     }
 
     // Anticipate and mark the two different scenarios of missing output schema.
@@ -297,61 +244,40 @@ AbstractPlanNode::fromJSONObject(PlannerDomValue obj) {
 
     node->loadFromJSONObject(obj);
 
-    AbstractPlanNode* retval = node.get();
-    node.release();
-    assert(retval);
-    return retval;
+    nodeGuard.release();
+    assert(node);
+    return node;
 }
 
-// ------------------------------------------------------------------
-// UTILITY METHODS
-// ------------------------------------------------------------------
-string
-AbstractPlanNode::debug() const
+void AbstractPlanNode::loadOutputSchemaFromJSONObject(PlannerDomValue obj)
 {
-    ostringstream buffer;
-    buffer << planNodeToString(getPlanNodeType())
-           << "[" << getPlanNodeId() << "]";
-    return buffer.str();
-}
+    int columnCount = obj.arrayLen();
+    m_validOutputColumnCount = columnCount;
 
-string
-AbstractPlanNode::debug(bool traverse) const
-{
-    return (traverse ? debug(string("")) : debug());
-}
+    AbstractExpression** output_expression_array = new AbstractExpression*[columnCount];
+    m_outputExpressionArray.reset(output_expression_array);
 
-string
-AbstractPlanNode::debug(const string& spacer) const
-{
-    ostringstream buffer;
-    buffer << spacer << "* " << this->debug() << "\n";
-    string info_spacer = spacer + "  |";
-    buffer << this->debugInfo(info_spacer);
-    //
-    // Inline PlanNodes
-    //
-    if (!m_inlineNodes.empty()) {
-        buffer << info_spacer << "Inline Plannodes: "
-               << m_inlineNodes.size() << "\n";
-        string internal_spacer = info_spacer + "  ";
-        map<PlanNodeType, AbstractPlanNode*>::const_iterator it;
-        for (it = m_inlineNodes.begin(); it != m_inlineNodes.end(); it++) {
-            buffer << info_spacer << "Inline "
-                   << planNodeToString(it->second->getPlanNodeType())
-                   << ":\n";
-            buffer << it->second->debugInfo(internal_spacer);
+    for (int ii = 0; ii < columnCount; ii++) {
+        PlannerDomValue colObject = obj.valueAtIndex(ii);
+        if (colObject.hasKey("COLUMN_NAME")) {
+            m_outputColumnNames.push_back(colObject.valueForKey("COLUMN_NAME").asStr());
         }
+        else {
+            char tmpName[6]; // 6 for 'C' + '1024' + null terminator
+            std::snprintf(tmpName, sizeof(tmpName), "C%d", ii);
+            m_outputColumnNames.push_back(tmpName);
+        }
+        AbstractExpression* expression = NULL;
+        if (colObject.hasKey("EXPRESSION")) {
+            PlannerDomValue columnExpressionValue = colObject.valueForKey("EXPRESSION");
+            expression = AbstractExpression::buildExpressionTree(columnExpressionValue);
+            assert(expression);
+        }
+        // List the same value in the owned expressions vector for proper memory management
+        // and in the scoped array for quick execute-time iteration.
+        m_outputColumnExpressions.push_back(expression);
+        output_expression_array[ii] = expression;
     }
-    //
-    // Traverse the tree
-    //
-    string child_spacer = spacer + "  ";
-    for (int ctr = 0, cnt = static_cast<int>(m_children.size()); ctr < cnt; ctr++) {
-        buffer << child_spacer << m_children[ctr]->getPlanNodeType() << "\n";
-        buffer << m_children[ctr]->debug(child_spacer);
-    }
-    return (buffer.str());
 }
 
 AbstractExpression* AbstractPlanNode::loadExpressionFromJSONObject(const char* label,
@@ -377,6 +303,52 @@ void AbstractPlanNode::loadExpressionsFromJSONObject(std::vector<AbstractExpress
             AbstractExpression::buildExpressionTree(searchKeyExprArray.valueAtIndex(i));
         arrayOut.push_back(expr);
     }
+}
+
+
+// ------------------------------------------------------------------
+// UTILITY METHODS
+// ------------------------------------------------------------------
+std::string AbstractPlanNode::debug() const
+{
+    ostringstream buffer;
+    buffer << planNodeToString(getPlanNodeType())
+           << "[" << getPlanNodeId() << "]";
+    return buffer.str();
+}
+
+std::string AbstractPlanNode::debugTree() const { return debug(std::string("   ")); }
+
+std::string AbstractPlanNode::debug(const std::string& spacer) const
+{
+    std::ostringstream buffer;
+    buffer << spacer << "* " << debug() << "\n";
+    string info_spacer = spacer + "  |";
+    buffer << debugInfo(info_spacer);
+    //
+    // Inline PlanNodes
+    //
+    if (!m_inlineNodes.empty()) {
+        buffer << info_spacer << "Inline Plannodes: "
+               << m_inlineNodes.size() << "\n";
+        string internal_spacer = info_spacer + "  ";
+        map<PlanNodeType, AbstractPlanNode*>::const_iterator it;
+        for (it = m_inlineNodes.begin(); it != m_inlineNodes.end(); it++) {
+            buffer << info_spacer << "Inline "
+                   << planNodeToString(it->second->getPlanNodeType())
+                   << ":\n";
+            buffer << it->second->debugInfo(internal_spacer);
+        }
+    }
+    //
+    // Traverse the tree
+    //
+    string child_spacer = spacer + "  ";
+    for (int ctr = 0, cnt = static_cast<int>(m_children.size()); ctr < cnt; ctr++) {
+        buffer << child_spacer << m_children[ctr]->getPlanNodeType() << "\n";
+        buffer << m_children[ctr]->debug(child_spacer);
+    }
+    return buffer.str();
 }
 
 }

@@ -48,22 +48,19 @@
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 
-#include "SchemaColumn.h"
-
-using namespace std;
-
 namespace voltdb {
 
 PlanNodeType ProjectionPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_PROJECTION; }
 
-string ProjectionPlanNode::debugInfo(const string& spacer) const
+std::string ProjectionPlanNode::debugInfo(const std::string& spacer) const
 {
-    ostringstream buffer;
-    buffer << spacer << "Projection Output[" << m_outputColumnNames.size() << "]:\n";
+    const std::vector<std::string>& column_names = getOutputColumnNames();
     const AbstractExpression* const* outputExpressions = getOutputExpressionArray();
-    for (int ctr = 0, cnt = (int)m_outputColumnNames.size(); ctr < cnt; ctr++) {
+    std::ostringstream buffer;
+    buffer << spacer << "Projection Output[" << column_names.size() << "]:\n";
+    for (int ctr = 0, cnt = (int)column_names.size(); ctr < cnt; ctr++) {
         buffer << spacer << "  [" << ctr << "] ";
-        buffer << "name=" << m_outputColumnNames[ctr] << " : ";
+        buffer << "name=" << column_names[ctr] << " : ";
         if (outputExpressions[ctr] != NULL) {
             buffer << outputExpressions[ctr]->debug(spacer + "   ");
         }
@@ -76,15 +73,12 @@ string ProjectionPlanNode::debugInfo(const string& spacer) const
 
 void ProjectionPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
-    for (int ii = 0; ii < getOutputSchema().size(); ii++) {
-        SchemaColumn* outputColumn = getOutputSchema()[ii];
-        m_outputColumnNames.push_back(outputColumn->getColumnName());
-    }
+    /* This space intentionally left blank. */
 }
 
 const int* ProjectionPlanNode::getOutputColumnIdArrayIfAllColumns() const
 {
-    int columnCount = (int)getOutputSchema().size();
+    int columnCount = getValidOutputColumnCount();
     int* result = ExpressionUtil::convertIfAllTupleValues(getOutputExpressionArray(), columnCount);
     const_cast<ProjectionPlanNode*>(this)->
         m_outputColumnIds.reset(result); // cache for memory management purposes.

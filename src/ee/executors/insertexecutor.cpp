@@ -44,14 +44,10 @@
  */
 
 #include "insertexecutor.h"
-#include "common/debuglog.h"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "common/types.h"
 #include "plannodes/insertnode.h"
-#include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
 #include "storage/table.h"
@@ -60,10 +56,7 @@
 #include "storage/temptable.h"
 #include "storage/ConstraintFailureException.h"
 
-#include <vector>
-
-using namespace std;
-using namespace voltdb;
+namespace voltdb {
 
 void InsertExecutor::p_initMore()
 {
@@ -162,4 +155,6 @@ bool InsertExecutor::p_execute()
     setModifiedTuples(modifiedTuples);
     VOLT_DEBUG("Finished inserting tuple");
     return true;
+}
+
 }

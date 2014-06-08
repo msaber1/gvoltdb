@@ -47,8 +47,8 @@
 #define HSTORENESTLOOPINDEXEXECUTOR_H
 
 #include "executors/abstractexecutor.h"
-#include "common/tabletuple.h"
 
+#include "common/tabletuple.h"
 #include "plannodes/limitnode.h"
 
 #include "boost/scoped_array.hpp"

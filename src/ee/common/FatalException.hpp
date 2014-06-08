@@ -199,7 +199,7 @@ inline bool debug_false_or_true_or_crash_123(int one_or_two_or_three) {
             if (debug_false_or_true_or_crash_123(ONE_OR_TWO_OR_THREE)) {                      \
                 throwFatalLogicErrorStreamed(STREAMABLES);                                    \
             } else {                                                                          \
-                std::cout << STREAMABLES;                                                     \
+                std::cout << STREAMABLES << std::endl;                                        \
                 assert(CONDITION);                                                            \
             }                                                                                 \
         }                                                                                     \
