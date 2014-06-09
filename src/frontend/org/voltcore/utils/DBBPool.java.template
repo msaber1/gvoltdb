@@ -289,6 +289,16 @@ public final class DBBPool {
      * @return First 8 bytes of  Murmur hash3_x64_128 of value
      */
     public static native int getMurmur3128( long value);
+    
+    /**
+     * Get the full 16 bytes of results of a murmur3 checksum with the output
+     * going to the supplied pointer
+     * @param ptr
+     * @param offset
+     * @param length
+     * @param out
+     */
+    public static native void getMurmur3128(long ptr, int offset, int length, long out);
 
     private static final NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>> m_pooledBuffers =
             new NonBlockingHashMap<Integer, ConcurrentLinkedQueue<BBContainer>>();

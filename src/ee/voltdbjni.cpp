@@ -719,6 +719,16 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128__
 }
 
 /*
+ * Class:     org_voltcore_utils_DBBPool
+ * Method:    getMurmur3128
+ * Signature: (JIIJ)V
+ */
+JNIEXPORT void JNICALL Java_org_voltcore_utils_DBBPool_getMurmur3128__JIIJ
+  (JNIEnv *, jclass, jlong ptr, jint offset, jint length, jlong out) {
+    MurmurHash3_x64_128(  reinterpret_cast<char*>(ptr) + offset, length, 0, reinterpret_cast<void*>(out));
+}
+
+/*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    nativeTick
  * Signature: (JJJ)V
