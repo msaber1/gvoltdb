@@ -60,7 +60,7 @@ public class LogisticRegression
         VoltTable keys = client.callProcedure("@GetPartitionKeys", "INTEGER").getResults()[0];
 
         try {
-            for (int iter = 0; iter < 150; iter++) {
+            for (int iter = 0; iter < 1000; iter++) {
                 double[] grad = new double[dim];
                 for (int k = 0; k < keys.getRowCount(); k++) {
                     long key = keys.fetchRow(k).getLong(1);

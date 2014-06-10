@@ -44,7 +44,7 @@ public class AsyncLogisticRegression
     public static void main(String[] args) throws Exception {
         int dim = 3;
         double[] weights = new double[dim];
-        double stepsize = 0.0001;
+        double stepsize = 0.001;
         double lambda = 0.01;
 
         // init client
@@ -63,7 +63,7 @@ public class AsyncLogisticRegression
         int patitions = keys.getRowCount();
 
         try {
-            for (int iter = 0; iter < 150; iter++) {
+            for (int iter = 0; iter < 1000; iter++) {
                 double[] grad = new double[dim];
                 for (int k = 0; k < patitions; k++) {
                     long key = keys.fetchRow(k).getLong(1);

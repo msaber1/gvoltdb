@@ -104,6 +104,12 @@ function asynclr() {
         lr.AsyncLogisticRegression
 }
 
+function sgdlr() {
+    srccompile
+    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        lr.SGDLogisticRegression
+}
+
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help}"
