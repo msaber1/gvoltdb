@@ -145,7 +145,7 @@ public class ParserDML extends ParserDQL {
                         break;
                     }
 
-                    // $FALL-THROUGH$
+                    // fall through
                 } else {
                     rewind(position);
 
@@ -153,7 +153,7 @@ public class ParserDML extends ParserDQL {
                 }
             }
 
-            // $FALL-THROUGH$
+            // fall through
             case Tokens.OVERRIDING : {
                 if (token.tokenType == Tokens.OVERRIDING) {
                     read();
@@ -176,7 +176,7 @@ public class ParserDML extends ParserDQL {
                 }
             }
 
-            // $FALL-THROUGH$
+            // fall through
             case Tokens.VALUES : {
                 read();
 

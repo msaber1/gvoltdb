@@ -115,8 +115,10 @@ public final class Constraint implements SchemaObject {
                             UNIQUE         = 2,
                             CHECK          = 3,
                             PRIMARY_KEY    = 4,
-                            TEMP           = 5,
-                            LIMIT          = 6;
+// A VoltDB extension to support table row limits
+                            LIMIT          = 6,
+// End of VoltDB extension
+                            TEMP           = 5;
     ConstraintCore          core;
     private HsqlName        name;
     int                     constType;
@@ -1018,11 +1020,11 @@ public final class Constraint implements SchemaObject {
 
     /************************* Volt DB Extensions *************************/
 
-    Expression[] indexExprs; // A VoltDB extension to support indexed expressions
+    Expression[] indexExprs; // For VoltDB, support indexed expressions
     boolean assumeUnique = false; // For VoltDB
     int rowsLimit = Integer.MAX_VALUE; // For VoltDB
 
-    // A VoltDB extension to support indexed expressions
+    // VoltDB support for indexed expressions
     public Constraint withExpressions(Expression[] exprs) {
         indexExprs = exprs;
         return this;
@@ -1077,7 +1079,7 @@ public final class Constraint implements SchemaObject {
         return constraint;
     }
 
-    // A VoltDB extension to support indexed expressions
+    // VoltDB support for indexed expressions
     public boolean isUniqueWithExprs(Expression[] indexExprs2) {
         if (constType != UNIQUE || (indexExprs == null) || ! indexExprs.equals(indexExprs2)) {
             return false;
@@ -1085,13 +1087,13 @@ public final class Constraint implements SchemaObject {
         return true;
     }
 
-    // A VoltDB extension to support indexed expressions
+    // VoltDB support for indexed expressions
     // Is this for temp constraints only? What's a temp constraint?
     public boolean hasExprs() {
         return indexExprs != null;
     }
 
-    // A VoltDB extension to support indexed expressions
+    // VoltDB support for indexed expressions
     public String getExprList(StringBuffer sb) {
         String sep = "";
         for(Expression ex : indexExprs) {

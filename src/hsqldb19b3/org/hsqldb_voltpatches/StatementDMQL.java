@@ -255,7 +255,7 @@ public abstract class StatementDMQL extends Statement {
                     return;
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case ResultConstants.RETURN_GENERATED_KEYS :
                 generatedIndexes = new int[]{ colIndex };
                 break;

@@ -70,7 +70,6 @@ public class ParserDDL extends ParserRoutine {
         super(session, scanner);
     }
 
-    @Override
     void reset(String sql) {
         super.reset(sql);
     }
@@ -187,7 +186,7 @@ public class ParserDDL extends ParserRoutine {
             // A VoltDB extension to support the assume unique attribute
             case Tokens.ASSUMEUNIQUE :
                 assumeUnique = true;
-                // $FALL-THROUGH$
+                // fall through
             // End of VoltDB extension
             case Tokens.UNIQUE :
                 read();
@@ -616,7 +615,7 @@ public class ParserDDL extends ParserRoutine {
                     // A VoltDB extension to support the assume unique attribute
                     case Tokens.ASSUMEUNIQUE :
                         assumeUnique = true;
-                        // $FALL-THROUGH$
+                        // fall through
                     // End of VoltDB extension
                     case Tokens.UNIQUE :
                         read();
@@ -716,7 +715,7 @@ public class ParserDDL extends ParserRoutine {
                     case Tokens.COLUMN :
                         read();
 
-                    // $FALL-THROUGH$
+                    // fall through
                     default : {
                         checkIsSimpleName();
 
@@ -859,7 +858,7 @@ public class ParserDDL extends ParserRoutine {
                     case Tokens.COLUMN :
                         read();
 
-                    // $FALL-THROUGH$
+                    // fall through
                     default : {
                         checkIsSimpleName();
 
@@ -1014,10 +1013,10 @@ public class ParserDDL extends ParserRoutine {
                 case Tokens.FOREIGN :
                 // A VoltDB extension to support the assume unique attribute
                 case Tokens.ASSUMEUNIQUE :
+                case Tokens.LIMIT :
                 // End of VoltDB extension
                 case Tokens.UNIQUE :
                 case Tokens.CHECK :
-                case Tokens.LIMIT :
                     if (!startPart) {
                         throw unexpectedToken();
                     }
@@ -1371,12 +1370,13 @@ public class ParserDDL extends ParserRoutine {
 
                     break;
                 }
+                // A VoltDB extension to support row limit constraints
                 case Constraint.LIMIT : {
                     table.addConstraint(c);
                     session.database.schemaManager.addSchemaObject(c);
-
                     break;
                 }
+                // End of VoltDB extension
             }
         }
 
@@ -2744,7 +2744,7 @@ public class ParserDDL extends ParserRoutine {
             // A VoltDB extension to support indexed expressions and the assume unique attribute
             case Tokens.ASSUMEUNIQUE :
                 assumeUnique = true;
-                // $FALL-THROUGH$
+                // fall through
             // End of VoltDB extension
             case Tokens.UNIQUE : {
                 if (schemaObject.getName().type != SchemaObject.TABLE) {
@@ -2820,6 +2820,7 @@ public class ParserDDL extends ParserRoutine {
 
                 break;
             }
+            // A VoltDB extension to support row limit constraints
             case Tokens.LIMIT : {
                 read();
 
@@ -2832,9 +2833,9 @@ public class ParserDDL extends ParserRoutine {
                 Constraint c = new Constraint(constName, null, Constraint.LIMIT);
                 readLimitConstraintCondition(c);
                 constraintList.add(c);
-
                 break;
             }
+            // End of VoltDB extension
             default : {
                 if (constName != null) {
                     throw Error.error(ErrorCode.X_42581);
@@ -2898,7 +2899,7 @@ public class ParserDDL extends ParserRoutine {
                 // A VoltDB extension to support indexed expressions and the assume unique attribute
                 case Tokens.ASSUMEUNIQUE :
                     assumeUnique = true;
-                    // $FALL-THROUGH$
+                    // fall through
                 // End of VoltDB extension
                 case Tokens.UNIQUE : {
                     read();
@@ -2928,7 +2929,7 @@ public class ParserDDL extends ParserRoutine {
                     readThis(Tokens.KEY);
                 }
 
-                // $FALL-THROUGH$
+                // fall through
                 case Tokens.REFERENCES : {
                     OrderedHashSet set = new OrderedHashSet();
 
@@ -3954,7 +3955,7 @@ public class ParserDDL extends ParserRoutine {
                 }
             }
 
-            // $FALL-THROUGH$
+            // fall through
             default :
         }
 
@@ -4676,7 +4677,7 @@ public class ParserDDL extends ParserRoutine {
                             columnSet = readColumnNames(false);
                         }
 
-                    // $FALL-THROUGH$
+                    // fall through
                     case Tokens.DELETE :
                     case Tokens.TRIGGER :
                         if (right == null) {
@@ -4960,7 +4961,6 @@ public class ParserDDL extends ParserRoutine {
         session.checkDDLWrite();
     }
 
-
     /************************* Volt DB Extensions *************************/
     /**
      * Responsible for handling Volt limit constraints section of CREATE TABLE ...
@@ -4975,7 +4975,7 @@ public class ParserDDL extends ParserRoutine {
         c.rowsLimit = rowsLimit;
     }
 
-    /// A VoltDB extension to the parsing behavior of the "readColumnList/readColumnNames" functions,
+    /// VoltDB added parsing behavior of the "readColumnList/readColumnNames" functions,
     /// adding support for indexed expressions.
     private java.util.List<Expression> XreadExpressions(java.util.List<Boolean> ascDesc) {
         readThis(Tokens.OPENBRACKET);
@@ -4986,7 +4986,7 @@ public class ParserDDL extends ParserRoutine {
             Expression expression = XreadValueExpression();
             indexExprs.add(expression);
 
-            // A VoltDB extension to the "readColumnList(table, true)" support for descending-value indexes,
+            // VoltDB added "readColumnList(table, true)" support for descending-value indexes,
             // that similarly parses the asc/desc indicators but COLLECTS them so they can be ignored later,
             // rather than ignoring them on the spot.
             if (ascDesc != null) {

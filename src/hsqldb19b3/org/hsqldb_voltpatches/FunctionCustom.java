@@ -487,13 +487,21 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_SIGN :
             case FUNC_SOUNDEX :
             case FUNC_ASCII :
+                // A VoltDB extension to customize the SQL function set support
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                // fall through
+                // End of VoltDB extension
+            case FUNC_CHAR :
+                // A VoltDB extension to customize the SQL function set support
+                parseList = singleParamList;
+                break;
+                // End of VoltDB extension
             case FUNC_HEXTORAW :
             case FUNC_RAWTOHEX :
                 // A VoltDB extension to customize the SQL function set support
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
-                // $FALL-THROUGH$
+                // fall through
                 // End of VoltDB extension
-            case FUNC_CHAR :
             case FUNC_SPACE :
                 parseList = singleParamList;
                 break;
@@ -506,7 +514,7 @@ public class FunctionCustom extends FunctionSQL {
             // A VoltDB extension to customize the SQL function set support
             case FUNC_DATEDIFF :
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
-                // $FALL-THROUGH$
+                // fall through
             case FUNC_REPEAT :
             /* disable 2 lines ...
             case FUNC_REPEAT :
@@ -803,7 +811,7 @@ public class FunctionCustom extends FunctionSQL {
                 }
             }
 
-            // $FALL-THROUGH$
+            // fall through
             case FUNC_TRUNCATE : {
                 if (data[0] == null || data[1] == null) {
                     return null;
@@ -1247,7 +1255,7 @@ public class FunctionCustom extends FunctionSQL {
                 funcType           = FUNC_TIMESTAMPDIFF;
             }
 
-            // $FALL-THROUGH$
+            // fall through
             case FUNC_TIMESTAMPDIFF : {
                 if (nodes[1].dataType == null) {
                     nodes[1].dataType = Type.SQL_TIMESTAMP;
@@ -1383,7 +1391,7 @@ public class FunctionCustom extends FunctionSQL {
                     throw Error.error(ErrorCode.X_42561);
                 }
 
-            // $FALL-THROUGH$
+            // fall through
             case FUNC_ACOS :
             case FUNC_ASIN :
             case FUNC_ATAN :
