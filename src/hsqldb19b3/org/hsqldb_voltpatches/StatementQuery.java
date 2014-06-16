@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2011, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,17 +31,19 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
 import org.hsqldb_voltpatches.result.Result;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.result.ResultProperties;
 
 /**
  * Implementation of Statement for query expressions.<p>
  *
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.9
  * @since 1.9.0
  */
 public class StatementQuery extends StatementDMQL {
@@ -50,23 +52,12 @@ public class StatementQuery extends StatementDMQL {
                    CompileContext compileContext) {
 
         super(StatementTypes.SELECT_CURSOR, StatementTypes.X_SQL_DATA,
-              session.currentSchema);
+              session.getCurrentSchemaHsqlName());
 
-        this.queryExpression = queryExpression;
+        this.statementReturnType = StatementTypes.RETURN_RESULT;
+        this.queryExpression     = queryExpression;
 
-        setDatabseObjects(compileContext);
-        checkAccessRights(session);
-    }
-
-    StatementQuery(Session session, QueryExpression queryExpression,
-                   CompileContext compileContext, HsqlName[] targets) {
-
-        super(StatementTypes.SELECT_SINGLE, StatementTypes.X_SQL_DATA,
-              session.currentSchema);
-
-        this.queryExpression = queryExpression;
-
-        setDatabseObjects(compileContext);
+        setDatabseObjects(session, compileContext);
         checkAccessRights(session);
     }
 
@@ -91,13 +82,12 @@ public class StatementQuery extends StatementDMQL {
                 return queryExpression.getMetaData();
 
             default :
-                throw Error.runtimeError(
-                    ErrorCode.U_S0500,
-                    "CompiledStatement.getResultMetaData()");
+                throw Error.runtimeError(ErrorCode.U_S0500,
+                                         "StatementQuery.getResultMetaData()");
         }
     }
 
-    void getTableNamesForRead(OrderedHashSet set) {
+    void collectTableNamesForRead(OrderedHashSet set) {
 
         queryExpression.getBaseTableNames(set);
 
@@ -106,9 +96,27 @@ public class StatementQuery extends StatementDMQL {
                 subqueries[i].queryExpression.getBaseTableNames(set);
             }
         }
+
+        for (int i = 0; i < routines.length; i++) {
+            set.addAll(routines[i].getTableNamesForRead());
+        }
     }
 
     void getTableNamesForWrite(OrderedHashSet set) {}
+
+    void collectTableNamesForWrite(OrderedHashSet set) {
+
+        if (queryExpression.isUpdatable) {
+            queryExpression.getBaseTableNames(set);
+        }
+    }
+
+    public int getResultProperties() {
+
+        return queryExpression.isUpdatable
+               ? ResultProperties.updatablePropsValue
+               : ResultProperties.defaultPropsValue;
+    }
 
     /************************* Volt DB Extensions *************************/
 
@@ -243,7 +251,9 @@ public class StatementQuery extends StatementDMQL {
             try {
                 // read offset. it may be a parameter token.
                 VoltXMLElement offset = new VoltXMLElement("offset");
-                if (limitCondition.nodes[0].isParam == false) {
+                if (limitCondition.nodes[0].isUnresolvedParam()) {
+                    offset.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId(session));
+                } else {
                     Integer offsetValue = (Integer)limitCondition.nodes[0].getValue(session);
                     if (offsetValue > 0) {
                         Expression expr = new ExpressionValue(offsetValue,
@@ -251,67 +261,25 @@ public class StatementQuery extends StatementDMQL {
                         offset.children.add(expr.voltGetXML(session));
                         offset.attributes.put("offset", offsetValue.toString());
                     }
-                } else {
-                    offset.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId(session));
                 }
                 query.children.add(offset);
 
                 // read limit. it may be a parameter token.
                 VoltXMLElement limit = new VoltXMLElement("limit");
-                if (limitCondition.nodes[1].isParam == false) {
+                if (limitCondition.nodes[1].isUnresolvedParam()) {
+                    limit.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
+                } else {
                     Integer limitValue = (Integer)limitCondition.nodes[1].getValue(session);
                     Expression expr = new ExpressionValue(limitValue,
                             org.hsqldb_voltpatches.types.Type.SQL_BIGINT);
                     limit.children.add(expr.voltGetXML(session));
                     limit.attributes.put("limit", limitValue.toString());
-                } else {
-                    limit.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
                 }
                 query.children.add(limit);
 
             } catch (HsqlException ex) {
                 // XXX really?
                 ex.printStackTrace();
-            }
-        }
-
-        // Just gather a mish-mash of every possible relevant expression
-        // and uniq them later
-        org.hsqldb_voltpatches.lib.HsqlList col_list = new org.hsqldb_voltpatches.lib.HsqlArrayList();
-        select.collectAllExpressions(col_list, Expression.columnExpressionSet, Expression.emptyExpressionSet);
-        if (select.queryCondition != null)
-        {
-            Expression.collectAllExpressions(col_list, select.queryCondition,
-                                             Expression.columnExpressionSet,
-                                             Expression.emptyExpressionSet);
-        }
-        for (int i = 0; i < select.exprColumns.length; i++) {
-            Expression.collectAllExpressions(col_list, select.exprColumns[i],
-                                             Expression.columnExpressionSet,
-                                             Expression.emptyExpressionSet);
-        }
-        for (RangeVariable rv : select.rangeVariables)
-        {
-            if (rv.indexCondition != null)
-            {
-                Expression.collectAllExpressions(col_list, rv.indexCondition,
-                                                 Expression.columnExpressionSet,
-                                                 Expression.emptyExpressionSet);
-
-            }
-            if (rv.indexEndCondition != null)
-            {
-                Expression.collectAllExpressions(col_list, rv.indexEndCondition,
-                                                 Expression.columnExpressionSet,
-                                                 Expression.emptyExpressionSet);
-
-            }
-            if (rv.nonIndexJoinCondition != null)
-            {
-                Expression.collectAllExpressions(col_list, rv.nonIndexJoinCondition,
-                                                 Expression.columnExpressionSet,
-                                                 Expression.emptyExpressionSet);
-
             }
         }
 
@@ -381,13 +349,14 @@ public class StatementQuery extends StatementDMQL {
                 orderByCols.add(expr);
             } else if (expr.equals(select.getHavingCondition())) {
                 // Having
-                if( !(expr instanceof ExpressionLogical && expr.isAggregate) ) {
+                if( !(expr instanceof ExpressionLogical && expr.isAggregate()) ) {
                     throw new org.hsqldb_voltpatches.HSQLInterface.HSQLParseException(
                             "VoltDB does not support HAVING clause without aggregation. " +
                             "Consider using WHERE clause if possible");
                 }
 
-            } else if (expr.opType != OpTypes.SIMPLE_COLUMN || (expr.isAggregate && expr.alias != null)) {
+            } else if (expr.opType != OpTypes.SIMPLE_COLUMN ||
+                       (expr.isAggregate() && expr.alias != null)) {
                 // Add aggregate aliases to the display columns to maintain
                 // the output schema column ordering.
                 displayCols.add(expr);

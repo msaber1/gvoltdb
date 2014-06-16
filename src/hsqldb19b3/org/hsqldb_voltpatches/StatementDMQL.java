@@ -1,4 +1,4 @@
-/* Copyright (c) 2001-2009, The HSQL Development Group
+/* Copyright (c) 2001-2014, The HSQL Development Group
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -32,21 +32,24 @@
 package org.hsqldb_voltpatches;
 
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
+import org.hsqldb_voltpatches.HsqlNameManager.SimpleName;
 import org.hsqldb_voltpatches.ParserDQL.CompileContext;
+import org.hsqldb_voltpatches.error.Error;
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.ArrayUtil;
 import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
-import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
+import org.hsqldb_voltpatches.map.ValuePool;
 import org.hsqldb_voltpatches.result.Result;
-import org.hsqldb_voltpatches.result.ResultConstants;
 import org.hsqldb_voltpatches.result.ResultMetaData;
+import org.hsqldb_voltpatches.rights.Grantee;
 
 /**
  * Statement implementation for DML and base DQL statements.
  *
- * @author Campbell Boucher-Burnett (boucherb@users dot sourceforge.net)
+ * @author Campbell Boucher-Burnet (boucherb@users dot sourceforge.net)
  * @author Fred Toussi (fredt@users dot sourceforge.net)
- * @version 1.9.0
+ * @version 2.2.7
  * @since 1.7.2
  */
 
@@ -66,7 +69,7 @@ public abstract class StatementDMQL extends Statement {
 
     /** column map of query expression */
     int[]           baseColumnMap;
-    RangeVariable[] targetRangeVariables;
+    RangeVariable[] targetRangeVariables = RangeVariable.emptyArray;
 
     /** source table for MERGE */
     Table sourceTable;
@@ -78,14 +81,14 @@ public abstract class StatementDMQL extends Statement {
     boolean restartIdentity;
 
     /** column map for INSERT operation direct or via MERGE */
-    int[] insertColumnMap;
+    int[] insertColumnMap = ValuePool.emptyIntArray;
 
     /** column map for UPDATE operation direct or via MERGE */
-    int[] updateColumnMap;
-    int[] baseUpdateColumnMap;
+    int[] updateColumnMap     = ValuePool.emptyIntArray;
+    int[] baseUpdateColumnMap = ValuePool.emptyIntArray;
 
     /** Column value Expressions for UPDATE and MERGE. */
-    Expression[] updateExpressions;
+    Expression[] updateExpressions = Expression.emptyArray;
 
     /** Column value Expressions for MERGE */
     Expression[][] multiColumnValues;
@@ -101,27 +104,28 @@ public abstract class StatementDMQL extends Statement {
     boolean[] updateCheckColumns;
 
     /**
+     * VIEW check
+     */
+    Expression    updatableTableCheck;
+    RangeVariable checkRangeVariable;
+
+    /**
      * Select to be evaluated when this is an INSERT_SELECT or
      * SELECT statement
      */
     QueryExpression queryExpression;
 
     /**
-     * Parse-order array of Expression objects, all of iType == PARAM ,
+     * Name of cursor
+     */
+    SimpleName cursorName;
+
+    /**
+     * Parse-order array of Expression objects, all of type PARAMETER ,
      * involved in some way in any INSERT_XXX, UPDATE, DELETE, SELECT or
      * CALL CompiledStatement
      */
     ExpressionColumn[] parameters;
-
-    /**
-     * int[] contains column indexes for generated values
-     */
-    int[] generatedIndexes;
-
-    /**
-     * ResultMetaData for generated values
-     */
-    ResultMetaData generatedResultMetaData;
 
     /**
      * ResultMetaData for parameters
@@ -131,25 +135,7 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Subqueries inverse usage depth order
      */
-    SubQuery[] subqueries;
-
-    /**
-     * The type of this CompiledStatement. <p>
-     *
-     * One of: <p>
-     *
-     * <ol>
-     *  <li>UNKNOWN
-     *  <li>INSERT_VALUES
-     *  <li>INSERT_SELECT
-     *  <li>UPDATE
-     *  <li>DELETE
-     *  <li>SELECT
-     *  <li>CALL
-     *  <li>MERGE
-     *  <li>DDL
-     * </ol>
-     */
+    TableDerived[] subqueries = TableDerived.emptyArray;
 
     /**
      * Total number of RangeIterator objects used
@@ -178,133 +164,89 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
+    public void setCursorName(SimpleName name) {
+        cursorName = name;
+    }
+
+    public SimpleName getCursorName() {
+        return cursorName;
+    }
+
     public Result execute(Session session) {
 
-        Result result = getAccessRightsResult(session);
+        Result result;
 
-        if (result != null) {
-            return result;
+        if (targetTable != null && session.isReadOnly()
+                && !targetTable.isTemp()) {
+            HsqlException e = Error.error(ErrorCode.X_25006);
+
+            return Result.newErrorResult(e);
         }
 
-        if (this.isExplain) {
-            return Result.newSingleColumnStringResult("OPERATION",
-                    describe(session));
-        }
-
-        if (session.sessionContext.dynamicArguments.length
-                != parameters.length) {
-
-//            return Result.newErrorResult(Error.error(ErrorCode.X_42575));
+        if (isExplain) {
+            return getExplainResult(session);
         }
 
         try {
-            materializeSubQueries(session);
-
-            result = getResult(session);
-        } catch (Throwable t) {
-            String commandString = sql;
-
-            if (session.database.getProperties().getErrorLevel()
-                    == HsqlDatabaseProperties.NO_MESSAGE) {
-                commandString = null;
+            if (subqueries.length > 0) {
+                materializeSubQueries(session);
             }
 
-            result = Result.newErrorResult(t, commandString);
+            result = getResult(session);
+
+            clearStructures(session);
+        } catch (Throwable t) {
+            clearStructures(session);
+
+            result = Result.newErrorResult(t, null);
 
             result.getException().setStatementType(group, type);
-
-
         }
 
-        session.sessionContext.clearStructures(this);
+        return result;
+    }
+
+    private Result getExplainResult(Session session) {
+
+        Result result = Result.newSingleColumnStringResult("OPERATION",
+            describe(session));
+        OrderedHashSet set = getReferences();
+
+        result.navigator.add(new Object[]{ "Object References" });
+
+        for (int i = 0; i < set.size(); i++) {
+            HsqlName name = (HsqlName) set.get(i);
+
+            result.navigator.add(new Object[]{
+                name.getSchemaQualifiedStatementName() });
+        }
+
+        result.navigator.add(new Object[]{ "Read Locks" });
+
+        for (int i = 0; i < readTableNames.length; i++) {
+            HsqlName name = readTableNames[i];
+
+            result.navigator.add(new Object[]{
+                name.getSchemaQualifiedStatementName() });
+        }
+
+        result.navigator.add(new Object[]{ "WriteLocks" });
+
+        for (int i = 0; i < writeTableNames.length; i++) {
+            HsqlName name = writeTableNames[i];
+
+            result.navigator.add(new Object[]{
+                name.getSchemaQualifiedStatementName() });
+        }
 
         return result;
     }
 
     abstract Result getResult(Session session);
 
-    /**
-     * For the creation of the statement
-     */
-    public void setGeneratedColumnInfo(int generate, ResultMetaData meta) {
+    abstract void collectTableNamesForRead(OrderedHashSet set);
 
-        // can support INSERT_SELECT also
-        if (type != StatementTypes.INSERT) {
-            return;
-        }
-
-        int colIndex = baseTable.getIdentityColumnIndex();
-
-        if (colIndex == -1) {
-            return;
-        }
-
-        switch (generate) {
-
-            case ResultConstants.RETURN_NO_GENERATED_KEYS :
-                return;
-
-            case ResultConstants.RETURN_GENERATED_KEYS_COL_INDEXES :
-                int[] columnIndexes = meta.getGeneratedColumnIndexes();
-
-                if (columnIndexes.length != 1) {
-                    return;
-                }
-
-                if (columnIndexes[0] != colIndex) {
-                    return;
-                }
-
-            // fall through
-            case ResultConstants.RETURN_GENERATED_KEYS :
-                generatedIndexes = new int[]{ colIndex };
-                break;
-
-            case ResultConstants.RETURN_GENERATED_KEYS_COL_NAMES :
-                String[] columnNames = meta.getGeneratedColumnNames();
-
-                if (columnNames.length != 1) {
-                    return;
-                }
-
-                if (baseTable.findColumn(columnNames[0]) != colIndex) {
-                    return;
-                }
-
-                generatedIndexes = new int[]{ colIndex };
-                break;
-        }
-
-        generatedResultMetaData =
-            ResultMetaData.newResultMetaData(generatedIndexes.length);
-
-        for (int i = 0; i < generatedIndexes.length; i++) {
-            ColumnSchema column = baseTable.getColumn(generatedIndexes[i]);
-
-            generatedResultMetaData.columns[i] = column;
-        }
-
-        generatedResultMetaData.prepareData();
-    }
-
-    Object[] getGeneratedColumns(Object[] data) {
-
-        if (generatedIndexes == null) {
-            return null;
-        }
-
-        Object[] values = new Object[generatedIndexes.length];
-
-        for (int i = 0; i < generatedIndexes.length; i++) {
-            values[i] = data[generatedIndexes[i]];
-        }
-
-        return values;
-    }
-
-    public boolean hasGeneratedColumns() {
-        return generatedIndexes != null;
-    }
+    abstract void collectTableNamesForWrite(OrderedHashSet set);
 
     boolean[] getInsertOrUpdateColumnCheckList() {
 
@@ -328,90 +270,125 @@ public abstract class StatementDMQL extends Statement {
         return null;
     }
 
-    private void setParameters() {
-
-        for (int i = 0; i < parameters.length; i++) {
-            parameters[i].parameterIndex = i;
-        }
-    }
-
     void materializeSubQueries(Session session) {
-
-        if (subqueries.length == 0) {
-            return;
-        }
 
         HashSet subqueryPopFlags = new HashSet();
 
         for (int i = 0; i < subqueries.length; i++) {
-            SubQuery sq = subqueries[i];
+            TableDerived td = subqueries[i];
 
-            // VIEW working tables may be reused in a single query but they are filled only once
-            if (!subqueryPopFlags.add(sq)) {
+            if (!subqueryPopFlags.add(td)) {
                 continue;
             }
 
-            if (!sq.isCorrelated()) {
-                sq.materialise(session);
+            if (!td.isCorrelated()) {
+                td.materialise(session);
             }
         }
     }
 
-    public void clearVariables() {
+    TableDerived[] getSubqueries(Session session) {
 
-        isValid            = false;
-        targetTable        = null;
-        baseTable          = null;
-        condition          = null;
-        insertColumnMap    = null;
-        updateColumnMap    = null;
-        updateExpressions  = null;
-        insertExpression   = null;
-        insertCheckColumns = null;
+        OrderedHashSet subQueries = null;
 
-//        expression         = null;
-        parameters = null;
-        subqueries = null;
+        for (int i = 0; i < targetRangeVariables.length; i++) {
+            if (targetRangeVariables[i] == null) {
+                continue;
+            }
+
+            OrderedHashSet set = targetRangeVariables[i].getSubqueries();
+
+            subQueries = OrderedHashSet.addAll(subQueries, set);
+        }
+
+        for (int i = 0; i < updateExpressions.length; i++) {
+            subQueries = updateExpressions[i].collectAllSubqueries(subQueries);
+        }
+
+        if (insertExpression != null) {
+            subQueries = insertExpression.collectAllSubqueries(subQueries);
+        }
+
+        if (condition != null) {
+            subQueries = condition.collectAllSubqueries(subQueries);
+        }
+
+        if (queryExpression != null) {
+            OrderedHashSet set = queryExpression.getSubqueries();
+
+            subQueries = OrderedHashSet.addAll(subQueries, set);
+        }
+
+        if (updatableTableCheck != null) {
+            OrderedHashSet set = updatableTableCheck.getSubqueries();
+
+            subQueries = OrderedHashSet.addAll(subQueries, set);
+        }
+
+        if (subQueries == null || subQueries.size() == 0) {
+            return TableDerived.emptyArray;
+        }
+
+        TableDerived[] subQueryArray = new TableDerived[subQueries.size()];
+
+        subQueries.toArray(subQueryArray);
+
+        return subQueryArray;
     }
 
-    void setDatabseObjects(CompileContext compileContext) {
+    void setDatabseObjects(Session session, CompileContext compileContext) {
 
         parameters = compileContext.getParameters();
 
-        setParameters();
         setParameterMetaData();
 
-        subqueries         = compileContext.getSubqueries();
+        subqueries         = getSubqueries(session);
         rangeIteratorCount = compileContext.getRangeVarCount();
-        rangeVariables     = compileContext.getRangeVariables();
+        rangeVariables     = compileContext.getAllRangeVariables();
         sequences          = compileContext.getSequences();
         routines           = compileContext.getRoutines();
 
         OrderedHashSet set = new OrderedHashSet();
 
-        getTableNamesForRead(set);
-
-        for (int i = 0; i < routines.length; i++) {
-            set.addAll(routines[i].getTableNamesForRead());
-        }
-
-        if (set.size() > 0) {
-            readTableNames = new HsqlName[set.size()];
-
-            set.toArray(readTableNames);
-            set.clear();
-        }
-
-        getTableNamesForWrite(set);
-
-        for (int i = 0; i < routines.length; i++) {
-            set.addAll(routines[i].getTableNamesForWrite());
-        }
+        collectTableNamesForWrite(set);
 
         if (set.size() > 0) {
             writeTableNames = new HsqlName[set.size()];
 
             set.toArray(writeTableNames);
+            set.clear();
+        }
+
+        collectTableNamesForRead(set);
+        set.removeAll(writeTableNames);
+
+        if (set.size() > 0) {
+            readTableNames = new HsqlName[set.size()];
+
+            set.toArray(readTableNames);
+        }
+
+        if (readTableNames.length == 0 && writeTableNames.length == 0) {
+            if (type == StatementTypes.SELECT_CURSOR
+                    || type == StatementTypes.SELECT_SINGLE) {
+                isTransactionStatement = false;
+            }
+        }
+
+        references = compileContext.getSchemaObjectNames();
+
+        if (targetTable != null) {
+            references.add(targetTable.getName());
+
+            if (targetTable == baseTable) {
+                if (insertCheckColumns != null) {
+                    targetTable.getColumnNames(insertCheckColumns, references);
+                }
+
+                if (updateCheckColumns != null) {
+                    targetTable.getColumnNames(updateCheckColumns, references);
+                }
+            }
         }
     }
 
@@ -423,7 +400,19 @@ public abstract class StatementDMQL extends Statement {
     void checkAccessRights(Session session) {
 
         if (targetTable != null && !targetTable.isTemp()) {
-            targetTable.checkDataReadOnly();
+            if (!session.isProcessingScript()) {
+                targetTable.checkDataReadOnly();
+            }
+
+            Grantee owner = targetTable.getOwner();
+
+            if (owner != null && owner.isSystem()) {
+                if (!session.getUser().isSystem()) {
+                    throw Error.error(ErrorCode.X_42501,
+                                      targetTable.getName().name);
+                }
+            }
+
             session.checkReadWrite();
         }
 
@@ -491,10 +480,12 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
-    Result getAccessRightsResult(Session session) {
+    Result getWriteAccessResult(Session session) {
 
         try {
-            checkAccessRights(session);
+            if (targetTable != null && !targetTable.isTemp()) {
+                session.checkReadWrite();
+            }
         } catch (HsqlException e) {
             return Result.newErrorResult(e);
         }
@@ -513,12 +504,11 @@ public abstract class StatementDMQL extends Statement {
             case StatementTypes.DELETE_WHERE :
             case StatementTypes.INSERT :
             case StatementTypes.UPDATE_WHERE :
+            case StatementTypes.MERGE :
                 return ResultMetaData.emptyResultMetaData;
 
             default :
-                throw Error.runtimeError(
-                    ErrorCode.U_S0500,
-                    "CompiledStatement.getResultMetaData()");
+                throw Error.runtimeError(ErrorCode.U_S0500, "StatementDMQL");
         }
     }
 
@@ -576,6 +566,10 @@ public abstract class StatementDMQL extends Statement {
                                                   + (i + 1);
             parameterMetaData.columnTypes[idx] = parameters[i].dataType;
 
+            if (parameters[i].dataType == null) {
+                throw Error.error(ErrorCode.X_42567);
+            }
+
             byte parameterMode = SchemaObject.ParameterModes.PARAM_IN;
 
             if (parameters[i].column != null
@@ -599,7 +593,7 @@ public abstract class StatementDMQL extends Statement {
 
         try {
             return describeImpl(session);
-        } catch (Exception e) {
+        } catch (Throwable e) {
             e.printStackTrace();
 
             return e.toString();
@@ -609,18 +603,20 @@ public abstract class StatementDMQL extends Statement {
     /**
      * Provides the toString() implementation.
      */
-    private String describeImpl(Session session) throws Exception {
+    String describeImpl(Session session) throws Exception {
 
         StringBuffer sb;
 
         sb = new StringBuffer();
 
+        int blanks = 0;
+
         switch (type) {
 
             case StatementTypes.SELECT_CURSOR : {
-                sb.append(queryExpression.describe(session));
+                sb.append(queryExpression.describe(session, 0));
                 appendParms(sb).append('\n');
-                appendSubqueries(session, sb);
+                appendSubqueries(session, sb, 2);
 
                 return sb.toString();
             }
@@ -631,7 +627,7 @@ public abstract class StatementDMQL extends Statement {
                     appendMultiColumns(sb, insertColumnMap).append('\n');
                     appendTable(sb).append('\n');
                     appendParms(sb).append('\n');
-                    appendSubqueries(session, sb).append(']');
+                    appendSubqueries(session, sb, 2).append(']');
 
                     return sb.toString();
                 } else {
@@ -639,9 +635,10 @@ public abstract class StatementDMQL extends Statement {
                     sb.append('[').append('\n');
                     appendColumns(sb, insertColumnMap).append('\n');
                     appendTable(sb).append('\n');
-                    sb.append(queryExpression.describe(session)).append('\n');
+                    sb.append(queryExpression.describe(session,
+                                                       blanks)).append('\n');
                     appendParms(sb).append('\n');
-                    appendSubqueries(session, sb).append(']');
+                    appendSubqueries(session, sb, 2).append(']');
 
                     return sb.toString();
                 }
@@ -652,12 +649,14 @@ public abstract class StatementDMQL extends Statement {
                 appendColumns(sb, updateColumnMap).append('\n');
                 appendTable(sb).append('\n');
                 appendCondition(session, sb);
-                sb.append(targetRangeVariables[0].describe(session)).append(
-                    '\n');
-                sb.append(targetRangeVariables[1].describe(session)).append(
-                    '\n');
+
+                for (int i = 0; i < targetRangeVariables.length; i++) {
+                    sb.append(targetRangeVariables[i].describe(session,
+                            blanks)).append('\n');
+                }
+
                 appendParms(sb).append('\n');
-                appendSubqueries(session, sb).append(']');
+                appendSubqueries(session, sb, 2).append(']');
 
                 return sb.toString();
             }
@@ -666,12 +665,14 @@ public abstract class StatementDMQL extends Statement {
                 sb.append('[').append('\n');
                 appendTable(sb).append('\n');
                 appendCondition(session, sb);
-                sb.append(targetRangeVariables[0].describe(session)).append(
-                    '\n');
-                sb.append(targetRangeVariables[1].describe(session)).append(
-                    '\n');
+
+                for (int i = 0; i < targetRangeVariables.length; i++) {
+                    sb.append(targetRangeVariables[i].describe(session,
+                            blanks)).append('\n');
+                }
+
                 appendParms(sb).append('\n');
-                appendSubqueries(session, sb).append(']');
+                appendSubqueries(session, sb, 2).append(']');
 
                 return sb.toString();
             }
@@ -688,14 +689,14 @@ public abstract class StatementDMQL extends Statement {
                 appendColumns(sb, updateColumnMap).append('\n');
                 appendTable(sb).append('\n');
                 appendCondition(session, sb);
-                sb.append(targetRangeVariables[0].describe(session)).append(
-                    '\n');
-                sb.append(targetRangeVariables[1].describe(session)).append(
-                    '\n');
-                sb.append(targetRangeVariables[2].describe(session)).append(
-                    '\n');
+
+                for (int i = 0; i < targetRangeVariables.length; i++) {
+                    sb.append(targetRangeVariables[i].describe(session,
+                            blanks)).append('\n');
+                }
+
                 appendParms(sb).append('\n');
-                appendSubqueries(session, sb).append(']');
+                appendSubqueries(session, sb, 2).append(']');
 
                 return sb.toString();
             }
@@ -705,15 +706,23 @@ public abstract class StatementDMQL extends Statement {
         }
     }
 
-    private StringBuffer appendSubqueries(Session session, StringBuffer sb) {
+    private StringBuffer appendSubqueries(Session session, StringBuffer sb,
+                                          int blanks) {
 
         sb.append("SUBQUERIES[");
 
         for (int i = 0; i < subqueries.length; i++) {
-            sb.append("\n[level=").append(subqueries[i].level).append('\n');
+            sb.append("\n[level=").append(subqueries[i].depth).append('\n');
 
-            if (subqueries[i].queryExpression != null) {
-                sb.append(subqueries[i].queryExpression.describe(session));
+            if (subqueries[i].queryExpression == null) {
+                for (int j = 0; j < blanks; j++) {
+                    sb.append(' ');
+                }
+
+                sb.append("value expression");
+            } else {
+                sb.append(subqueries[i].queryExpression.describe(session,
+                        blanks));
             }
 
             sb.append("]");
@@ -741,7 +750,7 @@ public abstract class StatementDMQL extends Statement {
 
     private StringBuffer appendColumns(StringBuffer sb, int[] columnMap) {
 
-        if (columnMap == null || updateExpressions == null) {
+        if (columnMap == null || updateExpressions.length == 0) {
             return sb;
         }
 
@@ -750,8 +759,11 @@ public abstract class StatementDMQL extends Statement {
         for (int i = 0; i < columnMap.length; i++) {
             sb.append('\n').append(columnMap[i]).append(':').append(
                 ' ').append(
-                targetTable.getColumn(columnMap[i]).getNameString()).append(
-                '[').append(updateExpressions[i]).append(']');
+                targetTable.getColumn(columnMap[i]).getNameString());
+        }
+
+        for (int i = 0; i < updateExpressions.length; i++) {
+            sb.append('[').append(updateExpressions[i]).append(']');
         }
 
         sb.append(']');
@@ -761,6 +773,7 @@ public abstract class StatementDMQL extends Statement {
 
     private StringBuffer appendMultiColumns(StringBuffer sb, int[] columnMap) {
 
+        // todo - multiColVals is always null
         if (columnMap == null || multiColumnValues == null) {
             return sb;
         }
@@ -787,7 +800,7 @@ public abstract class StatementDMQL extends Statement {
 
         for (int i = 0; i < parameters.length; i++) {
             sb.append('\n').append('@').append(i).append('[').append(
-                parameters[i]).append(']');
+                parameters[i].describe(null, 0)).append(']');
         }
 
         sb.append(']');
@@ -799,14 +812,22 @@ public abstract class StatementDMQL extends Statement {
 
         return condition == null ? sb.append("CONDITION[]\n")
                                  : sb.append("CONDITION[").append(
-                                     condition.describe(session)).append(
+                                     condition.describe(session, 0)).append(
                                      "]\n");
     }
 
-    public void resolve() {}
+    public void resolve(Session session) {}
 
-    public RangeVariable[] getRangeVariables() {
-        return rangeVariables;
+    public final boolean isCatalogLock() {
+        return false;
+    }
+
+    public boolean isCatalogChange() {
+        return false;
+    }
+
+    public void clearStructures(Session session) {
+        session.sessionContext.clearStructures(this);
     }
 
     /************************* Volt DB Extensions *************************/
@@ -844,7 +865,7 @@ public abstract class StatementDMQL extends Statement {
             parameter.attributes.put("id", expr.getUniqueId(session));
             org.hsqldb_voltpatches.types.Type paramType = expr.getDataType();
             if (paramType != null) {
-                parameter.attributes.put("valuetype", Types.getTypeName(paramType.typeCode));
+                parameter.attributes.put("valuetype", paramType.getNameString());
             }
             // Use of non-null nodeDataTypes for a DYNAMIC_PARAM is a voltdb extension to signal
             // that values passed to parameters such as the one in "col in ?" must be vectors.

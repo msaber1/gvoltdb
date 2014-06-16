@@ -19,6 +19,7 @@ package org.hsqldb_voltpatches;
 
 import java.util.TimeZone;
 
+import org.hsqldb_voltpatches.error.ErrorCode;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
@@ -113,7 +114,7 @@ public class HSQLInterface {
 
         HsqlProperties props = new HsqlProperties();
         try {
-            sessionProxy = DatabaseManager.newSession(DatabaseURL.S_MEM, name, "SA", "", props, 0);
+            sessionProxy = DatabaseManager.newSession(DatabaseURL.S_MEM, name, "SA", "", props, "GMT+0", 0);
         } catch (HsqlException e) {
             e.printStackTrace();
         }
@@ -121,7 +122,7 @@ public class HSQLInterface {
         // Specifically set the timezone to UTC to avoid the default usage local timezone in HSQL.
         // This ensures that all VoltDB data paths use the same timezone for representing time.
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
-        sessionProxy.executeDirectStatement("SET SESSION TIME ZONE INTERVAL '00:00' HOUR TO MINUTE;");
+        sessionProxy.executeDirectStatement("SET TIME ZONE INTERVAL '00:00' HOUR TO MINUTE;");
 
         // make HSQL case insensitive
         sessionProxy.executeDirectStatement("SET IGNORECASE TRUE;");
