@@ -146,8 +146,7 @@ void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string 
     int column_count = (int)m_abstractNode->getOutputSchema().size();
     std::vector<std::string> column_names(column_count);
     assert(column_count >= 1);
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
+    for (int ctr = 0; ctr < column_count; ctr++) {
         column_names[ctr] = m_abstractNode->getOutputSchema()[ctr]->getColumnName();
     }
     m_abstractNode->setOutputTable(TableFactory::getTempTable(m_abstractNode->databaseId(),
@@ -155,6 +154,16 @@ void AbstractExecutor::setTempOutputTable(TempTableLimits* limits, const string 
                                                               schema,
                                                               column_names,
                                                               limits));
+}
+
+void AbstractExecutor::setTempOutputLikeInputTable(TempTableLimits* limits)
+{
+    assert(m_abstractNode->getInputTables().size() == 1);
+    Table* input_table = m_abstractNode->getInputTables()[0];
+    m_abstractNode->setOutputTable(TableFactory::getCopiedTempTable(m_abstractNode->databaseId(),
+                                                                    input_table->name(),
+                                                                    input_table,
+                                                                    limits));
 }
 
 /**

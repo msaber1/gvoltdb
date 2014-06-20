@@ -46,45 +46,33 @@
 #ifndef HSTOREMATERIALIZEEXECUTOR_H
 #define HSTOREMATERIALIZEEXECUTOR_H
 
-#include <vector>
-#include "boost/shared_array.hpp"
+#include "executors/abstractexecutor.h"
+
 #include "common/common.h"
 #include "common/valuevector.h"
-#include "executors/abstractexecutor.h"
+
+#include "boost/shared_array.hpp"
 
 namespace voltdb {
 
 class AbstractExpression;
-class TempTable;
-class Table;
-class MaterializePlanNode;
 
 /**
  *
  */
 class MaterializeExecutor : public AbstractExecutor {
-  public:
-    MaterializeExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
-        AbstractExecutor(engine, abstract_node)
-    {
-        node = NULL;
-        output_table = NULL;
-        input_table = NULL;
-        expression_array = NULL;
-        this->engine = engine;
-    }
+public:
+    MaterializeExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+        : AbstractExecutor(engine, abstract_node)
+        , expression_array(NULL)
+    { }
     ~MaterializeExecutor();
-  protected:
+protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-  private:
-    MaterializePlanNode* node;
-    TempTable* output_table;
-    Table* input_table;
-    int m_columnCount;
-
+private:
     boost::shared_array<int> all_param_array_ptr;
     int* all_param_array;
 
@@ -97,7 +85,6 @@ class MaterializeExecutor : public AbstractExecutor {
     AbstractExpression** expression_array;
 
     bool batched;
-    VoltDBEngine *engine;
 };
 
 }

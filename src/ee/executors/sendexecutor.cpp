@@ -54,10 +54,6 @@
 #include "execution/VoltDBEngine.h"
 
 #include "storage/table.h"
-#include "storage/tablefactory.h"
-#include "indexes/tableindex.h"
-#include "storage/tableiterator.h"
-#include "storage/tableutil.h"
 #include "storage/temptable.h"
 
 namespace voltdb {
@@ -66,34 +62,26 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
                           TempTableLimits* limits)
 {
     VOLT_TRACE("init Send Executor");
-
-    SendPlanNode* node = dynamic_cast<SendPlanNode*>(abstractNode);
+    SendPlanNode* node = dynamic_cast<SendPlanNode*>(m_abstractNode);
     assert(node);
     assert(node->getInputTables().size() == 1);
-    m_inputTable = node->getInputTables()[0];
-    assert(m_inputTable);
-
-    //
-    // Just pass our input table on through...
-    //
-    node->setOutputTable(node->getInputTables()[0]);
-
+    Table* inputTable = node->getInputTables()[0];
+    assert(inputTable);
+    // Just pass our input table on through... Is this needed? The table isn't actually used.
+    node->setOutputTable(inputTable);
     return true;
 }
 
 bool SendExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("started SEND");
-
-    assert(m_inputTable);
-    //m_inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
+    SendPlanNode* node = dynamic_cast<SendPlanNode*>(m_abstractNode);
+    assert(node);
+    Table* inputTable = node->getInputTables()[0];
+    assert(inputTable);
     // Just blast the input table on through VoltDBEngine!
-    if (!m_engine->send(m_inputTable)) {
-        VOLT_ERROR("Failed to send table '%s'", m_inputTable->name().c_str());
-        return false;
-    }
-    VOLT_DEBUG("SEND TABLE: %s", m_inputTable->debug().c_str());
-
+    m_engine->send(inputTable);
+    VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
     return true;
 }
 
-}
+} // namespace voltdb

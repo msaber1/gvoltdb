@@ -44,16 +44,13 @@
  */
 
 #include "limitexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/tabletuple.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 
-using namespace voltdb;
+namespace voltdb {
 
 bool
 LimitExecutor::p_init(AbstractPlanNode* abstract_node,
@@ -61,25 +58,16 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
 {
     VOLT_TRACE("init limit Executor");
 
-    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(abstract_node);
+    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
     assert(node);
 
-    //
     // Skip if we are inline
-    //
-    if (!node->isInline())
-    {
-        //
-        // Just copy the table schema of our input table
-        //
-        assert(node->getInputTables().size() == 1);
-        node->
-            setOutputTable(TableFactory::
-                           getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
-                                              limits));
+    if (node->isInline()) {
+        return true;
     }
+
+    // Just copy the table schema of our input table
+    setTempOutputLikeInputTable(limits);
     return true;
 }
 
@@ -128,3 +116,5 @@ LimitExecutor::p_execute(const NValueArray &params)
 
     return true;
 }
+
+} // namespace voltdb

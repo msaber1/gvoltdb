@@ -19,43 +19,30 @@
 #ifndef HSTOREINDEXCOUNTEXECUTOR_H
 #define HSTOREINDEXCOUNTEXECUTOR_H
 
-#include "common/common.h"
 #include "common/valuevector.h"
-#include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
 
 #include "boost/shared_array.hpp"
-#include "boost/unordered_set.hpp"
-#include "boost/pool/pool_alloc.hpp"
-#include <set>
-#include <memory>
 
 namespace voltdb {
 
-class TempTable;
-class PersistentTable;
 class AbstractExpression;
-class IndexCountPlanNode;
 
 class IndexCountExecutor : public AbstractExecutor
 {
 public:
     IndexCountExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
         : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL), m_endKeyBackingStore(NULL)
-    {
-    }
+    { }
     ~IndexCountExecutor();
 
 private:
     bool p_init(AbstractPlanNode*, TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    long countNulls(TableIndex * tableIndex, AbstractExpression * countNullExpr);
-
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
-    IndexCountPlanNode *m_node;
     int m_numOfColumns;
     int m_numOfSearchkeys;
     int m_numOfEndkeys;
@@ -67,10 +54,6 @@ private:
     IndexLookupType m_lookupType;
     IndexLookupType m_endType;
 
-    // IndexCount Information
-    TempTable* m_outputTable;
-
-
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
     boost::shared_array<AbstractExpression*> m_searchKeyArrayPtr;
@@ -81,6 +64,6 @@ private:
     char* m_endKeyBackingStore;
 };
 
-}
+} // namespace voltdb
 
 #endif // HSTOREINDEXCOUNTEXECUTOR_H

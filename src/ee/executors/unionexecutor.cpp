@@ -43,19 +43,15 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include "boost/unordered_set.hpp"
-#include "boost/unordered_map.hpp"
-
 #include "unionexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "plannodes/unionnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
+
+#include "boost/unordered_set.hpp"
+#include "boost/unordered_map.hpp"
 
 namespace voltdb {
 
@@ -373,14 +369,12 @@ bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
     }
     //
     // Create our output table that will hold all the tuples that we are appending into.
-    // Since we're are assuming that all of the tables have the same number of columns with
-    // the same format. Therefore, we will just grab the first table in the list
+    // Since we are assuming that all of the tables have the same number of columns with
+    // the same format, grab the first table in the list.
     //
-    node->setOutputTable(TableFactory::getCopiedTempTable(node->databaseId(),
-                                                          node->getInputTables()[0]->name(),
-                                                          node->getInputTables()[0],
-                                                          limits));
-
+    // Our output table should look exactly like our input table.
+    // TODO: Fix ENG-6291 there are known cases where the first table's schema is not quite good enough.
+    setTempOutputLikeInputTable(limits);
     m_setOperator = detail::SetOperator::getSetOperator(node);
     return true;
 }

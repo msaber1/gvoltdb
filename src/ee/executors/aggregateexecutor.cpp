@@ -55,7 +55,7 @@
 #include "storage/tableiterator.h"
 
 #include "boost/foreach.hpp"
-#include "boost/unordered_map.hpp"
+#include "boost/unordered_set.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -64,6 +64,7 @@
 #include <utility>
 
 namespace voltdb {
+
 /*
  * Type of the hash set used to check for column aggregate distinctness
  */
@@ -509,10 +510,8 @@ inline void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) 
         m_hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
         initAggInstances(aggregateRow);
 
-        char* storage = reinterpret_cast<char*>(
-                m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
-        TableTuple passThroughTupleSource = TableTuple (storage, m_inputSchema);
-
+        PoolBackedTupleStorage passThroughTupleSource;
+        passThroughTupleSource.init(m_inputSchema, &m_memoryPool);
         aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
         // The map is referencing the current key tuple for use by the new group,
         // so force a new tuple allocation to hold the next candidate key.
@@ -567,9 +566,7 @@ void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
 
     m_pmp = pmp;
 
-    char* storage = reinterpret_cast<char*>(
-            m_memoryPool.allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
-    m_passThroughTupleSource = TableTuple (storage, inputSchema);
+    m_passThroughTupleSource.init(inputSchema);
 }
 
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
@@ -604,7 +601,8 @@ inline void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple
 
             // Start the aggregation calculation.
             initAggInstances(m_aggregateRow);
-            m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
+            m_aggregateRow->recordPassThroughTuple((const TableTuple &)m_passThroughTupleSource,
+                                                   nextTuple);
             advanceAggs(m_aggregateRow, nextTuple);
         } else {
             m_failPrePredicateOnFirstRow = true;
@@ -627,7 +625,8 @@ inline void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple
             m_inProgressGroupByValues = m_nextGroupByValues;
 
             // record the new group scanned tuple
-            m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
+            m_aggregateRow->recordPassThroughTuple((const TableTuple &)m_passThroughTupleSource,
+                                                   nextTuple);
             break;
         }
     }
@@ -664,4 +663,4 @@ void AggregateSerialExecutor::p_execute_finish()
     m_inProgressGroupByValues.clear();
 }
 
-}
+} // namespace voltdb

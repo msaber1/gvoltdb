@@ -103,6 +103,7 @@ class AbstractExecutor {
      * Called from p_init.
      */
     void setTempOutputTable(TempTableLimits* limits, const std::string tempTableName="temp");
+    void setTempOutputLikeInputTable(TempTableLimits* limits);
 
     /**
      * Set up a single-column temp output table for DML executors that require one to return their counts.

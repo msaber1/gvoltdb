@@ -46,21 +46,16 @@
 #ifndef HSTORENESTLOOPINDEXEXECUTOR_H
 #define HSTORENESTLOOPINDEXEXECUTOR_H
 
-#include "common/common.h"
+#include "executors/abstractexecutor.h"
+
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
-#include "expressions/abstractexpression.h"
-#include "executors/abstractexecutor.h"
 
 
 namespace voltdb {
 
-class NestLoopIndexPlanNode;
+class AbstractExpression;
 class IndexScanPlanNode;
-class PersistentTable;
-class Table;
-class TempTable;
-class TableIndex;
 
 /**
  * Nested loop for IndexScan.
@@ -74,17 +69,9 @@ class NestLoopIndexExecutor : public AbstractExecutor
 {
 public:
     NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node),
-        index_values_backing_store(NULL)
-    {
-        node = NULL;
-        inline_node = NULL;
-        output_table = NULL;
-        inner_table = NULL;
-        index = NULL;
-        outer_table = NULL;
-        m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
-    }
+        : AbstractExecutor(engine, abstract_node)
+        , m_lookupType(INDEX_LOOKUP_TYPE_INVALID)
+    { }
 
     ~NestLoopIndexExecutor();
 
@@ -95,23 +82,15 @@ protected:
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    NestLoopIndexPlanNode* node;
-    IndexScanPlanNode* inline_node;
+    IndexScanPlanNode* m_inline_node;
     IndexLookupType m_lookupType;
-    TempTable* output_table;
-    PersistentTable* inner_table;
-    TableIndex *index;
-    TableTuple index_values;
-    Table* outer_table;
-    JoinType join_type;
+    JoinType m_join_type;
     std::vector<AbstractExpression*> m_outputExpressions;
     SortDirectionType m_sortDirection;
     StandAloneTupleStorage m_null_tuple;
-
-    //So valgrind doesn't report the data as lost.
-    char *index_values_backing_store;
+    StandAloneTupleStorage m_index_values;
 };
 
-}
+} // namespace voltdb
 
 #endif

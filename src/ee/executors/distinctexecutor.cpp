@@ -44,20 +44,16 @@
  */
 
 #include "distinctexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "plannodes/distinctnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 
 #include <set>
 #include <cassert>
 
-using namespace voltdb;
+namespace voltdb {
 
 bool DistinctExecutor::p_init(AbstractPlanNode*,
                               TempTableLimits* limits)
@@ -73,12 +69,7 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
         assert(node->getInputTables()[0]->columnCount() > 0);
         assert(node->getChildren()[0] != NULL);
 
-        node->
-            setOutputTable(TableFactory::
-                           getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
-                                              limits));
+        setTempOutputLikeInputTable(limits);
     }
     return (true);
 }
@@ -118,3 +109,5 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
 
 DistinctExecutor::~DistinctExecutor() {
 }
+
+} // namespace voltdb

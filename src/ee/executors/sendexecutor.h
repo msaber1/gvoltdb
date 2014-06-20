@@ -46,35 +46,25 @@
 #ifndef HSTORESENDEXECUTOR_H
 #define HSTORESENDEXECUTOR_H
 
-#include "common/common.h"
-#include "common/ids.h"
-#include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
-namespace voltdb {
+#include "common/valuevector.h"
 
-class SendPlanNode;
+namespace voltdb {
 
 class SendExecutor : public AbstractExecutor
 {
 public:
     SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode)
         : AbstractExecutor(engine, abstractNode)
-    {
-        m_inputTable = NULL;
-        m_engine = engine;
-    }
+    { }
 
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
-
-private:
-    Table* m_inputTable;
-    VoltDBEngine *m_engine;
 };
 
-}
+} // namespace voltdb
 
 #endif

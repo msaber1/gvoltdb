@@ -44,14 +44,12 @@
  */
 
 #include "materializeexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "plannodes/materializenode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 
 namespace voltdb {
@@ -61,67 +59,63 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
 {
     VOLT_TRACE("init Materialize Executor");
 
-    node = dynamic_cast<MaterializePlanNode*>(abstractNode);
+    MaterializePlanNode* node = dynamic_cast<MaterializePlanNode*>(m_abstractNode);
     assert(node);
     batched = node->isBatched();
 
     // Construct the output table
-    m_columnCount = static_cast<int>(node->getOutputSchema().size());
-    assert(m_columnCount >= 0);
+    int columnCount = static_cast<int>(node->getOutputSchema().size());
+    assert(columnCount >= 0);
 
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
+    std::vector<AbstractExpression*>& columnExpressions = node->getOutputColumnExpressions();
+
     // initialize local variables
-    all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(node->getOutputColumnExpressions());
+    all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(columnExpressions);
     all_param_array = all_param_array_ptr.get();
 
-    needs_substitute_ptr = boost::shared_array<bool>(new bool[m_columnCount]);
-    needs_substitute = needs_substitute_ptr.get();
+    needs_substitute = new bool[columnCount];
+    needs_substitute_ptr.reset(needs_substitute);
 
-    expression_array_ptr =
-      boost::shared_array<AbstractExpression*>(new AbstractExpression*[m_columnCount]);
-    expression_array = expression_array_ptr.get();
+    expression_array = new AbstractExpression*[columnCount];
+    expression_array_ptr.reset(expression_array);
 
-    for (int ctr = 0; ctr < m_columnCount; ctr++) {
-        assert (node->getOutputColumnExpressions()[ctr] != NULL);
-        expression_array_ptr[ctr] = node->getOutputColumnExpressions()[ctr];
-        needs_substitute_ptr[ctr] = node->getOutputColumnExpressions()[ctr]->hasParameter();
+    for (int ctr = 0; ctr < columnCount; ctr++) {
+        assert (columnExpressions[ctr] != NULL);
+        expression_array_ptr[ctr] = columnExpressions[ctr];
+        needs_substitute_ptr[ctr] = columnExpressions[ctr]->hasParameter();
     }
 
-    //output table should be temptable
-    output_table = dynamic_cast<TempTable*>(node->getOutputTable());
-
-    return (true);
+    return true;
 }
 
 bool MaterializeExecutor::p_execute(const NValueArray &params) {
-    assert (node == dynamic_cast<MaterializePlanNode*>(m_abstractNode));
-    assert(node);
-    assert (!node->isInline()); // inline projection's execute() should not be called
-    assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
-    assert (output_table);
-    assert (m_columnCount == (int)node->getOutputColumnNames().size());
+    assert(dynamic_cast<MaterializePlanNode*>(m_abstractNode));
+    assert (m_tmpOutputTable);
+
+    int columnCount = m_tmpOutputTable->columnCount();
 
     // batched insertion
     if (batched) {
-        int paramcnt = engine->getUsedParamcnt();
-        VOLT_TRACE("batched insertion with %d params. %d for each tuple.", paramcnt, m_columnCount);
-        TableTuple &temp_tuple = output_table->tempTuple();
-        for (int i = 0, tuples = paramcnt / m_columnCount; i < tuples; ++i) {
-            for (int j = m_columnCount - 1; j >= 0; --j) {
-                temp_tuple.setNValue(j, params[i * m_columnCount + j]);
+        int paramcnt = m_engine->getUsedParamcnt();
+        VOLT_TRACE("batched insertion with %d params. %d for each tuple.", paramcnt, columnCount);
+        TableTuple &temp_tuple = m_tmpOutputTable->tempTuple();
+        for (int i = 0, tuples = paramcnt / columnCount; i < tuples; ++i) {
+            for (int j = columnCount - 1; j >= 0; --j) {
+                temp_tuple.setNValue(j, params[i * columnCount + j]);
             }
-            output_table->insertTupleNonVirtual(temp_tuple);
+            m_tmpOutputTable->insertTempTuple(temp_tuple);
         }
-        VOLT_TRACE ("Materialized :\n %s", this->output_table->debug().c_str());
+        VOLT_TRACE ("Materialized :\n %s", m_tmpOutputTable->debug().c_str());
         return true;
     }
 
 
     // substitute parameterized values in expression trees.
     if (all_param_array == NULL) {
-        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+        for (int ctr = columnCount - 1; ctr >= 0; --ctr) {
             assert(expression_array[ctr]);
             VOLT_TRACE("predicate[%d]: %s", ctr, expression_array[ctr]->debug(true).c_str());
         }
@@ -131,10 +125,10 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
     // should think about whether we would ever want to materialize
     // more than one tuple and whether such a thing is possible with
     // the AbstractExpression scheme
-    TableTuple &temp_tuple = output_table->tempTuple();
+    TableTuple &temp_tuple = m_tmpOutputTable->tempTuple();
     if (all_param_array != NULL) {
         VOLT_TRACE("sweet, all params\n");
-        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+        for (int ctr = columnCount - 1; ctr >= 0; --ctr) {
             temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
         }
     }
@@ -142,13 +136,13 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
         TableTuple dummy;
         // add the generated value to the temp tuple. it must have the
         // same value type as the output column.
-        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+        for (int ctr = columnCount - 1; ctr >= 0; --ctr) {
             temp_tuple.setNValue(ctr, expression_array[ctr]->eval(&dummy, NULL));
         }
     }
 
     // Add tuple to the output
-    output_table->insertTupleNonVirtual(temp_tuple);
+    m_tmpOutputTable->insertTempTuple(temp_tuple);
 
     return true;
 }
@@ -156,4 +150,4 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
 MaterializeExecutor::~MaterializeExecutor() {
 }
 
-}
+} // namespace voltdb

@@ -43,23 +43,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <algorithm>
-#include <vector>
 #include "orderbyexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
 #include "execution/ProgressMonitorProxy.h"
 #include "plannodes/orderbynode.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
 #include "storage/temptable.h"
 #include "storage/tableiterator.h"
-#include "storage/tablefactory.h"
 
-using namespace voltdb;
+#include <algorithm>
+#include <vector>
+
 using namespace std;
+
+namespace voltdb {
 
 bool
 OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
@@ -73,20 +71,11 @@ OrderByExecutor::p_init(AbstractPlanNode* abstract_node,
 
     assert(node->getChildren()[0] != NULL);
 
-    //
     // Our output table should look exactly like out input table
-    //
-    node->
-        setOutputTable(TableFactory::
-                       getCopiedTempTable(node->databaseId(),
-                                          node->getInputTables()[0]->name(),
-                                          node->getInputTables()[0],
-                                          limits));
+    setTempOutputLikeInputTable(limits);
 
     // pickup an inlined limit, if one exists
-    limit_node =
-        dynamic_cast<LimitPlanNode*>(node->
-                                     getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
+    limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
 
     return true;
 }
@@ -202,3 +191,5 @@ OrderByExecutor::p_execute(const NValueArray &params)
 
 OrderByExecutor::~OrderByExecutor() {
 }
+
+} // namespace voltdb

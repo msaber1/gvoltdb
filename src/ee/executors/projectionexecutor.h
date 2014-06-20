@@ -46,49 +46,41 @@
 #ifndef HSTOREPROJECTIONEXECUTOR_H
 #define HSTOREPROJECTIONEXECUTOR_H
 
-#include <vector>
-#include "boost/shared_array.hpp"
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
+
+#include "boost/shared_array.hpp"
 
 namespace voltdb {
 
 class AbstractExpression;
-class TempTable;
-class Table;
 
 /**
  *
  */
 class ProjectionExecutor : public AbstractExecutor {
-    public:
-        ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) {
-            output_table = NULL;
-        }
-        ~ProjectionExecutor();
-    protected:
-        bool p_init(AbstractPlanNode*,
-                    TempTableLimits* limits);
-        bool p_execute(const NValueArray &params);
+public:
+    ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+        : AbstractExecutor(engine, abstract_node)
+    { }
+    ~ProjectionExecutor();
+protected:
+    bool p_init(AbstractPlanNode*,
+                TempTableLimits* limits);
+    bool p_execute(const NValueArray &params);
 
-    private:
-        TempTable* output_table;
-        Table* input_table;
-        int m_columnCount;
-        boost::shared_array<int> all_tuple_array_ptr;
-        int* all_tuple_array;
-        boost::shared_array<int> all_param_array_ptr;
-        int* all_param_array;
-        boost::shared_array<bool> needs_substitute_ptr;
-        bool *needs_substitute;
-        TableTuple tuple;
+private:
+    int m_columnCount;
+    boost::shared_array<int> all_tuple_array_ptr;
+    int* all_tuple_array;
+    boost::shared_array<int> all_param_array_ptr;
+    int* all_param_array;
+    boost::shared_array<bool> needs_substitute_ptr;
+    bool *needs_substitute;
 
-        boost::shared_array<AbstractExpression*> expression_array_ptr;
-        AbstractExpression** expression_array;
+    boost::shared_array<AbstractExpression*> expression_array_ptr;
+    AbstractExpression** expression_array;
 };
 
-}
+} // namespace voltdb
 
 #endif

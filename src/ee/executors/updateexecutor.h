@@ -46,54 +46,38 @@
 #ifndef HSTOREUPDATEEXECUTOR_H
 #define HSTOREUPDATEEXECUTOR_H
 
-#include <vector>
-
-#include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
-#include "execution/VoltDBEngine.h"
+
+#include <vector>
 
 namespace voltdb {
-
-class TableIndex;
-
-class UpdatePlanNode;
-class TempTable;
-class PersistentTable;
 
 class UpdateExecutor : public AbstractExecutor
 {
 public:
     UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
         : AbstractExecutor(engine, abstract_node)
-    {
-        m_inputTargetMapSize = -1;
-        m_inputTable = NULL;
-        m_engine = engine;
-        m_partitionColumn = -1;
-    }
+        , m_inputTargetMapSize(-1)
+        , m_inputTable(NULL)
+        , m_partitionColumn(-1)
+    { }
 
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    UpdatePlanNode* m_node;
-
     std::vector<std::pair<int, int> > m_inputTargetMap;
     int m_inputTargetMapSize;
 
     TempTable* m_inputTable;
-
-    TableTuple m_inputTuple;
     int m_partitionColumn;
     bool m_partitionColumnIsString;
 
-    /** reference to the engine/context to store the number of modified tuples */
-    VoltDBEngine* m_engine;
 };
 
-}
+} // namespace voltdb
 
 #endif

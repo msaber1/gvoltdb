@@ -48,9 +48,9 @@
 #include "common/TupleSchema.h"
 #include "executors/abstractexecutor.h"
 #include "plannodeutil.h"
+#include "storage/persistenttable.h"
 
 #include <sstream>
-#include <stdexcept>
 #include <string>
 
 using namespace std;
@@ -192,7 +192,12 @@ AbstractPlanNode::getInputTables()
 void
 AbstractPlanNode::setOutputTable(Table* table)
 {
-    m_outputTable = table;
+    PersistentTable* persistentTable = dynamic_cast<PersistentTable*>(table);
+    if (persistentTable) {
+        m_outputTcd =
+    } else {
+        m_outputTable = table;
+    }
 }
 
 Table*

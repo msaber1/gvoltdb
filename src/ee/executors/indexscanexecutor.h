@@ -53,19 +53,12 @@
 
 namespace voltdb {
 
-class TempTable;
-class PersistentTable;
-
 class AbstractExpression;
 
-//
-// Inline PlanNodes
-//
-class IndexScanPlanNode;
+class AggregateExecutorBase;
 class ProjectionPlanNode;
 class LimitPlanNode;
 
-class AggregateExecutorBase;
 
 class IndexScanExecutor : public AbstractExecutor
 {
@@ -86,12 +79,12 @@ private:
     // Data in this class is arranged roughly in the order it is read for
     // p_execute(). Please don't reshuffle it only in the name of beauty.
 
-    IndexScanPlanNode *m_node;
     int m_numOfColumns;
     int m_numOfSearchkeys;
 
     // Inline Projection
     ProjectionPlanNode* m_projectionNode;
+    LimitPlanNode* m_limit_node;
     int* m_projectionAllTupleArray; // projection_all_tuple_array_ptr[]
     AbstractExpression** m_projectionExpressions;
 
@@ -100,9 +93,6 @@ private:
 
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;
-
-    // IndexScan Information
-    TempTable* m_outputTable;
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
@@ -114,6 +104,6 @@ private:
     AggregateExecutorBase* m_aggExec;
 };
 
-}
+} // namespace voltdb
 
 #endif

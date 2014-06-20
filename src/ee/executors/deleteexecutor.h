@@ -55,38 +55,24 @@
 
 namespace voltdb {
 
-class TableIndex;
-
-class DeletePlanNode;
 class TempTable;
-class PersistentTable;
 
 class DeleteExecutor : public AbstractExecutor
 {
 public:
     DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
         : AbstractExecutor(engine, abstract_node)
-    {
-        m_inputTable = NULL;
-        m_engine = engine;
-    }
+        , m_inputTable(NULL)
+    { }
 
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
-    DeletePlanNode* m_node;
-
-    /** true if all tuples are deleted, truncate is the only case we
-        don't need PK to delete tuples. */
+    /// true if all tuples are deleted.
     bool m_truncate;
     TempTable* m_inputTable;
-    TableTuple m_inputTuple;
-
-    /** reference to the engine/context to store the number of
-        modified tuples */
-    VoltDBEngine* m_engine;
 };
 
 }
