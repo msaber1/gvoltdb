@@ -253,17 +253,37 @@ public class TestCRUDSuite extends RegressionSuite {
             fail(error.getMessage());
         }
 
-        // JNI
+        //* <-- Change this structured comment from '//'-style to 'block style' to toggle over
+        //      to just the one single-server IPC DEBUG config.
+        //      PLEASE AVOID USING '/' '*' block-style comments in the config code below to avoid
+        //      breaking this multi-part structured comment.
+        // IF (! DEBUG config) ...
+
+        // Single-server JNI configuration
         config = new LocalCluster("crud-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);
 
-        // CLUSTER
+        // CLUSTER JNI configuration
         config = new LocalCluster("crud-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean t2 = config.compile(project);
         assertTrue(t2);
         builder.addServerConfig(config);
+
+        /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("crud-debug.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        // build the jarfile
+        success = config.compile(project);
+        assert(success);
+        // add this config to the set of tests to run
+        builder.addServerConfig(config);
+
+        // ... ENDIF (DEBUG config) [ FRAGILE! This ends the structured comment. Do not break it. ] */
 
         return builder;
     }

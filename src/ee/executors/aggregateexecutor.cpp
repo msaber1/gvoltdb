@@ -474,7 +474,7 @@ void AggregateHashExecutor::p_execute_init(const NValueArray& params,
 bool AggregateHashExecutor::p_execute(const NValueArray& params)
 {
     // Input table
-    Table* input_table = m_abstractNode->getInputTables()[0];
+    Table* input_table = m_abstractNode->getInputTable();
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
 
@@ -510,8 +510,10 @@ inline void AggregateHashExecutor::p_execute_tuple(const TableTuple& nextTuple) 
         m_hash.insert(HashAggregateMapType::value_type(nextGroupByKeyTuple, aggregateRow));
         initAggInstances(aggregateRow);
 
-        PoolBackedTupleStorage passThroughTupleSource;
-        passThroughTupleSource.init(m_inputSchema, &m_memoryPool);
+        char* storage = reinterpret_cast<char*>(
+                m_memoryPool.allocateZeroes(m_inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+        TableTuple passThroughTupleSource = TableTuple (storage, m_inputSchema);
+
         aggregateRow->recordPassThroughTuple(passThroughTupleSource, nextTuple);
         // The map is referencing the current key tuple for use by the new group,
         // so force a new tuple allocation to hold the next candidate key.
@@ -551,7 +553,7 @@ inline void AggregateSerialExecutor::getNextGroupByValues(const TableTuple& next
 void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
         ProgressMonitorProxy* pmp, const TupleSchema * inputSchema) {
     executeAggBase(params);
-    assert(m_prePredicate == NULL || m_abstractNode->getInputTables()[0]->activeTupleCount() <= 1);
+    assert(m_prePredicate == NULL || m_abstractNode->getInputTable()->activeTupleCount() <= 1);
     m_aggregateRow = new (m_memoryPool, m_aggTypes.size()) AggregateRow();
 
     m_noInputRows = true;
@@ -566,13 +568,15 @@ void AggregateSerialExecutor::p_execute_init(const NValueArray& params,
 
     m_pmp = pmp;
 
-    m_passThroughTupleSource.init(inputSchema);
+    char* storage = reinterpret_cast<char*>(
+            m_memoryPool.allocateZeroes(inputSchema->tupleLength() + TUPLE_HEADER_SIZE));
+    m_passThroughTupleSource = TableTuple (storage, inputSchema);
 }
 
 bool AggregateSerialExecutor::p_execute(const NValueArray& params)
 {
     // Input table
-    Table* input_table = m_abstractNode->getInputTables()[0];
+    Table* input_table = m_abstractNode->getInputTable();
     assert(input_table);
     VOLT_TRACE("input table\n%s", input_table->debug().c_str());
     TableIterator it = input_table->iteratorDeletingAsWeGo();
@@ -601,8 +605,7 @@ inline void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple
 
             // Start the aggregation calculation.
             initAggInstances(m_aggregateRow);
-            m_aggregateRow->recordPassThroughTuple((const TableTuple &)m_passThroughTupleSource,
-                                                   nextTuple);
+            m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
             advanceAggs(m_aggregateRow, nextTuple);
         } else {
             m_failPrePredicateOnFirstRow = true;
@@ -625,8 +628,7 @@ inline void AggregateSerialExecutor::p_execute_tuple(const TableTuple& nextTuple
             m_inProgressGroupByValues = m_nextGroupByValues;
 
             // record the new group scanned tuple
-            m_aggregateRow->recordPassThroughTuple((const TableTuple &)m_passThroughTupleSource,
-                                                   nextTuple);
+            m_aggregateRow->recordPassThroughTuple(m_passThroughTupleSource, nextTuple);
             break;
         }
     }

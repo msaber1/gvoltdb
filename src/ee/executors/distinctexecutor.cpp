@@ -66,7 +66,7 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
     //
     if (!node->isInline()) {
         assert(node->getInputTables().size() == 1);
-        assert(node->getInputTables()[0]->columnCount() > 0);
+        assert(node->getInputTable()->columnCount() > 0);
         assert(node->getChildren()[0] != NULL);
 
         setTempOutputLikeInputTable(limits);
@@ -79,7 +79,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = node->getInputTable();
     assert(input_table);
 
     TableIterator iterator = input_table->iteratorDeletingAsWeGo();

@@ -17,15 +17,12 @@
 
 #include "indexcountexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
+#include "common/ValueFactory.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "plannodes/indexcountnode.h"
-#include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"

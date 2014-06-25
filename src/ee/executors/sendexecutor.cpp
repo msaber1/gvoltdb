@@ -45,16 +45,9 @@
 
 #include "sendexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "plannodes/sendnode.h"
-
 #include "execution/VoltDBEngine.h"
-
+#include "plannodes/sendnode.h"
 #include "storage/table.h"
-#include "storage/temptable.h"
 
 namespace voltdb {
 
@@ -62,13 +55,9 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
                           TempTableLimits* limits)
 {
     VOLT_TRACE("init Send Executor");
-    SendPlanNode* node = dynamic_cast<SendPlanNode*>(m_abstractNode);
-    assert(node);
-    assert(node->getInputTables().size() == 1);
-    Table* inputTable = node->getInputTables()[0];
-    assert(inputTable);
-    // Just pass our input table on through... Is this needed? The table isn't actually used.
-    node->setOutputTable(inputTable);
+    assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
+    assert(dynamic_cast<SendPlanNode*>(m_abstractNode)->getInputTables().size() == 1);
+    assert(dynamic_cast<SendPlanNode*>(m_abstractNode)->getInputTable());
     return true;
 }
 
@@ -76,7 +65,7 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("started SEND");
     SendPlanNode* node = dynamic_cast<SendPlanNode*>(m_abstractNode);
     assert(node);
-    Table* inputTable = node->getInputTables()[0];
+    Table* inputTable = node->getInputTable();
     assert(inputTable);
     // Just blast the input table on through VoltDBEngine!
     m_engine->send(inputTable);

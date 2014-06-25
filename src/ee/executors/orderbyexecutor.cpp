@@ -42,7 +42,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 #include "orderbyexecutor.h"
 
 #include "common/tabletuple.h"
@@ -130,7 +129,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
     assert(node);
     TempTable* output_table = dynamic_cast<TempTable*>(node->getOutputTable());
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = node->getInputTable();
     assert(input_table);
 
     //

@@ -42,11 +42,8 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
-#include <iostream>
 #include "seqscanexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "executors/aggregateexecutor.h"
@@ -58,10 +55,11 @@
 #include "plannodes/limitnode.h"
 #include "storage/table.h"
 #include "storage/temptable.h"
-#include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 
-using namespace voltdb;
+#include <sstream>
+
+namespace voltdb {
 
 bool SeqScanExecutor::p_init(AbstractPlanNode* abstract_node,
                              TempTableLimits* limits)
@@ -278,3 +276,5 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
     return true;
 }
+
+} // namespace voltdb

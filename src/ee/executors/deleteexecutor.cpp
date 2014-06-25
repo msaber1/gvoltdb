@@ -47,6 +47,7 @@
 
 #include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
+#include "plannodes/deletenode.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
@@ -71,7 +72,7 @@ bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
     }
 
     assert(node->getInputTables().size() == 1);
-    m_inputTable = dynamic_cast<TempTable*>(node->getInputTables()[0]); //input table should be temptable
+    m_inputTable = node->getTempInputTable(); //input table should be temptable
     assert(m_inputTable);
     return true;
 }

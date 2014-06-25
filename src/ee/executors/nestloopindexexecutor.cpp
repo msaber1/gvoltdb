@@ -42,19 +42,18 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 #include "nestloopindexexecutor.h"
 
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/ProgressMonitorProxy.h"
 #include "expressions/abstractexpression.h"
+#include "indexes/tableindex.h"
 #include "plannodes/nestloopindexnode.h"
 #include "plannodes/indexscannode.h"
 #include "plannodes/limitnode.h"
 #include "storage/persistenttable.h"
 #include "storage/temptable.h"
-#include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
 
 namespace voltdb {
@@ -116,7 +115,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(m_tmpOutputTable);
 
     assert(node->getInputTables().size() == 1);
-    assert(node->getInputTables()[0]);
+    assert(node->getInputTable());
 
     PersistentTable* inner_table = dynamic_cast<PersistentTable*>(m_inline_node->getTargetTable());
     assert(inner_table);
@@ -146,9 +145,6 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     return true;
 }
 
-void NestLoopIndexExecutor::updateTargetTableAndIndex() {
-}
-
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
     NestLoopIndexPlanNode* node = static_cast<NestLoopIndexPlanNode*>(m_abstractNode);
@@ -161,18 +157,22 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     TableIndex* index = inner_table->index(m_inline_node->getTargetIndexName());
     assert(index);
 
+    TableTuple null_tuple;
+
     // NULL tuple for outer join
     if (m_join_type == JOIN_TYPE_LEFT) {
         Table* inner_out_table = m_inline_node->getOutputTable();
         assert(inner_out_table);
-        ((TableTuple)m_null_tuple).setSchema(inner_out_table->schema());
+        null_tuple = m_null_tuple;
+        null_tuple.setSchema(inner_out_table->schema());
     }
 
-    ((TableTuple)m_index_values).setSchema(index->getKeySchema());
+    TableTuple index_values = m_index_values;
+    index_values.setSchema(index->getKeySchema());
 
     //outer_table is the input table that have tuples to be iterated
     assert(node->getInputTables().size() == 1);
-    Table* outer_table = node->getInputTables()[0];
+    Table* outer_table = node->getInputTable();
     assert (outer_table);
     VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
                outer_table->debug().c_str(), inner_table->debug().c_str());
@@ -244,8 +244,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (outer_tuple.sizeInValues() == outer_table->columnCount());
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     TableTuple &join_tuple = m_tmpOutputTable->tempTuple();
-    TableTuple null_tuple = m_null_tuple;
-    TableTuple index_values = m_index_values;
     int num_of_inner_cols = (m_join_type == JOIN_TYPE_LEFT)? null_tuple.sizeInValues() : 0;
 
     ProgressMonitorProxy pmp(m_engine, this, inner_table);
@@ -498,7 +496,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     continue;
                 }
                 ++tuple_ctr;
-                join_tuple.setNValues(num_of_outer_cols, m_null_tuple, 0, num_of_inner_cols);
+                join_tuple.setNValues(num_of_outer_cols, null_tuple, 0, num_of_inner_cols);
                 m_tmpOutputTable->insertTempTuple(join_tuple);
                 pmp.countdownProgress();
             }

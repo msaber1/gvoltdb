@@ -126,10 +126,10 @@ struct AggregateRow
         }
     }
 
-    void recordPassThroughTuple(const TableTuple &passThroughTupleSource, const TableTuple &tuple)
+    void recordPassThroughTuple(TableTuple &passThroughTupleSource, const TableTuple &tuple)
     {
+        passThroughTupleSource.copy(tuple);
         m_passThroughTuple = passThroughTupleSource;
-        m_passThroughTuple.copy(tuple);
     }
 
     // A tuple from the group of tuples being aggregated. Source of pass through columns.
@@ -205,6 +205,7 @@ protected:
     AbstractExpression* m_postPredicate;
 
     ProgressMonitorProxy* m_pmp;
+    TableTuple m_passThroughTupleSource;
 };
 
 typedef boost::unordered_map<TableTuple,
@@ -259,7 +260,6 @@ protected:
 
     void getNextGroupByValues(const TableTuple& nextTuple);
 
-    StandAloneTupleStorage m_passThroughTupleSource;
     AggregateRow * m_aggregateRow;
     std::vector<NValue> m_inProgressGroupByValues;
     std::vector<NValue> m_nextGroupByValues;

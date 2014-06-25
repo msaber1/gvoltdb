@@ -66,7 +66,7 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
-    std::vector<AbstractExpression*>& columnExpressions = node->getOutputColumnExpressions();
+    const std::vector<AbstractExpression*>& columnExpressions = node->getOutputColumnExpressions();
     int columnCount = (int)columnExpressions.size();
 
     // initialize local variables
@@ -111,7 +111,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
 #endif
 
     assert(node->getInputTables().size() == 1);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = node->getInputTable();
     assert(input_table);
 
     VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());

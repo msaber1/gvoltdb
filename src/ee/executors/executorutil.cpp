@@ -42,12 +42,9 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 #include "executorutil.h"
 
 #include "common/debuglog.h"
-#include "common/FatalException.hpp"
-
 #include "executors/aggregateexecutor.h"
 #include "executors/deleteexecutor.h"
 #include "executors/distinctexecutor.h"

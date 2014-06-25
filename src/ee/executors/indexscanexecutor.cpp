@@ -42,15 +42,11 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 #include "indexscanexecutor.h"
 
-#include "common/debuglog.h"
-#include "common/common.h"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "executors/aggregateexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
+#include "executors/aggregateexecutor.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
@@ -61,7 +57,6 @@
 #include "plannodes/limitnode.h"
 #include "plannodes/aggregatenode.h"
 
-#include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"

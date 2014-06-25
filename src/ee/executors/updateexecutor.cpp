@@ -43,31 +43,29 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cassert>
-#include <boost/scoped_ptr.hpp>
-#include <boost/foreach.hpp>
-
 #include "updateexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
-#include "common/types.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "plannodes/updatenode.h"
 #include "plannodes/projectionnode.h"
 #include "storage/table.h"
-#include "storage/tablefactory.h"
 #include "indexes/tableindex.h"
 #include "storage/tableiterator.h"
-#include "storage/tableutil.h"
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 #include "storage/ConstraintFailureException.h"
 
+#include <boost/scoped_ptr.hpp>
+#include <boost/foreach.hpp>
+
+#include <cassert>
+
 using namespace std;
-using namespace voltdb;
+
+namespace voltdb {
 
 bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
                             TempTableLimits* limits)
@@ -78,7 +76,7 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
     assert(node);
     assert(node->getInputTables().size() == 1);
     // input table should be temptable
-    m_inputTable = dynamic_cast<TempTable*>(node->getInputTables()[0]);
+    m_inputTable = node->getTempInputTable();
     assert(m_inputTable);
 
     // target table should be persistenttable
@@ -212,12 +210,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             }
         }
 
-        if (!targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple,
-                                                           indexesToUpdate)) {
-            VOLT_INFO("Failed to update tuple from table '%s'",
-                      targetTable->name().c_str());
-            return false;
-        }
+        targetTable->updateTupleWithSpecificIndexes(targetTuple, tempTuple, indexesToUpdate);
     }
 
     TableTuple& count_tuple = m_tmpOutputTable->tempTuple();
@@ -234,3 +227,5 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
 
     return true;
 }
+
+} // namespace voltdb

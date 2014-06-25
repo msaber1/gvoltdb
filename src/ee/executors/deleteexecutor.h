@@ -46,16 +46,9 @@
 #ifndef HSTOREDELETEEXECUTOR_H
 #define HSTOREDELETEEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
-#include "plannodes/deletenode.h"
-#include "execution/VoltDBEngine.h"
 
 namespace voltdb {
-
-class TempTable;
 
 class DeleteExecutor : public AbstractExecutor
 {

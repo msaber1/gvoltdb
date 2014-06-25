@@ -46,8 +46,6 @@
 #ifndef HSTOREUPDATEEXECUTOR_H
 #define HSTOREUPDATEEXECUTOR_H
 
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
 
 #include <vector>

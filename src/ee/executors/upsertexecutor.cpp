@@ -43,46 +43,43 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 #include "upsertexecutor.h"
-#include "common/debuglog.h"
+
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "common/types.h"
 #include "plannodes/upsertnode.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
-#include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/tableutil.h"
 #include "storage/temptable.h"
 #include "storage/ConstraintFailureException.h"
 
 #include <vector>
 
 using namespace std;
-using namespace voltdb;
+
+namespace voltdb {
 
 bool UpsertExecutor::p_init(AbstractPlanNode* abstractNode,
         TempTableLimits* limits)
 {
     VOLT_TRACE("init Upsert Executor");
 
-    m_node = dynamic_cast<UpsertPlanNode*>(abstractNode);
-    assert(m_node);
-    assert(m_node->getTargetTable());
-    assert(m_node->getInputTables().size() == 1);
+    UpsertPlanNode* node = dynamic_cast<UpsertPlanNode*>(m_abstractNode);
+    assert(node);
+    assert(node->getTargetTable());
+    assert(node->getInputTables().size() == 1);
 
     setDMLCountOutputTable(limits);
 
     // Target table must be persistentTable
-    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(node->getTargetTable());
     if ( persistentTarget == NULL ) {
-        VOLT_ERROR("Upsert is not supported for Stream table %s", m_node->getTargetTable()->name().c_str());
+        VOLT_ERROR("Upsert is not supported for Stream table %s", node->getTargetTable()->name().c_str());
     }
 
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
+    m_inputTable = node->getTempInputTable(); //input table should be temptable
     assert(m_inputTable);
 
     m_partitionColumnIsString = false;
@@ -93,16 +90,18 @@ bool UpsertExecutor::p_init(AbstractPlanNode* abstractNode,
         }
     }
 
-    m_multiPartition = m_node->isMultiPartition();
+    m_multiPartition = node->isMultiPartition();
     return true;
 }
 
 bool UpsertExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("execute Upsert Executor");
 
+    assert(dynamic_cast<UpsertPlanNode*>(m_abstractNode));
+    UpsertPlanNode* node = static_cast<UpsertPlanNode*>(m_abstractNode);
     // Update target table reference from table delegate
-    PersistentTable* targetTable = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
-    assert(targetTable);
+    assert(dynamic_cast<PersistentTable*>(node->getTargetTable()));
+    PersistentTable* targetTable = static_cast<PersistentTable*>(node->getTargetTable());
     assert (targetTable->columnCount() == m_inputTable->columnCount());
     TableTuple targetTuple = TableTuple(targetTable->schema());
 
@@ -113,8 +112,7 @@ bool UpsertExecutor::p_execute(const NValueArray &params) {
     // count the number of successful inserts
     int modifiedTuples = 0;
 
-    Table* outputTable = m_node->getOutputTable();
-    assert(outputTable);
+    assert(m_tmpOutputTable);
 
     TableIterator iterator = m_inputTable->iterator();
     while (iterator.next(tbTuple)) {
@@ -174,19 +172,15 @@ bool UpsertExecutor::p_execute(const NValueArray &params) {
         modifiedTuples++;
     }
 
-    TableTuple& count_tuple = outputTable->tempTuple();
+    TableTuple& count_tuple = m_tmpOutputTable->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(modifiedTuples));
-    // try to put the tuple into the output table
-    if (!outputTable->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to upsert tuple count (%d) into"
-                " output table '%s'",
-                modifiedTuples,
-                outputTable->name().c_str());
-        return false;
-    }
-
+    // put the tuple into the output table
+    m_tmpOutputTable->insertTempTuple(count_tuple);
     // add to the planfragments count of modified tuples
     m_engine->m_tuplesModified += modifiedTuples;
     VOLT_DEBUG("Finished upserting tuple");
     return true;
 }
+
+} // namespace voltdb
+

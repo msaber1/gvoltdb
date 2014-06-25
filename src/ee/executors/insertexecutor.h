@@ -46,15 +46,9 @@
 #ifndef HSTOREINSERTEXECUTOR_H
 #define HSTOREINSERTEXECUTOR_H
 
-#include "common/common.h"
-#include "common/valuevector.h"
-#include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
-
-class InsertPlanNode;
-class TempTable;
 
 /**
  *
@@ -64,29 +58,19 @@ class InsertExecutor : public AbstractExecutor
 public:
     InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
         : AbstractExecutor(engine, abstract_node)
-    {
-        m_inputTable = NULL;
-        m_node = NULL;
-        m_engine = engine;
-        m_partitionColumn = -1;
-        m_multiPartition = false;
-    }
+        , m_partitionColumn(-1)
+        , m_multiPartition(false)
+    { }
 
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
-        InsertPlanNode* m_node;
-        TempTable* m_inputTable;
-
         int m_partitionColumn;
         bool m_partitionColumnIsString;
         bool m_multiPartition;
         bool m_isStreamed;
-
-        /** reference to the engine/context to store the number of modified tuples */
-        VoltDBEngine* m_engine;
 };
 
 }

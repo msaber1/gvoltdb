@@ -15,10 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <iostream>
 #include "tablecountexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
+
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "common/ValueFactory.hpp"
@@ -26,10 +24,11 @@
 #include "plannodes/tablecountnode.h"
 #include "storage/persistenttable.h"
 #include "storage/temptable.h"
-#include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 
-using namespace voltdb;
+#include <iostream>
+
+namespace voltdb {
 
 bool TableCountExecutor::p_init(AbstractPlanNode* abstract_node,
                              TempTableLimits* limits)
@@ -87,6 +86,6 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-TableCountExecutor::~TableCountExecutor() {
-}
+TableCountExecutor::~TableCountExecutor() { }
 
+} // namespace voltdb

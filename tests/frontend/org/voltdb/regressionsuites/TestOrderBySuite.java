@@ -791,21 +791,27 @@ public class TestOrderBySuite extends RegressionSuite {
         project.addSchema(TestOrderBySuite.class.getResource("testorderby-ddl.sql"));
         project.addProcedures(PROCEDURES);
 
-        //* Single-server configuration  -- please do not remove or corrupt this structured comment
+        //* <-- Change this structured comment from '//'-style to 'block style' to toggle over
+        //      to just the one single-server IPC DEBUG config.
+        //      PLEASE AVOID USING '/' '*' block-style comments in the config code below to avoid
+        //      breaking this multi-part structured comment.
+        // IF (! DEBUG config) ...
+
+        // Single-server configuration
         config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-        // End single-server configuration  -- please do not remove or corrupt this structured comment */
+        // End single-server configuration.
 
-        //* HSQL backend server configuration  -- please do not remove or corrupt this structured comment
+        // HSQL backend server configuration
         config = new LocalCluster("testorderby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-        // End HSQL backend server configuration  -- please do not remove or corrupt this structured comment */
+        // End HSQL backend server configuration
 
-        //* Multi-server configuration  -- please do not remove or corrupt this structured comment
+        // Multi-server configuration
         config = new LocalCluster("testorderby-cluster.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI);
         // Disable hasLocalServer -- with hasLocalServer enabled,
         // multi-server pro configs mysteriously hang at startup under eclipse.
@@ -813,7 +819,21 @@ public class TestOrderBySuite extends RegressionSuite {
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-        // End multi-server configuration  -- please do not remove or corrupt this structured comment */
+        // End multi-server configuration
+
+        /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("testorderby-debug.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        // build the jarfile
+        success = config.compile(project);
+        assert(success);
+        // add this config to the set of tests to run
+        builder.addServerConfig(config);
+
+        // ... ENDIF (DEBUG config) [ FRAGILE! This ends the structured comment. Do not break it. ] */
 
         return builder;
     }

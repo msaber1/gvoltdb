@@ -44,101 +44,97 @@
  */
 
 #include "insertexecutor.h"
-#include "common/debuglog.h"
+
+#include "common/tabletuple.h"
 #include "common/ValueFactory.hpp"
 #include "common/ValuePeeker.hpp"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "common/types.h"
 #include "plannodes/insertnode.h"
 #include "execution/VoltDBEngine.h"
 #include "storage/persistenttable.h"
 #include "storage/streamedtable.h"
-#include "storage/table.h"
 #include "storage/tableiterator.h"
-#include "storage/tableutil.h"
 #include "storage/temptable.h"
 #include "storage/ConstraintFailureException.h"
 
 #include <vector>
 
 using namespace std;
-using namespace voltdb;
+
+namespace voltdb {
 
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
                             TempTableLimits* limits)
 {
     VOLT_TRACE("init Insert Executor");
 
-    m_node = dynamic_cast<InsertPlanNode*>(abstractNode);
-    assert(m_node);
-    assert(m_node->getTargetTable());
-    assert(m_node->getInputTables().size() == 1);
+    InsertPlanNode* node = dynamic_cast<InsertPlanNode*>(abstractNode);
+    assert(node);
+    assert(node->getTargetTable());
+    assert(node->getInputTables().size() == 1);
 
     setDMLCountOutputTable(limits);
 
-    m_inputTable = dynamic_cast<TempTable*>(m_node->getInputTables()[0]); //input table should be temptable
-    assert(m_inputTable);
+    TempTable* inputTable = node->getTempInputTable();
+    assert(inputTable); //input table should be temptable
 
     // Target table can be StreamedTable or PersistentTable and must not be NULL
-    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(m_node->getTargetTable());
+    PersistentTable *persistentTarget = dynamic_cast<PersistentTable*>(node->getTargetTable());
     m_partitionColumn = -1;
     m_partitionColumnIsString = false;
     m_isStreamed = (persistentTarget == NULL);
     if (persistentTarget) {
         m_partitionColumn = persistentTarget->partitionColumn();
         if (m_partitionColumn != -1) {
-            if (m_inputTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
+            if (inputTable->schema()->columnType(m_partitionColumn) == VALUE_TYPE_VARCHAR) {
                 m_partitionColumnIsString = true;
             }
         }
     }
 
-    m_multiPartition = m_node->isMultiPartition();
+    m_multiPartition = node->isMultiPartition();
     return true;
 }
 
-bool InsertExecutor::p_execute(const NValueArray &params) {
-    assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
-    assert(m_node);
-    assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
-    assert(m_inputTable);
-
+bool InsertExecutor::p_execute(const NValueArray &params)
+{
+    assert(dynamic_cast<InsertPlanNode*>(m_abstractNode));
+    InsertPlanNode* node = static_cast<InsertPlanNode*>(m_abstractNode);
+    assert(node);
+    TempTable* inputTable = node->getTempInputTable();
+    assert(inputTable);
     // Target table can be StreamedTable or PersistentTable and must not be NULL
     // Update target table reference from table delegate
-    Table* targetTable = m_node->getTargetTable();
+    Table* targetTable = node->getTargetTable();
     assert(targetTable);
     assert((targetTable == dynamic_cast<PersistentTable*>(targetTable)) ||
             (targetTable == dynamic_cast<StreamedTable*>(targetTable)));
 
-    TableTuple tbTuple = TableTuple(m_inputTable->schema());
+    TableTuple tbTuple = TableTuple(inputTable->schema());
 
-    VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
+    VOLT_TRACE("INPUT TABLE: %s\n", inputTable->debug().c_str());
 #ifdef DEBUG
     //
     // This should probably just be a warning in the future when we are
     // running in a distributed cluster
     //
-    if (m_inputTable->isTempTableEmpty()) {
-        VOLT_ERROR("No tuples were found in our input table '%s'",
-                   m_inputTable->name().c_str());
+    if (inputTable->isTempTableEmpty()) {
+        VOLT_ERROR("No tuples were found in our input table '%s'", inputTable->name().c_str());
         return false;
     }
 #endif
-    assert ( ! m_inputTable->isTempTableEmpty());
+    assert ( ! inputTable->isTempTableEmpty());
 
     // count the number of successful inserts
     int modifiedTuples = 0;
 
-    Table* outputTable = m_node->getOutputTable();
-    assert(outputTable);
+    assert(m_tmpOutputTable);
 
     //
     // An insert is quite simple really. We just loop through our m_inputTable
     // and insert any tuple that we find into our targetTable. It doesn't get any easier than that!
     //
-    assert (tbTuple.sizeInValues() == m_inputTable->columnCount());
-    TableIterator iterator = m_inputTable->iterator();
+    assert (tbTuple.sizeInValues() == inputTable->columnCount());
+    TableIterator iterator = inputTable->iterator();
     while (iterator.next(tbTuple)) {
         VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
                    tbTuple.debug(targetTable->name()).c_str(), targetTable->name().c_str(),
@@ -173,31 +169,21 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
         }
 
         // try to put the tuple into the target table
-        if (!targetTable->insertTuple(tbTuple)) {
-            VOLT_ERROR("Failed to insert tuple from input table '%s' into"
-                       " target table '%s'",
-                       m_inputTable->name().c_str(),
-                       targetTable->name().c_str());
-            return false;
-        }
+        targetTable->insertTuple(tbTuple);
 
         // successfully inserted
         modifiedTuples++;
     }
 
-    TableTuple& count_tuple = outputTable->tempTuple();
+    TableTuple& count_tuple = m_tmpOutputTable->tempTuple();
     count_tuple.setNValue(0, ValueFactory::getBigIntValue(modifiedTuples));
     // try to put the tuple into the output table
-    if (!outputTable->insertTuple(count_tuple)) {
-        VOLT_ERROR("Failed to insert tuple count (%d) into"
-                   " output table '%s'",
-                   modifiedTuples,
-                   outputTable->name().c_str());
-        return false;
-    }
+    m_tmpOutputTable->insertTempTuple(count_tuple);
 
     // add to the planfragments count of modified tuples
     m_engine->m_tuplesModified += modifiedTuples;
     VOLT_DEBUG("Finished inserting tuple");
     return true;
 }
+
+} // namespace voltdb

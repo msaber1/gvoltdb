@@ -72,10 +72,7 @@ public:
         : AbstractExecutor(engine, abstract_node)
         , m_lookupType(INDEX_LOOKUP_TYPE_INVALID)
     { }
-
     ~NestLoopIndexExecutor();
-
-    void updateTargetTableAndIndex();
 
 protected:
     bool p_init(AbstractPlanNode*,

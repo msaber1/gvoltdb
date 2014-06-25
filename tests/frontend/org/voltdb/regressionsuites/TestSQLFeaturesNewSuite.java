@@ -83,7 +83,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         try {
             client.callProcedure("TruncateTable");
         } catch (ProcCallException ex) {
-            System.out.println(ex.getMessage());
+            //* enable to debug */ System.out.println(ex.getMessage());
             e = ex;
             assertTrue(ex.getMessage().contains("CONSTRAINT VIOLATION"));
         } finally {
@@ -122,7 +122,7 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         }
 
         vt = client.callProcedure("@Explain", nestedLoopIndexJoin).getResults()[0];
-        System.err.println(vt);
+        //* enable to debug */ System.err.println(vt);
         assertTrue(vt.toString().contains("NESTLOOP INDEX INNER JOIN"));
         assertTrue(vt.toString().contains("inline INDEX SCAN of \"PTABLE\""));
         assertTrue(vt.toString().contains("SEQUENTIAL SCAN of \"RTABLE\""));
@@ -249,7 +249,10 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
 
         boolean success;
 
-        //* <-- Change this comment to 'block style' to toggle over to just the one single-server IPC DEBUG config.
+        //* <-- Change this structured comment from '//'-style to 'block style' to toggle over
+        //      to just the one single-server IPC DEBUG config.
+        //      PLEASE AVOID USING '/' '*' block-style comments in the config code below to avoid
+        //      breaking this multi-part structured comment.
         // IF (! DEBUG config) ...
 
         /////////////////////////////////////////////////////////////
@@ -295,14 +298,14 @@ public class TestSQLFeaturesNewSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
         /////////////////////////////////////////////////////////////
-        config = new LocalCluster("sqlfeatures-new-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        config = new LocalCluster("sqlfeatures-new-debug.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         // build the jarfile
         success = config.compile(project);
         assert(success);
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
-        // ... ENDIF (DEBUG config) [ FRAGILE! This is a structured comment. Do not break it. ] */
+        // ... ENDIF (DEBUG config) [ FRAGILE! This ends the structured comment. Do not break it. ] */
 
         return builder;
     }

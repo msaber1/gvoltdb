@@ -57,8 +57,7 @@ namespace voltdb {
         m_valueIdx(value_idx), m_paramValue()
     {
         VOLT_TRACE("ParameterValueExpression %d", value_idx);
-        ExecutorContext* context = ExecutorContext::getExecutorContext();
-        VoltDBEngine* engine = context->getEngine();
+        VoltDBEngine* engine = ExecutorContext::getEngine();
         assert(engine != NULL);
         NValueArray& params = engine->getParameterContainer();
         assert(value_idx < params.size());

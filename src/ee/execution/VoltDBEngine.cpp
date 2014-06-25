@@ -1184,7 +1184,7 @@ bool VoltDBEngine::initPlanNode(const int64_t fragId,
     // have internal Projections), then we need to make sure that we set that
     // internal node's executor as well
     if (node->getInlinePlanNodes().size() > 0) {
-        map<PlanNodeType, AbstractPlanNode*>::iterator internal_it;
+        map<PlanNodeType, AbstractPlanNode*>::const_iterator internal_it;
         for (internal_it = node->getInlinePlanNodes().begin();
              internal_it != node->getInlinePlanNodes().end(); internal_it++) {
             AbstractPlanNode* inline_node = internal_it->second;

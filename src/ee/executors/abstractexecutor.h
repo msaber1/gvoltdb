@@ -84,18 +84,24 @@ class AbstractExecutor {
         }
     }
 
-  protected:
-    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode) {
-        m_abstractNode = abstractNode;
-        m_tmpOutputTable = NULL;
-        m_engine = engine;
-    }
+protected:
+    //TODO: simplify the constructor definitions by setting all of these in init.
+    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
+        : m_abstractNode(abstractNode)
+        , m_tmpOutputTable(NULL)
+        , m_engine(engine)
+    { }
 
     /** Concrete executor classes implement initialization in p_init() */
+    //TODO: simplify the p_init signature -- the ABstractPlanNode is already available as a member.
+    // Should return void and indicate errors with a detailed fatal exception.
     virtual bool p_init(AbstractPlanNode*,
                         TempTableLimits* limits) = 0;
 
     /** Concrete executor classes impelmenet execution in p_execute() */
+    //TODO: simplify the p_execute signature -- params is seldom required and always available from
+    // the engine, anyway.
+    // Should return void and indicate errors with a detailed EE exception.
     virtual bool p_execute(const NValueArray& params) = 0;
 
     /**

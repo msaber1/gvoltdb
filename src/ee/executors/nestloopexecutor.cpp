@@ -42,22 +42,19 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+#include "nestloopexecutor.h"
+
+#include "common/tabletuple.h"
+#include "execution/ProgressMonitorProxy.h"
+#include "expressions/abstractexpression.h"
+#include "plannodes/limitnode.h"
+#include "plannodes/nestloopnode.h"
+#include "storage/temptable.h"
+#include "storage/tableiterator.h"
+
 #include <vector>
 #include <string>
 #include <stack>
-#include "nestloopexecutor.h"
-#include "common/debuglog.h"
-#include "common/common.h"
-#include "common/tabletuple.h"
-#include "common/FatalException.hpp"
-#include "execution/ProgressMonitorProxy.h"
-#include "expressions/abstractexpression.h"
-#include "expressions/tuplevalueexpression.h"
-#include "storage/table.h"
-#include "storage/temptable.h"
-#include "storage/tableiterator.h"
-#include "plannodes/nestloopnode.h"
-#include "plannodes/limitnode.h"
 
 #ifdef VOLT_DEBUG_ENABLED
 #include <ctime>
@@ -66,7 +63,8 @@
 #endif
 
 using namespace std;
-using namespace voltdb;
+
+namespace voltdb {
 
 bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
                               TempTableLimits* limits)
@@ -81,7 +79,7 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
 
     // NULL tuple for outer join
     if (node->getJoinType() == JOIN_TYPE_LEFT) {
-        Table* inner_table = node->getInputTables()[1];
+        Table* inner_table = node->getInputTable(1);
         assert(inner_table);
         m_null_tuple.init(inner_table->schema());
     }
@@ -104,10 +102,10 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     TempTable* output_table = dynamic_cast<TempTable*>(output_table_ptr);
     assert(output_table);
 
-    Table* outer_table = node->getInputTables()[0];
+    Table* outer_table = node->getInputTable(0);
     assert(outer_table);
 
-    Table* inner_table = node->getInputTables()[1];
+    Table* inner_table = node->getInputTable(1);
     assert(inner_table);
 
     VOLT_TRACE ("input table left:\n %s", outer_table->debug().c_str());
@@ -138,10 +136,6 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
                     "NULL" : wherePredicate->debug(true).c_str());
     }
 
-    // Join type
-    JoinType join_type = node->getJoinType();
-    assert(join_type == JOIN_TYPE_INNER || join_type == JOIN_TYPE_LEFT);
-
     LimitPlanNode* limit_node = dynamic_cast<LimitPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
     int limit = -1;
     int offset = -1;
@@ -149,12 +143,22 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
+    // Join type
+    JoinType join_type = node->getJoinType();
+    assert(join_type == JOIN_TYPE_INNER || join_type == JOIN_TYPE_LEFT);
+
     int outer_cols = outer_table->columnCount();
     int inner_cols = inner_table->columnCount();
-    TableTuple outer_tuple(node->getInputTables()[0]->schema());
-    TableTuple inner_tuple(node->getInputTables()[1]->schema());
+    TableTuple outer_tuple(outer_table->schema());
+    TableTuple inner_tuple(inner_table->schema());
+    // NULL tuple for outer join
+    TableTuple null_tuple;
+    if (join_type == JOIN_TYPE_LEFT) {
+        null_tuple = m_null_tuple;
+        null_tuple.setSchema(inner_table->schema());
+    }
+
     TableTuple &joined = output_table->tempTuple();
-    TableTuple null_tuple = m_null_tuple;
 
     TableIterator iterator0 = outer_table->iteratorDeletingAsWeGo();
     int tuple_ctr = 0;
@@ -221,3 +225,5 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
 
     return (true);
 }
+
+} // namespace voltdb

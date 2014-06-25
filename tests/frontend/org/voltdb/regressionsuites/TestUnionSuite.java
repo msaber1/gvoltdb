@@ -440,6 +440,12 @@ public class TestUnionSuite extends RegressionSuite {
         project.addStmtProcedure("InsertC", "INSERT INTO C VALUES(?, ?);");
         project.addStmtProcedure("InsertD", "INSERT INTO D VALUES(?, ?);");
 
+        //* <-- Change this structured comment from '//'-style to 'block style' to toggle over
+        //      to just the one single-server IPC DEBUG config.
+        //      PLEASE AVOID USING '/' '*' block-style comments in the config code below to avoid
+        //      breaking this multi-part structured comment.
+        // IF (! DEBUG config) ...
+
         // local
         config = new LocalCluster("testunion-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();
@@ -454,6 +460,21 @@ public class TestUnionSuite extends RegressionSuite {
         config = new LocalCluster("testunion-cluster.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
+
+        /*/ // ... ELSE (DEBUG config) ... [ FRAGILE! This is a structured comment. Do not break it. ]
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #0: DEBUG Local Site/Partition running on IPC backend
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("testorderby-debug.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        // build the jarfile
+        if (!config.compile(project)) {
+            fail();
+        }
+        // add this config to the set of tests to run
+        builder.addServerConfig(config);
+
+        // ... ENDIF (DEBUG config) [ FRAGILE! This ends the structured comment. Do not break it. ] */
 
         return builder;
     }

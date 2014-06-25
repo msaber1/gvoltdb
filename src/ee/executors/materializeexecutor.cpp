@@ -70,7 +70,7 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     // Create output table based on output schema from the plan
     setTempOutputTable(limits);
 
-    std::vector<AbstractExpression*>& columnExpressions = node->getOutputColumnExpressions();
+    const std::vector<AbstractExpression*>& columnExpressions = node->getOutputColumnExpressions();
 
     // initialize local variables
     all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(columnExpressions);
