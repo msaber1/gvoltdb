@@ -154,7 +154,13 @@ TupleSchema::createTupleSchema(const TupleSchema *first,
     return schema;
 }
 
-void TupleSchema::freeTupleSchema(TupleSchema *schema) {
+void TupleSchema::freeTupleSchema(TupleSchema *schema)
+{
+    if (schema) {
+        ::memset(schema, 0xdb, sizeof(TupleSchema) +
+                               (sizeof(ColumnInfo) * (schema->columnCount() + 1)) +
+                               (sizeof(int16_t) * schema->getUninlinedObjectColumnCount()));
+    }
     delete[] reinterpret_cast<char*>(schema);
 }
 

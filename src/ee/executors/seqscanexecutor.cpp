@@ -197,78 +197,95 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
         ProgressMonitorProxy pmp(m_engine, this, node->isSubQuery() ? NULL : input_table);
 
-        if (m_aggExec != NULL) {
+        if (m_aggExec == NULL) {
+            while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple)) {
+                VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
+                           tuple.debug(input_table->name()).c_str(), tuple_ctr,
+                           (int)input_table->activeTupleCount());
+                pmp.countdownProgress();
+                //
+                // For each tuple we need to evaluate it against our predicate
+                //
+                if (predicate == NULL || predicate->eval(&tuple, NULL).isTrue()) {
+                    // Check if we have to skip this tuple because of offset
+                    if (tuple_skipped < offset) {
+                        tuple_skipped++;
+                        continue;
+                    }
+                    ++tuple_ctr;
+
+                    //
+                    // Nested Projection
+                    // Project (or replace) values from input tuple
+                    //
+                    if (projection_node != NULL) {
+                        VOLT_TRACE("inline projection...");
+                        TableTuple temp_tuple;
+                        temp_tuple = output_temp_table->tempTuple();
+
+                        for (int ctr = 0; ctr < num_of_columns; ctr++) {
+                            NValue value =
+                                projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
+                            temp_tuple.setNValue(ctr, value);
+                        }
+
+                        output_temp_table->insertTempTuple(temp_tuple);
+                    }
+                    else {
+                        // Insert the tuple into our output table
+                        output_temp_table->insertTempTuple(tuple);
+                    }
+                }
+                pmp.countdownProgress();
+            }
+        }
+        else {
             m_aggExec->setAggregateOutputTable(output_temp_table);
             const TupleSchema * inputSchema = input_table->schema();
             if (projection_node != NULL) {
                 inputSchema = projection_node->getOutputTable()->schema();
             }
             m_aggExec->p_execute_init(params, &pmp, inputSchema);
-        }
 
-
-        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
-        {
-            VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
-                       tuple.debug(input_table->name()).c_str(), tuple_ctr,
-                       (int)input_table->activeTupleCount());
-            pmp.countdownProgress();
-            //
-            // For each tuple we need to evaluate it against our predicate
-            //
-            if (predicate == NULL || predicate->eval(&tuple, NULL).isTrue())
-            {
-                // Check if we have to skip this tuple because of offset
-                if (tuple_skipped < offset) {
-                    tuple_skipped++;
-                    continue;
-                }
-                ++tuple_ctr;
-
+            while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple)) {
+                VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
+                           tuple.debug(input_table->name()).c_str(), tuple_ctr,
+                           (int)input_table->activeTupleCount());
+                pmp.countdownProgress();
                 //
-                // Nested Projection
-                // Project (or replace) values from input tuple
+                // For each tuple we need to evaluate it against our predicate
                 //
-                if (projection_node != NULL)
-                {
-                    VOLT_TRACE("inline projection...");
-                    TableTuple temp_tuple;
-                    if (m_aggExec != NULL) {
-                        temp_tuple = projection_node->getOutputTable()->tempTuple();
-                    } else {
-                        temp_tuple = output_temp_table->tempTuple();
+                if (predicate == NULL || predicate->eval(&tuple, NULL).isTrue()) {
+                    // Check if we have to skip this tuple because of offset
+                    if (tuple_skipped < offset) {
+                        tuple_skipped++;
+                        continue;
                     }
+                    ++tuple_ctr;
 
-                    for (int ctr = 0; ctr < num_of_columns; ctr++) {
-                        NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
-                        temp_tuple.setNValue(ctr, value);
-                    }
+                    //
+                    // Nested Projection
+                    // Project (or replace) values from input tuple
+                    //
+                    if (projection_node != NULL) {
+                        VOLT_TRACE("inline projection...");
+                        TableTuple temp_tuple = projection_node->getOutputTable()->tempTuple();
 
-                    if (m_aggExec != NULL) {
+                        for (int ctr = 0; ctr < num_of_columns; ctr++) {
+                            NValue value =
+                                projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
+                            temp_tuple.setNValue(ctr, value);
+                        }
                         m_aggExec->p_execute_tuple(temp_tuple);
-                    } else {
-                        output_temp_table->insertTupleNonVirtual(temp_tuple);
                     }
-                }
-                else
-                {
-                    if (m_aggExec != NULL) {
+                    else {
                         m_aggExec->p_execute_tuple(tuple);
-                    } else {
-                        //
-                        // Insert the tuple into our output table
-                        //
-                        output_temp_table->insertTupleNonVirtual(tuple);
-                    }
                 }
                 pmp.countdownProgress();
             }
-        }
 
-        if (m_aggExec != NULL) {
             m_aggExec->p_execute_finish();
         }
-
     }
     //* for debug */std::cout << "SeqScanExecutor: node id " << node->getPlanNodeId() <<
     //* for debug */    " output table " << (void*)output_table <<
