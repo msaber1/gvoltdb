@@ -280,6 +280,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     }
                     else {
                         m_aggExec->p_execute_tuple(tuple);
+                    }
                 }
                 pmp.countdownProgress();
             }
