@@ -43,6 +43,7 @@ public class VoltZK {
     public static final String root = "/db";
 
     public static final String buildstring = "/db/buildstring";
+    public static final String startAction = "/db/start_action";
     public static final String catalogbytes = "/db/catalogbytes";
     //This node doesn't mean as much as it used to, it is accurate at startup
     //but isn't updated after elastic join. We use the cartographer for most things
@@ -104,6 +105,7 @@ public class VoltZK {
 
     public static final String elasticJoinActiveBlocker = ZKUtil.joinZKPath(elasticJoinActiveBlockers, "join_blocker");
     public static final String request_truncation_snapshot_node = ZKUtil.joinZKPath(request_truncation_snapshot, "request_");
+    public static final String start_action_node = ZKUtil.joinZKPath(startAction, "node_");
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {

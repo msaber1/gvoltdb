@@ -57,7 +57,6 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
-
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.log4j.Appender;
@@ -447,6 +446,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             //Start validating the build string in the background
             final Future<?> buildStringValidation = validateBuildString(getBuildString(), m_messenger.getZK());
+
+            validateStartAction(m_config.m_startAction, m_messenger.getZK());
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
             if (!isRejoin && !m_joining) {
@@ -2510,7 +2511,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 buildStringBytes,
                 Ids.OPEN_ACL_UNSAFE,
                 CreateMode.PERSISTENT,
-                new ZKUtil.StringCallback(),
+                new ZKUtil.StringCallback() {
+                    @Override
+                    public void processResult(int rc, String path, Object ctx, String name) {
+                        KeeperException.Code code = KeeperException.Code.get(rc);
+                        if (code == KeeperException.Code.OK) {
+                            System.out.println("The buildstring znode creation is succeed");
+                        } else {
+                            System.out.println("The buildstring znode creation is failed: " + code);
+                        }
+                    }
+                },
                 null);
 
         zk.getData(VoltZK.buildstring, false, new org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback() {
@@ -2539,6 +2550,55 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }, null);
 
         return retval;
+    }
+
+    private String validateStartAction(StartAction action, ZooKeeper zk) {
+//        byte[] startActionBytes = null;
+//        try {
+//            startActionBytes = action.toString().getBytes("UTF-8");
+//        } catch (UnsupportedEncodingException e) {
+//            // TODO Auto-generated catch block
+//            e.printStackTrace();
+//        }
+//        zk.create(VoltZK.startAction,
+//                startActionBytes,
+//                Ids.OPEN_ACL_UNSAFE,
+//                CreateMode.PERSISTENT,
+//                new ZKUtil.StringCallback()  {
+//                    @Override
+//                    public void processResult(int rc, String path, Object ctx, String name) {
+//                        KeeperException.Code code = KeeperException.Code.get(rc);
+//                        if (code == KeeperException.Code.OK) {
+//                            System.out.println("The buildstring znode creation is succeed");
+//                        } else {
+//                            System.out.println("The buildstring znode creation is failed: " + code);
+//                        }
+//                    }
+//                 }, null);
+//
+//        zk.create(VoltZK.start_action_node,
+//                startActionBytes,
+//                Ids.OPEN_ACL_UNSAFE,
+//                CreateMode.PERSISTENT_SEQUENTIAL,
+//                new ZKUtil.StringCallback()  {
+//                    @Override
+//                    public void processResult(int rc, String path, Object ctx, String name) {
+//                        KeeperException.Code code = KeeperException.Code.get(rc);
+//                        if (code == KeeperException.Code.OK) {
+//                            System.out.println("The buildstring znode creation is succeed");
+//                        } else {
+//                            System.out.println("The buildstring znode creation is failed: " + code);
+//                        }
+//                    }
+//                 }, null);
+//
+//        try {
+//            zk.getData(VoltZK.startAction, false, null);
+//        } catch (KeeperException | InterruptedException e) {
+//            // TODO Auto-generated catch block
+//            e.printStackTrace();
+//        }
+        return null;
     }
 
     /**
