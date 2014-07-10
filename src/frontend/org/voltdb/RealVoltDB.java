@@ -2553,51 +2553,52 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     private String validateStartAction(StartAction action, ZooKeeper zk) {
-//        byte[] startActionBytes = null;
-//        try {
-//            startActionBytes = action.toString().getBytes("UTF-8");
-//        } catch (UnsupportedEncodingException e) {
-//            // TODO Auto-generated catch block
-//            e.printStackTrace();
-//        }
-//        zk.create(VoltZK.startAction,
-//                startActionBytes,
-//                Ids.OPEN_ACL_UNSAFE,
-//                CreateMode.PERSISTENT,
-//                new ZKUtil.StringCallback()  {
-//                    @Override
-//                    public void processResult(int rc, String path, Object ctx, String name) {
-//                        KeeperException.Code code = KeeperException.Code.get(rc);
-//                        if (code == KeeperException.Code.OK) {
-//                            System.out.println("The buildstring znode creation is succeed");
-//                        } else {
-//                            System.out.println("The buildstring znode creation is failed: " + code);
-//                        }
-//                    }
-//                 }, null);
-//
-//        zk.create(VoltZK.start_action_node,
-//                startActionBytes,
-//                Ids.OPEN_ACL_UNSAFE,
-//                CreateMode.PERSISTENT_SEQUENTIAL,
-//                new ZKUtil.StringCallback()  {
-//                    @Override
-//                    public void processResult(int rc, String path, Object ctx, String name) {
-//                        KeeperException.Code code = KeeperException.Code.get(rc);
-//                        if (code == KeeperException.Code.OK) {
-//                            System.out.println("The buildstring znode creation is succeed");
-//                        } else {
-//                            System.out.println("The buildstring znode creation is failed: " + code);
-//                        }
-//                    }
-//                 }, null);
-//
-//        try {
-//            zk.getData(VoltZK.startAction, false, null);
-//        } catch (KeeperException | InterruptedException e) {
-//            // TODO Auto-generated catch block
-//            e.printStackTrace();
-//        }
+        byte[] startActionBytes = null;
+        try {
+            startActionBytes = action.toString().getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+        final byte[] finalStartActionBytes = startActionBytes;
+        zk.create(VoltZK.startAction,
+                null,
+                Ids.OPEN_ACL_UNSAFE,
+                CreateMode.PERSISTENT,
+                new ZKUtil.StringCallback()  {
+                    @Override
+                    public void processResult(int rc, String path, Object ctx, String name) {
+                        KeeperException.Code code = KeeperException.Code.get(rc);
+                        if (code == KeeperException.Code.OK) {
+                            System.out.println("The buildstring znode creation is succeed");
+                        } else {
+                            System.out.println("The buildstring znode creation is failed: " + code);
+                        }
+                    }
+                 }, null);
+
+        zk.create(VoltZK.start_action_node + m_messenger.getHostId(),
+                finalStartActionBytes,
+                Ids.OPEN_ACL_UNSAFE,
+                CreateMode.EPHEMERAL,
+                new ZKUtil.StringCallback()  {
+                    @Override
+                    public void processResult(int rc, String path, Object ctx, String name) {
+                        KeeperException.Code code = KeeperException.Code.get(rc);
+                        if (code == KeeperException.Code.OK) {
+                            System.out.println("The /db/start_action/node_" + m_messenger.getHostId() + " znode was created: " + finalStartActionBytes.toString());
+                        } else {
+                            System.out.println("The /db/start_action/node_" + m_messenger.getHostId() + " znode creation failed: " + code);
+                        }
+                    }
+                 }, null);
+
+        try {
+            zk.getData(VoltZK.startAction, false, null);
+        } catch (KeeperException | InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
         return null;
     }
 
