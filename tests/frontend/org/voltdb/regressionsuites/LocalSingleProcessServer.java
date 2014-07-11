@@ -114,7 +114,6 @@ public abstract class LocalSingleProcessServer implements VoltServerConfig {
         return m_compiled;
     }
 
-    @Override
     public boolean compileWithAdminMode(VoltProjectBuilder builder,
                                         int adminPort, boolean adminOnStartup)
     {

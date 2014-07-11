@@ -283,7 +283,9 @@ public class TestFailuresSuite extends RegressionSuite {
     // temp table serialization sizes. This needs more investigation.
     //
     public void testMemoryOverload() throws IOException, ProcCallException {
-        if (isHSQL() || isValgrind()) return;
+        if (isHSQL()) {
+            return;
+        }
 
         final int STRLEN = 30000;
 
@@ -362,7 +364,9 @@ public class TestFailuresSuite extends RegressionSuite {
     }
 
     public void testPerPlanFragmentMemoryOverload() throws IOException, ProcCallException {
-        if (isHSQL() || isValgrind()) return;
+        if (isHSQL()) {
+            return;
+        }
 
         System.out.println("STARTING testPerPlanFragmentMemoryOverload");
         Client client = getClient();
@@ -490,6 +494,9 @@ public class TestFailuresSuite extends RegressionSuite {
     static public Test suite() {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestFailuresSuite.class);
+        builder.disableIfMemcheck("valgrind makes memory overload hard to test",
+                "testMemoryOverload",
+                "testPerPlanFragmentMemoryOverload");
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();

@@ -378,6 +378,19 @@ public class VoltProjectBuilder {
     }
 
     /**
+     * Intended one-time setting of entire literal sql ddl schema for a test cluster.
+     * @return true unless there is some unexpected temp file io trouble.
+     */
+    public boolean setLiteralSchema(String ddlText) {
+        try {
+            addLiteralSchema(ddlText);
+            return true;
+        } catch (IOException ioex) {
+            return false;
+        }
+    }
+
+    /**
      * Add a schema based on a URL.
      * @param schemaURL Schema file URL
      */

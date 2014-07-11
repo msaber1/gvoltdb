@@ -190,12 +190,6 @@ public class TestAdminMode extends RegressionSuite
     // Somewhat hacky test of the LIVECLIENTS @Statistics selector
     public void testBacklogAndPolling() throws Exception
     {
-        if (isValgrind()) {
-            // no reasonable way to get the timing right in valgrind
-            // also, this test isn't really about c++ code
-            return;
-        }
-
         ClientConfig config = new ClientConfig();
         config.setProcedureCallTimeout(600000);
         final Client adminclient = ClientFactory.createClient(config);
@@ -318,23 +312,6 @@ public class TestAdminMode extends RegressionSuite
 //        }
 //    }
 
-    /**
-     * LocalSingleProcessServer is verboten, but it needs to be used here because
-     * LocalCluster doesn't yet do the right admin mode thing yet.
-     */
-    @SuppressWarnings("deprecation")
-    static class ForcedLocalSingleProcessServer extends LocalSingleProcessServer {
-        public ForcedLocalSingleProcessServer(String jarFileName,
-                int siteCount, BackendTarget target) {
-            super(jarFileName, siteCount, target);
-        }
-
-        @Override
-        public void setMaxHeap(int max) {
-            //Nothing
-        }
-    }
-
     @SuppressWarnings("deprecation")
     static public Test suite() throws IOException {
         // Set system property for 4sec CLIENT_HANGUP_TIMEOUT
@@ -342,16 +319,14 @@ public class TestAdminMode extends RegressionSuite
 
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestAdminMode.class);
-
+        builder.disableIfMemcheck("this test is timing sensitive and not about C++",
+                "testBacklogAndPolling");
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
-        boolean success;
-        ForcedLocalSingleProcessServer config =
-                new ForcedLocalSingleProcessServer("admin-mode1.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster("admin-mode1.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // Start in admin mode
-        success = config.compileWithAdminMode(project, 32323, true);
-        assertTrue(success);
+        assertTrue(config.compileWithAdminMode(project, 32323, true));
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);

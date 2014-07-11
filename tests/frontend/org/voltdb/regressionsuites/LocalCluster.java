@@ -304,6 +304,14 @@ public class LocalCluster implements VoltServerConfig {
         m_callingMethodName = name;
     }
 
+    public boolean compileWithLiteralSchema(String literalSchema) {
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        if ( ! builder.setLiteralSchema(literalSchema)) {
+            return false;
+        }
+        return compile(builder);
+    }
+
     @Override
     public boolean compile(VoltProjectBuilder builder) {
         if (!m_compiled) {
@@ -325,19 +333,18 @@ public class LocalCluster implements VoltServerConfig {
         return m_compiled;
     }
 
-    @Override
     public boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort, boolean adminOnStartup)
     {
-        // ATTN: LocalCluster does not support non-default admin ports.
-        // Need a way to correctly initializing the portGenerator
+        // ATTN: LocalCluster does not support non-default admin ports in all configurations.
+        // Needs a way of correctly initializing the portGenerator
         // and then resetting it after tests to the usual default.
-        if (adminPort != VoltDB.DEFAULT_ADMIN_PORT) {
+        if (adminPort != VoltDB.DEFAULT_ADMIN_PORT && (m_hostCount > 1 || m_kfactor > 0)) {
             return false;
         }
 
         if (!m_compiled) {
-            m_compiled = builder.compile(templateCmdLine.jarFileName(), m_siteCount, m_hostCount, m_kfactor,
-                    adminPort, adminOnStartup);
+            m_compiled = builder.compile(templateCmdLine.jarFileName(),
+                    m_siteCount, m_hostCount, m_kfactor, adminPort, adminOnStartup);
             templateCmdLine.pathToDeployment(builder.getPathToDeployment());
             m_voltdbroot = builder.getPathToVoltRoot().getAbsolutePath();
         }
@@ -1252,7 +1259,7 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_leader = config.m_leader;
     }
 
-    public boolean isMemcheckDefined() {
+    public static boolean isMemcheckDefined() {
         final String buildType = System.getenv().get("BUILD");
         if (buildType == null) {
             return false;

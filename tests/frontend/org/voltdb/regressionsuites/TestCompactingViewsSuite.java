@@ -116,11 +116,6 @@ public class TestCompactingViewsSuite extends RegressionSuite {
     }
 
     public void testPartitionedCompactingViews() throws Exception {
-        // hard to test compaction in valgrind via java (at the moment)
-        if (isValgrind()) {
-            return;
-        }
-
         runCompactingViewsForTable("PP.insert", "PP.delete", "selectPP");
         runCompactingViewsForTable("PR.insert", "deletePR", "selectPR");
     }
@@ -128,6 +123,8 @@ public class TestCompactingViewsSuite extends RegressionSuite {
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCompactingViewsSuite.class);
+        builder.disableIfMemcheck("valgrind makes compaction hard to test atm",
+                "testPartitionedCompactingViews");
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
 

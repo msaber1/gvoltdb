@@ -40,12 +40,6 @@ public class TestGiantDeleteSuite extends RegressionSuite {
 
     public void testGiantDelete() throws IOException, ProcCallException
     {
-        /*
-         * Times out with valgrind
-         */
-        if (isValgrind()) {
-            return;
-        }
         Client client = getClient(1000 * 60 * 10);
         for (int i = 0; i < 100; i++) {
             client.callProcedure("InsertBatch", 200000, 0, i * 200000);
@@ -80,8 +74,9 @@ public class TestGiantDeleteSuite extends RegressionSuite {
     static public junit.framework.Test suite() {
 
         VoltServerConfig config = null;
-        MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestGiantDeleteSuite.class);
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestGiantDeleteSuite.class);
+        builder.disableIfMemcheck("valgrind makes memory overload hard to test",
+                "testGiantDelete");
 
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(Insert.class.getResource("giant-delete-ddl.sql"));

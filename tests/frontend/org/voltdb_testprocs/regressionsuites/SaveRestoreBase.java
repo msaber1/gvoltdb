@@ -33,7 +33,6 @@ import org.voltdb.regressionsuites.RegressionSuite;
 public class SaveRestoreBase extends RegressionSuite {
     protected static final String TMPDIR = "/tmp/" + System.getProperty("user.name");
     protected static final String TESTNONCE = "testnonce";
-    protected static final String JAR_NAME = "sysproc-threesites.jar";
 
     public SaveRestoreBase(String s) {
         super(s);

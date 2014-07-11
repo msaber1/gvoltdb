@@ -109,9 +109,6 @@ public interface VoltServerConfig {
             String snapshotPath,
             String ppdPrefix);
 
-    boolean compileWithAdminMode(VoltProjectBuilder builder, int adminPort,
-                                 boolean adminOnStartup);
-
     /**
      * Create a directory so it is accessible
      * to all voltdb instances represented by this config from within each instances

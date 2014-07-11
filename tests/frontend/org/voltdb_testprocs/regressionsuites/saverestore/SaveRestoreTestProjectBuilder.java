@@ -27,8 +27,11 @@ import java.io.File;
 import java.io.IOException;
 import java.net.URL;
 
+import org.voltdb.BackendTarget;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
@@ -49,6 +52,7 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
 
     public static final URL ddlURL =
         SaveRestoreTestProjectBuilder.class.getResource("saverestore-ddl.sql");
+    public static final String JAR_NAME = "sysproc-threesites.jar";
     public static final String jarFilename = "saverestore.jar";
 
     public void addDefaultProcedures()
@@ -106,25 +110,78 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         return jarFilename;
     }
 
-    public Catalog createSaveRestoreSchemaCatalog() throws IOException
-    {
-        String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
-        String catalogJar = testDir + File.separator + "saverestore-jni.jar";
-
-        addAllDefaults();
-
-        boolean status = compile(catalogJar);
-        assert(status);
-
-        // read in the catalog
-        byte[] bytes = MiscUtils.fileToBytes(new File(catalogJar));
-        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
-        assert(serializedCatalog != null);
-
-        // create the catalog (that will be passed to the ClientInterface
-        Catalog catalog = new Catalog();
-        catalog.execute(serializedCatalog);
-
-        return catalog;
+    public static LocalCluster configureCluster(int site_count, int host_count, int k_factor) {
+        LocalCluster lc = new LocalCluster(JAR_NAME, site_count, host_count, k_factor,
+                                           BackendTarget.NATIVE_EE_JNI);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        if (lc.compile(project)) {
+            return lc;
+        }
+        return null;
     }
+
+    public static LocalCluster configureNoPartitioningCluster() {
+        LocalCluster lc = new LocalCluster(JAR_NAME, 3, 1, 9, BackendTarget.NATIVE_EE_JNI);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultProceduresNoPartitioning();
+        if (lc.compile(project)) {
+            return lc;
+        }
+        return null;
+    }
+
+    public static LocalCluster configureAltPartitioningCluster() {
+        LocalCluster lc = new LocalCluster(JAR_NAME, 3, 1, 9, BackendTarget.NATIVE_EE_JNI);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addDefaultSchema();
+        project.addDefaultProcedures();
+        project.addDefaultPartitioning();
+        // partition the original replicated table on its primary key
+        project.addPartitionInfo("REPLICATED_TESTER", "RT_ID");
+        if (lc.compile(project)) {
+            return lc;
+        }
+        return null;
+    }
+
+    public static LocalCluster configureAltSchemaCluster() {
+        LocalCluster lc = new LocalCluster(JAR_NAME, 3, 1, 9, BackendTarget.NATIVE_EE_JNI);
+        lc.setHasLocalServer(false);
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addSchema(SaveRestoreTestProjectBuilder.class.getResource("saverestore-altered-ddl.sql"));
+        project.addDefaultProcedures();
+        project.addDefaultPartitioning();
+        if (lc.compile(project)) {
+            return lc;
+        }
+        return null;
+    }
+
+    public static boolean addServerConfig(MultiConfigSuiteBuilder builder) {
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaults();
+        LocalCluster config = configureCluster(3, 1, 0);
+        if (config == null) {
+            return false;
+        }
+        builder.addServerConfig(config);
+        return true;
+    }
+
+    public static boolean addServerNoPartitioningConfig(MultiConfigSuiteBuilder builder) {
+        SaveRestoreTestProjectBuilder project = new SaveRestoreTestProjectBuilder();
+        project.addAllDefaultsNoPartitioning();
+        LocalCluster config = configureCluster(3, 1, 0);
+        if (config == null) {
+            return false;
+        }
+        builder.addServerConfig(config);
+        return true;
+    }
+
 }

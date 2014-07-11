@@ -138,22 +138,19 @@ public class ScanPerfTest extends TestCase {
 
         // build and compile a catalog
         System.out.println("Compiling catalog.");
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(TableHelper.ddlForTable(pTable));
-        builder.addLiteralSchema("PARTITION TABLE P ON COLUMN ID;\n" +
+        String literalSchema = TableHelper.ddlForTable(pTable) +
+                "PARTITION TABLE P ON COLUMN ID;\n" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.planner.ScanPerfTest$ScanTable;\n" +
-                "PARTITION PROCEDURE ScanPerfTest$ScanTable ON TABLE P COLUMN ID;\n");
+                "PARTITION PROCEDURE ScanPerfTest$ScanTable ON TABLE P COLUMN ID;\n";
         cluster = new LocalCluster("scanperf.jar", 8, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        cluster.setHasLocalServer(false);
         //cluster.setMaxHeap(10);
-        boolean success = cluster.compile(builder);
-        assertTrue(success);
+        assertTrue(cluster.compileWithLiteralSchema(literalSchema));
 
         //fail();
 
         System.out.println("Starting cluster.");
-        cluster.setHasLocalServer(false);
-        cluster.overrideAnyRequestForValgrind();
-        cluster.startUp(true, ReplicationRole.NONE);
+        cluster.startUp();
 
         System.out.println("Getting client connected.");
         ClientConfig clientConfig = new ClientConfig();

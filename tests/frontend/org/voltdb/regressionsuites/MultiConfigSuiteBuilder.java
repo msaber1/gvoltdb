@@ -26,7 +26,9 @@ package org.voltdb.regressionsuites;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import junit.framework.Test;
 import junit.framework.TestCase;
@@ -47,7 +49,8 @@ public class MultiConfigSuiteBuilder extends TestSuite {
 
     /** The class that contains the JUnit test methods to run */
     Class<? extends TestCase> m_testClass = null;
-
+    String m_whyMemcheckRunIsDisabled = null;
+    String[] m_memcheckSkipMethods = new String[]{};
     /**
      * Get the JUnit test methods for a given class. These methods have no
      * parameters, return void and start with "test".
@@ -55,17 +58,24 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @param testCls The class that contains the JUnit test methods to run.
      * @return A list of the names of each JUnit test method.
      */
-    static List<String> getTestMethodNames(Class<? extends TestCase> testCls) {
+    private List<String> getTestMethodNames(Set<String> bannedList) {
         ArrayList<String> retval = new ArrayList<String>();
 
-        for (Method m : testCls.getMethods()) {
-            if (m.getReturnType() != void.class)
+        for (Method method : m_testClass.getMethods()) {
+            if (method.getReturnType() != void.class) {
                 continue;
-            if (m.getParameterTypes().length > 0)
+            }
+            if (method.getParameterTypes().length > 0) {
                 continue;
-            if (m.getName().startsWith("test") == false)
+            }
+            String methodName = method.getName();
+            if ( ! methodName.startsWith("test")) {
                 continue;
-            retval.add(m.getName());
+            }
+            if (bannedList != null && bannedList.contains(methodName)) {
+                continue;
+            }
+            retval.add(method.getName());
         }
 
         return retval;
@@ -78,6 +88,12 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      */
     public MultiConfigSuiteBuilder(Class<? extends TestCase> testClass) {
         m_testClass = testClass;
+    }
+
+    public void disableIfMemcheck(String reasonMemcheckDisabled, String...methodNames) {
+        assert(reasonMemcheckDisabled != null);
+        m_whyMemcheckRunIsDisabled = reasonMemcheckDisabled;
+        m_memcheckSkipMethods = methodNames;
     }
 
     /**
@@ -103,8 +119,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         final String enabled_configs = System.getenv().get("VOLT_REGRESSIONS");
         System.out.println("VOLT REGRESSIONS ENABLED: " + enabled_configs);
 
-        if (!(enabled_configs == null || enabled_configs.contentEquals("all")))
-        {
+        if (enabled_configs != null && ! enabled_configs.contentEquals("all")) {
             if (config instanceof LocalCluster) {
                 if (config.isHSQL() && !enabled_configs.contains("hsql")) {
                     return true;
@@ -118,13 +133,29 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             }
         }
 
+        Set<String> bannedList = new HashSet<String>();
         final String buildType = System.getenv().get("BUILD");
         if (buildType != null) {
             if (buildType.startsWith("memcheck")) {
+                // don't run valgrind if configured not to
+                if (m_whyMemcheckRunIsDisabled != null) {
+                    if (m_memcheckSkipMethods.length == 0) {
+                        System.out.println("The JUNIT suite " + m_testClass.getCanonicalName() +
+                                " is disabled for BUILD=memcheck because " + m_whyMemcheckRunIsDisabled);
+                        return true;
+                    }
+                    for (String methodName : m_memcheckSkipMethods) {
+                        bannedList.add(methodName);
+                    }
+                }
                 if (config instanceof LocalCluster) {
                     LocalCluster lc = (LocalCluster) config;
-                    // don't run valgrind on multi-node clusters without embedded processes
-                    if ((lc.getNodeCount() > 1) || (lc.m_hasLocalServer == false)) {
+                    // don't run valgrind on multi-node clusters
+                    if (lc.getNodeCount() > 1) {
+                        return true;
+                    }
+                    // don't run valgrind on clusters without embedded processes ???
+                    if ( ! lc.m_hasLocalServer) {
                         return true;
                     }
                 }
@@ -144,7 +175,7 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         }
 
         // get the set of test methods
-        List<String> methods = getTestMethodNames(m_testClass);
+        List<String> methods = getTestMethodNames(bannedList);
 
         // add a test case instance for each method for the specified
         // server config

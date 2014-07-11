@@ -56,7 +56,7 @@ public class TestTempTableMemoryKnob extends RegressionSuite {
     // but in this case we bump up the temp table limit so that it doesn't
     // throw a proc call exception.
     public void testPerPlanFragmentMemoryKnob() throws IOException, ProcCallException {
-        if (isHSQL() || isValgrind()) return;
+        if (isHSQL()) return;
 
         System.out.println("STARTING testPerPlanFragmentMemoryKnob");
         Client client = getClient();
@@ -73,26 +73,21 @@ public class TestTempTableMemoryKnob extends RegressionSuite {
             System.err.println("Inserted " + (mb + 5) + "mb");
         }
 
-        boolean threw = false;
-        try
-        {
+        try {
             results = client.callProcedure("FetchTooMuch", 0).getResults();
             assertEquals(1, results.length);
             System.out.println("Fetched the 300 megabytes");
         }
-        catch (ProcCallException e)
-        {
+        catch (ProcCallException e) {
             e.printStackTrace();
-            threw = true;
+            fail("Should have successfully completed a select with 300MB temp table but didn't");
         }
-        assertFalse("Should have successfully completed a select with 300MB temp table but didn't",
-                    threw);
     }
 
     static public Test suite() {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestTempTableMemoryKnob.class);
-
+        builder.disableIfMemcheck(" it would be redundant and slow.");
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////

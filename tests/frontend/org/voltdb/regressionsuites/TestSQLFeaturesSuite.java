@@ -356,7 +356,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     }
 
     public void testJoinOrder() throws Exception {
-        if (isHSQL() || isValgrind() || VoltCompiler.DEBUG_VERIFY_CATALOG) {
+        if (isHSQL() || VoltCompiler.DEBUG_VERIFY_CATALOG) {
             // This test is disabled for verifycatalog until join order is supported in the DDL and explain plan
             return;
         }
