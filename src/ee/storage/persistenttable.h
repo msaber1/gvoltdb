@@ -497,6 +497,9 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
+public: bool m_debugVerboseIndexDelete;
+public: std::time_t m_time;
+
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :

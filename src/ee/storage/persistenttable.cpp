@@ -93,6 +93,8 @@ PersistentTable::PersistentTable(int partitionColumn, int tableAllocationTargetS
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this)
+    , m_debugVerboseIndexDelete(false)
+    , m_time(0)
 {
     for (int ii = 0; ii < TUPLE_BLOCK_NUM_BUCKETS; ii++) {
         m_blocksNotPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
@@ -684,11 +686,20 @@ void PersistentTable::insertIntoAllIndexes(TableTuple *tuple) {
 }
 
 void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
+    if (m_debugVerboseIndexDelete) {
+        m_time = std::time(0);
+    }
     BOOST_FOREACH(TableIndex *index, m_indexes) {
+        if (m_debugVerboseIndexDelete) {
+            std::cout << "Deleting tuples from table " << m_name << "'s index " << index->getName() << " with id " << index->getId() << std::endl;
+        }
         if (!index->deleteEntry(tuple)) {
             throwFatalException(
                     "Failed to delete tuple in Table: %s Index %s", m_name.c_str(), index->getName().c_str());
         }
+    }
+    if (m_debugVerboseIndexDelete) {
+        m_debugVerboseIndexDelete = false;
     }
 }
 

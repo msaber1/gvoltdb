@@ -110,6 +110,7 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     }
     else
     {
+        m_targetTable->m_debugVerboseIndexDelete = true;
         assert(m_inputTable);
         assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
         assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
@@ -132,6 +133,8 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
                 return false;
             }
         }
+        cout << "m_debugVerboseIndexDelete: Deleted tuples from table " << m_targetTable->name() << " in about "
+             << m_targetTable->m_time - std::time(0) << " seconds." << endl;
         modified_tuples = m_inputTable->tempTableTupleCount();
         VOLT_TRACE("Deleted %d rows from table : %s with %d active, %d visible, %d allocated",
                    (int)modified_tuples,
