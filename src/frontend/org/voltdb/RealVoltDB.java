@@ -2594,6 +2594,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
     }
 
+    class StartActionWatcher implements Watcher {
+
+        @Override
+        public void process(WatchedEvent event) {
+            scheduleWork(new Runnable() {
+                @Override
+                public void run() {
+                    ZooKeeper zk = m_messenger.getZK();
+                    ChildrenCallback cb = new ChildrenCallback();
+                    zk.getChildren(VoltZK.startAction, new StartActionWatcher(), cb, null);
+                    try {
+                        processChildInfo(zk, cb);
+                    } catch (InterruptedException | KeeperException
+                            | TimeoutException e) {
+                        // TODO Auto-generated catch block
+                        e.printStackTrace();
+                    }
+                }
+            }, 0, 0, TimeUnit.MILLISECONDS);
+        }
+
+    }
+
     private Future<?> validateStartAction(StartAction action, ZooKeeper zk) {
         byte[] startActionBytes = null;
         final SettableFuture<Object> retval = SettableFuture.create();
@@ -2647,28 +2670,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         }
 
         final ChildrenCallback cb = new ChildrenCallback();
-        zk.getChildren(VoltZK.startAction, new Watcher() {
-
-            @Override
-            public void process(WatchedEvent event) {
-
-                scheduleWork(new Runnable() {
-                    @Override
-                    public void run() {
-                        // TODO Auto-generated method stub
-                        try {
-                            processChildInfo(m_messenger.getZK(), cb);
-                        } catch (InterruptedException | KeeperException
-                                | TimeoutException e) {
-                            // TODO Auto-generated catch block
-                            e.printStackTrace();
-                        }
-                    }
-                }, 0, 0, TimeUnit.MILLISECONDS);
-
-            }
-
-        }, cb, null);
+        zk.getChildren(VoltZK.startAction, new StartActionWatcher(), cb, null);
         try {
             processChildInfo(zk, cb);
         } catch (InterruptedException | KeeperException | TimeoutException e) {
