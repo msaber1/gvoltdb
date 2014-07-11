@@ -2651,13 +2651,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
             @Override
             public void process(WatchedEvent event) {
-                try {
-                    processChildInfo(m_messenger.getZK(), cb);
-                } catch (InterruptedException | KeeperException
-                        | TimeoutException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
+
+                scheduleWork(new Runnable() {
+                    @Override
+                    public void run() {
+                        // TODO Auto-generated method stub
+                        try {
+                            processChildInfo(m_messenger.getZK(), cb);
+                        } catch (InterruptedException | KeeperException
+                                | TimeoutException e) {
+                            // TODO Auto-generated catch block
+                            e.printStackTrace();
+                        }
+                    }
+                }, 0, 0, TimeUnit.MILLISECONDS);
 
             }
 
