@@ -68,6 +68,8 @@ import org.apache.log4j.FileAppender;
 import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.WatchedEvent;
+import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -2644,8 +2646,22 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             e.printStackTrace();
         }
 
-        ChildrenCallback cb = new ChildrenCallback();
-        zk.getChildren(VoltZK.startAction, false, cb, null);
+        final ChildrenCallback cb = new ChildrenCallback();
+        zk.getChildren(VoltZK.startAction, new Watcher() {
+
+            @Override
+            public void process(WatchedEvent event) {
+                try {
+                    processChildInfo(m_messenger.getZK(), cb);
+                } catch (InterruptedException | KeeperException
+                        | TimeoutException e) {
+                    // TODO Auto-generated catch block
+                    e.printStackTrace();
+                }
+
+            }
+
+        }, cb, null);
         try {
             processChildInfo(zk, cb);
         } catch (InterruptedException | KeeperException | TimeoutException e) {
