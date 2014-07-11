@@ -38,6 +38,7 @@ import java.net.SocketException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -56,6 +57,7 @@ import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.cassandra_voltpatches.GCInspector;
@@ -82,6 +84,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.ZKCountdownLatch;
 import org.voltcore.zk.ZKUtil;
+import org.voltcore.zk.ZKUtil.ChildrenCallback;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Cluster;
@@ -2576,6 +2579,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return retval;
     }
 
+    private void processChildInfo(ZooKeeper zk, ChildrenCallback cb) throws InterruptedException, KeeperException, TimeoutException {
+        Object[] result = cb.get(5, TimeUnit.SECONDS);
+        @SuppressWarnings("unchecked")
+        List<String> children = (List<String>) result[3];
+        if (!children.isEmpty()) {
+            Collections.sort(children);
+            String leader = children.get(0);
+            for (String child : children) {
+                System.out.println("processChildInfo: [" + child + "]:" + new String(zk.getData(VoltZK.startAction + "/" + child, false, null)));
+            }
+        }
+    }
+
     private Future<?> validateStartAction(StartAction action, ZooKeeper zk) {
         byte[] startActionBytes = null;
         final SettableFuture<Object> retval = SettableFuture.create();
@@ -2624,6 +2640,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 initCompleted = true;
             }
         } catch (KeeperException | InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+
+        ChildrenCallback cb = new ChildrenCallback();
+        zk.getChildren(VoltZK.startAction, false, cb, null);
+        try {
+            processChildInfo(zk, cb);
+        } catch (InterruptedException | KeeperException | TimeoutException e) {
             // TODO Auto-generated catch block
             e.printStackTrace();
         }
