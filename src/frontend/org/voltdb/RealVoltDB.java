@@ -2638,7 +2638,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     if (startActionAtLeader.equals("CREATE")) {
                         if (startAction.equals("CREATE")) {
                             retval.set(null);
-                        } else if (startAction.equals("ADD")) {
+                        } else if (startAction.equals("JOIN")) {
                             retval.setException(new Exception("You could not add a node during start process, must create first"));
                         }
                     }
