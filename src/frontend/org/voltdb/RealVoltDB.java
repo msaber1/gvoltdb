@@ -2591,7 +2591,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     if (nodeId == m_messenger.getHostId()) {
                         VoltDB.crashLocalVoltDB("Add a node during start process is not allowed, must create first");
                     } else {
-                        consoleLog.l7dlog(Level.WARN, "Node " + nodeId + "tried to join but it is not allowed at create time", null);
+                        //consoleLog.l7dlog(Level.WARN, "Node " + nodeId + "tried to join but it is not allowed at create time", null);
                         hostLog.warn("Node " + nodeId + "tried to join but it is not allowed at create time");
                     }
                 }
