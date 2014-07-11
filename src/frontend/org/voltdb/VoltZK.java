@@ -44,6 +44,7 @@ public class VoltZK {
 
     public static final String buildstring = "/db/buildstring";
     public static final String startAction = "/db/start_action";
+    public static final String initCompleted = "/db/init_completed";
     public static final String catalogbytes = "/db/catalogbytes";
     //This node doesn't mean as much as it used to, it is accurate at startup
     //but isn't updated after elastic join. We use the cartographer for most things

@@ -57,6 +57,7 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import org.apache.cassandra_voltpatches.GCInspector;
 import org.apache.hadoop_voltpatches.util.PureJavaCrc32;
 import org.apache.log4j.Appender;
@@ -447,7 +448,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             //Start validating the build string in the background
             final Future<?> buildStringValidation = validateBuildString(getBuildString(), m_messenger.getZK());
 
-            validateStartAction(m_config.m_startAction, m_messenger.getZK());
+            final Future<?> startActionValidation = validateStartAction(m_config.m_startAction, m_messenger.getZK());
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
             if (!isRejoin && !m_joining) {
@@ -518,6 +519,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Failed to instantiate join coordinator", true, e);
                 }
+            }
+
+            try {
+                startActionValidation.get();
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
             }
 
             /*
@@ -2343,6 +2350,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             m_mode = OperationMode.RUNNING;
         }
         consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_ServerCompletedInitialization.name(), null);
+
+        // Create a zk node to indicate initialization is completed
+        m_messenger.getZK().create(VoltZK.initCompleted,
+                null,
+                Ids.OPEN_ACL_UNSAFE,
+                CreateMode.PERSISTENT,
+                new ZKUtil.StringCallback() {
+                    @Override
+                    public void processResult(int rc, String path, Object ctx, String name) {
+                        KeeperException.Code code = KeeperException.Code.get(rc);
+                        if (code == KeeperException.Code.OK) {
+                            System.out.println("The /db/init_completed znode creation succeed");
+                        } else {
+                            System.out.println("The /db/init_completed znode creation failed: " + code);
+                        }
+                    }
+        }, null);
     }
 
     @Override
@@ -2552,7 +2576,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         return retval;
     }
 
-    private String validateStartAction(StartAction action, ZooKeeper zk) {
+    private Future<?> validateStartAction(StartAction action, ZooKeeper zk) {
         byte[] startActionBytes = null;
         final SettableFuture<Object> retval = SettableFuture.create();
         try {
@@ -2594,23 +2618,37 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     }
                  }, null);
 
-//        zk.getData(VoltZK.start_action_node + "0", false, new org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback() {
-//            @Override
-//            public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat) {
-//                KeeperException.Code code = KeeperException.Code.get(rc);
-//                if (code == KeeperException.Code.OK) {
-//                    String startAction = new String(finalStartActionBytes);
-//                    String startActionAtLeader = new String(data);
-//                    if (startActionAtLeader == "c") {
-//                        retval.set(null);
-//                    }
-//                } else {
-//                    retval.setException(KeeperException.create(code));
-//                }
-//            }
-//        }, null);
+        boolean initCompleted = false;
+        try {
+            if (zk.exists(VoltZK.initCompleted, false) != null) {
+                initCompleted = true;
+            }
+        } catch (KeeperException | InterruptedException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
 
-        return null;
+        zk.getData(VoltZK.start_action_node + "0", false, new org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback() {
+            @Override
+            public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat) {
+                KeeperException.Code code = KeeperException.Code.get(rc);
+                if (code == KeeperException.Code.OK) {
+                    String startAction = new String(finalStartActionBytes);
+                    String startActionAtLeader = new String(data);
+                    if (startActionAtLeader.equals("CREATE")) {
+                        if (startAction.equals("CREATE")) {
+                            retval.set(null);
+                        } else if (startAction.equals("ADD")) {
+                            retval.setException(new Exception("You could not add a node during start process, must create first"));
+                        }
+                    }
+                } else {
+                    retval.setException(KeeperException.create(code));
+                }
+            }
+        }, null);
+
+        return retval;
     }
 
     /**
