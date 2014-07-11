@@ -2554,6 +2554,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
 
     private String validateStartAction(StartAction action, ZooKeeper zk) {
         byte[] startActionBytes = null;
+        final SettableFuture<Object> retval = SettableFuture.create();
         try {
             startActionBytes = action.toString().getBytes("UTF-8");
         } catch (UnsupportedEncodingException e) {
@@ -2570,9 +2571,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     public void processResult(int rc, String path, Object ctx, String name) {
                         KeeperException.Code code = KeeperException.Code.get(rc);
                         if (code == KeeperException.Code.OK) {
-                            System.out.println("The buildstring znode creation is succeed");
+                            System.out.println("The startAction znode creation succeed");
                         } else {
-                            System.out.println("The buildstring znode creation is failed: " + code);
+                            System.out.println("The startAction znode creation failed: " + code);
                         }
                     }
                  }, null);
@@ -2586,19 +2587,29 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                     public void processResult(int rc, String path, Object ctx, String name) {
                         KeeperException.Code code = KeeperException.Code.get(rc);
                         if (code == KeeperException.Code.OK) {
-                            System.out.println("The /db/start_action/node_" + m_messenger.getHostId() + " znode was created: " + finalStartActionBytes.toString());
+                            System.out.println("The /db/start_action/node_" + m_messenger.getHostId() + " znode was created: " + new String(finalStartActionBytes));
                         } else {
                             System.out.println("The /db/start_action/node_" + m_messenger.getHostId() + " znode creation failed: " + code);
                         }
                     }
                  }, null);
 
-        try {
-            zk.getData(VoltZK.startAction, false, null);
-        } catch (KeeperException | InterruptedException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
+//        zk.getData(VoltZK.start_action_node + "0", false, new org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback() {
+//            @Override
+//            public void processResult(int rc, String path, Object ctx, byte[] data, Stat stat) {
+//                KeeperException.Code code = KeeperException.Code.get(rc);
+//                if (code == KeeperException.Code.OK) {
+//                    String startAction = new String(finalStartActionBytes);
+//                    String startActionAtLeader = new String(data);
+//                    if (startActionAtLeader == "c") {
+//                        retval.set(null);
+//                    }
+//                } else {
+//                    retval.setException(KeeperException.create(code));
+//                }
+//            }
+//        }, null);
+
         return null;
     }
 
