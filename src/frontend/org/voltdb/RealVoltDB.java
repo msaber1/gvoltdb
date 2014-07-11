@@ -526,12 +526,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 }
             }
 
-            try {
-                startActionValidation.get();
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
-            }
-
             /*
              * Construct all the mailboxes for things that need to be globally addressable so they can be published
              * in one atomic shot.
@@ -2582,6 +2576,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
     }
 
     private void processChildInfo(ZooKeeper zk, ChildrenCallback cb) throws InterruptedException, KeeperException, TimeoutException {
+        boolean initCompleted = zk.exists(VoltZK.initCompleted, false) != null;
         Object[] result = cb.get(5, TimeUnit.SECONDS);
         @SuppressWarnings("unchecked")
         List<String> children = (List<String>) result[3];
@@ -2590,6 +2585,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             String leader = children.get(0);
             for (String child : children) {
                 System.out.println("processChildInfo: [" + child + "]:" + new String(zk.getData(VoltZK.startAction + "/" + child, false, null)));
+                if (child.equals("JOIN") && !initCompleted) {
+                    int nodeId = Integer.parseInt(child.split("_")[1]);
+                    if (nodeId == m_messenger.getHostId()) {
+                        VoltDB.crashLocalVoltDB("Add a node during start process is not allowed, must create first");
+                    } else {
+                        consoleLog.l7dlog(Level.WARN, "Node " + nodeId + "tried to join but it is not allowed at create time", null);
+                        hostLog.warn("Node " + nodeId + "tried to join but it is not allowed at create time");
+                    }
+                }
             }
         }
     }
