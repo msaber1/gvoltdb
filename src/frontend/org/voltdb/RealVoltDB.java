@@ -2584,8 +2584,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             Collections.sort(children);
             String leader = children.get(0);
             for (String child : children) {
-                System.out.println("processChildInfo: [" + child + "]:" + new String(zk.getData(VoltZK.startAction + "/" + child, false, null)));
-                if (child.equals("JOIN") && !initCompleted) {
+                String startAction = new String(zk.getData(VoltZK.startAction + "/" + child, false, null));
+                System.out.println("processChildInfo: [" + child + "]:" + startAction);
+                if (startAction.equals("JOIN") && !initCompleted) {
                     int nodeId = Integer.parseInt(child.split("_")[1]);
                     if (nodeId == m_messenger.getHostId()) {
                         VoltDB.crashLocalVoltDB("Add a node during start process is not allowed, must create first");
