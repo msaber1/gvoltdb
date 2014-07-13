@@ -28,8 +28,6 @@ import java.io.IOException;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.TheHashinator;
-import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.benchmark.tpcc.procedures.UpdateNewOrder;
@@ -216,12 +214,7 @@ public class TestMultiPartitionSuite extends RegressionSuite {
 
     public void testWrongPartitioning() throws IOException, ProcCallException {
         // Restrict to clustered tests (configured with > 1 partition)
-        LocalCluster config = (LocalCluster)this.getServerConfig();
-        int sites = config.m_siteCount;
-        int nodes = config.m_hostCount;
-        int k = config.m_kfactor;
-        int parts = (nodes * sites) / (k + 1);
-        if (parts == 1) {
+        if (isSinglePartitionConfig()) {
             return;
         }
 

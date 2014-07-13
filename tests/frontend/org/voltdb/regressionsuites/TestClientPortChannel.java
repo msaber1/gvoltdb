@@ -26,8 +26,8 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.SecureRandom;
+
 import junit.framework.TestCase;
-import org.voltdb.BackendTarget;
 
 import org.voltdb.client.ConnectionUtil;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -72,12 +72,11 @@ public class TestClientPortChannel extends TestCase {
             builder.addLiteralSchema(mySchema);
             String catalogJar = "dummy.jar";
 
-            m_config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
+            m_config = new LocalCluster(catalogJar, 2, 1, 0);
+            m_config.disableEmbeddedServer();
             m_config.portGenerator.enablePortProvider();
             m_config.portGenerator.pprovider.setNextClient(m_clientPort);
             m_config.portGenerator.pprovider.setAdmin(m_adminPort);
-            m_config.setHasLocalServer(false);
             boolean success = m_config.compile(builder);
             assertTrue(success);
 

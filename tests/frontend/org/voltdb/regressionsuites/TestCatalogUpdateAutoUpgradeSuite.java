@@ -25,13 +25,11 @@ package org.voltdb.regressionsuites;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.HashMap;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -238,13 +236,13 @@ public class TestCatalogUpdateAutoUpgradeSuite extends RegressionSuite {
         upgradeCatalogXMLPath = upgradeCatalogBasePath + ".xml";
         upgradeCatalogJarPath = upgradeCatalogBasePath + ".jar";
 
-        HashMap<String, String> env = new HashMap<String, String>();
         // If we are doing something special with a stored procedure it will be on HostId 0
-        env.put("__VOLTDB_TARGET_CLUSTER_HOSTID__", "0");
-        LocalCluster config = new LocalCluster("catalogupdate-for-upgrade.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI, env);
+        LocalCluster config =
+                new LocalCluster("catalogupdate-for-upgrade.jar", SITES_PER_HOST, HOSTS, K);
+        config.disableEmbeddedServer();
+        config.setJavaProperty("__VOLTDB_TARGET_CLUSTER_HOSTID__", "0");
         boolean compile = config.compile(project);
         assertTrue(compile);
-        config.setHasLocalServer(false);
         builder.addServerConfig(config);
 
         MiscUtils.copyFile(project.getPathToDeployment(), upgradeCatalogXMLPath);

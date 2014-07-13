@@ -29,8 +29,6 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.ReplicationRole;
 import org.voltdb.SQLStmt;
 import org.voltdb.TableHelper;
 import org.voltdb.VoltProcedure;
@@ -143,7 +141,8 @@ public class ScanPerfTest extends TestCase {
         builder.addLiteralSchema("PARTITION TABLE P ON COLUMN ID;\n" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.planner.ScanPerfTest$ScanTable;\n" +
                 "PARTITION PROCEDURE ScanPerfTest$ScanTable ON TABLE P COLUMN ID;\n");
-        cluster = new LocalCluster("scanperf.jar", 8, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        cluster = new LocalCluster("scanperf.jar", 8, 1, 0);
+        cluster.disableEmbeddedServer();
         //cluster.setMaxHeap(10);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -151,9 +150,12 @@ public class ScanPerfTest extends TestCase {
         //fail();
 
         System.out.println("Starting cluster.");
-        cluster.setHasLocalServer(false);
-        cluster.overrideAnyRequestForValgrind();
-        cluster.startUp(true, ReplicationRole.NONE);
+        if (LocalCluster.isMemcheckDefined()) {
+            System.out.println("Warning: timings MAY be getting fouled by valgrind " +
+                    "and/or de-optimized EE memory management, so look at this -Dbuild=memcheck run " +
+                    "as a correctness check rather than a performance test.");
+        }
+        cluster.startUp();
 
         System.out.println("Getting client connected.");
         ClientConfig clientConfig = new ClientConfig();

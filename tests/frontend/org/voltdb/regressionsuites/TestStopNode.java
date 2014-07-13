@@ -26,10 +26,8 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
-
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -177,8 +175,7 @@ public class TestStopNode extends RegressionSuite
         if (!MiscUtils.isPro()) {
             kfactor = 0;
         }
-        m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
-        m_config.setHasLocalServer(true);
+        m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor);
         success = m_config.compile(project);
         assertTrue(success);
 

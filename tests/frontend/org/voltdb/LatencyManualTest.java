@@ -52,9 +52,7 @@ public class LatencyManualTest {
             // and accompanying call to builder.addExport
             builder.setTableAsExportOnly("blah");
 
-            LocalCluster cluster = new LocalCluster("latencycheck.jar",
-                    2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-            cluster.setHasLocalServer(true);
+            LocalCluster cluster = new LocalCluster("latencycheck.jar", 2, 1, 0);
             boolean success = cluster.compile(builder);
             assert(success);
 

@@ -888,11 +888,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 fail("Failed to set up schema");
             }
 
-            m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
-                                         BackendTarget.NATIVE_EE_JNI,
-                                         LocalCluster.FailureState.ALL_RUNNING,
-                                         m_debug);
-            m_cluster.setHasLocalServer(true);
+            m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor);
+            if (m_debug) {
+                m_cluster.enableDebugPort();
+            }
             boolean success = m_cluster.compile(m_builder);
             assert(success);
 

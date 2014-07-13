@@ -322,11 +322,8 @@ public class TestUpdateDeployment extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalCluster("catalogupdate-cluster-base.jar", SITES_PER_HOST, HOSTS, K, BackendTarget.NATIVE_EE_JNI);
-
-        // Catalog upgrade test(s) sporadically fail if there's a local server because
-        // a file pipe isn't available for grepping local server output.
-        ((LocalCluster) config).setHasLocalServer(true);
+        LocalCluster config =
+                new LocalCluster("catalogupdate-cluster-base.jar", SITES_PER_HOST, HOSTS, K);
 
         // build up a project builder for the workload
         TPCCProjectBuilder project = new TPCCProjectBuilder();

@@ -125,6 +125,16 @@ public class RegressionSuite extends TestCase {
     }
 
     /**
+     * @return
+     */
+    public boolean isSinglePartitionConfig() {
+        if (m_config instanceof LocalCluster) {
+            return ((LocalCluster)m_config).isSinglePartitionConfig();
+        }
+        throw new UnsupportedOperationException();
+    }
+
+    /**
      * @return a reference to the associated VoltServerConfig
      */
     public final VoltServerConfig getServerConfig() {

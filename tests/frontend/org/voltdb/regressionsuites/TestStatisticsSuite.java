@@ -37,7 +37,6 @@ import org.HdrHistogram_voltpatches.AbstractHistogram;
 import org.HdrHistogram_voltpatches.Histogram;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.utils.CompressionStrategySnappy;
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -1080,8 +1079,6 @@ public class TestStatisticsSuite extends SaveRestoreBase {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite() throws IOException {
-        VoltServerConfig config = null;
-
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestStatisticsSuite.class);
 
@@ -1121,10 +1118,11 @@ public class TestStatisticsSuite extends SaveRestoreBase {
         /*
          * Add a cluster configuration for sysprocs too
          */
-        config = new LocalCluster("statistics-cluster.jar", TestStatisticsSuite.SITES,
-                TestStatisticsSuite.HOSTS, TestStatisticsSuite.KFACTOR,
-                BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
+        LocalCluster config = new LocalCluster("statistics-cluster.jar", TestStatisticsSuite.SITES,
+                TestStatisticsSuite.HOSTS, TestStatisticsSuite.KFACTOR);
+        if ( ! hasLocalServer) {
+            config.disableEmbeddedServer();
+        }
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

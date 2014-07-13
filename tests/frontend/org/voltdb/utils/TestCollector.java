@@ -35,7 +35,6 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.junit.Before;
 import org.junit.Test;
-import org.voltdb.BackendTarget;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -65,14 +64,13 @@ public class TestCollector {
         builder.addProcedures(CrashJVM.class);
         builder.addProcedures(CrashVoltDBProc.class);
 
-        cluster = new LocalCluster("collect.jar",
-                2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        cluster.setHasLocalServer(false);
+        cluster = new LocalCluster("collect.jar", 2, 1, 0);
+        cluster.disableEmbeddedServer();
         boolean success = cluster.compile(builder);
         assert (success);
         cluster.startUp(true);
 
-        String voltDbFilePrefix = cluster.getSubRoots().get(0).getPath();
+        String voltDbFilePrefix = cluster.getSubRoot(0).getPath();
         File voltDbRoot = new File(voltDbFilePrefix, builder.getPathToVoltRoot().getPath());
         voltDbRootPath = voltDbRoot.getPath();
 

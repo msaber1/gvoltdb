@@ -22,7 +22,6 @@
  */
 package org.voltdb.groovy;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.LegacyHashinator;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltTable;
@@ -99,11 +98,11 @@ public class TestGroovyDeployment extends RegressionSuite {
         /*
          * compile the catalog all tests start with
          */
-        config = new LocalCluster("groovy-ddl-cluster-rep.jar", 2, 1, 0,
-                BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ALL_RUNNING, true, false, null);
+        config = new LocalCluster("groovy-ddl-cluster-rep.jar", 2, 1, 0);
+        config.disableEmbeddedServer();
+        config.enableDebugPort();
         boolean compile = config.compile(project);
         assertTrue(compile);
-        config.setHasLocalServer(false);
         config.setMaxHeap(512);
         builder.addServerConfig(config);
 

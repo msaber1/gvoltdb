@@ -402,8 +402,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     // JUnit magic that uses the regression suite helper classes.
     //
     static public Test suite() throws IOException {
-        VoltServerConfig config = null;
-
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestSystemProcedureSuite.class);
 
@@ -449,9 +447,10 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         /*
          * Add a cluster configuration for sysprocs too
          */
-        config = new LocalCluster("sysproc-cluster.jar", TestSystemProcedureSuite.SITES, TestSystemProcedureSuite.HOSTS, TestSystemProcedureSuite.KFACTOR,
-                                  BackendTarget.NATIVE_EE_JNI);
-        ((LocalCluster) config).setHasLocalServer(hasLocalServer);
+        LocalCluster config = new LocalCluster("sysproc-cluster.jar", SITES, HOSTS, KFACTOR);
+        if ( ! hasLocalServer) {
+            config.disableEmbeddedServer();
+        }
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

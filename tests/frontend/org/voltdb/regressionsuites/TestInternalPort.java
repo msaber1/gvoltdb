@@ -29,10 +29,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
 
-import static junit.framework.Assert.fail;
 import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestInternalPort extends TestCase {
@@ -60,13 +58,12 @@ public class TestInternalPort extends TestCase {
             builder.addLiteralSchema("");
             String catalogJar = "dummy.jar";
 
-            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
+            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0);
+            config.disableEmbeddedServer();
             config.portGenerator.enablePortProvider();
             config.portGenerator.pprovider.setInternalPort(rport);
             //We dont expect the process to initialize as its goint to wait for leader.
             config.setExpectedToInitialize(false);
-            config.setHasLocalServer(false);
 
             boolean success = config.compile(builder);
             assertTrue(success);

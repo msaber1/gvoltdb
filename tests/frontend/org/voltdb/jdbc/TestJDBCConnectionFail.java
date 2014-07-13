@@ -29,10 +29,8 @@ import java.sql.DriverManager;
 import java.sql.SQLException;
 import java.util.List;
 
-
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.regressionsuites.MultiConfigSuiteBuilder;
@@ -110,8 +108,7 @@ public class TestJDBCConnectionFail extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor, BackendTarget.NATIVE_EE_JNI);
-        m_config.setHasLocalServer(true);
+        m_config = new LocalCluster("decimal-default.jar", 4, 5, kfactor);
         success = m_config.compile(project);
         assertTrue(success);
 

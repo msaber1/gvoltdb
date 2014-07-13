@@ -25,13 +25,8 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -74,8 +69,8 @@ public class TestShutdown extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalCluster config = new LocalCluster("decimal-default.jar", 4, 5, 3, BackendTarget.NATIVE_EE_JNI);
-        config.setHasLocalServer(false);
+        LocalCluster config = new LocalCluster("decimal-default.jar", 4, 5, 3);
+        config.disableEmbeddedServer();
         success = config.compile(project);
         assertTrue(success);
 

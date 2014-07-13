@@ -32,8 +32,6 @@ import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
 
-import org.voltdb.utils.MiscUtils;
-
 /**
  * A subclass of TestSuite that multiplexes test methods across
  * all volt configurations given to it. For example, if there are
@@ -87,19 +85,6 @@ public class MultiConfigSuiteBuilder extends TestSuite {
      * @param config A Server Configuration to run this set of tests on.
      */
     public boolean addServerConfig(VoltServerConfig config) {
-
-        // near silent skip on k>0 and community edition
-        if (!MiscUtils.isPro()) {
-            int k = 0;
-            if (config instanceof LocalCluster) {
-                k = ((LocalCluster) config).m_kfactor;
-            }
-            if (k > 0) {
-                System.out.println("Skipping ClusterConfig instance with k > 0.");
-                return false;
-            }
-        }
-
         final String enabled_configs = System.getenv().get("VOLT_REGRESSIONS");
         System.out.println("VOLT REGRESSIONS ENABLED: " + enabled_configs);
 
@@ -118,15 +103,30 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             }
         }
 
-        final String buildType = System.getenv().get("BUILD");
-        if (buildType != null) {
-            if (buildType.startsWith("memcheck")) {
-                if (config instanceof LocalCluster) {
-                    LocalCluster lc = (LocalCluster) config;
-                    // don't run valgrind on multi-node clusters without embedded processes
-                    if ((lc.getNodeCount() > 1) || (lc.m_hasLocalServer == false)) {
-                        return true;
-                    }
+        if (LocalCluster.isMemcheckDefined()) {
+            if (config instanceof LocalCluster) {
+                LocalCluster lc = (LocalCluster) config;
+                // The original comment here read:
+                // // don't run valgrind on multi-node clusters without embedded processes
+                // but the code was:
+                // if ((lc.getNodeCount() > 1) || (lc.m_hasLocalServer == false)) {
+                //     return true;
+                // }
+                // which really means "don't run valgrind on any multi-node clusters
+                // AND don't run valgrind without an embedded server".
+                // Why does the embedded server matter? -- there SEEMS to be valgrind
+                // handling for more than just the single embedded server code path
+                // -- does it work?
+                // Paul decided to perpetuate the existing guard code here,
+                // but clarify it by breaking it into separate checks,
+                // and to add this disparaging commentary on the original comment.
+                // Could you do better?
+                if (lc.getNodeCount() > 1) {
+                    return true;
+                }
+                // Skip valgrind testing if there is no embedded server? Why?
+                if ( ! lc.hasEmbeddedServer()) {
+                    return true;
                 }
                 if (config.isHSQL()) {
                     return true;

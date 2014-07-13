@@ -792,7 +792,7 @@ public class TestOrderBySuite extends RegressionSuite {
         project.addProcedures(PROCEDURES);
 
         //* Single-server configuration  -- please do not remove or corrupt this structured comment
-        config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
@@ -806,10 +806,10 @@ public class TestOrderBySuite extends RegressionSuite {
         // End HSQL backend server configuration  -- please do not remove or corrupt this structured comment */
 
         //* Multi-server configuration  -- please do not remove or corrupt this structured comment
-        config = new LocalCluster("testorderby-cluster.jar", 3, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        // Disable hasLocalServer -- with hasLocalServer enabled,
-        // multi-server pro configs mysteriously hang at startup under eclipse.
-        config.setHasLocalServer(false);
+        // Disable embedded server? -- with it enabled,
+        // multi-server pro configs mysteriously hang at startup under eclipse?
+        config = new LocalCluster("testorderby-cluster.jar", 3, 2, 1);
+        config.disableEmbeddedServer();
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

@@ -42,16 +42,9 @@ public class CrashVoltDBTest extends TestCase {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema(simpleSchema);
         builder.addProcedures(CrashVoltDBProc.class);
-        /*boolean success = builder.compile(Configuration.getPathToCatalogForTest("crash.jar"), 1, 1, 0, "localhost");
-        assert(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("crash.xml"));*/
-
-        LocalCluster cluster = new LocalCluster("crash.jar",
-                2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        cluster.setHasLocalServer(true);
-        boolean success = cluster.compile(builder);
-        assert (success);
-        cluster.startUp(true);
+        LocalCluster cluster = new LocalCluster("crash.jar", 2, 2, 1);
+        assertTrue(cluster.compile(builder));
+        cluster.startUp();
 
         final String listener = cluster.getListenerAddresses().get(0);
         final Client client = ClientFactory.createClient();

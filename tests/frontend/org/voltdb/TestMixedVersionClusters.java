@@ -51,14 +51,9 @@ public class TestMixedVersionClusters {
             assert(regexOverrides != null);
             assert(versions.length == regexOverrides.length);
 
-            m_cluster = new LocalCluster(
-                    JAR_NAME,
-                    2,
-                    versions.length,
-                    K,
-                    BackendTarget.NATIVE_EE_JNI);
+            m_cluster = new LocalCluster(JAR_NAME, 2, versions.length, K);
+            m_cluster.disableEmbeddedServer();
             m_cluster.setOverridesForHotfix(versions, regexOverrides);
-            m_cluster.setHasLocalServer(false);
             m_cluster.setDeploymentAndVoltDBRoot(
                     m_builder.getPathToDeployment(),
                     m_builder.getPathToVoltRoot().getAbsolutePath());

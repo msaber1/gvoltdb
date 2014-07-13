@@ -29,10 +29,8 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
 
-import static junit.framework.Assert.assertTrue;
 import junit.framework.TestCase;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestHttpPort extends TestCase {
@@ -61,11 +59,10 @@ public class TestHttpPort extends TestCase {
             String catalogJar = "dummy.jar";
             builder.setHTTPDPort(rport);
 
-            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
+            LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0);
+            config.disableEmbeddedServer();
             config.portGenerator.enablePortProvider();
             config.portGenerator.pprovider.setAdmin(rport);
-            config.setHasLocalServer(false);
             //We expect it to crash
             config.setExpectedToCrash(true);
 

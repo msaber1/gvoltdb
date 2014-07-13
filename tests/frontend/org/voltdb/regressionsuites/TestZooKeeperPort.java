@@ -29,7 +29,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.security.SecureRandom;
 
-import static junit.framework.Assert.assertTrue;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
@@ -61,10 +60,9 @@ public class TestZooKeeperPort extends TestCase {
             String catalogJar = "dummy.jar";
 
             LocalCluster config = new LocalCluster(catalogJar, 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
+            config.disableEmbeddedServer();
             config.portGenerator.enablePortProvider();
             config.portGenerator.pprovider.setZkPort(rport);
-            config.setHasLocalServer(false);
             //We expect it to crash
             config.setExpectedToCrash(true);
 

@@ -26,10 +26,8 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.concurrent.CountDownLatch;
 
-
 import junit.framework.Test;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
@@ -105,8 +103,7 @@ public class TestStopNode2NK1PartitionDetection extends RegressionSuite
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
         //Lets tolerate 3 node failures.
-        m_config = new LocalCluster("decimal-default.jar", 4, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        m_config.setHasLocalServer(true);
+        m_config = new LocalCluster("decimal-default.jar", 4, 2, 1);
         success = m_config.compile(project);
         assertTrue(success);
 
