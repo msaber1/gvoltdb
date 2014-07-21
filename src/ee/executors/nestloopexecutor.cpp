@@ -223,6 +223,9 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
         }
     }
 
+    cleanupInputTempTable(inner_table);
+    cleanupInputTempTable(outer_table);
+
     return (true);
 }
 

@@ -148,7 +148,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
         VOLT_TRACE("OUTPUT TABLE: %s\n", m_tmpOutputTable->debug().c_str());
     }
 
-    //VOLT_TRACE("PROJECTED TABLE: %s\n", m_tmpOutputTable->debug().c_str());
+    cleanupInputTempTable(input_table);
 
     return (true);
 }

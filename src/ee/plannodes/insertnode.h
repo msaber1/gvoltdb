@@ -47,6 +47,7 @@
 #define HSTOREINSERTNODE_H
 
 #include <sstream>
+#include <vector>
 #include "abstractoperationnode.h"
 
 namespace voltdb {
@@ -56,15 +57,21 @@ namespace voltdb {
  */
 class InsertPlanNode : public AbstractOperationPlanNode {
 public:
-    InsertPlanNode() { }
+    InsertPlanNode() : AbstractOperationPlanNode(), m_multiPartition(false), m_fieldMap() { }
     PlanNodeType getPlanNodeType() const;
 
     bool isMultiPartition() { return m_multiPartition; }
 
+    void initTemplateTuple(VoltDBEngine* engine, TableTuple& templateTuple);
+
+    const std::vector<int>& getFieldMap() const { return m_fieldMap; }
+
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
 
+private:
     bool m_multiPartition;
+    std::vector<int> m_fieldMap;
 };
 
 } // namespace voltdb

@@ -104,6 +104,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
         }
     }
 
+    cleanupInputTempTable(input_table);
     return true;
 }
 

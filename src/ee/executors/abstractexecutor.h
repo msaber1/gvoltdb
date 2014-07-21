@@ -62,7 +62,7 @@ class VoltDBEngine;
  * AbstractExecutor provides the API for initializing and invoking executors.
  */
 class AbstractExecutor {
-  public:
+public:
     virtual ~AbstractExecutor();
 
     /** Executors are initialized once when the catalog is loaded */
@@ -81,6 +81,14 @@ class AbstractExecutor {
         if (m_tmpOutputTable) {
             VOLT_TRACE("Clearing output table...");
             m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
+        }
+    }
+
+    inline void cleanupInputTempTable(Table * input_table) {
+        TempTable* tmp_input_table = dynamic_cast<TempTable*>(input_table);
+        if (tmp_input_table) {
+            // No need of its input temp table
+            tmp_input_table->deleteAllTuplesNonVirtual(false);
         }
     }
 

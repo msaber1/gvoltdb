@@ -375,6 +375,8 @@ public class ExportManager
                     m_generations.put(catalogContext.m_uniqueId, currentGeneration);
                 } else {
                     exportLog.info("Persisted export generation same as catalog exists. Persisted generation will be used and appended to");
+                    ExportGeneration currentGeneration = m_generations.get(catalogContext.m_uniqueId);
+                    currentGeneration.initializeMissingPartitionsFromCatalog(conn, m_hostId, m_messenger, partitions);
                 }
             }
             final ExportGeneration nextGeneration = m_generations.firstEntry().getValue();
@@ -514,12 +516,12 @@ public class ExportManager
     }
 
     public void shutdown() {
+        for (ExportGeneration generation : m_generations.values()) {
+            generation.close();
+        }
         ExportDataProcessor proc = m_processor.getAndSet(null);
         if (proc != null) {
             proc.shutdown();
-        }
-        for (ExportGeneration generation : m_generations.values()) {
-            generation.close();
         }
         m_generations.clear();
         m_loaderClass = null;
