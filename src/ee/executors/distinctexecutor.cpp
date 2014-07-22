@@ -76,8 +76,8 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
         node->
             setOutputTable(TableFactory::
                            getCopiedTempTable(node->databaseId(),
-                                              node->getInputTables()[0]->name(),
-                                              node->getInputTables()[0],
+                                              node->getInputTable()->name(),
+                                              node->getInputTable(),
                                               limits));
     }
     return (true);
@@ -88,7 +88,7 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
-    Table* input_table = node->getInputTables()[0];
+    Table* input_table = node->getInputTable();
     assert(input_table);
 
     TableIterator iterator = input_table->iteratorDeletingAsWeGo();
