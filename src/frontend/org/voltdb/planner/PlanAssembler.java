@@ -2013,7 +2013,8 @@ public class PlanAssembler {
             // Delete the aggregate node case to handle ENG-6485, or say we don't push down meeting aggregate node
             // TODO: We might want to optimize/push down "limit" for some cases
             if (!(receiveNode instanceof OrderByPlanNode) &&
-                !(receiveNode instanceof ProjectionPlanNode)) {
+                !(receiveNode instanceof ProjectionPlanNode) &&
+                ! isValidAggregateNodeForLimitPushdown(receiveNode) ) {
                 return null;
             }
 
@@ -2042,6 +2043,36 @@ public class PlanAssembler {
             receiveNode = receiveNode.getChild(0);
         }
         return receiveNode.getChild(0);
+    }
+
+    private static boolean isValidAggregateNodeForLimitPushdown(AbstractPlanNode receiveNode) {
+        if (receiveNode instanceof AggregatePlanNode == false) {
+            return false;
+        }
+        if (receiveNode.getParentCount() == 0) {
+            return false;
+        }
+
+        // Limitation: can only push past coordinating aggregation nodes
+        if (!((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
+            return false;
+        }
+
+        AbstractPlanNode parent = receiveNode.getParent(0);
+        if (parent instanceof OrderByPlanNode) {
+            return true;
+        }
+        if ( parent instanceof ProjectionPlanNode &&
+             parent.getParentCount() > 0 &&
+             parent.getParent(0) instanceof OrderByPlanNode) {
+            // Xin really wants inline project with aggregation
+
+            return true;
+        }
+
+        // When aggregate without order by and does not group by partition column,
+        // Limit should not be pushed down.
+        return false;
     }
 
     /**
