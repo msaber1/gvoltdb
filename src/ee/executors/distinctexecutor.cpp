@@ -69,8 +69,8 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
     // Create a duplicate of input table
     //
     if (!node->isInline()) {
-        assert(node->getInputTables().size() == 1);
-        assert(node->getInputTables()[0]->columnCount() > 0);
+        assert(node->getInputTableCount() == 1);
+        assert(node->getInputTable()->columnCount() > 0);
         assert(node->getChildren()[0] != NULL);
 
         node->

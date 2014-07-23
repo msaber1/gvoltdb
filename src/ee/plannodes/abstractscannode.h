@@ -61,9 +61,9 @@ public:
     std::string debugInfo(const std::string& spacer) const;
 
     Table* getTargetTable() const;
-    void setTargetTableDelegate(TableCatalogDelegate* tcd); // DEPRECATED
+    void setTargetTableDelegate(TableCatalogDelegate* tcd) { m_tcd = tcd; } // DEPRECATED?
 
-    std::string getTargetTableName() const; // DEPRECATED
+    std::string getTargetTableName() const { return m_target_table_name; } // DEPRECATED?
     AbstractExpression* getPredicate() const { return m_predicate.get(); }
 
     bool isSubQuery() const { return m_isSubQuery; }
