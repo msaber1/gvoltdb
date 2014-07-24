@@ -616,8 +616,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
             // This is done under Inits.doInitializationWork(), so need to wait until we get here.
             // Current calculation needs pro/community knowledge, number of tables, and the sites/host,
             // which is the number of initiators (minus the possibly idle MPI initiator)
-            checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
-                    (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
+            if (m_config.m_backend != BackendTarget.HSQLDB_BACKEND) {
+                checkHeapSanity(MiscUtils.isPro(), m_catalogContext.tables.size(),
+                        (m_iv2Initiators.size() - 1), m_configuredReplicationFactor);
+            }
 
             if (m_joining && m_config.m_replicationRole == ReplicationRole.REPLICA) {
                 VoltDB.crashLocalVoltDB("Elastic join is prohibited on a replica cluster.", false, null);
@@ -987,7 +989,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
                 stringer.object();
 
                 stringer.key("workingDir").value(System.getProperty("user.dir"));
-                stringer.key("pid").value(CLibrary.getpid());
+                if (!m_config.m_noLoadLibVOLTDB) {
+                    stringer.key("pid").value(CLibrary.getpid());
+                }
 
                 stringer.key("log4jDst").array();
                 Enumeration<?> appenders = Logger.getRootLogger().getAllAppenders();
@@ -1550,7 +1554,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback
         if (!m_rejoining) {
             hostLog.info(startActionLog);
         }
-        hostLog.info("PID of this Volt process is " + CLibrary.getpid());
+
+        if (!m_config.m_noLoadLibVOLTDB) {
+            hostLog.info("PID of this Volt process is " + CLibrary.getpid());
+        }
 
         // print out awesome network stuff
         hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));

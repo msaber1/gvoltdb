@@ -158,7 +158,7 @@ public class VoltDB {
         public String m_httpPortInterface = "";
 
         /** running the enterprise version? */
-        public final boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
+        public boolean m_isEnterprise = org.voltdb.utils.MiscUtils.isPro();
 
         public int m_deadHostTimeoutMS = 90 * 1000;
 
@@ -278,6 +278,10 @@ public class VoltDB {
                 else if (arg.equals("quietadhoc"))
                 {
                     m_quietAdhoc = true;
+                }
+                else if (arg.equals("nopro"))
+                {
+                    m_isEnterprise = false;
                 }
                 // handle from the command line as two strings <catalog> <filename>
                 else if (arg.equals("port")) {

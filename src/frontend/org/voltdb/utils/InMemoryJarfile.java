@@ -216,6 +216,18 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     // CLASSLOADING
     ///////////////////////////////////////////////////////
 
+    private static String keyToClassName(final String key) {
+        // Windows jars also seem to use forward slashes.
+        String className = key.replace('/', '.');
+        return className;
+    }
+
+    private static String classNameToKey(final String className) {
+        // Windows jars also seem to use forward slashes.
+        String key = className.replace('.', '/');
+        return key;
+    }
+
     public class JarLoader extends ClassLoader {
         final Map<String, Class<?>> m_cache = new HashMap<String, Class<?>>();
         final Set<String> m_classNames = new HashSet<String>();
@@ -223,7 +235,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         void noteUpdated(String key) {
             if (!key.endsWith(".class"))
                 return;
-            String javaClassName = key.replace(File.separatorChar, '.');
+            String javaClassName = keyToClassName(key);
             javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
             m_classNames.add(javaClassName);
         }
@@ -231,7 +243,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
         void noteRemoved(String key) {
             if (!key.endsWith(".class"))
                 return;
-            String javaClassName = key.replace(File.separatorChar, '.');
+            String javaClassName = keyToClassName(key);
             javaClassName = javaClassName.substring(0, javaClassName.length() - 6);
             m_classNames.remove(javaClassName);
             m_cache.remove(javaClassName);
@@ -258,7 +270,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
 
             // now look through the list
             if (m_classNames.contains(className)) {
-                String classPath = className.replace('.', File.separatorChar) + ".class";
+                String classPath = classNameToKey(className) + ".class";
 
                 byte bytes[] = get(classPath);
                 if (bytes == null)
@@ -305,7 +317,7 @@ public class InMemoryJarfile extends TreeMap<String, byte[]> {
     @Override
     public byte[] put(String key, byte[] value) {
         if (value == null)
-            throw new RuntimeException("InMemoryJarFile cannon contain null entries.");
+            throw new RuntimeException("InMemoryJarFile cannot contain null entries.");
         byte[] retval = super.put(key, value);
         m_loader.noteUpdated(key);
         return retval;

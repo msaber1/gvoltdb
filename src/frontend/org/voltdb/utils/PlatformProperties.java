@@ -178,6 +178,15 @@ public class PlatformProperties implements Serializable {
         return hw;
     }
 
+    /**
+     * Windows support is only for testing ODBC.
+     * @return default hardware info
+     */
+    protected HardwareInfo getWindowsHardwareInfo() {
+        HardwareInfo hw = new HardwareInfo();
+        return hw;
+    }
+
     protected PlatformProperties() {
         HardwareInfo hw = null;
         if (System.getProperty("os.name").toLowerCase().contains("mac")) {
@@ -186,8 +195,13 @@ public class PlatformProperties implements Serializable {
         else if (System.getProperty("os.name").toLowerCase().contains("linux")) {
             hw = getLinuxHardwareInfo();
         }
+        else if (System.getProperty("os.name").toLowerCase().contains("win")) {
+            // Windows support is only for testing ODBC.
+            hw = getWindowsHardwareInfo();
+        }
         else {
-            hostLog.warn("Unable to determine supported operating system. Hardware info such as Memory,CPU will be incorrectly reported.");
+            hostLog.warn("Unable to determine supported operating system. " +
+                         "Hardware info such as Memory and CPU will be incorrectly reported.");
             hw = new HardwareInfo();
         }
 

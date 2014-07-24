@@ -41,7 +41,7 @@ import org.voltdb.processtools.ShellTools;
  */
 public class SystemStatsCollector {
 
-    private enum GetRSSMode { MACOSX_NATIVE, PROCFS, PS }
+    private enum GetRSSMode { MACOSX_NATIVE, PROCFS, PS, UNAVAILABLE }
 
     static long starttime = System.currentTimeMillis();
     static final long javamaxheapmem = ManagementFactory.getMemoryMXBean().getHeapMemoryUsage().getMax();
@@ -134,6 +134,12 @@ public class SystemStatsCollector {
          * @return Structure containing output of the "ps" call.
          */
         public static PSData getPSData(int pid) {
+            // Windows is only used for testing ODBC.
+            PlatformProperties pp = PlatformProperties.getPlatformProperties();
+            if (pp.osName.toLowerCase().contains("win")) {
+                return new PSData(-1, -1, -1, -1, -1);
+            }
+
             // run "ps" to get stats for this pid
             String command = String.format("ps -p %d -o rss,pmem,pcpu,time,etime", pid);
             String results = ShellTools.local_cmd(command);
@@ -256,8 +262,9 @@ public class SystemStatsCollector {
      * @param large Add result to large set?
      */
     public static synchronized void asyncSampleSystemNow(final boolean medium, final boolean large) {
-        // slow mode starts an async thread
-        if (mode == GetRSSMode.PS) {
+        switch (mode) {
+
+          case PS:
             if (thread != null) {
                 if (thread.isAlive()) return;
                 else thread = null;
@@ -268,10 +275,16 @@ public class SystemStatsCollector {
                 public void run() { sampleSystemNow(medium, large); }
             });
             thread.start();
-        }
-        // fast mode doesn't spawn a thread
-        else {
+            break;
+
+          case UNAVAILABLE:
+            break;
+
+          case PROCFS:
+          case MACOSX_NATIVE:
+          default:
             sampleSystemNow(medium, large);
+            break;
         }
     }
 
@@ -297,6 +310,13 @@ public class SystemStatsCollector {
         pid = Integer.valueOf(pidString);
         initialized = true;
 
+        // Memory info is unavailable on Windows for now (for testing ODBC only).
+        if (pp.osName.toLowerCase().contains("win")) {
+            mode = GetRSSMode.UNAVAILABLE;
+            memorysize = -1;
+            return;
+        }
+
         // get the RSS and other stats from scraping "ps" from the command line
         PSScraper.PSData psdata = PSScraper.getPSData(pid);
         assert(psdata.rss > 0);
@@ -306,6 +326,7 @@ public class SystemStatsCollector {
         assert(memorysize > 0);
 
         // now try to figure out the best way to get the rss size
+
         long rss = -1;
 
         // try the mac method
@@ -356,28 +377,23 @@ public class SystemStatsCollector {
 
     /**
      * Poll the operating system and generate a Datum
-     * @return A newly created Datum instance.
+     * @return A newly created Datum instance or null if unavailable.
      */
     private static synchronized Datum generateCurrentSample() {
         // get this info once
         if (!initialized) initialize();
 
-        long rss = -1;
         switch (mode) {
-        case MACOSX_NATIVE:
-            rss = ExecutionEngine.nativeGetRSS();
-            break;
-        case PROCFS:
-            rss = getRSSFromProcFS();
-            break;
-        case PS:
-            rss = PSScraper.getPSData(pid).rss;
-            break;
+          case MACOSX_NATIVE:
+            return new Datum(ExecutionEngine.nativeGetRSS());
+          case PROCFS:
+            return new Datum(getRSSFromProcFS());
+          case PS:
+            return new Datum(PSScraper.getPSData(pid).rss);
+          case UNAVAILABLE:
+          default:
+            return null;
         }
-
-        // create a new Datum which adds java stats
-        Datum d = new Datum(rss);
-        return d;
     }
 
     /**

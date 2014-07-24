@@ -29,6 +29,7 @@ voltdbroot/
 log/
 voltipc.xcodeproj/
 tests/test_apps/*/*.jar
+tests/frontend/**/*.jar
 doc/tutorials/*/*.jar
 doc/tutorials/auction/csvloader_*.csv
 src/frontend/org/voltdb/compiler/projectfile/
@@ -55,3 +56,4 @@ doc/tutorials/auction/csvloader_*.csv
 /src/ee/org_voltdb_utils_PosixAdvise.h
 /src/frontend/org/voltcore/utils/DBBPool.java
 /src/frontend/org/voltcore/utils/.flagfile
+/.properties
