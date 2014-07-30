@@ -26,21 +26,15 @@ import org.voltdb.types.PlanNodeType;
  *
  */
 public class PartialAggregatePlanNode extends AggregatePlanNode {
+
+    // Default constructor required for new instance operation
     public PartialAggregatePlanNode() {
         super();
     }
 
     public PartialAggregatePlanNode(List<Integer> partialGroupByColumns) {
         super();
-        setPartialAggregateColumns(partialGroupByColumns);
-    }
-
-    public PartialAggregatePlanNode(PartialAggregatePlanNode origin) {
-        super();
-    }
-
-    public void setPartialAggregateColumns(List<Integer> partialGroupByColumns) {
-        m_partialGroupByColumns = partialGroupByColumns;
+        m_orderedOutputGroupByColumns = partialGroupByColumns;
     }
 
     @Override
