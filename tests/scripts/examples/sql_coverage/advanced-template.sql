@@ -23,7 +23,6 @@
 DELETE FROM @dmltable
 INSERT INTO @dmltable VALUES (@insertvals)
 
-
 -- alias fun
 -- ticket 231
 SELECT -8, A._variable[#arg numeric] FROM @fromtables A WHERE @optionalfn(A.__[#arg] + 5   )        > @comparableconstant
@@ -75,17 +74,19 @@ SELECT @optionalfn(A._variable[#order1 @columntype]) AS Q13, @optionalfn(A._vari
 SELECT @optionalfn(A._variable[@columntype]) AS Q14, @optionalfn(A._variable[@columntype]), * FROM @fromtables A ORDER BY 1 _sortorder, 2 _sortorder
 
 -- additional aggregation fun
-SELECT 15, _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     ))                                                     FROM @fromtables A
+SELECT     _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     ))                                              AS Q15 FROM @fromtables A
 SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     ))                                              AS Q16 FROM @fromtables A WHERE @columnpredicate
 -- These test that the fixed issue eng-909 -- combining DISTINCT and non-DISTINCT aggs has not regressed.
-SELECT 18, _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     )), @agg(            A._variable[@columntype] )        FROM @fromtables A
+SELECT     _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     )), @agg(            A._variable[@columntype] ) AS Q18 FROM @fromtables A
 SELECT 19, _distinctableagg(DISTINCT                     A._variable[@columntype]      ), @agg(@optionalfn(A._variable[@columntype]))        FROM @fromtables A
 SELECT 20,                                               A._variable[#GB @columntype]   , @agg(@optionalfn(A._variable[@columntype]))        FROM @fromtables A GROUP BY         A.__[#GB]
 SELECT 21,                           @optionalfn(        A._variable[#GB @columntype] ) , @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY         A.__[#GB]
 SELECT 22,                           @optionalfn(@onefun(A._variable[#GB @columntype])) , @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY @onefun(A.__[#GB])
+-- multiple column group by
+SELECT 23,               A._variable[#GB1 @columntype],  A._variable[#GB2 @columntype]   , @agg(           A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
 
-SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), @agg(@optionalfn(A._variable[@columntype])) AS Q23 FROM @fromtables A
-SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), COUNT(*)                                    AS Q24 FROM @fromtables A
+SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), @agg(@optionalfn(A._variable[@columntype])) AS Q24 FROM @fromtables A
+SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), COUNT(*)                                    AS Q25 FROM @fromtables A
 
 -- update
 -- compare two cols

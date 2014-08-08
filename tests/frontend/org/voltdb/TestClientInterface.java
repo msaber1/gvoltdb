@@ -177,6 +177,8 @@ public class TestClientInterface {
         doReturn(m_zk).when(m_messenger).getZK();
         doReturn(mock(Configuration.class)).when(m_volt).getConfig();
         doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
+        doReturn(ReplicationRole.NONE).when(m_volt).getReplicationRole();
+        doReturn(m_context).when(m_volt).getCatalogContext();
         doAnswer(new Answer<Object>() {
             @Override
             public Object answer(InvocationOnMock invocation)
@@ -210,7 +212,8 @@ public class TestClientInterface {
         }
 
         byte[] bytes = MiscUtils.fileToBytes(cat);
-        String serializedCat = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
+        String serializedCat =
+            CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         assertNotNull(serializedCat);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCat);
@@ -593,7 +596,7 @@ public class TestClientInterface {
         final ByteBuffer msg = createMsg("@Promote");
         m_ci.handleRead(msg, m_handler, m_cxn);
         // Verify that the truncation request node was not created.
-        verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
+        verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot_node), any(byte[].class),
                                      eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
     }
 
@@ -606,8 +609,8 @@ public class TestClientInterface {
             final ByteBuffer msg = createMsg("@Promote");
             m_ci.handleRead(msg, m_handler, m_cxn);
             // Verify that the truncation request node was created.
-            verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot), any(byte[].class),
-                                eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT));
+            verify(m_zk, never()).create(eq(VoltZK.request_truncation_snapshot_node), any(byte[].class),
+                                eq(Ids.OPEN_ACL_UNSAFE), eq(CreateMode.PERSISTENT_SEQUENTIAL));
         }
         finally {
             logConfig.setEnabled(wasEnabled);

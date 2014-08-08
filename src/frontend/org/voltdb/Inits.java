@@ -17,14 +17,13 @@
 
 package org.voltdb;
 
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
 import java.net.MalformedURLException;
 import java.net.URL;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -279,13 +278,21 @@ public class Inits {
             // if I'm the leader, send out the catalog
             if (m_rvdb.m_myHostId == m_rvdb.m_hostIdWithStartupCatalog) {
 
-                if (m_rvdb.m_pathToStartupCatalog == null) {
-                    VoltDB.crashGlobalVoltDB("The catalog file location is missing, " +
-                                             " please see usage for more information",
-                                             false, null);
-                }
-
                 try {
+                    // If no catalog was supplied provide an empty one.
+                    if (m_rvdb.m_pathToStartupCatalog == null) {
+                        try {
+                            File emptyJarFile = CatalogUtil.createTemporaryEmptyCatalogJarFile();
+                            if (emptyJarFile == null) {
+                                VoltDB.crashLocalVoltDB("Failed to generate empty catalog.");
+                            }
+                            m_rvdb.m_pathToStartupCatalog = emptyJarFile.getAbsolutePath();
+                        }
+                        catch (IOException e) {
+                            VoltDB.crashLocalVoltDB("I/O exception while creating empty catalog jar file.", false, e);
+                        }
+                    }
+
                     // Get the catalog bytes and byte count.
                     byte[] catalogBytes = readCatalog(m_rvdb.m_pathToStartupCatalog);
 
@@ -300,17 +307,18 @@ public class Inits {
                     long catalogTxnId;
                     catalogTxnId = TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId();
 
-                    byte[] catalogHash = CatalogUtil.makeCatalogOrDeploymentHash(catalogBytes);
+                    // Need to get the deployment bytes from ZK
+                    CatalogAndIds catalogStuff =
+                        CatalogUtil.getCatalogFromZK(m_rvdb.getHostMessenger().getZK());
+                    byte[] deploymentBytes = catalogStuff.deploymentBytes;
 
                     // publish the catalog bytes to ZK
-                    CatalogUtil.uploadCatalogToZK(
+                    CatalogUtil.updateCatalogToZK(
                             m_rvdb.getHostMessenger().getZK(),
                             0, catalogTxnId,
                             catalogUniqueId,
-                            catalogHash,
                             catalogBytes,
-                            // The deployment hash was generated for the starter catalog, reuse it
-                            m_rvdb.m_catalogContext.deploymentHash);
+                            deploymentBytes);
                 }
                 catch (IOException e) {
                     VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
@@ -342,21 +350,27 @@ public class Inits {
                 catch (Exception e) {
                     VoltDB.crashLocalVoltDB("System was interrupted while waiting for a catalog.", false, null);
                 }
-            } while (catalogStuff == null);
+            } while (catalogStuff == null || catalogStuff.catalogBytes.length == 0);
 
+            String serializedCatalog = null;
+            byte[] catalogJarBytes = catalogStuff.catalogBytes;
             try {
-                Pair<String, String> loadResults = CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.bytes, hostLog);
-                m_rvdb.m_serializedCatalog = loadResults.getFirst();
+                Pair<InMemoryJarfile, String> loadResults =
+                    CatalogUtil.loadAndUpgradeCatalogFromJar(catalogStuff.catalogBytes);
+                serializedCatalog =
+                    CatalogUtil.getSerializedCatalogStringFromJar(loadResults.getFirst());
+                catalogJarBytes = loadResults.getFirst().getFullJarBytes();
             } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to load catalog", true, e);
+                VoltDB.crashLocalVoltDB("Unable to load catalog", false, e);
             }
 
-            if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
+            if ((serializedCatalog == null) || (serializedCatalog.length() == 0))
                 VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
 
             /* N.B. node recovery requires discovering the current catalog version. */
             Catalog catalog = new Catalog();
-            catalog.execute(m_rvdb.m_serializedCatalog);
+            catalog.execute(serializedCatalog);
+            serializedCatalog = null;
 
             // note if this fails it will print an error first
             try {
@@ -373,12 +387,11 @@ public class Inits {
             }
 
             try {
-                m_rvdb.m_serializedCatalog = catalog.serialize();
                 m_rvdb.m_catalogContext = new CatalogContext(
                         catalogStuff.txnId,
                         catalogStuff.uniqueId,
                         catalog,
-                        catalogStuff.bytes,
+                        catalogJarBytes,
                         // Our starter catalog has set the deployment hash, just yoink it out for now
                         m_rvdb.m_catalogContext.deploymentHash,
                         catalogStuff.version, -1);

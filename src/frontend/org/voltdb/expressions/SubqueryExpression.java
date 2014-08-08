@@ -58,8 +58,8 @@ public class SubqueryExpression extends AbstractExpression {
         super(ExpressionType.SUBQUERY);
         assert(subquery != null);
         m_subquery = subquery;
-        assert(m_subquery.getSubquery() != null);
-        m_subqueryId = m_subquery.getSubquery().m_stmtId;
+        assert(m_subquery.getSubqueryStmt() != null);
+        m_subqueryId = m_subquery.getSubqueryStmt().m_stmtId;
         if (m_subquery.getBestCostPlan() != null && m_subquery.getBestCostPlan().rootPlanGraph != null) {
             m_subqueryNode = m_subquery.getBestCostPlan().rootPlanGraph;
             m_subqueryNodeId = m_subqueryNode.getPlanNodeId();
@@ -83,7 +83,7 @@ public class SubqueryExpression extends AbstractExpression {
     }
 
     public AbstractParsedStmt getSubquery() {
-        return m_subquery.getSubquery();
+        return m_subquery.getSubqueryStmt();
     }
 
     public int getSubqueryId() {
@@ -201,8 +201,8 @@ public class SubqueryExpression extends AbstractExpression {
          * columns from the parent statement (getOrigStmtId() != this.subqueryId) and replace them with
          * the corresponding ParameterValueExpression. Keep the mapping between the original TVE
          * and new PVE which will be required by the back-end executor*/
-        AbstractParsedStmt subqueryStmt = m_subquery.getSubquery();
-        AbstractParsedStmt parentStmt = m_subquery.getSubquery().m_parentStmt;
+        AbstractParsedStmt subqueryStmt = m_subquery.getSubqueryStmt();
+        AbstractParsedStmt parentStmt = m_subquery.getSubqueryStmt().m_parentStmt;
         // we must have a parent -it's a subquery statement
         assert(parentStmt != null);
         for (Map.Entry<Integer, AbstractExpression> entry : subqueryStmt.m_parameterTveMap.entrySet()) {

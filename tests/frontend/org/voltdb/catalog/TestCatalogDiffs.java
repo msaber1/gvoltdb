@@ -66,7 +66,6 @@ public class TestCatalogDiffs extends TestCase {
         builder.addDefaultPartitioning();
         builder.addProcedures(procList);
         builder.setSecurityEnabled(securityEnabled);
-        builder.setSecurityProvider(securityProvider);
 
         if (gi != null && gi.length > 0)
             builder.addGroups(gi);
@@ -81,7 +80,7 @@ public class TestCatalogDiffs extends TestCase {
 
     protected Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = MiscUtils.fileToBytes(new File(pathToJar));
-        String serializedCatalog = CatalogUtil.loadAndUpgradeCatalogFromJar(bytes, null).getFirst();
+        String serializedCatalog = CatalogUtil.getSerializedCatalogStringFromJar(CatalogUtil.loadAndUpgradeCatalogFromJar(bytes).getFirst());
         assertNotNull(serializedCatalog);
         Catalog c = new Catalog();
         c.execute(serializedCatalog);
@@ -663,7 +662,6 @@ public class TestCatalogDiffs extends TestCase {
 
         String report = verifyDiff(catOriginal, catUpdated);
         assert(report.contains("Table A has been modified."));
-        assert(report.contains("Procedure ProcedureA has been modified."));
     }
 
     public void testAddUniqueCoveringTableIndex() throws IOException {

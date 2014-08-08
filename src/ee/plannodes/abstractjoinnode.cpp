@@ -46,20 +46,25 @@
 #include "abstractjoinnode.h"
 
 #include "expressions/abstractexpression.h"
+#include "common/TupleSchema.h"
 
 #include <stdexcept>
 #include <sstream>
+
+#include "boost/foreach.hpp"
 
 using namespace std;
 using namespace voltdb;
 
 AbstractJoinPlanNode::AbstractJoinPlanNode(CatalogId id)
-    : AbstractPlanNode(id), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
+    : AbstractPlanNode(id), m_preJoinPredicate(NULL), m_joinPredicate(NULL)
+    , m_wherePredicate(NULL), m_joinType(JOIN_TYPE_INVALID)
 {
 }
 
 AbstractJoinPlanNode::AbstractJoinPlanNode()
-    : AbstractPlanNode(), m_preJoinPredicate(NULL), m_joinPredicate(NULL), m_wherePredicate(NULL)
+    : AbstractPlanNode(), m_preJoinPredicate(NULL), m_joinPredicate(NULL)
+    , m_wherePredicate(NULL), m_joinType(JOIN_TYPE_INVALID)
 {
 }
 
@@ -68,6 +73,12 @@ AbstractJoinPlanNode::~AbstractJoinPlanNode()
     delete m_preJoinPredicate;
     delete m_joinPredicate;
     delete m_wherePredicate;
+
+    BOOST_FOREACH(SchemaColumn* scol, m_outputSchemaPreAgg) {
+        delete scol;
+    }
+
+    TupleSchema::freeTupleSchema(m_tupleSchemaPreAgg);
 }
 
 JoinType AbstractJoinPlanNode::getJoinType() const
@@ -88,6 +99,26 @@ AbstractExpression* AbstractJoinPlanNode::getJoinPredicate() const
 AbstractExpression* AbstractJoinPlanNode::getWherePredicate() const
 {
     return m_wherePredicate;
+}
+
+void AbstractJoinPlanNode::getOutputColumnExpressions(
+        std::vector<AbstractExpression*>& outputExpressions) const {
+    std::vector<SchemaColumn*> outputSchema;
+    if (m_outputSchemaPreAgg.size() > 0) {
+        outputSchema =  m_outputSchemaPreAgg;
+    } else {
+        outputSchema = getOutputSchema();
+    }
+    size_t schemaSize = outputSchema.size();
+
+    for (int i = 0; i < schemaSize; i++) {
+        outputExpressions.push_back(outputSchema[i]->getExpression());
+    }
+}
+
+const TupleSchema* AbstractJoinPlanNode::getTupleSchemaPreAgg() const
+{
+    return const_cast<const TupleSchema*>(m_tupleSchemaPreAgg);
 }
 
 string AbstractJoinPlanNode::debugInfo(const string& spacer) const
@@ -120,6 +151,17 @@ AbstractJoinPlanNode::loadFromJSONObject(PlannerDomValue obj)
     loadPredicateFromJSONObject("PRE_JOIN_PREDICATE", obj, m_preJoinPredicate);
     loadPredicateFromJSONObject("JOIN_PREDICATE", obj, m_joinPredicate);
     loadPredicateFromJSONObject("WHERE_PREDICATE", obj, m_wherePredicate);
+
+    if (obj.hasKey("OUTPUT_SCHEMA_PRE_AGG")) {
+        PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
+        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+            PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
+            m_outputSchemaPreAgg.push_back(outputColumn);
+        }
+    }
+
+    m_tupleSchemaPreAgg = AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg, true);
 }
 
 
@@ -133,3 +175,4 @@ AbstractJoinPlanNode::loadPredicateFromJSONObject(const char* predicateType, con
         predicate = NULL;
     }
 }
+

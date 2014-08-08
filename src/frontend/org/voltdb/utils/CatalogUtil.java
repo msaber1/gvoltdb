@@ -67,7 +67,6 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.ConnectorProperty;
 import org.voltdb.catalog.Constraint;
-import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Group;
@@ -92,6 +91,7 @@ import org.voltdb.compiler.deploymentfile.HttpdType;
 import org.voltdb.compiler.deploymentfile.PathEntry;
 import org.voltdb.compiler.deploymentfile.PathsType;
 import org.voltdb.compiler.deploymentfile.PropertyType;
+import org.voltdb.compiler.deploymentfile.SchemaType;
 import org.voltdb.compiler.deploymentfile.SecurityProviderString;
 import org.voltdb.compiler.deploymentfile.SecurityType;
 import org.voltdb.compiler.deploymentfile.SnapshotType;
@@ -107,7 +107,6 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
-import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
 import com.google_voltpatches.common.base.Charsets;
@@ -126,14 +125,13 @@ public abstract class CatalogUtil {
      * Load a catalog from the jar bytes.
      *
      * @param catalogBytes
-     * @param log
-     * @return Pair containing catalog serialized string and upgraded version (or null if it wasn't upgraded)
+     * @return Pair containing updated InMemoryJarFile and upgraded version (or null if it wasn't upgraded)
      * @throws IOException
      *             If the catalog cannot be loaded because it's incompatible, or
      *             if there is no version information in the catalog.
      */
-    public static Pair<String, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes, VoltLogger log)
-            throws IOException
+    public static Pair<InMemoryJarfile, String> loadAndUpgradeCatalogFromJar(byte[] catalogBytes)
+        throws IOException
     {
         // Throws IOException on load failure.
         InMemoryJarfile jarfile = loadInMemoryJarFile(catalogBytes);
@@ -141,9 +139,17 @@ public abstract class CatalogUtil {
         // I.e. jarfile may be modified.
         VoltCompiler compiler = new VoltCompiler();
         String upgradedFromVersion = compiler.upgradeCatalogAsNeeded(jarfile);
-        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+        return new Pair<InMemoryJarfile, String>(jarfile, upgradedFromVersion);
+    }
+
+    /**
+     * Convenience method to extract the catalog commands from an InMemoryJarfile as a string
+     */
+    public static String getSerializedCatalogStringFromJar(InMemoryJarfile jarfile)
+    {
+        byte[] serializedCatalogBytes = jarfile.get(CatalogUtil.CATALOG_FILENAME);
         String serializedCatalog = new String(serializedCatalogBytes, Constants.UTF8ENCODING);
-        return new Pair<String, String>(serializedCatalog, upgradedFromVersion);
+        return serializedCatalog;
     }
 
     /**
@@ -325,170 +331,6 @@ public abstract class CatalogUtil {
             columns.add(catalog_col_ref.getColumn());
         }
         return (columns);
-    }
-
-    /**
-     * Convert a Table catalog object into the proper SQL DDL, including all indexes,
-     * constraints, and foreign key references.
-     * @param catalog_tbl
-     * @return SQL Schema text representing the table.
-     */
-    public static String toSchema(Table catalog_tbl) {
-        assert(!catalog_tbl.getColumns().isEmpty());
-        final String spacer = "   ";
-
-        Set<Index> skip_indexes = new HashSet<Index>();
-        Set<Constraint> skip_constraints = new HashSet<Constraint>();
-
-        String ret = "CREATE TABLE " + catalog_tbl.getTypeName() + " (";
-
-        // Columns
-        String add = "\n";
-        for (Column catalog_col : CatalogUtil.getSortedCatalogItems(catalog_tbl.getColumns(), "index")) {
-            VoltType col_type = VoltType.get((byte)catalog_col.getType());
-
-            // this next assert would be great if we dealt with default values well
-            //assert(! ((catalog_col.getDefaultvalue() == null) && (catalog_col.getNullable() == false) ) );
-
-            ret += add + spacer + catalog_col.getTypeName() + " " +
-                   col_type.toSQLString() +
-                   (col_type == VoltType.STRING && catalog_col.getSize() > 0 ? "(" + catalog_col.getSize() + ")" : "");
-
-            // Default value
-            String defaultvalue = catalog_col.getDefaultvalue();
-            //VoltType defaulttype = VoltType.get((byte)catalog_col.getDefaulttype());
-            boolean nullable = catalog_col.getNullable();
-            // TODO: Shouldn't have to check whether the string contains "null"
-            if (defaultvalue != null && defaultvalue.toLowerCase().equals("null") && nullable) {
-                defaultvalue = null;
-            }
-            else { // XXX: if (defaulttype != VoltType.VOLTFUNCTION) {
-                // TODO: Escape strings properly
-                defaultvalue = "'" + defaultvalue + "'";
-            }
-            ret += " DEFAULT " + (defaultvalue != null ? defaultvalue : "NULL") +
-                   (!nullable ? " NOT NULL" : "");
-
-            // Single-column constraints
-            for (ConstraintRef catalog_const_ref : catalog_col.getConstraints()) {
-                Constraint catalog_const = catalog_const_ref.getConstraint();
-                ConstraintType const_type = ConstraintType.get(catalog_const.getType());
-
-                // Check if there is another column in our table with the same constraint
-                // If there is, then we need to add it to the end of the table definition
-                boolean found = false;
-                for (Column catalog_other_col : catalog_tbl.getColumns()) {
-                    if (catalog_other_col.equals(catalog_col)) continue;
-                    if (catalog_other_col.getConstraints().getIgnoreCase(catalog_const.getTypeName()) != null) {
-                        found = true;
-                        break;
-                    }
-                }
-                if (!found) {
-                    switch (const_type) {
-                        case FOREIGN_KEY: {
-                            Table catalog_fkey_tbl = catalog_const.getForeignkeytable();
-                            Column catalog_fkey_col = null;
-                            for (ColumnRef ref : catalog_const.getForeignkeycols()) {
-                                catalog_fkey_col = ref.getColumn();
-                                break; // Nasty hack to get first item
-                            }
-
-                            assert(catalog_fkey_col != null);
-                            ret += " REFERENCES " + catalog_fkey_tbl.getTypeName() + " (" + catalog_fkey_col.getTypeName() + ")";
-                            skip_constraints.add(catalog_const);
-                            break;
-                        }
-                        default:
-                            // Nothing for now
-                    }
-                }
-            }
-
-            add = ",\n";
-        }
-
-        // Constraints
-        for (Constraint catalog_const : catalog_tbl.getConstraints()) {
-            if (skip_constraints.contains(catalog_const)) continue;
-            ConstraintType const_type = ConstraintType.get(catalog_const.getType());
-
-            // Primary Keys / Unique Constraints
-            if (const_type == ConstraintType.PRIMARY_KEY || const_type == ConstraintType.UNIQUE) {
-                Index catalog_idx = catalog_const.getIndex();
-                String idx_suffix = IndexType.getSQLSuffix(catalog_idx.getType());
-
-                ret += add + spacer +
-                       (!idx_suffix.isEmpty() ? "CONSTRAINT " + catalog_const.getTypeName() + " " : "") +
-                       (const_type == ConstraintType.PRIMARY_KEY ? "PRIMARY KEY" : "UNIQUE") + " (";
-
-                String col_add = "";
-                for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
-                    ret += col_add + catalog_colref.getColumn().getTypeName();
-                    col_add = ", ";
-                } // FOR
-                ret += ")";
-                skip_indexes.add(catalog_idx);
-
-            // Foreign Key
-            } else if (const_type == ConstraintType.FOREIGN_KEY) {
-                Table catalog_fkey_tbl = catalog_const.getForeignkeytable();
-                String col_add = "";
-                String our_columns = "";
-                String fkey_columns = "";
-                for (ColumnRef catalog_colref : catalog_const.getForeignkeycols()) {
-                    // The name of the ColumnRef is the column in our base table
-                    Column our_column = catalog_tbl.getColumns().getIgnoreCase(catalog_colref.getTypeName());
-                    assert(our_column != null);
-                    our_columns += col_add + our_column.getTypeName();
-
-                    Column fkey_column = catalog_colref.getColumn();
-                    assert(fkey_column != null);
-                    fkey_columns += col_add + fkey_column.getTypeName();
-
-                    col_add = ", ";
-                }
-                ret += add + spacer + "CONSTRAINT " + catalog_const.getTypeName() + " " +
-                                      "FOREIGN KEY (" + our_columns + ") " +
-                                      "REFERENCES " + catalog_fkey_tbl.getTypeName() + " (" + fkey_columns + ")";
-            }
-            skip_constraints.add(catalog_const);
-        }
-        ret += "\n);\n";
-
-        // All other Indexes
-        for (Index catalog_idx : catalog_tbl.getIndexes()) {
-            if (skip_indexes.contains(catalog_idx)) continue;
-
-            ret += "CREATE INDEX " + catalog_idx.getTypeName() +
-                   " ON " + catalog_tbl.getTypeName() + " (";
-            add = "";
-
-            String jsonstring = catalog_idx.getExpressionsjson();
-
-            if (jsonstring.isEmpty()) {
-                for (ColumnRef catalog_colref : CatalogUtil.getSortedCatalogItems(catalog_idx.getColumns(), "index")) {
-                    ret += add + catalog_colref.getColumn().getTypeName();
-                    add = ", ";
-                }
-            } else {
-                List<AbstractExpression> indexedExprs = null;
-                try {
-                    indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring,
-                            new StmtTargetTableScan(catalog_tbl, catalog_tbl.getTypeName(), 0));
-                } catch (JSONException e) {
-                    // TODO Auto-generated catch block
-                    e.printStackTrace();
-                }
-                for (AbstractExpression expr : indexedExprs) {
-                    ret += add + expr.explain(catalog_tbl.getTypeName());
-                    add = ", ";
-                }
-            }
-            ret += ");\n";
-        }
-
-        return ret;
     }
 
     /**
@@ -886,6 +728,17 @@ public abstract class CatalogUtil {
                 // default to 10 seconds
                 catCluster.setHeartbeattimeout(10);
             }
+
+            // copy schema modification behavior from xml to catalog
+            if (cluster.getSchema() != null) {
+                catCluster.setUseadhocschema(cluster.getSchema() == SchemaType.ADHOC);
+            }
+            else {
+                // Don't think we can get here, deployment schema guarantees a default value
+                hostLog.warn("Schema modification setting not found. " +
+                        "Forcing default behavior of UpdateCatalog to modify database schema.");
+                catCluster.setUseadhocschema(false);
+            }
         }
     }
 
@@ -983,6 +836,7 @@ public abstract class CatalogUtil {
             case FILE: exportClientClassName = "org.voltdb.exportclient.ExportToFileClient"; break;
             case JDBC: exportClientClassName = "org.voltdb.exportclient.JDBCExportClient"; break;
             case KAFKA: exportClientClassName = "org.voltdb.exportclient.KafkaExportClient"; break;
+            case RABBITMQ: exportClientClassName = "org.voltdb.exportclient.RabbitMQExportClient"; break;
             //Validate that we can load the class.
             case CUSTOM:
                 try {
@@ -1284,8 +1138,10 @@ public abstract class CatalogUtil {
             return;
         }
 
-        // TODO: The database name is not available in deployment.xml (it is defined in project.xml). However, it must
-        // always be named "database", so I've temporarily hardcoded it here until a more robust solution is available.
+        // The database name is not available in deployment.xml (it is defined
+        // in project.xml). However, it must always be named "database", so
+        // I've temporarily hardcoded it here until a more robust solution is
+        // available.
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
         SecureRandom sr = new SecureRandom();
@@ -1402,12 +1258,15 @@ public abstract class CatalogUtil {
                 int catalogVersion,
                 long txnId,
                 long uniqueId,
-                byte[] catalogHash,
-                byte[] deploymentHash,
-                byte[] catalogBytes)
+                byte[] catalogBytes,
+                byte[] deploymentBytes)
     {
         ByteBuffer versionAndBytes =
-            ByteBuffer.allocate(catalogBytes.length +
+            ByteBuffer.allocate(
+                    4 +  // catalog bytes length
+                    catalogBytes.length +
+                    4 +  // deployment bytes length
+                    deploymentBytes.length +
                     4 +  // catalog version
                     8 +  // txnID
                     8 +  // unique ID
@@ -1417,36 +1276,48 @@ public abstract class CatalogUtil {
         versionAndBytes.putInt(catalogVersion);
         versionAndBytes.putLong(txnId);
         versionAndBytes.putLong(uniqueId);
-        versionAndBytes.put(catalogHash);
-        versionAndBytes.put(deploymentHash);
+        versionAndBytes.put(makeCatalogOrDeploymentHash(catalogBytes));
+        versionAndBytes.put(makeCatalogOrDeploymentHash(deploymentBytes));
+        versionAndBytes.putInt(catalogBytes.length);
         versionAndBytes.put(catalogBytes);
+        versionAndBytes.putInt(deploymentBytes.length);
+        versionAndBytes.put(deploymentBytes);
         return versionAndBytes;
     }
 
-    public static void uploadCatalogToZK(ZooKeeper zk,
+    /**
+     *  Attempt to create the ZK node and write the catalog/deployment bytes
+     *  to ZK.  Used during the initial cluster deployment discovery and
+     *  distribution.
+     */
+    public static void writeCatalogToZK(ZooKeeper zk,
                 int catalogVersion,
                 long txnId,
                 long uniqueId,
-                byte[] catalogHash,
-                byte[] deploymentHash,
-                byte[] catalogBytes) throws KeeperException, InterruptedException
+                byte[] catalogBytes,
+                byte[] deploymentBytes)
+        throws KeeperException, InterruptedException
     {
         ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogHash, catalogBytes, deploymentHash);
+                txnId, uniqueId, catalogBytes, deploymentBytes);
         zk.create(VoltZK.catalogbytes,
                 versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
     }
 
-    public static void setCatalogToZK(ZooKeeper zk,
+    /**
+     * Update the catalog/deployment contained in ZK.  Someone somewhere must have
+     * called writeCatalogToZK earlier in order to create the ZK node.
+     */
+    public static void updateCatalogToZK(ZooKeeper zk,
             int catalogVersion,
             long txnId,
             long uniqueId,
-            byte[] catalogHash,
-            byte[] deploymentHash,
-            byte[] catalogBytes) throws KeeperException, InterruptedException
+            byte[] catalogBytes,
+            byte[] deploymentBytes)
+        throws KeeperException, InterruptedException
     {
         ByteBuffer versionAndBytes = makeCatalogVersionAndBytes(catalogVersion,
-                txnId, uniqueId, catalogHash, deploymentHash, catalogBytes);
+                txnId, uniqueId, catalogBytes, deploymentBytes);
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1);
     }
 
@@ -1454,22 +1325,36 @@ public abstract class CatalogUtil {
         public final long txnId;
         public final long uniqueId;
         public final int version;
-        public final byte[] catalogHash;
-        public final byte[] deploymentHash;
-        public final byte[] bytes;
+        private final byte[] catalogHash;
+        private final byte[] deploymentHash;
+        public final byte[] catalogBytes;
+        public final byte[] deploymentBytes;
 
-        public CatalogAndIds(long txnId,
+        private CatalogAndIds(long txnId,
                 long uniqueId,
                 int catalogVersion,
                 byte[] catalogHash,
                 byte[] deploymentHash,
-                byte[] catalogBytes) {
+                byte[] catalogBytes,
+                byte[] deploymentBytes)
+        {
             this.txnId = txnId;
             this.uniqueId = uniqueId;
             this.version = catalogVersion;
             this.catalogHash = catalogHash;
             this.deploymentHash = deploymentHash;
-            this.bytes = catalogBytes;
+            this.catalogBytes = catalogBytes;
+            this.deploymentBytes = deploymentBytes;
+        }
+
+        public byte[] getCatalogHash()
+        {
+            return catalogHash.clone();
+        }
+
+        public byte[] getDeploymentHash()
+        {
+            return deploymentHash.clone();
         }
 
         @Override
@@ -1492,11 +1377,15 @@ public abstract class CatalogUtil {
         versionAndBytes.get(catalogHash);
         byte[] deploymentHash = new byte[20]; // sha-1 hash size
         versionAndBytes.get(deploymentHash);
-        byte[] catalogBytes = new byte[versionAndBytes.remaining()];
+        int catalogLength = versionAndBytes.getInt();
+        byte[] catalogBytes = new byte[catalogLength];
         versionAndBytes.get(catalogBytes);
+        int deploymentLength = versionAndBytes.getInt();
+        byte[] deploymentBytes = new byte[deploymentLength];
+        versionAndBytes.get(deploymentBytes);
         versionAndBytes = null;
         return new CatalogAndIds(catalogTxnId, catalogUniqueId, version, catalogHash,
-                deploymentHash, catalogBytes);
+                deploymentHash, catalogBytes, deploymentBytes);
     }
 
     /**
@@ -1541,14 +1430,14 @@ public abstract class CatalogUtil {
                 }
                 if (updated != null && updated.equals(table.getTypeName())) {
                     // make useage only in either read or updated, not both
-                    updateTableUsageAnnotation(table, stmt, true);
+                    updateTableUsageAnnotation(table, stmt, false);
                     updated = null;
                     continue;
                 }
-                updateTableUsageAnnotation(table, stmt, false);
+                updateTableUsageAnnotation(table, stmt, true);
             }
             else if (updated != null && updated.equals(table.getTypeName())) {
-                updateTableUsageAnnotation(table, stmt, true);
+                updateTableUsageAnnotation(table, stmt, false);
                 updated = null;
             }
         }
@@ -1684,7 +1573,6 @@ public abstract class CatalogUtil {
             try {
                 indexSize = AbstractExpression.fromJSONArrayString(jsonstring, null).size();
             } catch (JSONException e) {
-                // TODO Auto-generated catch block
                 e.printStackTrace();
             }
         }
@@ -1708,6 +1596,21 @@ public abstract class CatalogUtil {
             }
         }
         return true;
+    }
+
+    /**
+     * Build an empty catalog jar file.
+     * @return jar file or null (on failure)
+     * @throws IOException on failure to create temporary jar file
+     */
+    public static File createTemporaryEmptyCatalogJarFile() throws IOException {
+        File emptyJarFile = File.createTempFile("catalog-empty", ".jar");
+        emptyJarFile.deleteOnExit();
+        VoltCompiler compiler = new VoltCompiler();
+        if (!compiler.compileEmptyCatalog(emptyJarFile.getAbsolutePath())) {
+            return null;
+        }
+        return emptyJarFile;
     }
 
 }
