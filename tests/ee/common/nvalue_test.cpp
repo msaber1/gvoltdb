@@ -767,8 +767,7 @@ TEST_F(NValueTest, TestCastToString) {
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, NULL, false, "", 0, NULL);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     NValue tinyInt = ValueFactory::getTinyIntValue(120);
     NValue smallInt = ValueFactory::getSmallIntValue(120);
@@ -1981,8 +1980,8 @@ TEST_F(NValueTest, TestLike)
     testData.push_back("aaaaaaa");
     testData.push_back("abcccc%");
     testData.push_back("abcdefg");
-    testData.push_back("��xxx��yy");
-    testData.push_back("������x���xx��yy��");
+    testData.push_back("âxxxéyy");
+    testData.push_back("â🀲x一xxéyyԱ");
 
     std::vector<const char *> testExpressions;
     std::vector<int> testMatches;
@@ -1993,7 +1992,7 @@ TEST_F(NValueTest, TestLike)
     testExpressions.push_back("zzz%"); testMatches.push_back(0);
     testExpressions.push_back("%"); testMatches.push_back(static_cast<int>(testData.size()));
     testExpressions.push_back("a%"); testMatches.push_back(3);
-    testExpressions.push_back("��xxx%"); testMatches.push_back(1);
+    testExpressions.push_back("âxxx%"); testMatches.push_back(1);
     testExpressions.push_back("aaaaaaa"); testMatches.push_back(1);
     testExpressions.push_back("aaa"); testMatches.push_back(0);
     testExpressions.push_back("abcdef_"); testMatches.push_back(1);
@@ -2005,11 +2004,11 @@ TEST_F(NValueTest, TestLike)
     testExpressions.push_back("%__c%"); testMatches.push_back(2);
     testExpressions.push_back("a_%c%"); testMatches.push_back(2);
     //Take me down like i'm a domino
-    testExpressions.push_back("������x���xx��yy��"); testMatches.push_back(1);
-    testExpressions.push_back("��_x���xx��yy��"); testMatches.push_back(1);
-    testExpressions.push_back("������x_xx��yy��"); testMatches.push_back(1);
-    testExpressions.push_back("������x���xx��yy_"); testMatches.push_back(1);
-    testExpressions.push_back("������x���x��yy��"); testMatches.push_back(0);
+    testExpressions.push_back("â🀲x一xxéyyԱ"); testMatches.push_back(1);
+    testExpressions.push_back("â_x一xxéyyԱ"); testMatches.push_back(1);
+    testExpressions.push_back("â🀲x_xxéyyԱ"); testMatches.push_back(1);
+    testExpressions.push_back("â🀲x一xxéyy_"); testMatches.push_back(1);
+    testExpressions.push_back("â🀲x一xéyyԱ"); testMatches.push_back(0);
 
     for (int ii = 0; ii < testExpressions.size(); ii++) {
         const char *testExpression = testExpressions[ii];
@@ -2053,11 +2052,11 @@ TEST_F(NValueTest, TestSubstring)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, NULL, false, "", 0, NULL);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
     std::vector<std::string> testData;
     testData.push_back("abcdefg");
-    testData.push_back("��bcd��fg");
-    testData.push_back("������c�����f��");
+    testData.push_back("âbcdéfg");
+    testData.push_back("â🀲c一éfԱ");
 
     NValue startAtOne = ValueFactory::getIntegerValue(1);
     NValue sureEnd = ValueFactory::getIntegerValue(7);
@@ -2145,8 +2144,7 @@ TEST_F(NValueTest, TestExtract)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, NULL, false, "", 0, NULL);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     NValue result;
     NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
@@ -2342,7 +2340,7 @@ TEST_F(NValueTest, TestInList)
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
     ExecutorContext* poolHolder =
-        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, NULL, false, "", 0, NULL);
+        new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     int int_set1[] = { 10, 2, -3 };
     int int_set2[] = { 0, 1, 100, 10000, 1000000 };
@@ -2550,7 +2548,7 @@ TEST_F(NValueTest, TestDedupAndSort) {
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
     ExecutorContext* poolHolder =
-    new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, NULL, false, "", 0, NULL);
+    new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     std::vector<NValue> vectorValues;
     NValue arrayValue;
@@ -2756,8 +2754,7 @@ TEST_F(NValueTest, TestTimestampStringParse)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, NULL, false, "", 0, NULL);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     bool failed = false;
     const char* trials[] = {
@@ -3025,7 +3022,7 @@ TEST_F(NValueTest, TestTimestampStringParseShort)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, NULL, false, "", 0, NULL);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     std::string peekString;
 
@@ -3085,7 +3082,7 @@ TEST_F(NValueTest, TestTimestampStringParseWithLeadingAndTrailingSpaces)
     Pool* testPool = new Pool();
     UndoQuantum* wantNoQuantum = NULL;
     Topend* topless = NULL;
-    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, NULL, false, "", 0, NULL);
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, NULL, false, "", 0, NULL);
 
     std::string peekString;
 

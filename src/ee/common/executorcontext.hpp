@@ -58,6 +58,18 @@ class ExecutorContext {
                     CatalogId hostId,
                     DRTupleStream *drTupleStream);
 
+    // For testing only
+    ExecutorContext(int64_t siteId,
+                    CatalogId partitionId,
+                    UndoQuantum *undoQuantum,
+                    Topend* topend,
+                    Pool* tempStringPool,
+                    VoltDBEngine* engine,
+                    bool exportEnabled,
+                    std::string hostname,
+                    CatalogId hostId,
+                    DRTupleStream *drTupleStream);
+
     // It is the thread-hopping VoltDBEngine's responsibility to re-establish the EC for each new thread it runs on.
     void bindToThread();
 
