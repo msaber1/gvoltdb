@@ -38,9 +38,11 @@ import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.google_voltpatches.common.base.Preconditions;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 import org.voltdb.ReplicationRole;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
@@ -955,5 +957,33 @@ public class MiscUtils {
         remainingMs -= TimeUnit.SECONDS.toMillis(seconds);
         return String.format("%d days %02d:%02d:%02d.%03d",
                 days, hours, minutes, seconds, remainingMs);
+    }
+
+    /**
+     * Parses time frequency from the given string. Supported units are
+     * <ul>
+     *     <li>s - Seconds</li>
+     *     <li>m - Minutes</li>
+     *     <li>h - Hours</li>
+     * </ul>
+     *
+     * @param freq    The time frequency string, e.g. 1m stands for 1 minute.
+     * @return The parsed frequency and the corresponding time unit.
+     */
+    public static Pair<Integer, TimeUnit> parseTimeFrequency(final String freq)
+    {
+        Preconditions.checkArgument(freq != null && !freq.isEmpty());
+
+        final String loweredFreq = freq.toLowerCase();
+        final TimeUnit unit;
+
+        switch (loweredFreq.charAt(loweredFreq.length() - 1)) {
+        case 's': unit = TimeUnit.SECONDS; break;
+        case 'm': unit = TimeUnit.MINUTES; break;
+        case 'h': unit = TimeUnit.HOURS;   break;
+        default: throw new IllegalArgumentException("Time frequency only supports units [s, m, h] (seconds, minutes, hours).");
+        }
+
+        return Pair.of(Integer.parseInt(loweredFreq.substring(0, loweredFreq.length() - 1)), unit);
     }
 }

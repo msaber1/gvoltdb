@@ -28,6 +28,7 @@ import com.google_voltpatches.common.primitives.Ints;
 import org.junit.Test;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.CoreUtils.RetryException;
+import org.voltcore.utils.Pair;
 
 import java.util.Collection;
 import java.util.Map;
@@ -154,5 +155,19 @@ public class TestMiscUtils {
                 assertTrue(map.get(keys[0]).contains(values[i]));
             }
         }
+    }
+
+    @Test
+    public void testParseTimeFrequency()
+    {
+        assertEquals(Pair.of(1, TimeUnit.SECONDS), MiscUtils.parseTimeFrequency("1s"));
+        assertEquals(Pair.of(2, TimeUnit.MINUTES), MiscUtils.parseTimeFrequency("2m"));
+        assertEquals(Pair.of(3, TimeUnit.HOURS),   MiscUtils.parseTimeFrequency("3h"));
+
+        try { MiscUtils.parseTimeFrequency(null); fail(); } catch (IllegalArgumentException e) {}
+        try { MiscUtils.parseTimeFrequency(""); fail(); } catch (IllegalArgumentException e) {}
+        try { MiscUtils.parseTimeFrequency("1d"); fail(); } catch (IllegalArgumentException e) {}
+        try { MiscUtils.parseTimeFrequency("1mm"); fail(); } catch (IllegalArgumentException e) {}
+        try { MiscUtils.parseTimeFrequency("11 h"); fail(); } catch (IllegalArgumentException e) {}
     }
 }
