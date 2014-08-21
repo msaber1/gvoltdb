@@ -56,7 +56,8 @@ public class TestVarBinaryPartition extends TestCase {
                 "create table BLAH (" +
                 "clm_varinary varbinary(128) default '00' not null," +
                 "clm_smallint smallint default 0 not null, " +
-                ");";
+                ");\n" +
+                "";
 
             pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
             pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
@@ -80,20 +81,50 @@ public class TestVarBinaryPartition extends TestCase {
             client = ClientFactory.createClient();
             client.createConnection("localhost");
 
-            ClientResponse resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('22',1);" );
-            assert( resp.getResults().length == 1 );
-            resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('80',3);" );
-            assert( resp.getResults().length == 1 );
-            resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('8081828384858687888990',4);" );
-            assert( resp.getResults().length == 1 );
+        ClientResponse resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('22',1);" );
+        assertTrue( resp.getResults()[0].asScalarLong() == 1 );
+        resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('80',3);" );
+        assertTrue( resp.getResults()[0].asScalarLong() == 1 );
+        resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ('8081828384858687888990',4);" );
+        assertTrue( resp.getResults()[0].asScalarLong() == 1 );
 
-            Random rand = new Random();
-            for( int i = 0; i < 1000; i++ ){
-                byte[] b = new byte[rand.nextInt(128)];
-                rand.nextBytes(b);
-                String hexString = Encoder.hexEncode(b);
-                resp = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES ("+"'"+hexString+"'"+",5);" );
-                assert( resp.getResults().length == 1 );
+        Random rand = new Random();
+        for( int i = 0; i < 1000; i++ ){
+            byte[] bytes = new byte[rand.nextInt(128)];
+            rand.nextBytes(bytes);
+            String hexString = Encoder.hexEncode(bytes);
+            // Just to mix things up a little, alternate the form of the parameter passing among
+            // a literal hex string, a hex string parameter, and a byte[] parameter and independently
+            // validate the insert using another form in the SELECT.
+            if ( i % 2 == 0 ) {
+                if ( i % 4 == 0 ) {
+                    resp = client.callProcedure("@AdHoc",
+                            "INSERT INTO BLAH VALUES ('" + hexString + "',5);" );
+                } else {
+                    resp = client.callProcedure("@AdHoc",
+                            "INSERT INTO BLAH VALUES (?,5);", hexString);
+                }
+            } else {
+                resp =  client.callProcedure("@AdHoc",
+                            "INSERT INTO BLAH VALUES (?,5);", bytes);
             }
+            assertTrue( resp.getResults()[0].asScalarLong() == 1 );
+
+            int j = i / 4;
+            if ( j % 2 == 0 ) {
+                if ( j % 4 == 0 ) {
+                    resp = client.callProcedure("@AdHoc",
+                            "SELECT COUNT(*) FROM BLAH WHERE clm_varinary = CAST('" + hexString +
+                            "' AS VARBINARY);");
+                } else {
+                    resp = client.callProcedure("@AdHoc",
+                            "SELECT COUNT(*) FROM BLAH WHERE clm_varinary = ?;", hexString);
+                }
+            } else {
+                resp = client.callProcedure("@AdHoc",
+                        "SELECT COUNT(*) FROM BLAH WHERE clm_varinary = ?;", bytes);
+            }
+            assertTrue( resp.getResults()[0].asScalarLong() >= 1 );
+        }
     }
 }
