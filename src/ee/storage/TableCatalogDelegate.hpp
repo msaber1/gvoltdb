@@ -60,8 +60,7 @@ class TableCatalogDelegate : public CatalogDelegate {
     virtual void deleteCommand();
 
     // table specific
-    int init(catalog::Database const &catalogDatabase,
-             catalog::Table const &catalogTable);
+    void init(catalog::Database const &catalogDatabase, catalog::Table const &catalogTable);
 
     void processSchemaChanges(catalog::Database const &catalogDatabase,
                              catalog::Table const &catalogTable,
@@ -73,7 +72,7 @@ class TableCatalogDelegate : public CatalogDelegate {
 
     static TupleSchema *createTupleSchema(catalog::Table const &catalogTable);
 
-    static bool getIndexScheme(catalog::Table const &catalogTable,
+    static void getIndexScheme(catalog::Table const &catalogTable,
                                catalog::Index const &catalogIndex,
                                const TupleSchema *schema,
                                TableIndexScheme *scheme);
@@ -82,7 +81,7 @@ class TableCatalogDelegate : public CatalogDelegate {
      * Return a string that identifies this index by table name and schema,
      * rather than by given/assigned name.
      */
-    static std::string getIndexIdString(const catalog::Index &catalogIndex);
+    static std::string getIndexIdString(catalog::Table const &catalogTable, const catalog::Index &catalogIndex);
     static std::string getIndexIdString(const TableIndexScheme &indexScheme);
 
     /**

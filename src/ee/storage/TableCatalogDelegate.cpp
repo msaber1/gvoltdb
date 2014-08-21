@@ -47,6 +47,47 @@
 #include <map>
 
 using namespace std;
+
+typedef std::pair<std::string, catalog::ColumnRef*> LabeledColumnRef;
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(ColumnRef);
+
+/// Get the list of column indexes in the target table in the order they appear in the target index
+static vector<int32_t> getCatalogIndexColumnRefs(const catalog::Table &catalogTable,
+        const catalog::Index &catalogIndex)
+{
+    size_t colrefCount = catalogIndex.columns().size();
+    // The catalog::Index object now has a list of columns that are to be
+    // used
+    if (colrefCount == (size_t)0) {
+        throwFatalExceptionStreamed("Invalid catalog: index '" << catalogIndex.name() <<
+                "' on table '" << catalogTable.name() << "' lists no referenced columns");
+    }
+
+    vector<int32_t> columnIndexes(colrefCount, -1);
+    size_t colCount = catalogTable.columns().size();
+    BOOST_FOREACH (LabeledColumnRef each, catalogIndex.columns()) {
+        catalog::ColumnRef *catalog_colref = each.second;
+        int32_t listPosition = catalog_colref->index();
+        const catalog::Column *catalogColumn = catalog_colref->column();
+        int32_t columnOffset = catalogColumn->index();
+        if (listPosition < 0 || colrefCount <= listPosition ||
+                columnOffset < 0 || colCount <= columnOffset) {
+            throwFatalExceptionStreamed("Invalid catalog: invalid list position '" << listPosition <<
+                "' or offset '" << columnOffset << "' for index '" << catalogIndex.name() <<
+                "' on table '" << catalogTable.name() << "'");
+        }
+        columnIndexes[listPosition] = columnOffset;
+    }
+
+    BOOST_FOREACH (int32_t any, columnIndexes) {
+        if (any == -1) {
+            throwFatalExceptionStreamed("Invalid catalog: missing column list position for index '" <<
+                catalogIndex.name() << "' on table '" << catalogTable.name() <<  "'");
+        }
+    }
+    return columnIndexes;
+}
+
 namespace voltdb {
 
 TableCatalogDelegate::TableCatalogDelegate(int32_t catalogId, string path, string signature, int32_t compactionThreshold) :
@@ -94,7 +135,7 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Table const &catal
                                           columnInBytes);
 }
 
-bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
+void TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
                                           catalog::Index const &catalogIndex,
                                           const TupleSchema *schema,
                                           TableIndexScheme *scheme)
@@ -102,41 +143,13 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
     vector<int> index_columns;
     vector<ValueType> column_types;
 
-    // The catalog::Index object now has a list of columns that are to be
-    // used
-    if (catalogIndex.columns().size() == (size_t)0) {
-        VOLT_ERROR("Index '%s' in table '%s' does not declare any columns"
-                   " to use",
-                   catalogIndex.name().c_str(),
-                   catalogTable.name().c_str());
-        return false;
-    }
-
     vector<AbstractExpression*> indexedExpressions = TableIndex::simplyIndexColumns();
     const std::string expressionsAsText = catalogIndex.expressionsjson();
     if (expressionsAsText.length() != 0) {
         ExpressionUtil::loadIndexedExprsFromJson(indexedExpressions, expressionsAsText);
     }
 
-    // Since the columns are not going to come back in the proper order from
-    // the catalogs, we'll use the index attribute to make sure we put them
-    // in the right order
-    index_columns.resize(catalogIndex.columns().size());
-    map<string, catalog::ColumnRef*>::const_iterator colref_iterator;
-    for (colref_iterator = catalogIndex.columns().begin();
-         colref_iterator != catalogIndex.columns().end();
-         colref_iterator++) {
-        catalog::ColumnRef *catalog_colref = colref_iterator->second;
-        if (catalog_colref->index() < 0) {
-            VOLT_ERROR("Invalid column '%d' for index '%s' in table '%s'",
-                       catalog_colref->index(),
-                       catalogIndex.name().c_str(),
-                       catalogTable.name().c_str());
-            return false;
-        }
-        index_columns[catalog_colref->index()] = catalog_colref->column()->index();
-    }
-
+    index_columns = getCatalogIndexColumnRefs(catalogTable, catalogIndex);
     *scheme = TableIndexScheme(catalogIndex.name(),
                                (TableIndexType)catalogIndex.type(),
                                index_columns,
@@ -145,7 +158,6 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
                                true, // support counting indexes (wherever supported)
                                expressionsAsText,
                                schema);
-    return true;
 }
 
 /**
@@ -196,24 +208,10 @@ getIndexIdFromMap(TableIndexType type, bool countable, bool isUnique,
 }
 
 std::string
-TableCatalogDelegate::getIndexIdString(const catalog::Index &catalogIndex)
+TableCatalogDelegate::getIndexIdString(catalog::Table const &catalogTable, const catalog::Index &catalogIndex)
 {
-    vector<int32_t> columnIndexes(catalogIndex.columns().size());
-
-    // get the list of column indexes in the target table
-    // in the order they appear in the index
-    map<string, catalog::ColumnRef*>::const_iterator col_iterator;
-    for (col_iterator = catalogIndex.columns().begin();
-         col_iterator != catalogIndex.columns().end();
-         col_iterator++)
-    {
-        int32_t index = col_iterator->second->index();
-        const catalog::Column *catalogColumn = col_iterator->second->column();
-        columnIndexes[index] = catalogColumn->index();
-    }
-
+    vector<int32_t> columnIndexes = getCatalogIndexColumnRefs(catalogTable, catalogIndex);
     const std::string expressionsAsText = catalogIndex.expressionsjson();
-
     return getIndexIdFromMap((TableIndexType)catalogIndex.type(),
                              true, //catalogIndex.countable(), // always counting for now
                              catalogIndex.unique(),
@@ -272,9 +270,8 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
         catalog::Index *catalog_index = idx_iterator->second;
 
         TableIndexScheme index_scheme;
-        if (getIndexScheme(catalogTable, *catalog_index, schema, &index_scheme)) {
-            index_map[catalog_index->name()] = index_scheme;
-        }
+        getIndexScheme(catalogTable, *catalog_index, schema, &index_scheme);
+        index_map[catalog_index->name()] = index_scheme;
     }
 
     // Constraints
@@ -291,37 +288,30 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
             case CONSTRAINT_TYPE_PRIMARY_KEY:
                 // Make sure we have an index to use
                 if (catalog_constraint->index() == NULL) {
-                    VOLT_ERROR("The '%s' constraint '%s' on table '%s' does"
-                               " not specify an index",
-                               constraintutil::getTypeName(type).c_str(),
-                               catalog_constraint->name().c_str(),
-                               catalogTable.name().c_str());
-                    return NULL;
+                    throwSerializableEEExceptionStreamed(
+                        "Invalid catalog: The '" << constraintutil::getTypeName(type) <<
+                        "' constraint '" << catalog_constraint->name() <<
+                        "' on table '" << catalogTable.name() << "' does not specify an index");
                 }
                 // Make sure they didn't declare more than one primary key index
-                else if (pkey_index_id.size() > 0) {
-                    VOLT_ERROR("Trying to declare a primary key on table '%s'"
-                               "using index '%s' but '%s' was already set as"
-                               " the primary key",
-                               catalogTable.name().c_str(),
-                               catalog_constraint->index()->name().c_str(),
-                               pkey_index_id.c_str());
-                    return NULL;
+                if (pkey_index_id.size() > 0) {
+                    throwSerializableEEExceptionStreamed(
+                        "Invalid catalog: The table '" << catalogTable.name() <<
+                        "' defines an extra primary key index '" << catalog_constraint->index()->name() <<
+                        "' after an existing primary key index '" << pkey_index_id << "'");
                 }
                 pkey_index_id = catalog_constraint->index()->name();
-                break;
+                // fall through
             case CONSTRAINT_TYPE_UNIQUE:
                 // Make sure we have an index to use
                 // TODO: In the future I would like bring back my Constraint
                 //       object so that we can keep track of everything that a
                 //       table has...
                 if (catalog_constraint->index() == NULL) {
-                    VOLT_ERROR("The '%s' constraint '%s' on table '%s' does"
-                               " not specify an index",
-                               constraintutil::getTypeName(type).c_str(),
-                               catalog_constraint->name().c_str(),
-                               catalogTable.name().c_str());
-                    return NULL;
+                    throwSerializableEEExceptionStreamed(
+                        "Invalid catalog: The '" << constraintutil::getTypeName(type) <<
+                        "' constraint '" << catalog_constraint->name() <<
+                        "' on table '" << catalogTable.name() << "' does not specify an index");
                 }
                 break;
             // Unsupported
@@ -334,10 +324,9 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
                 break;
             // Unknown
             default:
-                VOLT_ERROR("Invalid constraint type '%s' for '%s'",
-                           constraintutil::getTypeName(type).c_str(),
-                           catalog_constraint->name().c_str());
-                return NULL;
+                throwSerializableEEExceptionStreamed(
+                    "Invalid catalog: Invalid constraint type '" << constraintutil::getTypeName(type) <<
+                    "' for constraint '" << catalog_constraint->name() << "'");
         }
     }
 
@@ -394,22 +383,18 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
         assert(index);
         table->addIndex(index);
     }
-
     return table;
 }
 
-int
-TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
-                           catalog::Table const &catalogTable)
+void TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
+                                catalog::Table const &catalogTable)
 {
     m_table = constructTableFromCatalog(catalogDatabase,
                                         catalogTable,
                                         m_compactionThreshold,
                                         m_materialized,
                                         m_signatureHash);
-    if (!m_table) {
-        return false; // mixing ints and booleans here :(
-    }
+    assert(m_table);
 
     m_exportEnabled = isExportEnabledForTable(catalogDatabase, catalogTable.relativeIndex());
 
@@ -418,7 +403,6 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
     m_table->configureIndexStats(databaseId);
 
     m_table->incrementRefcount();
-    return 0;
 }
 
 

@@ -19,6 +19,11 @@
 #define SERIALIZABLEEEEXCEPTION_H_
 
 #include <string>
+#include <sstream>
+
+#define throwSerializableEEExceptionStreamed(STREAMABLES) { \
+    std::ostringstream tSEbuffer; tSEbuffer << STREAMABLES << std::endl; \
+    throw voltdb::SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, tSEbuffer); }
 
 namespace voltdb {
 
@@ -50,6 +55,7 @@ public:
      * exception buffer.
      */
     SerializableEEException(VoltEEExceptionType exceptionType, std::string message);
+    SerializableEEException(VoltEEExceptionType exceptionType, const std::ostringstream& message);
     virtual ~SerializableEEException();
 
     void serialize (ReferenceSerializeOutput *output) const;

@@ -169,9 +169,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Catalog Functions
         // -------------------------------------------------
-        bool loadCatalog(const int64_t timestamp, const std::string &catalogPayload);
-        bool updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
-        bool processCatalogAdditions(bool addAll, int64_t timestamp);
+        void loadCatalog(const int64_t timestamp, const std::string &catalogPayload);
+        void updateCatalog(const int64_t timestamp, const std::string &catalogPayload);
+        void processCatalogAdditions(bool addAll, int64_t timestamp);
 
         /**
         * Load table data into a persistent table specified by the tableId parameter.
@@ -364,7 +364,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void initPlanNode(const int64_t fragId, AbstractPlanNode* node, TempTableLimits* limits);
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViews(bool addAll);
-        bool updateCatalogDatabaseReference();
+        void updateCatalogDatabaseReference();
 
         /**
          * Call into the topend with information about how executing a plan fragment is going.

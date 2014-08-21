@@ -148,7 +148,7 @@ class ExecutionEngineTest : public Test {
             int partitionCount = 3;
             ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY));
             engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
-            ASSERT_TRUE(engine->loadCatalog( -2, catalog_string));
+            engine->loadCatalog(-2, catalog_string);
 
             /*
              * Get a link to the catalog and pull out information about it

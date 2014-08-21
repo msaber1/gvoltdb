@@ -576,23 +576,21 @@ int VoltDBEngine::loadNextDependency(Table* destination) {
 // -------------------------------------------------
 // Catalog Functions
 // -------------------------------------------------
-bool VoltDBEngine::updateCatalogDatabaseReference() {
+void VoltDBEngine::updateCatalogDatabaseReference()
+{
     catalog::Cluster *cluster = m_catalog->clusters().get("cluster");
-    if (!cluster) {
-        VOLT_ERROR("Unable to find cluster catalog information");
-        return false;
+    if ( ! cluster) {
+        throwFatalExceptionStreamed("Invalid catalog: unable to find cluster information");
     }
 
     m_database = cluster->databases().get("database");
     if (!m_database) {
-        VOLT_ERROR("Unable to find database catalog information");
-        return false;
+        throwFatalExceptionStreamed("Invalid catalog: unable to find database information");
     }
-
-    return true;
 }
 
-bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPayload) {
+void VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPayload)
+{
     assert(m_executorContext != NULL);
     ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
     if (executorContext == NULL) {
@@ -604,29 +602,29 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
 
-
     m_catalog->execute(catalogPayload);
 
+    try {
+        updateCatalogDatabaseReference();
 
-    if (updateCatalogDatabaseReference() == false) {
-        return false;
-    }
+        // deal with the epoch
+        catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
+        int64_t epoch = catalogCluster->localepoch() * (int64_t)1000;
+        m_executorContext->setEpoch(epoch);
 
-    // deal with the epoch
-    catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
-    int64_t epoch = catalogCluster->localepoch() * (int64_t)1000;
-    m_executorContext->setEpoch(epoch);
+        // Tables care about EL state.
+        if (m_database->connectors().size() > 0 && m_database->connectors().get("0")->enabled()) {
+            VOLT_DEBUG("EL enabled.");
+            m_executorContext->m_exportEnabled = true;
+            m_isELEnabled = true;
+        }
 
-    // Tables care about EL state.
-    if (m_database->connectors().size() > 0 && m_database->connectors().get("0")->enabled()) {
-        VOLT_DEBUG("EL enabled.");
-        m_executorContext->m_exportEnabled = true;
-        m_isELEnabled = true;
-    }
-
-    // load up all the tables, adding all tables
-    if (processCatalogAdditions(true, timestamp) == false) {
-        return false;
+        // load up all the tables, adding all tables
+        processCatalogAdditions(true, timestamp);
+    } catch (const SerializableEEException &e) {
+        resetReusedResultOutputBuffer();
+        e.serialize(getExceptionOutputSerializer());
+        throw;
     }
 
     rebuildTableCollections();
@@ -635,7 +633,6 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const string &catalogPay
     initMaterializedViews(true);
 
     VOLT_DEBUG("Loaded catalog...");
-    return true;
 }
 
 /*
@@ -743,8 +740,7 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::Table *t2)
  * Use the txnId of the catalog update as the generation for export
  * data.
  */
-bool
-VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
+void VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
 {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
@@ -763,11 +759,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                                                                  m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
-            if (tcd->init(*m_database, *catalogTable) != 0) {
-                VOLT_ERROR("Failed to initialize table '%s' from catalog",
-                           catalogTable->name().c_str());
-                return false;
-            }
+            tcd->init(*m_database, *catalogTable);
             m_catalogDelegates[catalogTable->path()] = tcd;
             m_delegatesByName[tcd->getTable()->name()] = tcd;
 
@@ -852,7 +844,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
                 catalog::Index* foundIndex = labeledIndex.second;
                 std::string indexName = foundIndex->name();
-                std::string catalogIndexId = TableCatalogDelegate::getIndexIdString(*foundIndex);
+                std::string catalogIndexId =
+                    TableCatalogDelegate::getIndexIdString(*catalogTable, *foundIndex);
 
                 // Look for an index on the table to match the catalog index
                 bool found = false;
@@ -870,16 +863,8 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                     VOLT_TRACE("create and add the index...");
                     // create and add the index
                     TableIndexScheme scheme;
-                    bool success = TableCatalogDelegate::getIndexScheme(*catalogTable,
-                                                                        *foundIndex,
-                                                                        persistenttable->schema(),
-                                                                        &scheme);
-                    if (!success) {
-                        VOLT_ERROR("Failed to initialize index '%s' from catalog",
-                                   foundIndex->name().c_str());
-                        return false;
-                    }
-
+                    TableCatalogDelegate::getIndexScheme(*catalogTable, *foundIndex,
+                                                         persistenttable->schema(), &scheme);
                     TableIndex *index = TableIndexFactory::getInstance(scheme);
                     assert(index);
 
@@ -906,7 +891,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
                 //  looking for a match.
                 BOOST_FOREACH (LabeledIndex labeledIndex, catalogTable->indexes()) {
                     std::string catalogIndexId =
-                        TableCatalogDelegate::getIndexIdString(*(labeledIndex.second));
+                        TableCatalogDelegate::getIndexIdString(*catalogTable, *(labeledIndex.second));
                     if (catalogIndexId == currentIndexId) {
                         found = true;
                         break;
@@ -972,9 +957,6 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
             }
         }
     }
-
-    // new plan fragments are handled differently.
-    return true;
 }
 
 
@@ -983,8 +965,7 @@ VoltDBEngine::processCatalogAdditions(bool addAll, int64_t timestamp)
  * current and the desired catalog. Execute those commands and create,
  * delete or modify the corresponding exectution engine objects.
  */
-bool
-VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayload)
+void VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayload)
 {
     // clean up execution plans when the tables underneath might change
     if (m_plans) {
@@ -999,16 +980,14 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
     // throws SerializeEEExceptions on error.
     m_catalog->execute(catalogPayload);
 
-    if (updateCatalogDatabaseReference() == false) {
-        VOLT_ERROR("Error re-caching catalog references.");
-        return false;
-    }
-
-    processCatalogDeletes(timestamp);
-
-    if (processCatalogAdditions(false, timestamp) == false) {
-        VOLT_ERROR("Error processing catalog additions.");
-        return false;
+    try {
+        updateCatalogDatabaseReference();
+        processCatalogDeletes(timestamp);
+        processCatalogAdditions(false, timestamp);
+    } catch (const SerializableEEException &e) {
+        resetReusedResultOutputBuffer();
+        e.serialize(getExceptionOutputSerializer());
+        throw;
     }
 
     rebuildTableCollections();
@@ -1017,7 +996,6 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const string &catalogPayloa
 
     m_catalog->purgeDeletions();
     VOLT_DEBUG("Updated catalog...");
-    return true;
 }
 
 bool

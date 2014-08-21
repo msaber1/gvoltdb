@@ -330,16 +330,15 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->loadCatalog(timestamp, str);
-
-        if (success) {
-            VOLT_DEBUG("loadCatalog succeeded");
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-        }
+        engine->loadCatalog(timestamp, str);
+        VOLT_DEBUG("loadCatalog succeeded");
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     } catch (const SerializableEEException &e) {
+        VOLT_ERROR("loadCatalog threw an EE Exception");
         engine->resetReusedResultOutputBuffer();
         e.serialize(engine->getExceptionOutputSerializer());
     } catch (const FatalException &fe) {
+        VOLT_ERROR("loadCatalog threw a Fatal Exception");
         if (topend != NULL) {
             topend->crashVoltDB(fe);
         }
@@ -378,16 +377,15 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
-        bool success = engine->updateCatalog( timestamp, str);
-
-        if (success) {
-            VOLT_DEBUG("updateCatalog succeeded");
-            return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
-        }
+        engine->updateCatalog( timestamp, str);
+        VOLT_DEBUG("updateCatalog succeeded");
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     } catch (const SerializableEEException &e) {
+        VOLT_ERROR("updateCatalog threw an EE Exception");
         engine->resetReusedResultOutputBuffer();
         e.serialize(engine->getExceptionOutputSerializer());
     } catch (const FatalException &fe) {
+        VOLT_ERROR("updateCatalog threw a Fatal Exception");
         if (topend != NULL) {
             topend->crashVoltDB(fe);
         }

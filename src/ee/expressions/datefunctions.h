@@ -275,7 +275,7 @@ template<> inline NValue NValue::callUnary<FUNC_TO_TIMESTAMP_MICROSECOND>() cons
 }
 
 /** implement the timestamp TRUNCATE to YEAR function **/
-template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_YEAR>() const {
+template<> inline NValue NValue::callUnary<FUNC_VOLT_TRUNCATE_YEAR>() const {
     if (isNull()) {
         return *this;
     }
@@ -287,7 +287,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_YEAR>() const {
 }
 
 /** implement the timestamp TRUNCATE to QUARTER function **/
-template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_QUARTER>() const {
+template<> inline NValue NValue::callUnary<FUNC_VOLT_TRUNCATE_QUARTER>() const {
     if (isNull()) {
         return *this;
     }
@@ -300,7 +300,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_QUARTER>() const {
 }
 
 /** implement the timestamp TRUNCATE to MONTH function **/
-template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MONTH>() const {
+template<> inline NValue NValue::callUnary<FUNC_VOLT_TRUNCATE_MONTH>() const {
     if (isNull()) {
         return *this;
     }
@@ -312,7 +312,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MONTH>() const {
 }
 
 /** implement the timestamp TRUNCATE to DAY function **/
-template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_DAY>() const {
+template<> inline NValue NValue::callUnary<FUNC_VOLT_TRUNCATE_DAY>() const {
     if (isNull()) {
         return *this;
     }
@@ -325,7 +325,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_DAY>() const {
 }
 
 /** implement the timestamp TRUNCATE to HOUR function **/
-template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_HOUR>() const {
+template<> inline NValue NValue::callUnary<FUNC_VOLT_TRUNCATE_HOUR>() const {
     if (isNull()) {
         return *this;
     }
@@ -339,7 +339,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_HOUR>() const {
 }
 
 /** implement the timestamp TRUNCATE to MINUTE function **/
-template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MINUTE>() const {
+template<> inline NValue NValue::callUnary<FUNC_VOLT_TRUNCATE_MINUTE>() const {
     if (isNull()) {
         return *this;
     }
@@ -353,7 +353,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MINUTE>() const {
 }
 
 /** implement the timestamp TRUNCATE to SECOND function **/
-template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
+template<> inline NValue NValue::callUnary<FUNC_VOLT_TRUNCATE_SECOND>() const {
     if (isNull()) {
         return *this;
     }
@@ -367,7 +367,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_SECOND>() const {
 }
 
 /** implement the timestamp TRUNCATE to MILLIS function **/
-template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
+template<> inline NValue NValue::callUnary<FUNC_VOLT_TRUNCATE_MILLISECOND>() const {
     if (isNull()) {
         return *this;
     }
@@ -380,7 +380,7 @@ template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MILLISECOND>() const {
 }
 
 /** implement the timestamp TRUNCATE to MICROS function **/
-template<> inline NValue NValue::callUnary<FUNC_TRUNCATE_MICROSECOND>() const {
+template<> inline NValue NValue::callUnary<FUNC_VOLT_TRUNCATE_MICROSECOND>() const {
     if (isNull()) {
         return *this;
     }

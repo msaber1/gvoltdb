@@ -38,6 +38,7 @@
 
 namespace voltdb {
 
+// From FunctionSQL.java -- keep these in synch
 static const int FUNC_POSITION_CHAR                    = 1;     // numeric
 static const int FUNC_POSITION_BINARY                  = 2;
 static const int FUNC_OCCURENCES_REGEX                 = 3;
@@ -87,6 +88,7 @@ static const int FUNC_SYSTEM_USER                      = 59;
 static const int FUNC_USER                             = 60;
 static const int FUNC_VALUE                            = 61;
 
+// From FunctionCustom.java -- keep these in synch
 static const int FUNC_ISAUTOCOMMIT            = 71;
 static const int FUNC_ISREADONLYSESSION       = 72;
 static const int FUNC_ISREADONLYDATABASE      = 73;
@@ -138,104 +140,78 @@ static const int FUNC_SUBSTR           = 139;
 static const int FUNC_DATEDIFF         = 140;
 static const int FUNC_SECONDS_MIDNIGHT = 141;
 
-// Specializations of EXTRACT.
-// They are based on various sets of constants and need to be adjusted by a constant offset
-// to prevent conflict with the other FUNC_ definitions
+// From Tokens.java -- keep these in synch
+static const int BOTH                             = 22;
+static const int DAY                              = 72;
+static const int DAY_NAME                = 607;
+static const int DAY_OF_MONTH            = 610;
+static const int DAY_OF_WEEK           = 560;
+static const int DAY_OF_YEAR             = 611;
+static const int HOUR                             = 126;
+static const int LEADING                          = 149;
+static const int MINUTE                           = 167;
+static const int MONTH                            = 171;
+static const int MONTH_NAME              = 608;
+static const int QUARTER                 = 609;
+static const int SECOND                           = 248;
+static const int TRAILING                         = 284;
+static const int WEEKDAY                    = 741;
+static const int WEEK_OF_YEAR          = 592;
+static const int YEAR                             = 321;
+
+// Specializations of EXTRACT are based on various sets of constants
+// and need to be adjusted by a constant offset to prevent conflict with the other FUNC_ definitions.
 static const int SQL_EXTRACT_VOLT_FUNC_OFFSET = 1000;
 
-// These are from DTIType.java
-static const int SQL_TYPE_NUMBER_LIMIT = 256;
-static const int SQL_TIMEZONE_HOUR   = SQL_TYPE_NUMBER_LIMIT + 1;
-static const int SQL_TIMEZONE_MINUTE = SQL_TYPE_NUMBER_LIMIT + 2;
-static const int SQL_SECONDS_MIDNIGHT = SQL_TYPE_NUMBER_LIMIT + 10;
-
-// These are from Tokens.java.
-static const int SQL_DAY_NAME         = 607;
-static const int SQL_MONTH_NAME       = 608;
-static const int SQL_YEAR             = 321;
-static const int SQL_MONTH            = 171;
-static const int SQL_DAY              =  72;
-static const int SQL_HOUR             = 126;
-static const int SQL_MINUTE           = 167;
-static const int SQL_SECOND           = 248;
-static const int SQL_DAY_OF_WEEK      = 560;
-static const int SQL_DAY_OF_MONTH     = 610;
-static const int SQL_DAY_OF_YEAR      = 611;
-static const int SQL_WEEK_OF_YEAR     = 592;
-static const int SQL_QUARTER          = 609;
-static const int SQL_WEEKDAY          = 741;
-
-// These are from Types.java.
-static const int SQL_INTERVAL_YEAR             = 101;
-static const int SQL_INTERVAL_MONTH            = 102;
-static const int SQL_INTERVAL_DAY              = 103;
-static const int SQL_INTERVAL_HOUR             = 104;
-static const int SQL_INTERVAL_MINUTE           = 105;
-static const int SQL_INTERVAL_SECOND           = 106;
-
-static const int FUNC_EXTRACT_TIMEZONE_HOUR    = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_TIMEZONE_HOUR;
-static const int FUNC_EXTRACT_TIMEZONE_MINUTE  = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_TIMEZONE_MINUTE;
-static const int FUNC_EXTRACT_DAY_OF_WEEK      = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_DAY_OF_WEEK;
-static const int FUNC_EXTRACT_DAY_OF_MONTH     = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_DAY_OF_MONTH;
-static const int FUNC_EXTRACT_DAY_OF_YEAR      = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_DAY_OF_YEAR;
-static const int FUNC_EXTRACT_WEEK_OF_YEAR     = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_WEEK_OF_YEAR;
-static const int FUNC_EXTRACT_QUARTER          = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_QUARTER;
-static const int FUNC_EXTRACT_SECONDS_MIDNIGHT = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_SECONDS_MIDNIGHT;
-
-static const int FUNC_EXTRACT_DAY_NAME         = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_DAY_NAME;
-static const int FUNC_EXTRACT_MONTH_NAME       = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_MONTH_NAME;
-static const int FUNC_EXTRACT_YEAR             = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_YEAR;
-static const int FUNC_EXTRACT_MONTH            = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_MONTH;
-static const int FUNC_EXTRACT_DAY              = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_DAY;
-static const int FUNC_EXTRACT_HOUR             = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_HOUR;
-static const int FUNC_EXTRACT_MINUTE           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_MINUTE;
-static const int FUNC_EXTRACT_SECOND           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_SECOND;
-
-static const int FUNC_EXTRACT_INTERVAL_YEAR             = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_YEAR;
-static const int FUNC_EXTRACT_INTERVAL_MONTH            = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_MONTH;
-static const int FUNC_EXTRACT_INTERVAL_DAY              = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_DAY;
-static const int FUNC_EXTRACT_INTERVAL_HOUR             = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_HOUR;
-static const int FUNC_EXTRACT_INTERVAL_MINUTE           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_MINUTE;
-static const int FUNC_EXTRACT_INTERVAL_SECOND           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_INTERVAL_SECOND;
-static const int FUNC_EXTRACT_WEEKDAY                   = SQL_EXTRACT_VOLT_FUNC_OFFSET + SQL_WEEKDAY;
+// These names are specific to the EE, but are based on equivalent calculations in FunctionSQL.java
+// operating on the same constants.
+static const int FUNC_EXTRACT_DAY              = SQL_EXTRACT_VOLT_FUNC_OFFSET + DAY;
+static const int FUNC_EXTRACT_DAY_NAME         = SQL_EXTRACT_VOLT_FUNC_OFFSET + DAY_NAME;
+static const int FUNC_EXTRACT_DAY_OF_MONTH     = SQL_EXTRACT_VOLT_FUNC_OFFSET + DAY_OF_MONTH;
+static const int FUNC_EXTRACT_DAY_OF_WEEK      = SQL_EXTRACT_VOLT_FUNC_OFFSET + DAY_OF_WEEK;
+static const int FUNC_EXTRACT_DAY_OF_YEAR      = SQL_EXTRACT_VOLT_FUNC_OFFSET + DAY_OF_YEAR;
+static const int FUNC_EXTRACT_HOUR             = SQL_EXTRACT_VOLT_FUNC_OFFSET + HOUR;
+static const int FUNC_EXTRACT_MINUTE           = SQL_EXTRACT_VOLT_FUNC_OFFSET + MINUTE;
+static const int FUNC_EXTRACT_MONTH            = SQL_EXTRACT_VOLT_FUNC_OFFSET + MONTH;
+static const int FUNC_EXTRACT_MONTH_NAME       = SQL_EXTRACT_VOLT_FUNC_OFFSET + MONTH_NAME;
+static const int FUNC_EXTRACT_QUARTER          = SQL_EXTRACT_VOLT_FUNC_OFFSET + QUARTER;
+static const int FUNC_EXTRACT_SECOND           = SQL_EXTRACT_VOLT_FUNC_OFFSET + SECOND;
+static const int FUNC_EXTRACT_WEEK_OF_YEAR     = SQL_EXTRACT_VOLT_FUNC_OFFSET + WEEK_OF_YEAR;
+static const int FUNC_EXTRACT_WEEKDAY          = SQL_EXTRACT_VOLT_FUNC_OFFSET + WEEKDAY;
+static const int FUNC_EXTRACT_YEAR             = SQL_EXTRACT_VOLT_FUNC_OFFSET + YEAR;
 
 // VoltDB aliases (optimized implementations for existing HSQL functions)
 static const int FUNC_VOLT_SUBSTRING_CHAR_FROM              = 10000;
 
-// These are from Tokens.java.
-static const int SQL_TRIM_LEADING                      = 149;
-static const int SQL_TRIM_TRAILING                     = 284;
-static const int SQL_TRIM_BOTH                         = 22;
-
 // VoltDB-specific functions
-static const int FUNC_VOLT_SQL_ERROR                   = 20000;
-static const int FUNC_DECODE                           = 20001;
-static const int FUNC_VOLT_FIELD                       = 20002;
-static const int FUNC_VOLT_ARRAY_ELEMENT               = 20003;
-static const int FUNC_VOLT_ARRAY_LENGTH                = 20004;
-static const int FUNC_SINCE_EPOCH                      = 20005;
-static const int FUNC_SINCE_EPOCH_SECOND               = 20006;
-static const int FUNC_SINCE_EPOCH_MILLISECOND          = 20007;
-static const int FUNC_SINCE_EPOCH_MICROSECOND          = 20008;
-static const int FUNC_TO_TIMESTAMP                     = 20009;
-static const int FUNC_TO_TIMESTAMP_SECOND              = 20010;
-static const int FUNC_TO_TIMESTAMP_MILLISECOND         = 20011;
-static const int FUNC_TO_TIMESTAMP_MICROSECOND         = 20012;
+static const int FUNC_VOLT_SQL_ERROR            = 20000;
+static const int FUNC_DECODE                    = 20001;
+static const int FUNC_VOLT_FIELD                = 20002;
+static const int FUNC_VOLT_ARRAY_ELEMENT        = 20003;
+static const int FUNC_VOLT_ARRAY_LENGTH         = 20004;
+static const int FUNC_SINCE_EPOCH               = 20005;
+static const int FUNC_SINCE_EPOCH_SECOND        = 20006;
+static const int FUNC_SINCE_EPOCH_MILLISECOND   = 20007;
+static const int FUNC_SINCE_EPOCH_MICROSECOND   = 20008;
+static const int FUNC_TO_TIMESTAMP              = 20009;
+static const int FUNC_TO_TIMESTAMP_SECOND       = 20010;
+static const int FUNC_TO_TIMESTAMP_MILLISECOND  = 20011;
+static const int FUNC_TO_TIMESTAMP_MICROSECOND  = 20012;
 
-// VoltDB truncate timestamp function
-static const int FUNC_TRUNCATE_TIMESTAMP               = 20013; // FUNC_TRUNCATE is defined as 80 already
-static const int FUNC_TRUNCATE_YEAR                    = 20014;
-static const int FUNC_TRUNCATE_QUARTER                 = 20015;
-static const int FUNC_TRUNCATE_MONTH                   = 20016;
-static const int FUNC_TRUNCATE_DAY                     = 20017;
-static const int FUNC_TRUNCATE_HOUR                    = 20018;
-static const int FUNC_TRUNCATE_MINUTE                  = 20019;
-static const int FUNC_TRUNCATE_SECOND                  = 20020;
-static const int FUNC_TRUNCATE_MILLISECOND             = 20021;
-static const int FUNC_TRUNCATE_MICROSECOND             = 20022;
+// VoltDB truncate timestamp functions
+static const int FUNC_VOLT_TRUNCATE_TIMESTAMP     = 20013; // FUNC_TRUNCATE is defined as 80 already
+static const int FUNC_VOLT_TRUNCATE_YEAR          = 20014;
+static const int FUNC_VOLT_TRUNCATE_QUARTER       = 20015;
+static const int FUNC_VOLT_TRUNCATE_MONTH         = 20016;
+static const int FUNC_VOLT_TRUNCATE_DAY           = 20017;
+static const int FUNC_VOLT_TRUNCATE_HOUR          = 20018;
+static const int FUNC_VOLT_TRUNCATE_MINUTE        = 20019;
+static const int FUNC_VOLT_TRUNCATE_SECOND        = 20020;
+static const int FUNC_VOLT_TRUNCATE_MILLISECOND   = 20021;
+static const int FUNC_VOLT_TRUNCATE_MICROSECOND   = 20022;
 
-static const int FUNC_VOLT_FROM_UNIXTIME               = 20023;
-static const int FUNC_VOLT_FORMAT_CURRENCY             = 20024;
+static const int FUNC_VOLT_FROM_UNIXTIME          = 20023;
+static const int FUNC_VOLT_FORMAT_CURRENCY        = 20024;
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions
