@@ -76,34 +76,30 @@ hashRangeFactory(PlannerDomValue obj) {
     return new HashRangeExpression(hashColumnValue.asInt(), ranges, static_cast<int>(rangesArray.arrayLen()));
 }
 
+static void loadIntegerVector(std::vector<int>& ints, PlannerDomValue obj, const char* label)
+{
+    if (obj.hasNonNullKey(label)) {
+        PlannerDomValue array = obj.valueForKey(label);
+        int size = array.arrayLen();
+        ints.reserve(size);
+        for (int i = 0; i < size; ++i) {
+            int next = array.valueAtIndex(i).asInt();
+            ints.push_back(next);
+        }
+    }
+}
+
 /** Parse JSON parameters to create a subquery expression */
 static AbstractExpression*
 subqueryFactory(ExpressionType subqueryType, PlannerDomValue obj, const std::vector<AbstractExpression*>* args) {
     int subqueryId = obj.valueForKey("SUBQUERY_ID").asInt();
     std::vector<int> paramIdxs;
-    if (obj.hasNonNullKey("PARAM_IDX")) {
-        PlannerDomValue params = obj.valueForKey("PARAM_IDX");
-        int paramSize = params.arrayLen();
-        paramIdxs.reserve(paramSize);
-        if (args == NULL || args->size() != paramSize) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "subqueryFactory: parameter indexes/tve count mismatch");
-        }
-        for (int i = 0; i < paramSize; ++i) {
-            int paramIdx = params.valueAtIndex(i).asInt();
-            paramIdxs.push_back(paramIdx);
-        }
-    }
+    loadIntegerVector(paramIdxs, obj, "PARAM_IDX");
     std::vector<int> otherParamIdxs;
-    if (obj.hasNonNullKey("OTHER_PARAM_IDX")) {
-        PlannerDomValue otherParams = obj.valueForKey("OTHER_PARAM_IDX");
-        int otherParamSize = otherParams.arrayLen();
-        otherParamIdxs.reserve(otherParamSize);
-        otherParamIdxs.reserve(otherParamSize);
-        for (int i = 0; i < otherParamSize; ++i) {
-            int paramIdx = otherParams.valueAtIndex(i).asInt();
-            otherParamIdxs.push_back(paramIdx);
-        }
+    loadIntegerVector(otherParamIdxs, obj, "OTHER_PARAM_IDX");
+    if ((args == NULL && ! paramIdxs.empty()) || args->size() != paramIdxs.size()) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "subqueryFactory: parameter indexes/tve count mismatch");
     }
     return new SubqueryExpression(subqueryType, subqueryId, paramIdxs, otherParamIdxs, args);
 }

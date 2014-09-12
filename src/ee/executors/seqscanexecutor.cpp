@@ -167,8 +167,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         TableIterator iterator = input_table->iteratorDeletingAsWeGo();
         AbstractExpression *predicate = node->getPredicate();
 
-        if (predicate)
-        {
+        if (predicate) {
             VOLT_TRACE("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
         }
 
@@ -196,8 +195,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             temp_tuple = output_temp_table->tempTuple();
         }
 
-        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple))
-        {
+        while ((limit == -1 || tuple_ctr < limit) && iterator.next(tuple)) {
             VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
                        tuple.debug(input_table->name()).c_str(), tuple_ctr,
                        (int)input_table->activeTupleCount());
@@ -215,8 +213,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                     hasNullTuple = true;
                 }
             }
-            if (predicate == NULL || passedPredicate == true)
-            {
+            if (predicate == NULL || passedPredicate) {
                 // Check if we have to skip this tuple because of offset
                 if (tuple_skipped < offset) {
                     tuple_skipped++;
@@ -228,8 +225,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                 // Nested Projection
                 // Project (or replace) values from input tuple
                 //
-                if (projection_node != NULL)
-                {
+                if (projection_node != NULL) {
                     VOLT_TRACE("inline projection...");
                     for (int ctr = 0; ctr < num_of_columns; ctr++) {
                         NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
@@ -244,8 +240,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                         output_temp_table->insertTupleNonVirtual(temp_tuple);
                     }
                 }
-                else
-                {
+                else {
                     if (m_aggExec != NULL) {
                         if (m_aggExec->p_execute_tuple(tuple)) {
                             break;
@@ -269,10 +264,10 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
             m_aggExec->p_execute_finish();
         }
 
-        // if this scan node is used as a filter for the IN subquery expression we need
+        // If this scan node is used as a filter for the IN subquery expression we need
         // to differentiate between the empty result set (the input table is not empty but
-        // non of the tuples pass the predicate, and all of them are not NULL) and
-        // the NULL tuple result set (the input table is not empty, non of the tuples pass
+        // none of the tuples pass the predicate, and all of them are not NULL) and
+        // the NULL tuple result set (the input table is not empty, none of the tuples pass
         // the predicate, and there are NULL tuples
         if (m_isSemiScan && output_temp_table->activeTupleCount() == 0 &&
             input_table->activeTupleCount() != 0 && hasNullTuple) {

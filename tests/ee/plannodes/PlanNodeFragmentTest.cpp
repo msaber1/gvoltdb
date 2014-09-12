@@ -72,22 +72,6 @@ TEST_F(PlanNodeFragmentTest, HasDeleteFalse)
     EXPECT_FALSE(dut.hasDelete());
 }
 
-TEST_F(PlanNodeFragmentTest, HasDeleteInline)
-{
-    AbstractPlanNode* send_node = new SendPlanNode();
-    send_node->setPlanNodeIdForTest(1);
-    AbstractPlanNode* delete_node = new DeletePlanNode();
-    delete_node->setPlanNodeIdForTest(2);
-    AbstractPlanNode* index_scan_node = new IndexScanPlanNode();
-    index_scan_node->setPlanNodeIdForTest(3);
-
-    AbstractPlanNode* root1 = send_node;
-    root1->addChild(index_scan_node);
-    index_scan_node->addInlinePlanNode(delete_node);
-    PlanNodeFragment dut(root1);
-    EXPECT_TRUE(dut.hasDelete());
-}
-
 int main()
 {
     return TestSuite::globalInstance()->runAll();

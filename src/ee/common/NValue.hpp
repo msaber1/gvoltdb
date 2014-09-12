@@ -323,10 +323,6 @@ class NValue {
     // the pool, use the temp string pool.
     void allocateObjectFromInlinedValue(Pool* pool);
 
-    // Copy a tuple. If the source tuple is inlined, then allocate
-    // memory from the temp string pool and copy data there
-    static NValue copyNValue(NValue value);
-
     /* Check if the value represents SQL NULL */
     bool isNull() const;
 
@@ -652,8 +648,20 @@ class NValue {
         return &valueChars[i];
     }
 
+    // Copy a value. If the value is inlined in a source tuple, then allocate
+    // memory from the temp string pool and copy data there
+    NValue copyNValue() const
+    {
+        NValue copy = *this;
+        if (m_sourceInlined) {
+            // The NValue storage is inlined (a pointer to the backing tuple storage) and needs
+            // to be copied to a local storage
+            copy.allocateObjectFromInlinedValue(getTempStringPool());
+        }
+        return copy;
+    }
 
-  private:
+private:
     /*
      * Private methods are private for a reason. Don't expose the raw
      * data so that it can be operated on directly.
@@ -3089,7 +3097,7 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
  *  allocated out-of-line form, for use with a wider/widened tuple
  *  column.  Use the pool specified by the caller, or the temp string
  *  pool if none was supplied. **/
-inline void NValue::allocateObjectFromInlinedValue(Pool* pool = NULL)
+inline void NValue::allocateObjectFromInlinedValue(Pool* pool)
 {
     if (m_valueType == VALUE_TYPE_NULL || m_valueType == VALUE_TYPE_INVALID) {
         return;
@@ -3105,14 +3113,12 @@ inline void NValue::allocateObjectFromInlinedValue(Pool* pool = NULL)
         return;
     }
 
-    if (pool == NULL) {
-        pool = getTempStringPool();
-    }
+    assert(pool != NULL);
 
     // When an object is inlined, m_data is a direct pointer into a tuple's inline storage area.
     char* source = *reinterpret_cast<char**>(m_data);
 
-    // When it isn't inlined, m_data must contain a pointer to a StringRef object
+    // To become non-inlined, m_data must contain a pointer to a StringRef object
     // that contains that same data in that same format.
 
     int32_t length = getObjectLength_withoutNull();

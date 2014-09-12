@@ -70,8 +70,8 @@ class AbstractPlanNode;
 class PlanNodeFragment {
 
   public:
-    typedef std::map<int, std::vector<AbstractPlanNode*>* >::iterator PlanNodeMapIterator;
-    typedef std::map<int, std::vector<AbstractPlanNode*>* >::const_iterator PlanNodeMapIteratorConst;
+    typedef std::map<int, std::vector<AbstractPlanNode*> >::iterator PlanNodeMapIterator;
+    typedef std::map<int, std::vector<AbstractPlanNode*> >::const_iterator PlanNodeMapIteratorConst;
     typedef std::vector<AbstractPlanNode*>::iterator PlanNodeListIterator;
 
     PlanNodeFragment();
@@ -82,12 +82,11 @@ class PlanNodeFragment {
 
     // construct a new fragment from a root node (used by testcode)
     PlanNodeFragment(AbstractPlanNode *root_node);
-    void constructTree(AbstractPlanNode *node);
-
     // first node from the statement plan
-    AbstractPlanNode * getRootNode(int stmtId = 0) {
+    AbstractPlanNode * getRootNode(int stmtId = 0)
+    {
         assert(m_stmtExecutionListMap.find(stmtId) != m_stmtExecutionListMap.end());
-        return m_stmtExecutionListMap[stmtId]->front();
+        return m_stmtExecutionListMap[stmtId].front();
     }
 
     // the list of plannodes in execution order for a given sub-statement
@@ -125,13 +124,15 @@ class PlanNodeFragment {
     // reads parameters from json objects
     static void loadParamsFromJSONObject(PlanNodeFragment *pnf, PlannerDomValue obj);
 
+    void constructTree(AbstractPlanNode *node);
+
     // serialized java type: org.voltdb.plannodes.PlanNode[List|Tree]
     std::string m_serializedType;
     // translate id from catalog to pointer to plannode
     std::map<CatalogId, AbstractPlanNode*> m_idToNodeMap;
     // Pointers to nodes in execution order grouped by substatement
     // The statement id is the key. The top statement (parent) always has id = 0
-    std::map<int, std::vector<AbstractPlanNode*>* > m_stmtExecutionListMap;
+    std::map<int, std::vector<AbstractPlanNode*> > m_stmtExecutionListMap;
     // Pairs of argument index and type for parameters to the fragment
     std::vector<std::pair< int, voltdb::ValueType> > m_parameters;
 };
