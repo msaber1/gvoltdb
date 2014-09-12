@@ -848,6 +848,20 @@ public abstract class AbstractParsedStmt {
         }
     }
 
+    /** Get a list of the subqueries used by this statement.  This method
+     * may be overridden by subclasses, e.g., insert statements have a subquery
+     * but does not use m_joinTree.
+     **/
+    public List<StmtSubqueryScan> getSubqueries() {
+        List<StmtSubqueryScan> subqueries = new ArrayList<>();
+
+        if (m_joinTree != null) {
+          m_joinTree.extractSubQueries(subqueries);
+        }
+
+        return subqueries;
+    }
+
     // The parser currently attaches the summary parameter list
     // to each leaf (select) statement in a union, but not to the
     // union statement itself. It is always the same parameter list,

@@ -1927,7 +1927,24 @@ public class TestFunctionsSuite extends RegressionSuite {
         Client client = getClient();
         insertNumbers(client, values, values.length);
         subtestVarCharCasts(client);
+        subtestInlineVarCharCast(client);
         System.out.println("ENDING test of TO VARCHAR CAST");
+    }
+
+    private void subtestInlineVarCharCast(Client client) throws Exception {
+        // This is regression test coverage for ENG-6666.
+        String sql = "INSERT INTO INLINED_VC_VB_TABLE (ID, VC1, VC2, VB1, VB2) " +
+            "VALUES (22, 'FOO', 'BAR', 'DEADBEEF', 'CDCDCDCD');";
+        client.callProcedure("@AdHoc", sql);
+        sql = "SELECT CAST(VC1 AS VARCHAR) FROM INLINED_VC_VB_TABLE WHERE ID = 22;";
+        VoltTable vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertEquals("FOO", vt.getString(0));
+
+        sql = "SELECT CAST(VB1 AS VARBINARY) FROM INLINED_VC_VB_TABLE WHERE ID = 22;";
+        vt = client.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertTrue(VoltType.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
     }
 
     private void subtestVarCharCasts(Client client) throws Exception
@@ -2759,6 +2776,21 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertTrue(vt.getString(1).equals("Memsql:Bad"));
         }
 
+        // Test inlined varchar/varbinary value produced by CASE WHEN.
+        // This is regression coverage for ENG-6666.
+        sql = "INSERT INTO INLINED_VC_VB_TABLE (ID, VC1, VC2, VB1, VB2) " +
+            "VALUES (72, 'FOO', 'BAR', 'DEADBEEF', 'CDCDCDCD');";
+        cl.callProcedure("@AdHoc", sql);
+        sql = "SELECT CASE WHEN ID > 11 THEN VC1 ELSE VC2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertEquals("FOO", vt.getString(0));
+
+        sql = "SELECT CASE WHEN ID > 11 THEN VB1 ELSE VB2 END FROM INLINED_VC_VB_TABLE WHERE ID = 72;";
+        vt = cl.callProcedure("@AdHoc", sql).getResults()[0];
+        vt.advanceRow();
+        assertTrue(VoltType.varbinaryToPrintableString(vt.getVarbinary(0)).contains("DEADBEEF"));
+
         cl.callProcedure("R1.insert", 3, "ORACLE",  8, 8.0, new Timestamp(1000000000000L));
         // Test nested case when
         sql = "SELECT ID, CASE WHEN num < 5 THEN num * 5 " +
@@ -3157,6 +3189,143 @@ public class TestFunctionsSuite extends RegressionSuite {
         validateTableOfLongs(cl, sql,new long[][]{{29}, {9}, {1}});
     }
 
+    // ENG-3283
+    public void testAliasesOfSomeStringFunctions() throws IOException, ProcCallException {
+        String sql;
+        VoltTable result;
+        Client cl = getClient();
+        ClientResponse cr = cl.callProcedure("P1.insert", 0, "abc123ABC", null, null,
+                Timestamp.valueOf("2014-07-15 01:02:03.456"));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        // LTRIM and RTRIM has been implemented and tested
+
+        // SUBSTR
+        sql = "select SUBSTR(DESC, 1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+
+        sql = "select SUBSTR(DESC, 4, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"123"});
+
+        sql = "select SUBSTR(DESC, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"c123ABC"});
+
+        // Test spelled out SUBSTRING with comma delimiters vs. old-school FROM and FOR keywords.
+        sql = "select SUBSTRING(DESC, 1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ab"});
+
+        sql = "select SUBSTRING(DESC, 4, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"123"});
+
+        sql = "select SUBSTRING(DESC, 3) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"c123ABC"});
+
+        // Some weird cases -- the SQL-2003 standard says that even START < 1
+        // moves the end point (in this case, to the left) which is based on (LENGTH + START).
+        sql = "select SUBSTR(DESC, 0, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"a"}); // not "ab" !
+
+        sql = "select SUBSTR(DESC, -1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "ab" !
+
+        sql = "select SUBSTR(DESC, -1, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "a" !
+
+        sql = "select SUBSTR(DESC, -3, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not an error !
+
+        sql = "select SUBSTRING(DESC, 0, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"a"}); // not "ab" !
+
+        sql = "select SUBSTRING(DESC, -1, 2) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "ab" !
+
+        sql = "select SUBSTRING(DESC, -1, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not "a" !
+
+        sql = "select SUBSTRING(DESC, -3, 1) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{""}); // not an error !
+
+        // LCASE and UCASE
+        sql = "select LCASE(DESC) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"abc123abc"});
+
+        sql = "select UCASE(DESC) from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABC123ABC"});
+
+        // INSERT
+        sql = "select INSERT(DESC, 1, 3,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABC123ABC"});
+
+        sql = "select INSERT(DESC, 1, 1,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABCbc123ABC"});
+
+        sql = "select INSERT(DESC, 1, 4,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABC23ABC"});
+
+        sql = "select INSERT(DESC, 1, 0,'ABC') from p1 where id = 0;";
+        cr = cl.callProcedure("@AdHoc", sql);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        validateTableColumnOfScalarVarchar(result, new String[]{"ABCabc123ABC"});
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -3262,6 +3431,12 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "PRIMARY KEY (ID) ); " +
                 "PARTITION TABLE C_NULL ON COLUMN ID;" +
 
+                "CREATE TABLE INLINED_VC_VB_TABLE (" +
+                "ID INTEGER DEFAULT 0 NOT NULL," +
+                "VC1 VARCHAR(6)," +     // inlined
+                "VC2 VARCHAR(16)," +    // not inlined
+                "VB1 VARBINARY(6)," +   // inlined
+                "VB2 VARBINARY(64));" + // not inlined
                 "";
         try {
             project.addLiteralSchema(literalSchema);

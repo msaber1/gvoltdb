@@ -200,18 +200,24 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     /**
-     *  Set the parent TVE indicator
-     * @param parentTve
+     * Set the parent statement indicator
+     * @param origStmtId parent statement indicator
      */
-    public void setOrigStmtId(int origStmtId) {
-        m_origStmtId = origStmtId;
-    }
+    public void setOrigStmtId(int origStmtId) { m_origStmtId = origStmtId; }
 
     /**
-     * @return parent TVE indicator
+     * @return parent statement indicator
      */
-    public int getOrigStmtId() {
-        return m_origStmtId;
+    public int getOrigStmtId() { return m_origStmtId; }
+
+    public void setTypeSizeBytes(VoltType SchemaColumnType, int size, boolean bytes) {
+        setValueType(SchemaColumnType);
+        setValueSize(size);
+        m_inBytes = bytes;
+    }
+
+    public void setTypeSizeBytes(int columnType, int size, boolean bytes) {
+        setTypeSizeBytes(VoltType.get((byte)columnType), size, bytes);
     }
 
     @Override
@@ -220,6 +226,7 @@ public class TupleValueExpression extends AbstractValueExpression {
             return false;
         }
         TupleValueExpression expr = (TupleValueExpression) obj;
+        //TODO: this wild-carding is a little suspicious and needs to be justified/verified
         if (m_origStmtId != -1 && expr.m_origStmtId != -1) {
             // Implying both sides have statement id set
             // If one of the ids is not set it is considered to be a wild card
@@ -258,7 +265,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     @Override
     public int hashCode() {
         // based on implementation of equals
-        int result = (m_origStmtId == -1) ? 0 : m_origStmtId;
+        int result = 0;
         if (m_tableName != null) {
             result += m_tableName.hashCode();
         }
@@ -303,9 +310,8 @@ public class TupleValueExpression extends AbstractValueExpression {
         assert(column != null);
         m_tableName = table.getTypeName();
         m_columnIndex = column.getIndex();
-        setValueType(VoltType.get((byte)column.getType()));
-        setValueSize(column.getSize());
-        setInBytes(column.getInbytes());
+
+        setTypeSizeBytes(column.getType(), column.getSize(), column.getInbytes());
     }
 
     /**
@@ -320,9 +326,8 @@ public class TupleValueExpression extends AbstractValueExpression {
             // In case of sub-queries the TVE may not have its value type and size
             // resolved yet. Try to resolve it now
             SchemaColumn inputColumn = inputSchema.getColumns().get(index);
-            setValueType(inputColumn.getType());
-            setValueSize(inputColumn.getSize());
-            setInBytes(inputColumn.getExpression().getInBytes());
+            setTypeSizeBytes(inputColumn.getType(), inputColumn.getSize(),
+                    inputColumn.getExpression().getInBytes());
         }
         return index;
     }

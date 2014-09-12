@@ -133,6 +133,10 @@ class ExecutorContext {
         return m_engine;
     }
 
+    static VoltDBEngine* getEngine() {
+        return getExecutorContext()->m_engine;
+    }
+
     static UndoQuantum *currentUndoQuantum() {
         return getExecutorContext()->m_undoQuantum;
     }

@@ -410,11 +410,9 @@ public class PlanAssembler {
                 orderIsDeterministic = retval.isOrderDeterministic() &&
                         parsedStmt.isOrderDeterministicInSpiteOfUnorderedSubqueries();
             }
-            boolean hasLimitOrOffset = (fromSubqueryResult != null) ?
-                    fromSubqueryResult.m_hasLimitOrOffset : false;
-            hasLimitOrOffset = (exprSubqueryResult != null) ?
-                    hasLimitOrOffset && exprSubqueryResult.m_hasLimitOrOffset :
-                        hasLimitOrOffset;
+            boolean hasLimitOrOffset =
+                    ((fromSubqueryResult != null) && fromSubqueryResult.m_hasLimitOrOffset) ||
+                     (exprSubqueryResult != null) && exprSubqueryResult.m_hasLimitOrOffset));
             retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
 
             // Need to re-attach the sub-queries plans to the best parent plan. The same best plan for each
@@ -436,7 +434,7 @@ public class PlanAssembler {
         // This can happen in case of an INSERT INTO ... SELECT ... where the select statement has a limit on unordered data.
         // This may also be a concern in the future if we allow subqueries in UPDATE and DELETE statements
         //   (e.g., WHERE c IN (SELECT ...))
-        if (retval != null && retval.hasLimitOrOffset() && !retval.isOrderDeterministic() && !retval.readOnly) {
+        if (retval != null && retval.hasLimitOrOffset() && !retval.isOrderDeterministic() && !retval.getReadOnly()) {
             throw new PlanningErrorException("DML statement manipulates data in content non-deterministic way " +
                         "(this may happen on INSERT INTO ... SELECT, for example).");
         }
@@ -458,14 +456,15 @@ public class PlanAssembler {
      * @param parsedStmt - SQL context containing sub queries
      * @return ChildPlanResult
      */
-    private ParsedResultAccumulator getBestCostPlanForFromSubQueries(List<StmtSubqueryScan> subqueryNodes) {
+    private ParsedResultAccumulator getBestCostPlanForFromSubQueries(List<StmtSubqueryScan> subqueryNodes)
+    {
         int nextPlanId = 0;
         boolean orderIsDeterministic = true;
         boolean hasSignificantOffsetOrLimit = false;
         for (StmtSubqueryScan subqueryScan : subqueryNodes) {
             ParsedResultAccumulator parsedResult = planForParsedSubquery(subqueryScan, nextPlanId);
             if (parsedResult == null) {
-                return null;
+                throw new PlanningErrorException(m_recentErrorMsg);
             }
             nextPlanId = parsedResult.m_planId;
             orderIsDeterministic &= parsedResult.m_orderIsDeterministic;
@@ -488,7 +487,8 @@ public class PlanAssembler {
      * @param parsedStmt - SQL context containing sub queries
      * @return ChildPlanResult
      */
-    private ParsedResultAccumulator getBestCostPlanForExistsSubQueries(List<AbstractExpression> subqueryExprs) {
+    private ParsedResultAccumulator getBestCostPlanForExistsSubQueries(List<AbstractExpression> subqueryExprs)
+    {
         int nextPlanId = 0;
         boolean orderIsDeterministic = true;
         boolean hasSignificantOffsetOrLimit = false;
@@ -564,7 +564,7 @@ public class PlanAssembler {
                         "setupForNewPlans not called or not successfull.");
             }
             assert (nextStmt.m_tableList.size() == 1);
-            retval.readOnly = false;
+            retval.setReadOnly (false);
             if (nextStmt.m_tableList.get(0).getIsreplicated()) {
                 retval.replicatedTableDML = true;
             }
@@ -614,6 +614,7 @@ public class PlanAssembler {
 
             // make sure we got a winner
             if (bestChildPlan == null) {
+                m_recentErrorMsg = assembler.getErrorMessage();
                 if (m_recentErrorMsg == null) {
                     m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
                 }
@@ -683,7 +684,7 @@ public class PlanAssembler {
 
         CompiledPlan retval = new CompiledPlan();
         retval.rootPlanGraph = subUnionRoot;
-        retval.readOnly = true;
+        retval.setReadOnly(true);
         retval.sql = m_planSelector.m_sql;
         boolean orderIsDeterministic = m_parsedUnion.isOrderDeterministic();
         boolean hasLimitOrOffset = m_parsedUnion.hasLimitOrOffset();
@@ -708,8 +709,11 @@ public class PlanAssembler {
         CompiledPlan compiledPlan = assembler.getBestCostPlan(subQuery, true);
         // make sure we got a winner
         if (compiledPlan == null) {
+            String tbAlias = subqueryScan.getTableAlias();
+            m_recentErrorMsg = "Subquery statement for table " + tbAlias
+                    + " has error: " + assembler.getErrorMessage();
             if (m_recentErrorMsg == null) {
-                m_recentErrorMsg = "Unable to plan for subquery statement. Error unknown.";
+                m_recentErrorMsg = "Unable to plan for subquery statement for table " + tbAlias;
             }
             return null;
         }
@@ -863,7 +867,7 @@ public class PlanAssembler {
 
         CompiledPlan plan = new CompiledPlan();
         plan.rootPlanGraph = root;
-        plan.readOnly = true;
+        plan.setReadOnly(true);
         boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
         boolean hasLimitOrOffset = m_parsedSelect.hasLimitOrOffset();
         plan.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
@@ -1021,11 +1025,15 @@ public class PlanAssembler {
         // updated.  We'll associate the actual values with VOLT_TEMP_TABLE
         // to avoid any false schema/column matches with the actual table.
         for (Entry<Column, AbstractExpression> col : m_parsedUpdate.columns.entrySet()) {
+            String tableName = col.getKey().getTypeName();
+            AbstractExpression expr = col.getValue();
+            expr.setInBytes(col.getKey().getInbytes());
+
             proj_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
                                                    "VOLT_TEMP_TABLE",
-                                                   col.getKey().getTypeName(),
-                                                   col.getKey().getTypeName(),
-                                                   col.getValue()));
+                                                   tableName,
+                                                   tableName,
+                                                   expr));
 
             // check if this column is an indexed column
             if (affectedColumns.contains(col.getKey().getTypeName()))
@@ -1078,7 +1086,6 @@ public class PlanAssembler {
         return expr;
     }
 
-
     /**
      * Get the next (only) plan for a SQL insertion. Inserts are pretty simple
      * and this will only generate a single plan.
@@ -1092,28 +1099,49 @@ public class PlanAssembler {
             return null;
         m_bestAndOnlyPlanWasGenerated = true;
 
+        // The child of the insert node produces rows containing values
+        // from one of
+        //   - A VALUES clause.  In this case the child node is a MaterializeNode
+        //   - a SELECT statement as in "INSERT INTO ... SELECT ...".  In this case
+        //       the child node is the root of an arbitrary subplan.
+
         // figure out which table we're inserting into
         assert (m_parsedInsert.m_tableList.size() == 1);
         Table targetTable = m_parsedInsert.m_tableList.get(0);
+        StmtSubqueryScan subquery = m_parsedInsert.isInsertWithSubquery() ?
+                m_parsedInsert.getSubqueries().get(0) : null;
 
-        ParsedSelectStmt subselect = m_parsedInsert.getSubselect();
-        if (subselect != null) {
-            if (!m_partitioning.wasSpecifiedAsSingle()) {
-                // for now, insert-into-select is only supported for the SP/SP case.
-                throw new PlanningErrorException("INSERT INTO ... SELECT is only supported for single-partition stored procedures.");
+        CompiledPlan retval = null;
+        if (subquery != null) {
+
+            if (subquery.getBestCostPlan() == null) {
+                // Seems like this should really be caught earlier
+                // in getBestCostPlan, above.
+                throw new PlanningErrorException("INSERT INTO ... SELECT subquery could not be planned: "
+                        + m_recentErrorMsg);
+
             }
 
-            // setupForNewPlans ensures that we're not writing to a replicated table in a SP SP.
-            assert (!targetTable.getIsreplicated());
+            InsertSubPlanAssembler subPlanAssembler =
+                    new InsertSubPlanAssembler(m_catalogDb, m_parsedInsert, m_partitioning);
+            AbstractPlanNode subplan = subPlanAssembler.nextPlan();
+            if (subplan == null) {
+                throw new PlanningErrorException(subPlanAssembler.m_recentErrorMsg);
+            }
+            assert(m_partitioning.isJoinValid());
 
+            //  Use the subquery's plan as the basis for the insert plan.
+            retval = subquery.getBestCostPlan();
         }
+        else {
+            retval = new CompiledPlan();
+        }
+        retval.setReadOnly(false);
 
-        CompiledPlan retval = new CompiledPlan();
-        retval.readOnly = false;
-
-
+        // Iterate over each column in the table we're inserting into:
+        //   - Make sure we're supplying values for columns that require it
+        //   - Set partitioning expressions for VALUES (...) case
         CatalogMap<Column> targetTableColumns = targetTable.getColumns();
-
         for (Column col : targetTableColumns) {
             boolean needsValue = col.getNullable() == false && col.getDefaulttype() == 0;
             if (needsValue && !m_parsedInsert.m_columns.containsKey(col)) {
@@ -1123,7 +1151,7 @@ public class PlanAssembler {
             }
 
             // hint that this statement can be executed SP.
-            if (col.equals(m_partitioning.getPartitionColForDML()) && subselect == null) {
+            if (col.equals(m_partitioning.getPartitionColForDML()) && subquery == null) {
                 // When AdHoc insert-into-select is supported, we'll need to be able to infer
                 // partitioning of the sub-select
                 AbstractExpression expr = m_parsedInsert.getExpressionForPartitioning(col);
@@ -1132,18 +1160,8 @@ public class PlanAssembler {
             }
         }
 
-        // the root of the insert plan is always an InsertPlanNode
-        InsertPlanNode insertNode = new InsertPlanNode();
-        insertNode.setTargetTableName(targetTable.getTypeName());
-
-        // The child of the insert node produces rows containing values
-        // from one of
-        //   - A VALUES clause.  In this case the child node is a MaterializeNode
-        //   - a SELECT statement as in "INSERT INTO ... SELECT ...".  In this case
-        //       the child node is the root of an arbitrary subplan.
-
         NodeSchema matSchema = null;
-        if (subselect == null) {
+        if (subquery == null) {
             matSchema = new NodeSchema();
         }
 
@@ -1152,7 +1170,10 @@ public class PlanAssembler {
 
         // The insert statement's set of columns are contained in a LinkedHashMap,
         // meaning that we'll iterate over the columns here in the order that the user
-        // specified them in the original SQL.
+        // specified them in the original SQL.  (If the statement didn't specify any
+        // columns, then all the columns will be in the map in schema order.)
+        //   - Build the field map, used by insert executor to build tuple to execute
+        //   - For VALUES(...) insert statements, build the materialize node's schema
         for (Map.Entry<Column, AbstractExpression> e : m_parsedInsert.m_columns.entrySet()) {
             Column col = e.getKey();
             fieldMap[i] = col.getIndex();
@@ -1177,6 +1198,10 @@ public class PlanAssembler {
             i++;
         }
 
+        // the root of the insert plan is always an InsertPlanNode
+        InsertPlanNode insertNode = new InsertPlanNode();
+        insertNode.setTargetTableName(targetTable.getTypeName());
+
         // The field map tells the insert node
         // where to put values produced by child into the row to be inserted.
         insertNode.setFieldMap(fieldMap);
@@ -1189,13 +1214,6 @@ public class PlanAssembler {
 
             retval.statementGuaranteesDeterminism(false, true);
         } else {
-            retval = getBestCostPlan(subselect, false);
-            retval.readOnly = false;
-
-            boolean orderIsDeterministic = m_parsedInsert.getSubselect().isOrderDeterministic();
-            boolean hasLimitOrOffset = m_parsedInsert.getSubselect().hasLimitOrOffset();
-            retval.statementGuaranteesDeterminism(hasLimitOrOffset, orderIsDeterministic);
-
             insertNode.addAndLinkChild(retval.rootPlanGraph);
         }
 
@@ -1722,9 +1740,9 @@ public class PlanAssembler {
                     // Oh, oh, it's magic, you know..
                     TupleValueExpression tve = new TupleValueExpression(
                             "VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, outputColumnIndex);
-                    tve.setValueType(rootExpr.getValueType());
-                    tve.setValueSize(rootExpr.getValueSize());
-                    tve.setInBytes(rootExpr.getInBytes());
+                    tve.setTypeSizeBytes(rootExpr.getValueType(), rootExpr.getValueSize(),
+                            rootExpr.getInBytes());
+
                     boolean is_distinct = ((AggregateExpression)rootExpr).isDistinct();
                     aggNode.addAggregate(agg_expression_type, is_distinct, outputColumnIndex, agg_input_expr);
                     schema_col = new SchemaColumn("VOLT_TEMP_TABLE", "VOLT_TEMP_TABLE", "", col.alias, tve);

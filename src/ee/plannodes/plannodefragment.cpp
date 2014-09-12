@@ -71,26 +71,24 @@ PlanNodeFragment::PlanNodeFragment(AbstractPlanNode *root_node) :
     std::auto_ptr<std::vector<AbstractPlanNode*> > executeNodeList(new std::vector<AbstractPlanNode*>());
     m_stmtExecutionListMap.insert(std::make_pair(0, executeNodeList.get()));
     executeNodeList.release();
-    if (constructTree(root_node) != true) {
-        throwFatalException("Failed to construct plan fragment");
-    }
+    m_serializedType = "org.voltdb.plannodes.PlanNodeList";
+    constructTree(root_node);
 }
 
-bool PlanNodeFragment::constructTree(AbstractPlanNode* node) {
+void PlanNodeFragment::constructTree(AbstractPlanNode* node)
+{
     if (m_idToNodeMap.find(node->getPlanNodeId()) == m_idToNodeMap.end()) {
         m_stmtExecutionListMap[0]->push_back(node);
         m_idToNodeMap[node->getPlanNodeId()] = node;
         std::vector<AbstractPlanNode*> children = node->getChildren();
         for (int ii = 0; ii < children.size(); ++ii) {
-            if (!constructTree(children[ii])) {
-                return false;
-            }
+            constructTree(children[ii]);
         }
     }
-    return true;
 }
 
-PlanNodeFragment::~PlanNodeFragment() {
+PlanNodeFragment::~PlanNodeFragment()
+{
     for (PlanNodeMapIterator mapIt = m_stmtExecutionListMap.begin(); mapIt != m_stmtExecutionListMap.end();) {
         std::vector<AbstractPlanNode*>* execList = mapIt->second;
         m_stmtExecutionListMap.erase(mapIt++);
@@ -167,9 +165,8 @@ PlanNodeFragment::nodeListFromJSONObject(PlanNodeFragment *pnf, PlannerDomValue 
     for (std::vector< AbstractPlanNode* >::const_iterator node = planNodes.begin();
          node != planNodes.end(); ++node) {
         const std::vector<CatalogId>& childIds = (*node)->getChildIds();
-        std::vector<AbstractPlanNode*> &children = (*node)->getChildren();
         for (int zz = 0; zz < childIds.size(); zz++) {
-            children.push_back(pnf->m_idToNodeMap[childIds[zz]]);
+            (*node)->addChild(pnf->m_idToNodeMap[childIds[zz]]);
         }
     }
 
@@ -203,15 +200,12 @@ bool PlanNodeFragment::hasDelete() const
     // delete node can be only in the parent statement
     assert(m_stmtExecutionListMap.find(0) != m_stmtExecutionListMap.end());
     std::vector<AbstractPlanNode*>* planNodes = m_stmtExecutionListMap.find(0)->second;
-    for (int ii = 0; ii < planNodes->size(); ii++)
-    {
-        if ((*planNodes)[ii]->getPlanNodeType() == PLAN_NODE_TYPE_DELETE)
-        {
+    for (int ii = 0; ii < planNodes->size(); ii++) {
+        if ((*planNodes)[ii]->getPlanNodeType() == PLAN_NODE_TYPE_DELETE) {
             has_delete = true;
             break;
         }
-        if ((*planNodes)[ii]->getInlinePlanNode(PLAN_NODE_TYPE_DELETE) != NULL)
-        {
+        if ((*planNodes)[ii]->getInlinePlanNode(PLAN_NODE_TYPE_DELETE) != NULL) {
             has_delete = true;
             break;
         }
@@ -219,8 +213,10 @@ bool PlanNodeFragment::hasDelete() const
     return has_delete;
 }
 
-std::string PlanNodeFragment::debug() {
+std::string PlanNodeFragment::debug()
+{
     std::ostringstream buffer;
+    static const std::string no_spacer("");
     for (PlanNodeMapIterator mapIt = m_stmtExecutionListMap.begin(); mapIt != m_stmtExecutionListMap.end(); ++mapIt) {
         buffer << "Execute List " << mapIt->first << ":\n";
         std::vector<AbstractPlanNode*>* executeList = mapIt->second;
@@ -228,7 +224,7 @@ std::string PlanNodeFragment::debug() {
             buffer << "   [" << ctr << "]: " << (*executeList)[ctr]->debug() << "\n";
         }
         buffer << "Execute Tree " << mapIt->first << ":\n";
-        buffer << getRootNode(mapIt->first)->debug(true);
+        buffer << getRootNode(mapIt->first)->debug(no_spacer);
     }
     return (buffer.str());
 }
