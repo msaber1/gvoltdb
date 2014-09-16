@@ -486,7 +486,12 @@ public class ExpressionColumn extends Expression {
                     }
                 }
 
+                // A VoltDB extension to allow toSQL on expressions in DDL
+                if (rangeVariable == null || rangeVariable.tableAlias == null) {
+                /* disable 1 line ...
                 if (rangeVariable.tableAlias == null) {
+                ... disabled 1 line */
+                // End of VoltDB extension
                     return column.getName().getSchemaQualifiedStatementName();
                 } else {
                     StringBuffer sb = new StringBuffer();
@@ -818,15 +823,21 @@ public class ExpressionColumn extends Expression {
     VoltXMLElement voltAnnotateColumnXML(VoltXMLElement exp)
     {
         if (tableName != null) {
-            exp.attributes.put("table", tableName);
+            if (rangeVariable != null && rangeVariable.rangeTable != null &&
+                    rangeVariable.tableAlias != null &&
+                    rangeVariable.rangeTable.tableType == TableBase.SYSTEM_SUBQUERY) {
+                exp.attributes.put("table", rangeVariable.tableAlias.name.toUpperCase());
+            } else {
+                exp.attributes.put("table", tableName.toUpperCase());
+            }
         }
         //TODO: also indicate RangeVariable in case table is ambiguus (for self-joins).
-        exp.attributes.put("column", columnName);
+        exp.attributes.put("column", columnName.toUpperCase());
         if ((alias == null) || (getAlias().length() == 0)) {
-            exp.attributes.put("alias", columnName);
+            exp.attributes.put("alias", columnName.toUpperCase());
         }
         if (rangeVariable != null && rangeVariable.tableAlias != null) {
-            exp.attributes.put("tablealias",  rangeVariable.tableAlias.name);
+            exp.attributes.put("tablealias",  rangeVariable.tableAlias.name.toUpperCase());
         }
         return exp;
     }

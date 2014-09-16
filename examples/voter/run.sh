@@ -84,17 +84,11 @@ function server() {
     $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
 }
 
-# run the voltdb server locally as a daemon process
-function daemon() {
+function nohup_server() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
-    echo "Starting the VoltDB server."
-    echo "To perform this action manually, use the command line: "
-    echo
-    echo "$VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar"
-    echo
-    $VOLTDB create -B -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar
+    nohup $VOLTDB create -d deployment.xml -l $LICENSE -H $HOST $APPNAME.jar > nohup.log 2>&1 &
 }
 
 # run the voltdb server locally
@@ -229,6 +223,26 @@ function docker-client() {
         --contestants=6 \
         --maxvotes=2
 }
+
+# The following two demo functions are used by the Docker package. Don't remove.
+# compile the catalog and client code
+function demo-compile() {
+    catalog
+}
+
+function demo() {
+    echo "starting server in background..."
+    nohup_server
+    sleep 10
+    echo "starting client..."
+    client
+
+    echo
+    echo When you are done with the demo database, \
+        remember to use \"$VOLTDB_BIN/voltadmin shutdown\" to stop \
+        the server process.
+}
+
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|...}"

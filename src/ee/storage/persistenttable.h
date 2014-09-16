@@ -52,6 +52,7 @@
 #include <iostream>
 #include <boost/scoped_ptr.hpp>
 #include <boost/shared_ptr.hpp>
+#include "common/declarations.h"
 #include "common/types.h"
 #include "common/ids.h"
 #include "common/valuevector.h"
@@ -60,7 +61,7 @@
 #include "storage/CopyOnWriteIterator.h"
 #include "storage/ElasticIndex.h"
 #include "storage/table.h"
-#include "storage/TupleStreamWrapper.h"
+#include "storage/ExportTupleStream.h"
 #include "storage/TableStats.h"
 #include "storage/PersistentTableStats.h"
 #include "storage/TableStreamerInterface.h"
@@ -80,20 +81,6 @@ class MaterializedViewInfo;
 
 namespace voltdb {
 
-class TableColumn;
-class TableIndex;
-class TableIterator;
-class TableFactory;
-class TupleSerializer;
-class SerializeInput;
-class Topend;
-class MaterializedViewMetadata;
-class RecoveryProtoMsg;
-class TupleOutputStreamProcessor;
-class ReferenceSerializeInput;
-class PersistentTable;
-class TableCatalogDelegate;
-
 /**
  * Interface used by contexts, scanners, iterators, and undo actions to access
  * normally-private stuff in PersistentTable.
@@ -106,6 +93,7 @@ class PersistentTableSurgeon {
 public:
 
     TBMap &getData();
+    PersistentTable& getTable();
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
@@ -130,6 +118,7 @@ public:
     bool indexHas(TableTuple &tuple) const;
     bool indexAdd(TableTuple &tuple);
     bool indexRemove(TableTuple &tuple);
+    void initTableStreamer(TableStreamerInterface* streamer);
     bool hasStreamType(TableStreamType streamType) const;
     ElasticIndex::iterator indexIterator();
     ElasticIndex::iterator indexIteratorLowerBound(int32_t lowerBound);
@@ -144,6 +133,7 @@ public:
     void activateSnapshot();
     void printIndex(std::ostream &os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple &tuple) const;
+    void DRRollback(size_t drMark);
 
 private:
 
@@ -232,6 +222,13 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
         return new TableIterator(this, m_data.begin());
     }
 
+    TableIterator& iteratorDeletingAsWeGo() {
+        m_iter.reset(m_data.begin());
+        m_iter.setTempTableDeleteAsGo(false);
+        return m_iter;
+    }
+
+
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
@@ -319,7 +316,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
                         TableStreamType streamType,
                         int32_t partitionId,
                         CatalogId tableId,
-                        ReferenceSerializeInput &serializeIn);
+                        ReferenceSerializeInputBE &serializeIn);
 
     void dropMaterializedView(MaterializedViewMetadata *targetView);
     void segregateMaterializedViews(std::map<std::string, catalog::MaterializedViewInfo*>::const_iterator const & start,
@@ -396,7 +393,41 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
+    PersistentTable * getPreTruncateTable() {
+        return m_preTruncateTable;
+    }
+
+    PersistentTable * currentPreTruncateTable() {
+        if (m_preTruncateTable != NULL) {
+            return m_preTruncateTable;
+        }
+        return this;
+    }
+
+    void setPreTruncateTable(PersistentTable * tb) {
+        if (tb->getPreTruncateTable() != NULL) {
+            m_preTruncateTable = tb->getPreTruncateTable();
+        } else {
+            m_preTruncateTable= tb;
+        }
+
+        if (m_preTruncateTable != NULL) {
+            m_preTruncateTable->incrementRefcount();
+        }
+    }
+
+    void unsetPreTruncateTable() {
+        PersistentTable * prev = this->m_preTruncateTable;
+        if (prev != NULL) {
+            this->m_preTruncateTable = NULL;
+            prev->decrementRefcount();
+        }
+    }
+
   private:
+
+    // Zero allocation size uses defaults.
+    PersistentTable(int partitionColumn, char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
 
     /**
      * Prepare table for streaming from serialized data (internal for tests).
@@ -438,8 +469,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     bool checkNulls(TableTuple &tuple) const;
 
-    // Zero allocation size uses defaults.
-    PersistentTable(int partitionColumn, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX);
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
@@ -454,7 +483,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // occurs. In case of exception, target tuple should be released, but the
     // source tuple's memory should still be retained until the exception is
     // handled.
-    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible);
+    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream = true);
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
@@ -475,7 +504,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     virtual void processLoadedTuple(TableTuple &tuple,
                                     ReferenceSerializeOutput *uniqueViolationOutput,
                                     int32_t &serializedTupleCount,
-                                    size_t &tupleCountPosition);
+                                    size_t &tupleCountPosition,
+                                    bool shouldDRStreamRows);
 
     TBPtr allocateNextBlock();
 
@@ -517,7 +547,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // Provides access to all table streaming apparati, including COW and recovery.
     boost::shared_ptr<TableStreamerInterface> m_tableStreamer;
 
-  private:
     // pointers to chunks of data. Specific to table impl. Don't leak this type.
     TBMap m_data;
     int m_failedCompactionCount;
@@ -527,6 +556,15 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
 
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
+
+    // The original table from the first truncated table
+    PersistentTable * m_preTruncateTable;
+
+    //Cache config info, is this a materialized view
+    bool m_isMaterialized;
+
+    //SHA-1 of signature string
+    char m_signature[20];
 };
 
 inline PersistentTableSurgeon::PersistentTableSurgeon(PersistentTable &table) :
@@ -539,6 +577,10 @@ inline PersistentTableSurgeon::~PersistentTableSurgeon()
 
 inline TBMap &PersistentTableSurgeon::getData() {
     return m_table.m_data;
+}
+
+inline PersistentTable& PersistentTableSurgeon::getTable() {
+    return m_table;
 }
 
 inline void PersistentTableSurgeon::insertTupleForUndo(char *tuple) {
@@ -681,7 +723,13 @@ inline uint32_t PersistentTableSurgeon::getTupleCount() const {
     return m_table.m_tupleCount;
 }
 
+inline void PersistentTableSurgeon::initTableStreamer(TableStreamerInterface* streamer) {
+    assert(m_table.m_tableStreamer == NULL);
+    m_table.m_tableStreamer.reset(streamer);
+}
+
 inline bool PersistentTableSurgeon::hasStreamType(TableStreamType streamType) const {
+    assert(m_table.m_tableStreamer != NULL);
     return m_table.m_tableStreamer->hasStreamType(streamType);
 }
 
@@ -691,6 +739,13 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
     assert(m_table.m_schema != NULL);
     return boost::shared_ptr<ElasticIndexTupleRangeIterator>(
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
+}
+
+inline void
+PersistentTableSurgeon::DRRollback(size_t drMark) {
+    if (!m_table.m_isMaterialized) {
+        ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark);
+    }
 }
 
 inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {

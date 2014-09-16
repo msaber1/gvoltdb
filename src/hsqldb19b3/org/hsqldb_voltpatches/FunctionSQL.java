@@ -292,12 +292,20 @@ public class FunctionSQL extends Expression {
             case FUNC_EXTRACT :
                 name      = Tokens.T_EXTRACT;
                 parseList = new short[] {
+                    // A VoltDB extension to support more selectors
+                    Tokens.OPENBRACKET, Tokens.X_KEYSET, 18, Tokens.YEAR,
+                    /* disable 1 line ...
                     Tokens.OPENBRACKET, Tokens.X_KEYSET, 16, Tokens.YEAR,
+                    ... disabled 1 line */
+                    // End of VoltDB extension
                     Tokens.MONTH, Tokens.DAY, Tokens.HOUR, Tokens.MINUTE,
                     Tokens.SECOND, Tokens.DAY_OF_WEEK, Tokens.WEEK_OF_YEAR,
                     Tokens.QUARTER, Tokens.DAY_OF_YEAR, Tokens.DAY_OF_MONTH,
                     Tokens.DAY_NAME, Tokens.MONTH_NAME,
                     Tokens.SECONDS_MIDNIGHT, Tokens.TIMEZONE_HOUR,
+                    // A VoltDB extension to support WEEK, WEEKDAY
+                    Tokens.WEEKDAY, Tokens.WEEK,
+                    // End of VoltDB extension
                     Tokens.TIMEZONE_MINUTE, Tokens.FROM, Tokens.QUESTION,
                     Tokens.CLOSEBRACKET
                 };
@@ -406,7 +414,12 @@ public class FunctionSQL extends Expression {
                 };
                 parseListAlt = new short[] {
                     Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.COMMA,
+                    // A VoltDB extension to make the third parameter optional
+                    /* disable 1 line ...
                     Tokens.QUESTION, Tokens.COMMA, Tokens.QUESTION,
+                    ... disabled 1 line */
+                    Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION,
+                    // End of VoltDB extension
                     Tokens.CLOSEBRACKET
                 };
                 break;
@@ -420,17 +433,11 @@ public class FunctionSQL extends Expression {
             case FUNC_FOLD_LOWER :
                 name      = Tokens.T_LOWER;
                 parseList = singleParamList;
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             case FUNC_FOLD_UPPER :
                 name      = Tokens.T_UPPER;
                 parseList = singleParamList;
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             /*
@@ -476,9 +483,6 @@ public class FunctionSQL extends Expression {
                     Tokens.X_OPTION, 2, Tokens.USING, Tokens.CHARACTERS,
                     Tokens.CLOSEBRACKET
                 };
-                // A VoltDB extension to customize the SQL function set support
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
-                // End of VoltDB extension
                 break;
 
             case FUNC_CURRENT_CATALOG :
@@ -891,7 +895,12 @@ public class FunctionSQL extends Expression {
                 long offset = ((Number) value).longValue() - 1;
                 long length = 0;
 
+                // A VoltDB extension to make the third parameter optional and ignored vs. broken and disabled
+                /* disable 1 line ...
                 if (nodes[2] != null) {
+                ... disabled 1 line */
+                if (nodes.length > 2 && nodes[2] != null) {
+                // End of VoltDB extension
                     if (data[2] == null) {
                         return null;
                     }
@@ -901,6 +910,8 @@ public class FunctionSQL extends Expression {
                     length = ((Number) value).longValue();
                 }
 
+                // A VoltDB extension to make the fourth parameter optional and ignored vs. broken and disabled
+                /* disable 9 lines ...
                 if (nodes[3] != null
                         && ((Number) nodes[2].valueData).intValue()
                            == Tokens.OCTETS) {
@@ -910,6 +921,11 @@ public class FunctionSQL extends Expression {
 
                 return ((CharacterType) dataType).substring(session, data[0],
                         offset, length, nodes[2] != null, false);
+                ... disabled 9 lines */
+
+                return ((CharacterType) dataType).substring(session, data[0],
+                		offset, length, (nodes.length > 2 && nodes[2] != null), false);
+                // End of VoltDB extension
             }
             /*
             case FUNCTION_SUBSTRING_REG_EXPR :
@@ -1425,7 +1441,12 @@ public class FunctionSQL extends Expression {
                     throw Error.error(ErrorCode.X_42565);
                 }
 
+                // A VoltDB extension to make the third parameter optional
+                /* disable 1 line ...
                 if (nodes[2] != null) {
+                ... disabled 1 line */
+                if (nodes.length > 2 && nodes[2] != null) {
+                // End of VoltDB extension
                     if (nodes[2].dataType == null) {
                         nodes[2].dataType = NumberType.SQL_NUMERIC_DEFAULT_INT;
                     }
@@ -1523,6 +1544,11 @@ public class FunctionSQL extends Expression {
                     if (nodes[1] == null) {
                         nodes[1] = new ExpressionValue(" ", Type.SQL_CHAR);
                     }
+                    // A VoltDB extension to customize the SQL function set support
+                    else if (nodes[1].dataType != Type.SQL_CHAR) {
+                        nodes[1].dataType = Type.SQL_CHAR;
+                    }
+                    // End of VoltDB extension
                 } else if (dataType.isBinaryType()) {
                     funcType = FUNC_TRIM_BINARY;
 
@@ -2069,7 +2095,7 @@ public class FunctionSQL extends Expression {
         switch (funcType) {
         case FUNC_SUBSTRING_CHAR :
             // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
-            if (nodes[2] == null) {
+            if (nodes.length == 2 || nodes[2] == null) {
                 exp.attributes.put("volt_alias", "substring_from");
                 volt_funcType = FUNC_VOLT_SUBSTRING_CHAR_FROM;
             } else {
@@ -2093,18 +2119,19 @@ public class FunctionSQL extends Expression {
             // case DTIType.QUARTER :
                 volt_alias = "quarter";
                 break;
-            case Tokens.DAY_OF_MONTH :
-            // case DTIType.DAY_OF_MONTH :
-                volt_alias = "day_of_month";
-                break;
             case Tokens.DAY_OF_YEAR :
             // case DTIType.DAY_OF_YEAR :
                 volt_alias = "day_of_year";
                 break;
+            case Tokens.WEEKDAY :
+            	volt_alias = "weekday";
+            	break;
             case Tokens.DAY_OF_WEEK :
             // case DTIType.DAY_OF_WEEK :
                 volt_alias = "day_of_week";
                 break;
+            case Tokens.WEEK:
+            	keywordConstant = Tokens.WEEK_OF_YEAR;
             case Tokens.WEEK_OF_YEAR :
             // case DTIType.WEEK_OF_YEAR :
                 volt_alias = "week_of_year";
@@ -2133,6 +2160,9 @@ public class FunctionSQL extends Expression {
             case Tokens.MONTH :
                 volt_alias = "month";
                 break;
+            case Tokens.DAY_OF_MONTH :
+            // case DTIType.DAY_OF_MONTH :
+                keywordConstant = Tokens.DAY;
             case Tokens.DAY :
                 volt_alias = "day";
                 break;
@@ -2281,7 +2311,6 @@ public class FunctionSQL extends Expression {
             exp.children.remove(0);
             return exp;
 
-
         default :
             if (voltDisabled != null) {
                 exp.attributes.put("disabled", voltDisabled);
@@ -2294,7 +2323,7 @@ public class FunctionSQL extends Expression {
         switch (funcType) {
         case FUNC_SUBSTRING_CHAR :
             // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
-            if (nodes[2] == null) {
+            if (nodes.length == 2 || nodes[2] == null) {
                 exp.attributes.put("volt_alias", "substring_from");
             } else {
                 exp.attributes.put("volt_alias", "substring_from_for");

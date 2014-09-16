@@ -406,7 +406,7 @@ class CLIParser(ExtendedHelpOptionParser):
                         except ArgumentException, e:
                             exceptions.append(e)
                     iarg = len(args)
-                else:
+                elif len(args) > 0:
                     # All other arguments are treated as scalars.
                     # Pass through argument class get() for validation, conversion, etc..
                     try:
@@ -414,14 +414,14 @@ class CLIParser(ExtendedHelpOptionParser):
                     except ArgumentException, e:
                         exceptions.append(e)
                     iarg += 1
-                if value is not None:
+                if value is not None or arg.min_count == 0:
                     setattr(verb_opts, arg.name, value)
         # Run the gauntlet of error disclosure. Abort and display usage as appropriate.
         had_errors = 0
         show_usage = False
         if exceptions:
             msg = 'Argument value %s:' % utility.pluralize('error', len(exceptions))
-            utility.error(msg, [e.message for e in exceptions])
+            utility.error(msg, [str(e) for e in exceptions])
             had_errors += 1
         if iarg < len(args):
             self._abort('Extra arguments were provided:', args[iarg:])

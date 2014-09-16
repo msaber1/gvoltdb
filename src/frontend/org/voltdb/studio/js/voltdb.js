@@ -1,3 +1,9 @@
+jQuery.extend({
+    postJSON: function( url, data, callback) {
+       return jQuery.post(url, data, callback, "json");
+    }
+});
+
 (function (window, unused){
 
 var IVoltDB = (function(){
@@ -24,7 +30,7 @@ var IVoltDB = (function(){
         this.Key = (this.Server + '_' + this.Port + '_' + (user == ''?'':user) + '_' + (this.Admin == true?'Admin':'')).replace(/[^_a-zA-Z0-9]/g,"_");
         this.Display = this.Server + ':' + this.Port + (user == ''?'':' (' + user + ')') + (this.Admin == true?' - Admin':'');
 
-        this.BuildURI = function(procedure, parameters)
+        this.BuildParamSet = function(procedure, parameters)
         {
             var s = [];
             if (!this.Procedures.hasOwnProperty(procedure)) {
@@ -97,17 +103,18 @@ var IVoltDB = (function(){
                 s[s.length] = encodeURIComponent('Hashedpassword') + '=' + encodeURIComponent(this.HashedPassword);
             if (this.Admin)
                 s[s.length] = 'admin=true';
-            var uri = 'http://' + this.Server + ':' + this.Port + '/api/1.0/?' + s.join('&') + '&jsonp=?';
-            return uri;
+            var paramSet = s.join('&') + '&jsonp=?';
+            return paramSet;
         }
         this.CallExecute = function(procedure, parameters, callback)
         {
-            var uri = this.BuildURI(procedure, parameters);
-            if (typeof(uri) == 'string')
-                jQuery.getJSON(uri, callback);
+            var uri = 'http://' + this.Server + ':' + this.Port + '/api/1.0/' 
+            var params = this.BuildParamSet(procedure, parameters);
+            if (typeof(params) == 'string')
+                jQuery.postJSON(uri, params, callback);
             else
                 if (callback != null)
-                    callback({"status":-1,"statusstring":"PrepareStatement error: " + uri[0],"results":[]});
+                    callback({"status":-1,"statusstring":"PrepareStatement error: " + params[0],"results":[]});
         }
         var CallbackWrapper = function(userCallback)
         {
@@ -244,6 +251,8 @@ var IVoltDB = (function(){
                           , '@UpdateLogging': { '1' : ['xml'] }
                           , '@ValidatePartitioning': { '2': ['int', 'varbinary']}
                           , '@GetPartitionKeys': { '1': ['varchar']}
+                          , '@GC' : { '0' : [] }
+                          , '@StopNode' : { '1' : ['int'] }
                         };
         return this;
     }
@@ -314,6 +323,7 @@ var IVoltDB = (function(){
                                                   , '@Promote': { '0' : ['Returns bit'] }
                                                   , '@ValidatePartitioning': { '2' : ['HashinatorType (int)', 'Config (varbinary)', 'Returns Table[]'] }
                                                   , '@GetPartitionKeys': { '1' : ['VoltType (varchar)', 'Returns Table[]'] }
+                                                  , '@ApplyBinaryLogSP': { '2' : ['Partition (varbinary)', 'log (varbinary)', 'Returns Table[]'] }
                                                   };
 
                 /*
@@ -381,8 +391,7 @@ var IVoltDB = (function(){
     this.TestConnection = function(server, port, admin, user, password, isHashedPassword, onConnectionTested)
     {
         var conn = new Connection(server, port, admin, user, password, isHashedPassword);
-        var timeout = setTimeout(function() {onConnectionTested(false);}, 5000);
-        conn.BeginExecute('@Statistics', ['TABLE',0], function(response) { try { if (response.status == 1) {clearTimeout(timeout); onConnectionTested(true); } else onConnectionTested(false);} catch(x) {clearTimeout(timeout); onConnectionTested(true);} });
+        conn.BeginExecute('@Statistics', ['TABLE',0], function(response) { try { if (response.status == 1) { onConnectionTested(true); } else onConnectionTested(false);} catch(x) {onConnectionTested(true);} });
     }
     this.AddConnection = function(server, port, admin, user, password, isHashedPassword, onConnectionAdded)
     {
