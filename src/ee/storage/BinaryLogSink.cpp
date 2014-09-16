@@ -25,8 +25,8 @@
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
 
-#include<boost/unordered_map.hpp>
-#include<crc/crc32c.h>
+#include <boost/unordered_map.hpp>
+#include <crc/crc32c.h>
 
 namespace voltdb {
 
