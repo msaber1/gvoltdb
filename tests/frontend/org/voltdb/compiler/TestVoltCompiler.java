@@ -124,7 +124,7 @@ public class TestVoltCompiler extends TestCase {
                 "create table blah  (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n";
         VoltProjectBuilder pb = new VoltProjectBuilder();
         pb.addLiteralSchema(simpleSchema);
-        pb.addStmtProcedure("utf8insert", "insert into blah values(1, 'něco za nic')");
+        pb.addStmtProcedure("utf8insert", "insert into blah values(1, 'n��co za nic')");
         pb.addPartitionInfo("blah", "pkey");
         boolean success = pb.compile(Configuration.getPathToCatalogForTest("utf8xml.jar"));
         assertTrue(success);
@@ -1680,7 +1680,7 @@ public class TestVoltCompiler extends TestCase {
                                     IndexType.BALANCED_TREE,
                                     IndexType.BALANCED_TREE};
 
-    boolean[] can_be_hash = {true, true, true, true, false, false, true, false};
+    boolean[] can_be_hash = {true, true, true, true, true, true, true, true};
     boolean[] can_be_tree = {true, true, true, true, true, true, true, true};
 
     public void testDDLCompilerIndexDefaultTypes()

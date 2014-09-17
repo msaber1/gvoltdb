@@ -53,7 +53,6 @@
 
 #include "indexes/tableindex.h"
 #include "common/tabletuple.h"
-#include "structures/CompactingHashTable.h"
 
 namespace voltdb {
 

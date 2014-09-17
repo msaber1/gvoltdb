@@ -48,9 +48,10 @@
 
 #include <iostream>
 #include <cassert>
+#include <iterator>
+#include <boost/unordered_map.hpp>
 
 #include "indexes/tableindex.h"
-#include "structures/CompactingHashTable.h"
 
 namespace voltdb {
 
@@ -63,23 +64,27 @@ class CompactingHashUniqueIndex : public TableIndex
 {
     typedef typename KeyType::KeyEqualityChecker KeyEqualityChecker;
     typedef typename KeyType::KeyHasher KeyHasher;
-    typedef CompactingHashTable<KeyType, const void*, KeyHasher, KeyEqualityChecker> MapType;
+    typedef boost::unordered_map<KeyType, const void*, KeyHasher, KeyEqualityChecker> MapType;
     typedef typename MapType::iterator MapIterator;
+    typedef typename MapType::const_iterator MapCIterator;
 
     ~CompactingHashUniqueIndex() {};
 
-    static MapIterator& castToIter(IndexCursor& cursor) {
-        return *reinterpret_cast<MapIterator*> (cursor.m_keyIter);
+    static MapCIterator& castToIter(IndexCursor& cursor) {
+        return *reinterpret_cast<MapCIterator*> (cursor.m_keyIter);
     }
 
     bool addEntry(const TableTuple *tuple) {
         ++m_inserts;
-        return m_entries.insert(setKeyFromTuple(tuple), tuple->address());
+        std::pair<const KeyType, const void*> valuePair(setKeyFromTuple(tuple), tuple->address());
+        m_entries.insert(valuePair);
+        return true;
     }
 
     bool deleteEntry(const TableTuple *tuple) {
         ++m_deletes;
-        return m_entries.erase(setKeyFromTuple(tuple));
+        m_entries.erase(setKeyFromTuple(tuple));
+        return true;
     }
 
     /**
@@ -97,11 +102,11 @@ class CompactingHashUniqueIndex : public TableIndex
             return CompactingHashUniqueIndex::addEntry(&destinationTuple);
         }
 
-        MapIterator mapiter = findTuple(originalTuple);
-        if (mapiter.isEnd()) {
+        MapIterator mapiter = m_entries.find(setKeyFromTuple(&originalTuple));
+        if (mapiter == m_entries.end()) {
             return false;
         }
-        mapiter.setValue(destinationTuple.address());
+        mapiter->second = destinationTuple.address();
         m_updates++;
         return true;
     }
@@ -114,18 +119,18 @@ class CompactingHashUniqueIndex : public TableIndex
 
     bool exists(const TableTuple *persistentTuple) const
     {
-        return ! findTuple(*persistentTuple).isEnd();
+        return m_entries.find(setKeyFromTuple(persistentTuple)) != m_entries.cend();
     }
 
     bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
-        MapIterator &mapIter = castToIter(cursor);
+        MapCIterator &mapIter = castToIter(cursor);
         mapIter = findKey(searchKey);
 
-        if (mapIter.isEnd()) {
+        if (mapIter == m_entries.cend()) {
             cursor.m_match.move(NULL);
             return false;
         }
-        cursor.m_match.move(const_cast<void*>(mapIter.value()));
+        cursor.m_match.move(const_cast<void*>(mapIter->second));
 
         return true;
     }
@@ -139,22 +144,22 @@ class CompactingHashUniqueIndex : public TableIndex
     TableTuple uniqueMatchingTuple(const TableTuple &searchTuple) const
     {
         TableTuple retval(getTupleSchema());
-        const MapIterator keyIter = findTuple(searchTuple);
-        if ( ! keyIter.isEnd()) {
-            retval.move(const_cast<void*>(keyIter.value()));
+        MapCIterator keyIter = m_entries.find(setKeyFromTuple(&searchTuple));
+        if (keyIter != m_entries.cend()) {
+            retval.move(const_cast<void*>(keyIter->second));
         }
         return retval;
     }
 
     bool hasKey(const TableTuple *searchKey) const {
-        return ! findKey(searchKey).isEnd();
+        return findKey(searchKey) != m_entries.cend();
     }
 
     size_t getSize() const { return m_entries.size(); }
 
     int64_t getMemoryEstimate() const
     {
-        return m_entries.bytesAllocated();
+        return m_entries.max_bucket_count();
     }
 
     std::string getTypeName() const { return "CompactingHashUniqueIndex"; };
@@ -165,14 +170,9 @@ class CompactingHashUniqueIndex : public TableIndex
     }
 
     // Non-virtual (so "really-private") helper methods.
-    MapIterator findKey(const TableTuple *searchKey) const
+    MapCIterator findKey(const TableTuple *searchKey) const
     {
         return m_entries.find(KeyType(searchKey));
-    }
-
-    MapIterator findTuple(const TableTuple &originalTuple) const
-    {
-        return m_entries.find(setKeyFromTuple(&originalTuple));
     }
 
     const KeyType setKeyFromTuple(const TableTuple *tuple) const
@@ -184,12 +184,12 @@ class CompactingHashUniqueIndex : public TableIndex
     MapType m_entries;
 
     // comparison stuff
-   KeyEqualityChecker m_eq;
+    KeyEqualityChecker m_eq;
 
 public:
     CompactingHashUniqueIndex(const TupleSchema *keySchema, const TableIndexScheme &scheme) :
         TableIndex(keySchema, scheme),
-        m_entries(true, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
+        m_entries(100, KeyHasher(keySchema), KeyEqualityChecker(keySchema)),
         m_eq(keySchema)
     {}
 };
