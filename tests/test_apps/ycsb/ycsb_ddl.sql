@@ -3,9 +3,11 @@ CREATE TABLE Store
     keyspace VARCHAR(128)    NOT NULL
 ,   key      VARCHAR(128)    NOT NULL
 ,   value    VARBINARY(2056) NOT NULL
-,   PRIMARY KEY (keyspace, key)
 );
 PARTITION TABLE Store ON COLUMN key;
+CREATE UNIQUE INDEX store_pk_index ON Store (keyspace, key);
+
+CREATE UNIQUE INDEX store_hash_index ON Store (keyspace, key);
 
 CREATE PROCEDURE FROM CLASS com.procedures.Put;
 PARTITION PROCEDURE Put ON TABLE Store COLUMN key PARAMETER 1;

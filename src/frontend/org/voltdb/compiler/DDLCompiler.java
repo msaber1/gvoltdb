@@ -1662,8 +1662,6 @@ public class DDLCompiler {
         String colList = node.attributes.get("columns");
         String[] colNames = colList.split(",");
         Column[] columns = new Column[colNames.length];
-        boolean has_nonint_col = false;
-        String nonint_col_name = null;
 
         for (int i = 0; i < colNames.length; i++) {
             columns[i] = columnMap.get(colNames[i]);
@@ -1675,10 +1673,6 @@ public class DDLCompiler {
         if (exprs == null) {
             for (int i = 0; i < colNames.length; i++) {
                 VoltType colType = VoltType.get((byte)columns[i].getType());
-                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
-                    has_nonint_col = true;
-                    nonint_col_name = colNames[i];
-                }
                 // disallow columns from VARBINARYs
                 if (colType == VoltType.VARBINARY) {
                     String msg = "VARBINARY values are not currently supported as index keys: '" + colNames[i] + "'";
@@ -1688,10 +1682,6 @@ public class DDLCompiler {
         } else {
             for (AbstractExpression expression : exprs) {
                 VoltType colType = expression.getValueType();
-                if (colType == VoltType.DECIMAL || colType == VoltType.FLOAT || colType == VoltType.STRING) {
-                    has_nonint_col = true;
-                    nonint_col_name = "<expression>";
-                }
                 // disallow expressions of type VARBINARY
                 if (colType == VoltType.VARBINARY) {
                     String msg = "VARBINARY expressions are not currently supported as index keys.";
@@ -1701,28 +1691,14 @@ public class DDLCompiler {
         }
 
         Index index = table.getIndexes().add(name);
-        index.setCountable(false);
 
         // set the type of the index based on the index name and column types
         // Currently, only int types can use hash or array indexes
         String indexNameNoCase = name.toLowerCase();
-        if (indexNameNoCase.contains("tree"))
+        if (indexNameNoCase.contains("hash"))
         {
-            index.setType(IndexType.BALANCED_TREE.getValue());
-            index.setCountable(true);
-        }
-        else if (indexNameNoCase.contains("hash"))
-        {
-            if (!has_nonint_col)
-            {
-                index.setType(IndexType.HASH_TABLE.getValue());
-            }
-            else
-            {
-                String msg = "Index " + name + " in table " + table.getTypeName() +
-                             " uses a non-hashable column " + nonint_col_name;
-                throw m_compiler.new VoltCompilerException(msg);
-            }
+            index.setType(IndexType.HASH_TABLE.getValue());
+            index.setCountable(false);
         } else {
             index.setType(IndexType.BALANCED_TREE.getValue());
             index.setCountable(true);
