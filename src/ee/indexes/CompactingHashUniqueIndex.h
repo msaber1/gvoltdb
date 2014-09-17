@@ -77,13 +77,18 @@ class CompactingHashUniqueIndex : public TableIndex
     bool addEntry(const TableTuple *tuple) {
         ++m_inserts;
         std::pair<const KeyType, const void*> valuePair(setKeyFromTuple(tuple), tuple->address());
-        m_entries.insert(valuePair);
-        return true;
+        std::pair<MapIterator, bool> response = m_entries.insert(valuePair);
+
+        return response.second;
     }
 
     bool deleteEntry(const TableTuple *tuple) {
+        MapCIterator mapIter = m_entries.find(setKeyFromTuple(tuple));
+        if (mapIter == m_entries.cend()) {
+            return false;
+        }
         ++m_deletes;
-        m_entries.erase(setKeyFromTuple(tuple));
+        m_entries.erase(mapIter);
         return true;
     }
 
@@ -124,7 +129,7 @@ class CompactingHashUniqueIndex : public TableIndex
 
     bool moveToKey(const TableTuple *searchKey, IndexCursor& cursor) const {
         MapCIterator &mapIter = castToIter(cursor);
-        mapIter = findKey(searchKey);
+        mapIter = m_entries.find(KeyType(searchKey));
 
         if (mapIter == m_entries.cend()) {
             cursor.m_match.move(NULL);
@@ -152,7 +157,7 @@ class CompactingHashUniqueIndex : public TableIndex
     }
 
     bool hasKey(const TableTuple *searchKey) const {
-        return findKey(searchKey) != m_entries.cend();
+        return m_entries.find(KeyType(searchKey)) != m_entries.cend();
     }
 
     size_t getSize() const { return m_entries.size(); }
@@ -167,12 +172,6 @@ class CompactingHashUniqueIndex : public TableIndex
     TableIndex *cloneEmptyNonCountingTreeIndex() const
     {
         return new CompactingTreeUniqueIndex<NormalKeyValuePair<KeyType, void const *>, false >(TupleSchema::createTupleSchema(getKeySchema()), m_scheme);
-    }
-
-    // Non-virtual (so "really-private") helper methods.
-    MapCIterator findKey(const TableTuple *searchKey) const
-    {
-        return m_entries.find(KeyType(searchKey));
     }
 
     const KeyType setKeyFromTuple(const TableTuple *tuple) const
