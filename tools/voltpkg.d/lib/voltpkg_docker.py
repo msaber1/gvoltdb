@@ -44,14 +44,14 @@ class DockerTool(object):
         voltdb_bin (required) - bin folder with volt* scripts
         voltdb_lib (required) - lib folder with volt libraries
         voltdb_voltdb (required) - voltdb folder with volt jar
-        repo_url (required for ubuntu) - OS repository URL
-        repo_name (required for ubuntu) - OS repository name
-        repo_sections (required for ubuntu) - OS repository sections
+        repo_X_url (required for ubuntu) - repository #X URL
+        repo_X_name (required for ubuntu) - repository #X name
+        repo_X_sections (required for ubuntu) - repository #X section list
         dist_folder (defaults to "dist") - where distribution files are staged
         dockerfile_name (defaults to "Dockerfile")
         dockerfile_preamble (optional) - comment at top of docker file
         entrypoint (defaults to voltdb) - what to run
-        workdir (defaults to image_folder) - where to run from
+        work_folder (defaults to image_folder) - where to run from
     """
     def __init__(self, runner, config):
         self.runner = runner
@@ -63,7 +63,7 @@ class DockerTool(object):
         self.config['base_image'] = self.config['base_image'].lower()
         required = ['voltdb_base', 'image_folder', 'voltdb_bin', 'voltdb_lib', 'voltdb_voltdb']
         if self.config['base_image'] == 'ubuntu':
-            required.extend(['repo_url', 'repo_name', 'repo_sections'])
+            required.extend(['repo_1_url', 'repo_1_name', 'repo_1_sections'])
         else:
             self.runner.abort('Unsupported base image "%s".' % self.config['base_image'])
         missing = [check for check in required if check not in self.config]
@@ -115,7 +115,8 @@ class DockerTool(object):
             dist_folder = self.config['dist_folder']
             voltdb_base = self.config['voltdb_base'],
             if os.path.exists(dist_folder):
-                self.runner.verbose_info('Deleting existing distribution folder "%s"...' % dist_folder)
+                self.runner.verbose_info('Deleting existing distribution folder "%s"...'
+                                            % dist_folder)
                 shutil.rmtree(dist_folder)
             self.runner.info('Populating distribution folder "%s"...' % dist_folder)
             # Be selective when copying from the root folder of a source tree.
@@ -136,16 +137,24 @@ class DockerTool(object):
         # Pre-checked that it's a supported base image (just "ubuntu" for now).
         # Add else clauses for custom initialization of other base image types.
         if self.config['base_image'] == 'ubuntu':
-            self._add_line('RUN', 'echo "deb %(repo_url)s %(repo_name)s %(repo_sections)s"',
-                                '> /etc/apt/sources.list')
+            op = '>'
+            sources = '/etc/apt/sources.list'
+            for i in range(1, 10):
+                try:
+                    deb = 'deb %({pfx}_url)s %({pfx}_name)s %({pfx}_sections)s'.format(
+                                pfx=('repo_%d' % i))
+                    self._add_line('RUN', 'echo "{deb}" {op} {sources}'.format(**locals()))
+                    op = '>>'
+                except KeyError:
+                    pass
             self._add_line('RUN', 'apt-get update')
-            self._add_line('RUN', 'apt-get install -y openjdk-7-jre-headless')
-        # Generate WORKDIR statement by using the configured "workdir" or by
+            self._add_line('RUN', 'apt-get install -y openjdk-7-jre-headless python-dateutil')
+        # Generate WORKDIR statement by using the configured "work_folder" or by
         # defaulting to the image folder.
-        workdir = self.config.get('workdir', None)
-        if not workdir:
-            workdir = '%(image_folder)s'
-        self._add_line('WORKDIR', workdir)
+        work_folder = self.config.get('work_folder', None)
+        if not work_folder:
+            work_folder = '%(image_folder)s'
+        self._add_line('WORKDIR', work_folder)
         # Generate ENV statement to add dist/bin to the PATH.
         #TODO: Un-hard-code it and or make it more base image-specific.
         self._add_line('ENV', 'PATH', ':'.join([
@@ -164,7 +173,7 @@ class DockerTool(object):
         # and wrapping as a list of quoted strings inside square brackets.
         # Treat the relative paths as relative to the target folder inside the image.
         if 'entrypoint' in self.config:
-            args = shlex.split(self.config['entrypoint'])
+            args = shlex.split(self.config['entrypoint'] % self.config)
             if not args[0][0] in ['/', '.']:
                 args[0] = self._path('%(image_folder)s', args[0])
         else:

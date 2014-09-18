@@ -180,16 +180,46 @@ function docker-build() {
     docker build -q --rm -t $APPNAME .
 }
 
-function docker-run() {
-    docker run -p 127.0.0.1:41212:21212 -t $APPNAME
-}
-
 function docker-rebuild() {
     test -f Dockerfile || docker-generate
     docker build -q --no-cache --rm -t $APPNAME .
 }
 
+function docker-ps() {
+    docker ps -a | awk "
+        /^CONTAINER ID/ {
+            print;
+        }
+        \$2 ~ /^$APPNAME:/ {
+            print;
+        }
+    "
+}
+
+function docker-show() {
+    docker images "$@" | awk "
+        NR == 1 || \$1 ~ /^$APPNAME/ {
+            print;
+        }
+    "
+}
+
 function docker-clean() {
+    for C in $(docker-ps | awk 'NR>1{print $1}'); do
+        docker stop $C
+        docker rm $C
+    done
+    for I in $(docker-show -a | awk 'NR>1{print $3}'); do
+        docker rmi $I
+    done
+}
+
+function docker-clean-all() {
+    docker-clean
+    \rm -rf dist Dockerfile .dockerignore
+}
+
+function docker-wipe() {
     for C in $(docker ps -a -q); do
         docker stop $C
         docker rm $C
@@ -199,22 +229,21 @@ function docker-clean() {
     done
 }
 
-function docker-clean-all() {
-    docker-clean
-    \rm -rf dist Dockerfile
-}
-
-function docker-show() {
-    docker images | awk "NR==1||\$1~/^$APPNAME/{print}"
-}
-
 function docker-generate() {
     $VOLTPKG docker -O
 }
 
+function docker-server-start() {
+    docker run -p 127.0.0.1:41212:21212 -t $APPNAME create -d deployment.xml -l dist/voltdb/license.xml -Hlocalhost $APPNAME.jar
+}
+
+function docker-server-stop() {
+    $VOLTDB_BIN/voltadmin shutdown -H localhost:41212
+}
+
 function docker-client() {
     test -f obj/$APPNAME/AsyncBenchmark.class || srccompile
-    echo java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+    java -classpath obj:$CLIENTCLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
@@ -222,6 +251,10 @@ function docker-client() {
         --servers=127.0.0.1:41212 \
         --contestants=6 \
         --maxvotes=2
+}
+
+function docker-shell() {
+    docker run --rm -p 127.0.0.1:41212:21212 -t -i --entrypoint="/bin/bash" $APPNAME
 }
 
 # The following two demo functions are used by the Docker package. Don't remove.
@@ -246,8 +279,9 @@ function demo() {
 function help() {
     echo "Usage: ./run.sh {clean|catalog|server|async-benchmark|aysnc-benchmark-help|...}"
     echo "       {...|sync-benchmark|sync-benchmark-help|jdbc-benchmark|jdbc-benchmark-help|...}"
-    echo "       {...|docker-build|docker-run|docker-rebuild|docker-clean|docker-clean-all|...}"
-    echo "       {...|docker-client|docker-show|docker-generate}"
+    echo "       {...|docker-build|docker-rebuild|docker-clean|...}"
+    echo "       {...|docker-server-start|docker-server-stop|docker-client|...}"
+    echo "       {...|docker-show|docker-ps|docker-shell}"
 }
 
 # Run the target passed as the first arg on the command line

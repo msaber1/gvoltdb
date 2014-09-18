@@ -37,16 +37,33 @@ class Global:
     """
     Global data.
     """
-    configuration = vpconfig.ConfigurationTool('voltpkg',
-        app_name=vpconfig.Property('application name', default=os.path.basename(os.getcwd())),
-        base_image=vpconfig.Property('base docker image name', default='ubuntu'),
-        base_tag=vpconfig.Property('base docker image tag (e.g. OS version)', default='12.04'),
-        entrypoint=vpconfig.Property('docker image entrypoint (command)', default='%(dist_folder)s/bin/voltdb'),
-        repo_url=vpconfig.Property('package repository URL', default='http://mirror.anl.gov/pub/ubuntu/'),
-        repo_name=vpconfig.Property('package repository name', default='precise'),
-        repo_sections=vpconfig.Property('package repository name', default='main restricted universe'),
-        workdir=vpconfig.Property('working directory in image', default=''),
+    kwargs = dict(
+        app_name=vpconfig.Property(
+            'application name', default=os.path.basename(os.getcwd())),
+        base_image=vpconfig.Property(
+            'base docker image name', default='ubuntu'),
+        base_tag=vpconfig.Property(
+            'base docker image tag (e.g. OS version)', default='12.04'),
+        entrypoint=vpconfig.Property(
+            'docker image entrypoint (command)', default='%(dist_folder)s/bin/voltdb'),
+        dist_folder=vpconfig.Property(
+            'distribution folder in image', default='dist'),
+        work_folder=vpconfig.Property(
+            'working folder in image', default=''),
     )
+    default_repos = (
+        ('http://mirror.anl.gov/pub/ubuntu/', 'precise', 'main restricted universe'),
+        ('http://archive.ubuntu.com/ubuntu', 'precise-updates', 'main universe'),
+    )
+    for i in range(len(default_repos)):
+        url, name, sections = default_repos[i]
+        kwargs['repo_%d_url' % (i+1)] = vpconfig.Property(
+            'repository #%d URL' % (i+1), default=url)
+        kwargs['repo_%d_name' % (i+1)] = vpconfig.Property(
+            'repository #%d name' % (i+1), default=name)
+        kwargs['repo_%d_sections' % (i+1)] = vpconfig.Property(
+            'repository #%d section list' % (i+1), default=sections)
+    configuration = vpconfig.ConfigurationTool('voltpkg', **kwargs)
 
 
 @VOLT.Multi_Command(
@@ -91,3 +108,18 @@ def docker(runner):
     docker_tool = vpdocker.DockerTool(runner, config)
     docker_tool.generate()
     runner.info('Saved Dockerfile.')
+    # .dockerignore keeps log, voltdbroot, etc. out of the container.
+    runner.info('Generating .dockerignore...')
+    if os.path.exists('.dockerignore') and not runner.opts.overwrite:
+        runner.abort('.dockerignore exists. Delete the file or add the -O/--overwrite option.')
+    try:
+        f = utility.File('.dockerignore', mode='w')
+        f.open()
+        f.write('''\
+log
+obj
+voltdbroot
+''')
+    finally:
+        f.close()
+    runner.info('Saved .dockerignore.')

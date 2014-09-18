@@ -122,6 +122,8 @@ You can also edit "%(config)s" directly in a text editor.''' % format_dict
             else:
                 # Use an existing config value.
                 config[name] = value
+        for config_key in config:
+            config[config_key] = config[config_key] % config
         samples = []
         if not reset and missing:
             table = [(name, self.properties[name].description) for name in missing]
@@ -138,7 +140,7 @@ You can also edit "%(config)s" directly in a text editor.''' % format_dict
                 'The following setting defaults were applied and saved permanently:',
                 '',
                 utility.format_table(
-                    [(name, self.properties[name].default) for name in defaults],
+                    [(name, self.properties[name].default % config) for name in defaults],
                     indent=3, separator='  ', headings=['PROPERTY', 'VALUE'])
             ])
         if reset:

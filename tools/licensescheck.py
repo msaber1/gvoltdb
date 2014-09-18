@@ -24,7 +24,8 @@ prunelist = ('hsqldb19b3',
              'helloworld',
              'jaxb',
              'pmsg',
-             'customer-workloads')
+             'customer-workloads',
+             'dist')
 
 def licenseStartsHere(content, approvedLicenses):
     for license in approvedLicenses:
