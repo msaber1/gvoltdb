@@ -163,8 +163,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         // Index join will have to override this method.
         // Assert and provide functionality for generic join
         assert(m_children.size() == 2);
-        for (AbstractPlanNode child : m_children)
-        {
+        for (AbstractPlanNode child : m_children) {
             child.generateOutputSchema(db);
         }
         // Join the schema together to form the output schema
@@ -200,8 +199,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         IndexScanPlanNode index_scan =
             (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assert(m_children.size() == 2 && index_scan == null);
-        for (AbstractPlanNode child : m_children)
-        {
+        for (AbstractPlanNode child : m_children) {
             child.resolveColumnIndexes();
         }
 
@@ -217,32 +215,27 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         // output schema ordered: [outer table columns][inner table columns]
         TreeMap<Integer, SchemaColumn> sort_cols =
             new TreeMap<Integer, SchemaColumn>();
-        for (SchemaColumn col : m_outputSchemaPreInlineAgg.getColumns())
-        {
+        for (SchemaColumn col : m_outputSchemaPreInlineAgg.getColumns()) {
             // Right now these all need to be TVEs
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
             int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
-            if (index == -1)
-            {
+            if (index == -1) {
                 index = tve.resolveColumnIndexesUsingSchema(inner_schema);
-                if (index == -1)
-                {
+                if (index == -1) {
                     throw new RuntimeException("Unable to find index for column: " +
                                                col.toString());
                 }
                 sort_cols.put(index + outer_schema.size(), col);
             }
-            else
-            {
+            else {
                 sort_cols.put(index, col);
             }
             tve.setColumnIndex(index);
         }
         // rebuild the output schema from the tree-sorted columns
         NodeSchema new_output_schema = new NodeSchema();
-        for (SchemaColumn col : sort_cols.values())
-        {
+        for (SchemaColumn col : sort_cols.values()) {
             new_output_schema.addColumn(col);
         }
         m_outputSchemaPreInlineAgg = new_output_schema;
@@ -343,17 +336,13 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         // Finally, resolve m_predicate
         List<TupleValueExpression> predicate_tves =
                 ExpressionUtil.getTupleValueExpressions(expression);
-        for (TupleValueExpression tve : predicate_tves)
-        {
+        for (TupleValueExpression tve : predicate_tves) {
             int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
-            if (index == -1)
-            {
+            if (index == -1) {
                 index = tve.resolveColumnIndexesUsingSchema(inner_schema);
-                if (index == -1)
-                {
-                    throw new RuntimeException("Unable to find index for join TVE: " +
-                                               tve.toString());
+                if (index == -1) {
+                    throw new RuntimeException("Unable to find index for join TVE: " + tve);
                 }
                 tableIdx = 1;   // 1 for inner table
             }

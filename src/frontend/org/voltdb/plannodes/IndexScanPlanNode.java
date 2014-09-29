@@ -527,7 +527,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             m_estimatedOutputTupleCount = 1;
         }
 
-        LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
+        LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
         if (limit != null) {
             int limitInt = limit.getLimit();
             if (limitInt == -1) {

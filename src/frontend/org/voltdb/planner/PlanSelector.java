@@ -291,12 +291,6 @@ public class PlanSelector implements Cloneable {
                                       filename + "-json.txt",
                                       json,
                                       true);
-
-        // create a graph friendly version
-        BuildDirectoryUtils.writeFile("statement-all-plans/" + m_procName + "_" + m_stmtName,
-                                      filename + ".dot",
-                                      nodeList.toDOTString("name"),
-                                      true);
         return null;
     }
 

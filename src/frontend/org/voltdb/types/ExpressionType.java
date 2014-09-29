@@ -62,9 +62,9 @@ public enum ExpressionType {
     OPERATOR_NOT                   (OperatorExpression.class,  8, "NOT"),
         // logical not
     OPERATOR_IS_NULL               (OperatorExpression.class, 9, "IS NULL"),
-    // unary null evaluation
+        // unary null evaluation
     OPERATOR_EXISTS                (OperatorExpression.class, 9, "EXISTS"),
-    // unary exists evaluation
+        // unary exists evaluation
 
     // ----------------------------
     // Binary Comparison

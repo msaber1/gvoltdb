@@ -223,15 +223,18 @@ public class TestPushDownAggregates extends PlannerTestCase {
         List<AbstractPlanNode> pn = compileToFragments("select PKEY from T1 order by PKEY limit 5 offset 1");
         assertEquals(2, pn.size());
         assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        assertTrue(pn.get(0).toExplainPlanString().contains("OFFSET"));
         assertTrue(pn.get(1).toExplainPlanString().contains("LIMIT"));
+        assertFalse(pn.get(1).toExplainPlanString().contains("OFFSET"));
     }
 
     public void testLimit() {
         List<AbstractPlanNode> pn = compileToFragments("select PKEY from T1 order by PKEY limit 5");
-        PlanNodeList pnl = new PlanNodeList(pn.get(0));
-        System.out.println(pnl.toDOTString("FRAG0"));
-        pnl = new PlanNodeList(pn.get(1));
-        System.out.println(pnl.toDOTString("FRAG1"));
+        assertEquals(2, pn.size());
+        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        assertFalse(pn.get(0).toExplainPlanString().contains("OFFSET"));
+        assertTrue(pn.get(1).toExplainPlanString().contains("LIMIT"));
+        assertFalse(pn.get(1).toExplainPlanString().contains("OFFSET"));
     }
 
     public void testMultiPartLimitPushdown() {

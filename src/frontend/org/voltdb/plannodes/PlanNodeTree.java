@@ -54,8 +54,7 @@ public class PlanNodeTree implements JSONString {
     // Subquery ID / subquery root node plan
     protected final Map<Integer, AbstractPlanNode> m_subqueryMap = new HashMap<Integer, AbstractPlanNode>();
 
-    public PlanNodeTree() {
-    }
+    public PlanNodeTree() { }
 
     public PlanNodeTree(AbstractPlanNode root_node) {
         try {
@@ -77,16 +76,13 @@ public class PlanNodeTree implements JSONString {
         return m_planNodesListMap.get(0).get(0);
     }
 
-    public Boolean constructTree(List<AbstractPlanNode> planNodes, AbstractPlanNode node) throws Exception {
+    private void constructTree(List<AbstractPlanNode> planNodes, AbstractPlanNode node) throws Exception {
         planNodes.add(node);
         extractSubqueries(node);
         for (int i = 0; i < node.getChildCount(); i++) {
             AbstractPlanNode child = node.getChild(i);
-            if (!constructTree(planNodes, child)) {
-                return false;
-            }
+            constructTree(planNodes, child);
         }
-        return true;
     }
 
     public List< Pair< Integer, VoltType > > getParameters() {
@@ -148,11 +144,6 @@ public class PlanNodeTree implements JSONString {
         return m_planNodesListMap.get(0);
     }
 
-    public List<AbstractPlanNode> getNodeList(int idx) {
-        assert(idx < m_planNodesListMap.size());
-        return m_planNodesListMap.get(idx);
-    }
-
     /**
      *  Load json plan. The plan must have either "PLAN_NODE" array in case of a statement without
      *  subqueries or "PLAN_NODES_LISTS" array of "PLAN_NODE" arrays for each sub statement.
@@ -160,7 +151,7 @@ public class PlanNodeTree implements JSONString {
      * @param db
      * @throws JSONException
      */
-    public void loadFromJSONPlan( JSONObject jobj, Database db )  throws JSONException {
+    public void loadFromJSONPlan(JSONObject jobj, Database db) throws JSONException {
         if (jobj.has(Members.PLAN_NODES_LISTS.name())) {
             JSONArray jplanNodesArray = jobj.getJSONArray(Members.PLAN_NODES_LISTS.name());
             for (int i = 0; i < jplanNodesArray.length(); ++i) {
@@ -188,7 +179,7 @@ public class PlanNodeTree implements JSONString {
      * @param db
      * @throws JSONException
      */
-    public void loadPlanNodesFromJSONArrays( JSONArray jArray, Database db )  {
+    public void loadPlanNodesFromJSONArrays(JSONArray jArray, Database db) {
         loadPlanNodesFromJSONArrays(0, jArray, db);
     }
 
@@ -200,25 +191,24 @@ public class PlanNodeTree implements JSONString {
      * @param db
      * @throws JSONException
      */
-    public void loadPlanNodesFromJSONArrays( int stmtId, JSONArray jArray, Database db)  {
+    private void loadPlanNodesFromJSONArrays(int stmtId, JSONArray jArray, Database db) {
         List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
         int size = jArray.length();
 
         try {
-            for( int i = 0; i < size; i++ ) {
-                JSONObject jobj;
-                jobj = jArray.getJSONObject(i);
+            for (int i = 0; i < size; i++) {
+                JSONObject jobj = jArray.getJSONObject(i);
                 String nodeTypeStr = jobj.getString("PLAN_NODE_TYPE");
-                PlanNodeType nodeType = PlanNodeType.get( nodeTypeStr );
+                PlanNodeType nodeType = PlanNodeType.get(nodeTypeStr);
                 AbstractPlanNode apn = null;
                 try {
                     apn = nodeType.getPlanNodeClass().newInstance();
                 } catch (InstantiationException e) {
-                    System.err.println( e.getMessage() );
+                    System.err.println(e.toString());
                     e.printStackTrace();
                     return;
                 } catch (IllegalAccessException e) {
-                    System.err.println( e.getMessage() );
+                    System.err.println(e.toString());
                     e.printStackTrace();
                     return;
                 }
@@ -226,13 +216,12 @@ public class PlanNodeTree implements JSONString {
                 planNodes.add(apn);
             }
             //link children and parents
-            for( int i = 0; i < size; i++ ) {
-                JSONObject jobj;
-                jobj = jArray.getJSONObject(i);
+            for (int i = 0; i < size; i++) {
+                JSONObject jobj = jArray.getJSONObject(i);
                 if (jobj.has("CHILDREN_IDS")) {
                     JSONArray children = jobj.getJSONArray("CHILDREN_IDS");
-                    for( int j = 0; j < children.length(); j++ ) {
-                        planNodes.get(i).addAndLinkChild( getNodeofId( children.getInt(j), planNodes ) );
+                    for (int j = 0; j < children.length(); j++) {
+                        planNodes.get(i).addAndLinkChild(getNodeOfId(children.getInt(j), planNodes));
                     }
                 }
             }
@@ -240,12 +229,12 @@ public class PlanNodeTree implements JSONString {
         catch (JSONException e) {
             e.printStackTrace();
         }
-        m_planNodesListMap.put(stmtId,  planNodes);
+        m_planNodesListMap.put(stmtId, planNodes);
         return;
     }
 
     private void connectParentChildStmt(List<AbstractPlanNode> planNodes) {
-        for(AbstractPlanNode node : planNodes) {
+        for (AbstractPlanNode node : planNodes) {
             if (node instanceof AbstractScanPlanNode) {
                 AbstractScanPlanNode scanNode = (AbstractScanPlanNode)node;
                 connectPredicateStmt(scanNode.getPredicate());
@@ -262,24 +251,24 @@ public class PlanNodeTree implements JSONString {
         if (predicate == null) {
             return;
         }
-        List<AbstractExpression> existsExprs = predicate.findAllSubexpressionsOfType(
-                ExpressionType.OPERATOR_EXISTS);
+        List<AbstractExpression>
+                existsExprs = predicate.findAllSubexpressionsOfType(ExpressionType.OPERATOR_EXISTS);
         for (AbstractExpression expr : existsExprs) {
             assert(expr.getLeft() != null && expr.getLeft() instanceof SubqueryExpression);
             SubqueryExpression subqueryExpr = (SubqueryExpression) expr.getLeft();
             int subqueryId = subqueryExpr.getSubqueryId();
             int subqueryNodeId = subqueryExpr.getSubqueryNodeId();
             List<AbstractPlanNode> subqueryNodes = m_planNodesListMap.get(subqueryId);
-            AbstractPlanNode subqueryNode = getNodeofId(subqueryNodeId, subqueryNodes);
+            AbstractPlanNode subqueryNode = getNodeOfId(subqueryNodeId, subqueryNodes);
             assert(subqueryNode != null);
             subqueryExpr.setSubqueryNode(subqueryNode);
         }
     }
 
-    public AbstractPlanNode getNodeofId (int ID, List<AbstractPlanNode> planNodes) {
+    private AbstractPlanNode getNodeOfId (int id, List<AbstractPlanNode> planNodes) {
         int size = planNodes.size();
-        for( int i = 0; i < size; i++ ) {
-            if( planNodes.get(i).getPlanNodeId() == ID ) {
+        for (int i = 0; i < size; i++) {
+            if (planNodes.get(i).getPlanNodeId() == id) {
                 return planNodes.get(i);
             }
         }
@@ -292,10 +281,10 @@ public class PlanNodeTree implements JSONString {
      *  - NestLoopInPlan
      *  - AbstractScanPlanNode predicate
      *  - AbstractJoinPlanNode predicates
+     *  - AgggregatePlanNode predicates
      * @param node
-     * @throws Exception
      */
-    private void extractSubqueries(AbstractPlanNode node)  throws Exception {
+    private void extractSubqueries(AbstractPlanNode node) {
         if (node instanceof AbstractScanPlanNode) {
             AbstractScanPlanNode scanNode = (AbstractScanPlanNode) node;
             extractSubqueriesFromExpression(scanNode.getPredicate());
@@ -314,12 +303,13 @@ public class PlanNodeTree implements JSONString {
             extractSubqueriesFromExpression(aggNode.getPostPredicate());
         }
     }
-    private void extractSubqueriesFromExpression(AbstractExpression expr)  throws Exception {
+
+    private void extractSubqueriesFromExpression(AbstractExpression expr) {
         if (expr == null) {
             return;
         }
         List<AbstractExpression> subexprs = expr.findAllSubexpressionsOfType(ExpressionType.SUBQUERY);
-        for(AbstractExpression nextexpr : subexprs) {
+        for (AbstractExpression nextexpr : subexprs) {
             assert(nextexpr instanceof SubqueryExpression);
             SubqueryExpression subqueryExpr = (SubqueryExpression) nextexpr;
             int stmtId = subqueryExpr.getSubqueryId();

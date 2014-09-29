@@ -45,24 +45,18 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
     public PlanNodeList(AbstractPlanNode root_node) {
         super(root_node);
         try {
-            // Construct execute lists for all sub statement
-            for(List<AbstractPlanNode> nodeList : m_planNodesListMap.values()) {
+            // Construct execute lists for all sub statements
+            for (List<AbstractPlanNode> nodeList : m_planNodesListMap.values()) {
                 List<AbstractPlanNode> list = constructList(nodeList);
+                //
+                // Important! Make sure that our list has the same number of entries in our tree
+                //
+                assert(list.size() == planNodes.size());
                 m_executeLists.add(list);
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
-    }
-
-    public List<AbstractPlanNode> getExecutionList() {
-        assert(!m_executeLists.isEmpty());
-        return m_executeLists.get(0);
-    }
-
-    public List<AbstractPlanNode> getExecutionList(int idx) {
-        assert(idx < m_executeLists.size());
-        return m_executeLists.get(idx);
     }
 
     @Override
@@ -79,7 +73,7 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         return ret;
     }
 
-    public List<AbstractPlanNode> constructList(List<AbstractPlanNode> planNodes) throws Exception {
+    public List<AbstractPlanNode> constructList(List<AbstractPlanNode> planNodes) {
         //
         // Create a counter for each node based on the # of children that it has
         // If any node has no children, put it in the execute list
@@ -117,13 +111,6 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
                     execute_list.add(parent);
                 }
             }
-        }
-
-        //
-        // Important! Make sure that our list has the same number of entries in our tree
-        //
-        if (list.size() != planNodes.size()) {
-            throw new Exception("ERROR: The execution list has '" + list.size() + "' PlanNodes but our original tree has '" + planNodes.size() + "' PlanNode entries");
         }
         return list;
     }
@@ -184,20 +171,5 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
             return "This JSON error message is a lie";
         }
         return stringer.toString();
-    }
-
-    public String toDOTString(String name) {
-        StringBuilder sb = new StringBuilder();
-        sb.append("digraph ").append(name).append(" {\n");
-
-        for (List<AbstractPlanNode> list : m_executeLists) {
-            for (AbstractPlanNode node : list) {
-                sb.append(node.toDOTString());
-            }
-            sb.append('\n');
-        }
-        //TODO ENG-451-exists add subqueries
-        sb.append("\n}\n");
-        return sb.toString();
     }
 }

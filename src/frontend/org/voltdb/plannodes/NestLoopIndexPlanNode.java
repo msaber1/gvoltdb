@@ -51,8 +51,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // indexscan's target table that make it into the
         // rest of the plan.  the expressions that are
         // given to the projection are currently not ever used
-        IndexScanPlanNode inlineScan =
-            (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
+        IndexScanPlanNode inlineScan = (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assert(inlineScan != null);
         inlineScan.generateOutputSchema(db);
         assert(m_children.size() == 1);
@@ -71,34 +70,31 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     @Override
     public void resolveColumnIndexes()
     {
-        IndexScanPlanNode inline_scan =
-            (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
-        assert (m_children.size() == 1 && inline_scan != null);
-        for (AbstractPlanNode child : m_children)
-        {
+        IndexScanPlanNode inlineScan = (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assert (m_children.size() == 1 && inlineScan != null);
+        for (AbstractPlanNode child : m_children) {
             child.resolveColumnIndexes();
         }
 
         LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
-        if (limit != null)
-        {
+        if (limit != null) {
             // output schema of limit node has not been used
             limit.m_outputSchema = m_outputSchemaPreInlineAgg;
             limit.m_hasSignificantOutputSchema = false;
         }
 
         // We need the schema from the target table from the inlined index
-        final NodeSchema index_schema = inline_scan.getTableSchema();
+        final NodeSchema index_schema = inlineScan.getTableSchema();
         // We need the output schema from the child node
         final NodeSchema outer_schema = m_children.get(0).getOutputSchema();
 
         // pull every expression out of the inlined index scan
         // and resolve all of the TVEs against our two input schema from above.
-        resolvePredicate(inline_scan.getPredicate(), outer_schema, index_schema);
-        resolvePredicate(inline_scan.getEndExpression(), outer_schema, index_schema);
-        resolvePredicate(inline_scan.getInitialExpression(), outer_schema, index_schema);
-        resolvePredicate(inline_scan.getSkipNullPredicate(), outer_schema, index_schema);
-        resolvePredicate(inline_scan.getSearchKeyExpressions(), outer_schema, index_schema);
+        resolvePredicate(inlineScan.getPredicate(), outer_schema, index_schema);
+        resolvePredicate(inlineScan.getEndExpression(), outer_schema, index_schema);
+        resolvePredicate(inlineScan.getInitialExpression(), outer_schema, index_schema);
+        resolvePredicate(inlineScan.getSkipNullPredicate(), outer_schema, index_schema);
+        resolvePredicate(inlineScan.getSearchKeyExpressions(), outer_schema, index_schema);
 
         // resolve other predicates
         resolvePredicate(m_preJoinPredicate, outer_schema, index_schema);
@@ -153,9 +149,10 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // the sort direction from the outer table should be the same as the that in the inner table
         // (because we set when building this NLIJ)
         if (m_children.get(0).getPlanNodeType() == PlanNodeType.MATERIALIZEDSCAN) {
-            IndexScanPlanNode ispn = (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
-            assert (((MaterializedScanPlanNode)(m_children.get(0))).getSortDirection() == ispn.getSortDirection());
-            m_sortDirection = ispn.getSortDirection();
+            IndexScanPlanNode inlineScan = (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+            assert(((MaterializedScanPlanNode)(m_children.get(0))).getSortDirection() ==
+                    inlineScan.getSortDirection());
+            m_sortDirection = inlineScan.getSortDirection();
         }
     }
 
@@ -164,9 +161,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         super.validate();
 
         // Check that we have an inline IndexScanPlanNode
-        if (m_inlineNodes.isEmpty()) {
-            throw new Exception("ERROR: No inline PlanNodes are set for " + this);
-        } else if (!m_inlineNodes.containsKey(PlanNodeType.INDEXSCAN)) {
+        if (getInlinePlanNode(PlanNodeType.INDEXSCAN) == null) {
             throw new Exception("ERROR: No inline PlanNode with type '" + PlanNodeType.INDEXSCAN + "' was set for " + this);
         }
     }
@@ -181,8 +176,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         if ( ! super.isOrderDeterministic()) {
             return false;
         }
-        IndexScanPlanNode index_scan =
-            (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        IndexScanPlanNode index_scan = (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assert(index_scan != null);
         if ( ! index_scan.isOrderDeterministic()) {
             m_nondeterminismDetail = index_scan.m_nondeterminismDetail;

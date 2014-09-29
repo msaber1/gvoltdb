@@ -202,7 +202,6 @@ public class PlannerTestAideDeCamp {
         //
         try {
             BuildDirectoryUtils.writeFile("statement-plans", name + "_json.txt", json, true);
-            BuildDirectoryUtils.writeFile("statement-plans", name + ".dot", nodeLists.get(0).toDOTString("name"), true);
         } catch (Exception e) {
             e.printStackTrace();
         }

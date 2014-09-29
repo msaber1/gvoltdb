@@ -138,8 +138,7 @@ public class LimitPlanNode extends AbstractPlanNode {
         assert(m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
+        for (SchemaColumn col : m_outputSchema.getColumns()) {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
@@ -160,18 +159,22 @@ public class LimitPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    protected String explainPlanForNode(String indent) {
+    protected String explainPlanForNode(String indent)
+    {
         String retval = "";
-        if (m_limit >= 0)
+        if (m_limit >= 0) {
             retval += "LIMIT " + String.valueOf(m_limit) + " ";
-        if (m_offset > 0)
+        } else if (m_limitParameterId > -1) {
+            retval += "LIMIT ?" + m_limitParameterId + " ";
+        }
+        if (m_offset > 0) {
             retval += "OFFSET " + String.valueOf(m_offset) + " ";
+        } else if (m_offsetParameterId > -1) {
+            retval += "OFFSET ?" + m_offsetParameterId + " ";
+        }
         if (retval.length() > 0) {
             // remove the last space
             return retval.substring(0, retval.length() - 1);
-        }
-        else {
-            return "LIMIT with parameter";
         }
     }
 }
