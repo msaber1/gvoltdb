@@ -26,6 +26,10 @@
     "P1": {
         "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
                     ("DESC_INLINE", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC16", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC40B", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC63B", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC64B", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
@@ -34,6 +38,10 @@
     "R1": {
         "columns": (("DESC", FastSerializer.VOLTTYPE_STRING),
                     ("DESC_INLINE", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC16", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC40B", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC63B", FastSerializer.VOLTTYPE_STRING),
+                    ("DESC64B", FastSerializer.VOLTTYPE_STRING),
                     ("ID", FastSerializer.VOLTTYPE_INTEGER),
                     ("RATIO", FastSerializer.VOLTTYPE_FLOAT)),
         "partitions": (),
