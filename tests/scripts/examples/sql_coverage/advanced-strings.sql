@@ -89,9 +89,9 @@ SELECT DESC likeQ13 FROM @fromtables WHERE DESC _maybe LIKE _patterns3
 SELECT DESC likeQ14 FROM @fromtables WHERE DESC _maybe LIKE _patterns4
 SELECT DESC likeQ15 FROM @fromtables WHERE DESC _maybe LIKE _patterns5
 SELECT DESC likeQ16 FROM @fromtables WHERE DESC _maybe LIKE _patterns6
-SELECT DESC likeQ21 FROM @fromtables WHERE DESC _maybe LIKE _patterns1 ESCAPE '!'
-SELECT DESC likeQ22 FROM @fromtables WHERE DESC _maybe LIKE _patterns2 ESCAPE '!'
-SELECT DESC likeQ23 FROM @fromtables WHERE DESC _maybe LIKE _patterns3 ESCAPE '!'
-SELECT DESC likeQ24 FROM @fromtables WHERE DESC _maybe LIKE _patterns4 ESCAPE '!'
-SELECT DESC likeQ25 FROM @fromtables WHERE DESC _maybe LIKE _patterns5 ESCAPE '!'
-SELECT DESC likeQ26 FROM @fromtables WHERE DESC _maybe LIKE _patterns6 ESCAPE '!'
+--SELECT DESC likeQ21 FROM @fromtables WHERE DESC _maybe LIKE _patterns1 ESCAPE '!'
+--SELECT DESC likeQ22 FROM @fromtables WHERE DESC _maybe LIKE _patterns2 ESCAPE '!'
+--SELECT DESC likeQ23 FROM @fromtables WHERE DESC _maybe LIKE _patterns3 ESCAPE '!'
+--SELECT DESC likeQ24 FROM @fromtables WHERE DESC _maybe LIKE _patterns4 ESCAPE '!'
+--SELECT DESC likeQ25 FROM @fromtables WHERE DESC _maybe LIKE _patterns5 ESCAPE '!'
+--SELECT DESC likeQ26 FROM @fromtables WHERE DESC _maybe LIKE _patterns6 ESCAPE '!'

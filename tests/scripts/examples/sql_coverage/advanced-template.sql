@@ -71,18 +71,20 @@ SELECT 8, @optionalfn(A._variable[@columntype]), ID FROM @fromtables A ORDER BY 
 SELECT            (A._variable[#order1 @columntype]) AS Q12,            (A._variable[#order2 @columntype]), A._variable FROM @fromtables A ORDER BY @optionalfn(A.__[#order1]) _sortorder, @optionalfn(A.__[#order2])
 SELECT @optionalfn(A._variable[#order1 @columntype]) AS Q13, @optionalfn(A._variable[#order2 @columntype]), A._variable FROM @fromtables A ORDER BY 1 DESC, 2 DESC
 
-SELECT @optionalfn(A._variable[@columntype]) AS Q14, @optionalfn(A._variable[@columntype]), * FROM @fromtables A ORDER BY 1 _sortorder, 2 _sortorder
+--SELECT @optionalfn(A._variable[@columntype]) AS Q14, @optionalfn(A._variable[@columntype]), * FROM @fromtables A ORDER BY 1 _sortorder, 2 _sortorder
 
 -- additional aggregation fun
-SELECT     _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     ))                                              AS Q15 FROM @fromtables A
+--SELECT     _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     ))                                              AS Q15 FROM @fromtables A
 SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     ))                                              AS Q16 FROM @fromtables A WHERE @columnpredicate
 -- These test that the fixed issue eng-909 -- combining DISTINCT and non-DISTINCT aggs has not regressed.
-SELECT     _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     )), @agg(            A._variable[@columntype] ) AS Q18 FROM @fromtables A
-SELECT     _distinctableagg(DISTINCT                     A._variable[@columntype]      ), @agg(@optionalfn(A._variable[@columntype])) AS Q19 FROM @fromtables A
+--SELECT     _distinctableagg(DISTINCT @optionalfn(        A._variable[@columntype]     )), @agg(            A._variable[@columntype] ) AS Q18 FROM @fromtables A
+--SELECT     _distinctableagg(DISTINCT                     A._variable[@columntype]      ), @agg(@optionalfn(A._variable[@columntype])) AS Q19 FROM @fromtables A
+--uncomment:
 SELECT 20,                                               A._variable[#GB @columntype]   , @agg(@optionalfn(A._variable[@columntype]))        FROM @fromtables A GROUP BY         A.__[#GB]
-SELECT 21,                           @optionalfn(        A._variable[#GB @columntype] ) , @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY         A.__[#GB]
+--SELECT 21,                           @optionalfn(        A._variable[#GB @columntype] ) , @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY         A.__[#GB]
 SELECT 22,                           @optionalfn(@onefun(A._variable[#GB @columntype])) , @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY @onefun(A.__[#GB])
 -- multiple column group by
+--uncomment:
 SELECT 23,               A._variable[#GB1 @columntype],  A._variable[#GB2 @columntype]   , @agg(           A._variable[@columntype])         FROM @fromtables A GROUP BY         A.__[#GB1], A.__[#GB2]
 
 SELECT     @agg(                     @optionalfn(        A._variable[@columntype]     )), @agg(@optionalfn(A._variable[@columntype])) AS Q24 FROM @fromtables A
@@ -91,7 +93,7 @@ SELECT     @agg(                     @optionalfn(        A._variable[@columntype
 -- group by alias (50 - 60)
 SELECT 50,                           @optionalfn(@onefun(A._variable[#GB @columntype])) as tag , @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY tag
 SELECT 51,                           A._variable[#GB @columntype] as tag ,                       @agg(            A._variable[@columntype] )        FROM @fromtables A GROUP BY tag
-SELECT 52,              @optionalfn(@onefun(A._variable[#GB @columntype])) as tag1,  A._variable[@columntype] as tag2,  @agg(           A._variable[@columntype])         FROM @fromtables A GROUP BY        tag2, tag1
+--SELECT 52,              @optionalfn(@onefun(A._variable[#GB @columntype])) as tag1,  A._variable[@columntype] as tag2,  @agg(           A._variable[@columntype])         FROM @fromtables A GROUP BY        tag2, tag1
 
 -- update
 -- compare two cols
@@ -116,12 +118,12 @@ SELECT * FROM @fromtables Q29 WHERE Q29._variable[@columntype] _maybe LIKE '!%' 
 
 --- Test CASE WHEN
 --- CASE WHEN with expression
-SELECT * FROM @fromtables Q34 WHERE CASE WHEN Q34._variable[#arg @columntype] _cmp @comparableconstant THEN Q34._variable[#numone @columntype]     ELSE Q34.__[#arg] * 10 END _cmp @comparableconstant + 10
+--SELECT * FROM @fromtables Q34 WHERE CASE WHEN Q34._variable[#arg @columntype] _cmp @comparableconstant THEN Q34._variable[#numone @columntype]     ELSE Q34.__[#arg] * 10 END _cmp @comparableconstant + 10
 SELECT * FROM @fromtables Q35 WHERE CASE WHEN Q35._variable[#arg @columntype] _cmp @comparableconstant THEN Q35._variable[#numone @columntype]                            END _cmp @comparableconstant + 10
-SELECT __[#numone]        Q36,      CASE WHEN   A._variable[#arg @columntype] _cmp @comparableconstant THEN   A._variable[#numone @columntype]     ELSE   A.__[#arg] * 10 END FROM @fromtables A WHERE @columnpredicate
+--SELECT __[#numone]        Q36,      CASE WHEN   A._variable[#arg @columntype] _cmp @comparableconstant THEN   A._variable[#numone @columntype]     ELSE   A.__[#arg] * 10 END FROM @fromtables A WHERE @columnpredicate
 SELECT __[#arg]           Q37,      CASE WHEN   A._variable[#arg @columntype] _cmp @comparableconstant THEN   A.__[#arg]                                                  END FROM @fromtables A WHERE @columnpredicate
 --- CASE WHEN like DECODE
-SELECT * FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype] WHEN @comparableconstant THEN Q38._variable[#numone @columntype] * 2 ELSE Q38.__[#arg] * 10 END _cmp @comparableconstant + 10
-SELECT * FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] * 2                        END _cmp @comparableconstant + 10
-SELECT __[#numone]        Q40,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] * 2 ELSE   A.__[#arg] * 10 END FROM @fromtables A WHERE @columnpredicate
-SELECT __[#arg]           Q41,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] * 2                        END FROM @fromtables A WHERE @columnpredicate
+--SELECT * FROM @fromtables Q38 WHERE CASE      Q38._variable[#arg @columntype] WHEN @comparableconstant THEN Q38._variable[#numone @columntype] * 2 ELSE Q38.__[#arg] * 10 END _cmp @comparableconstant + 10
+--SELECT * FROM @fromtables Q39 WHERE CASE      Q39._variable[#arg @columntype] WHEN @comparableconstant THEN Q39._variable[#numone @columntype] * 2                        END _cmp @comparableconstant + 10
+--SELECT __[#numone]        Q40,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] * 2 ELSE   A.__[#arg] * 10 END FROM @fromtables A WHERE @columnpredicate
+--SELECT __[#arg]           Q41,      CASE        A._variable[#arg @columntype] WHEN @comparableconstant THEN   A._variable[#numone @columntype] * 2                        END FROM @fromtables A WHERE @columnpredicate
