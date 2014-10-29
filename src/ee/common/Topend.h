@@ -18,18 +18,14 @@
 #ifndef TOPEND_H_
 #define TOPEND_H_
 #include "common/ids.h"
-#include "common/FatalException.hpp"
 
 #include <string>
-#include <queue>
-#include <vector>
-#include <boost/shared_ptr.hpp>
-#include <boost/shared_array.hpp>
 
 namespace voltdb {
-class Table;
+class FatalException;
 class Pool;
 class StreamBlock;
+class Table;
 
 /*
  * Topend abstracts the EE's calling interface to Java to
@@ -51,7 +47,7 @@ class Topend {
 
     virtual std::string planForFragmentId(int64_t fragmentId) = 0;
 
-    virtual void crashVoltDB(voltdb::FatalException e) = 0;
+    virtual void crashVoltDB(const voltdb::FatalException& e) = 0;
 
     virtual int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) = 0;
     virtual void pushExportBuffer(
@@ -65,41 +61,9 @@ class Topend {
     virtual void pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
-    virtual ~Topend()
-    {
-    }
+    virtual ~Topend() {}
 };
 
-class DummyTopend : public Topend {
-public:
-    DummyTopend();
+} // namespace voltdb
 
-    int loadNextDependency(
-        int32_t dependencyId, voltdb::Pool *pool, Table* destination);
-
-    virtual int64_t fragmentProgressUpdate(int32_t batchIndex, std::string planNodeName,
-            std::string targetTableName, int64_t targetTableSize, int64_t tuplesFound,
-            int64_t currMemoryInBytes, int64_t peakMemoryInBytes);
-
-    std::string planForFragmentId(int64_t fragmentId);
-
-    void crashVoltDB(voltdb::FatalException e);
-
-    int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
-
-    virtual void pushExportBuffer(int64_t generation, int32_t partitionId, std::string signature, StreamBlock *block, bool sync, bool endOfStream);
-
-    void pushDRBuffer(int32_t partitionId, voltdb::StreamBlock *block);
-
-    void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
-    std::queue<int32_t> partitionIds;
-    std::queue<std::string> signatures;
-    std::deque<boost::shared_ptr<StreamBlock> > blocks;
-    std::vector<boost::shared_array<char> > data;
-    bool receivedDRBuffer;
-    bool receivedExportBuffer;
-
-};
-
-}
 #endif /* TOPEND_H_ */

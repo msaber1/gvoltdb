@@ -21,26 +21,14 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstring>
-#include <cstdlib>
-#include <queue>
-#include <deque>
 #include "harness.h"
-#include "common/types.h"
-#include "common/NValue.hpp"
-#include "common/ValueFactory.hpp"
-#include "common/TupleSchema.h"
-#include "common/tabletuple.h"
-#include "common/StreamBlock.h"
+#include "storage_test_support.h"
+
 #include "storage/ExportTupleStream.h"
-#include "common/Topend.h"
-#include "common/executorcontext.hpp"
-#include "boost/smart_ptr.hpp"
 
 using namespace std;
 using namespace voltdb;
 
-const int COLUMN_COUNT = 5;
 // Annoyingly, there's no easy way to compute the exact Exported tuple
 // size without incestuously using code we're trying to test.  I've
 // pre-computed this magic size for an Exported tuple of 5 integer
@@ -57,69 +45,27 @@ const int BUFFER_SIZE = 1024;
 
 class ExportTupleStreamTest : public Test {
 public:
-    ExportTupleStreamTest() : m_wrapper(NULL), m_schema(NULL), m_tuple(NULL),
-        m_context(new ExecutorContext( 1, 1, NULL, &m_topend, NULL, NULL, true, "localhost", 2, NULL)) {
-        srand(0);
-
-        // set up the schema used to fill the new buffer
-        std::vector<ValueType> columnTypes;
-        std::vector<int32_t> columnLengths;
-        std::vector<bool> columnAllowNull;
-        for (int i = 0; i < COLUMN_COUNT; i++) {
-            columnTypes.push_back(VALUE_TYPE_INTEGER);
-            columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_INTEGER));
-            columnAllowNull.push_back(false);
-        }
-        m_schema =
-          TupleSchema::createTupleSchemaForTest(columnTypes,
-                                         columnLengths,
-                                         columnAllowNull);
-
-        // allocate a new buffer and wrap it
-        m_wrapper = new ExportTupleStream(1, 1);
-
-        // excercise a smaller buffer capacity
-        m_wrapper->setDefaultCapacity(BUFFER_SIZE);
-
-        // set up the tuple we're going to use to fill the buffer
-        // set the tuple's memory to zero
-        ::memset(m_tupleMemory, 0, 8 * (COLUMN_COUNT + 1));
-
-        // deal with the horrible hack that needs to set the first
-        // value to true (rtb?? what is this horrible hack?)
-        *(reinterpret_cast<bool*>(m_tupleMemory)) = true;
-        m_tuple = new TableTuple(m_schema);
-        m_tuple->move(m_tupleMemory);
+    ExportTupleStreamTest()
+      : m_topend(m_env.m_topEnd)
+      , m_wrapper(1, 1)
+    {
+        // exercise a smaller buffer capacity
+        m_wrapper.setDefaultCapacity(BUFFER_SIZE);
     }
 
     void appendTuple(int64_t lastCommittedTxnId, int64_t currentTxnId)
     {
-        // fill a tuple
-        for (int col = 0; col < COLUMN_COUNT; col++) {
-            int value = rand();
-            m_tuple->setNValue(col, ValueFactory::getIntegerValue(value));
-        }
+        TableTuple& tuple = m_env.randomlyFillDefaultTuple();
         // append into the buffer
-        m_wrapper->appendTuple(lastCommittedTxnId,
-                               currentTxnId, 1, 1, 1, *m_tuple,
-                               ExportTupleStream::INSERT);
+        m_wrapper.appendTuple(lastCommittedTxnId, currentTxnId, 1, 1, 1, tuple, ExportTupleStream::INSERT);
     }
 
-    virtual ~ExportTupleStreamTest() {
-        delete m_wrapper;
-        delete m_tuple;
-        if (m_schema)
-            TupleSchema::freeTupleSchema(m_schema);
-    }
+    virtual ~ExportTupleStreamTest() { }
 
 protected:
-    ExportTupleStream* m_wrapper;
-    TupleSchema* m_schema;
-    char m_tupleMemory[(COLUMN_COUNT + 1) * 8];
-    TableTuple* m_tuple;
-    DummyTopend m_topend;
-    boost::scoped_ptr<ExecutorContext> m_context;
-
+    StorageTestEnvironment m_env;
+    AccessibleTopEnd& m_topend;
+    ExportTupleStream m_wrapper;
 };
 
 // Several of these cases were move to TestExportDataSource in Java
@@ -183,7 +129,7 @@ TEST_F(ExportTupleStreamTest, DoOneTuple)
 
     // write a new tuple and then flush the buffer
     appendTuple(1, 2);
-    m_wrapper->periodicFlush(-1, 2);
+    m_wrapper.periodicFlush(-1, 2);
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -199,22 +145,22 @@ TEST_F(ExportTupleStreamTest, BasicOps)
 {
 
     // verify the block count statistic.
-    size_t allocatedByteCount = m_wrapper->allocatedByteCount();
+    size_t allocatedByteCount = m_wrapper.allocatedByteCount();
     EXPECT_TRUE(allocatedByteCount == 0);
 
     for (int i = 1; i < 10; i++)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper->periodicFlush(-1, 9);
+    m_wrapper.periodicFlush(-1, 9);
 
     for (int i = 10; i < 20; i++)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper->periodicFlush(-1, 19);
+    m_wrapper.periodicFlush(-1, 19);
 
-    EXPECT_EQ( 1289, m_wrapper->allocatedByteCount());
+    EXPECT_EQ( 1289, m_wrapper.allocatedByteCount());
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -231,7 +177,7 @@ TEST_F(ExportTupleStreamTest, BasicOps)
     EXPECT_EQ(results->offset(), (MAGIC_TUPLE_SIZE * 10));
 
     // ack all of the data and re-verify block count
-    allocatedByteCount = m_wrapper->allocatedByteCount();
+    allocatedByteCount = m_wrapper.allocatedByteCount();
     EXPECT_TRUE(allocatedByteCount == 0);
 }
 
@@ -244,13 +190,13 @@ TEST_F(ExportTupleStreamTest, FarFutureFlush)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper->periodicFlush(-1, 99);
+    m_wrapper.periodicFlush(-1, 99);
 
     for (int i = 100; i < 110; i++)
     {
         appendTuple(i-1, i);
     }
-    m_wrapper->periodicFlush(-1, 130);
+    m_wrapper.periodicFlush(-1, 130);
 
     // get the first buffer flushed
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -349,7 +295,7 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndFlush) {
     ASSERT_FALSE(m_topend.receivedExportBuffer);
 
     // Now, flush the buffer with the tick
-    m_wrapper->periodicFlush(-1, 1);
+    m_wrapper.periodicFlush(-1, 1);
 
     // should be able to get 2 buffers, one full and one with one tuple
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -384,12 +330,12 @@ TEST_F(ExportTupleStreamTest, FillSingleTxnAndCommitWithRollback) {
     // now, drop in one more on a new TXN ID.  This should commit
     // the whole first buffer.  Roll back the new tuple and make sure
     // we have a good buffer
-    size_t mark = m_wrapper->bytesUsed();
+    size_t mark = m_wrapper.bytesUsed();
     appendTuple(1, 2);
-    m_wrapper->rollbackTo(mark);
+    m_wrapper.rollbackTo(mark);
 
     // so flush and make sure we got something sane
-    m_wrapper->periodicFlush(-1, 1);
+    m_wrapper.periodicFlush(-1, 1);
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
     m_topend.blocks.pop_front();
@@ -423,11 +369,11 @@ TEST_F(ExportTupleStreamTest, RollbackFirstTuple)
 
     appendTuple(1, 2);
     // rollback the first tuple
-    m_wrapper->rollbackTo(0);
+    m_wrapper.rollbackTo(0);
 
     // write a new tuple and then flush the buffer
     appendTuple(1, 2);
-    m_wrapper->periodicFlush(-1, 2);
+    m_wrapper.periodicFlush(-1, 2);
 
     // we should only have one tuple in the buffer
     ASSERT_TRUE(m_topend.receivedExportBuffer);
@@ -452,10 +398,10 @@ TEST_F(ExportTupleStreamTest, RollbackMiddleTuple)
     }
 
     // add another and roll it back and flush
-    size_t mark = m_wrapper->bytesUsed();
+    size_t mark = m_wrapper.bytesUsed();
     appendTuple(10, 11);
-    m_wrapper->rollbackTo(mark);
-    m_wrapper->periodicFlush(-1, 10);
+    m_wrapper.rollbackTo(mark);
+    m_wrapper.periodicFlush(-1, 10);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();
@@ -477,14 +423,14 @@ TEST_F(ExportTupleStreamTest, RollbackWholeBuffer)
     }
 
     // now, fill a couple of buffers with tuples from a single transaction
-    size_t mark = m_wrapper->bytesUsed();
+    size_t mark = m_wrapper.bytesUsed();
     int tuples_to_fill = BUFFER_SIZE / MAGIC_TUPLE_SIZE;
     for (int i = 0; i < (tuples_to_fill + 10) * 2; i++)
     {
         appendTuple(10, 11);
     }
-    m_wrapper->rollbackTo(mark);
-    m_wrapper->periodicFlush(-1, 10);
+    m_wrapper.rollbackTo(mark);
+    m_wrapper.periodicFlush(-1, 10);
 
     ASSERT_TRUE(m_topend.receivedExportBuffer);
     boost::shared_ptr<StreamBlock> results = m_topend.blocks.front();

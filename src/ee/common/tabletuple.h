@@ -401,7 +401,7 @@ private:
  */
 class PoolBackedTupleStorage {
 public:
-    PoolBackedTupleStorage():m_tuple(), m_pool(NULL) {}
+    PoolBackedTupleStorage() : m_tuple(), m_pool(NULL) {}
 
     void init(const TupleSchema* schema, Pool* pool) {
         m_tuple.setSchema(schema);

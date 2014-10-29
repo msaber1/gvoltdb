@@ -895,7 +895,7 @@ std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {
     return std::string(planBytes.get());
 }
 
-void VoltDBIPC::crashVoltDB(voltdb::FatalException e) {
+void VoltDBIPC::crashVoltDB(const voltdb::FatalException& e) {
     const char *reasonBytes = e.m_reason.c_str();
     int32_t reasonLength = static_cast<int32_t>(strlen(reasonBytes));
     int32_t lineno = static_cast<int32_t>(e.m_lineno);

@@ -34,11 +34,9 @@ StreamedTable::StreamedTable(bool exportEnabled)
     }
 }
 
-StreamedTable *
-StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
-    StreamedTable * st = new StreamedTable(true);
-    st->m_wrapper->setDefaultCapacity(wrapperBufSize);
-    return st;
+void StreamedTable::setCapacityForTest(size_t wrapperBufSize)
+{
+    m_wrapper->setDefaultCapacity(wrapperBufSize);
 }
 
 

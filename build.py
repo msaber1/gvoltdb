@@ -216,7 +216,6 @@ CTX.INPUT['common'] = """
  executorcontext.cpp
  serializeio.cpp
  StreamPredicateList.cpp
- Topend.cpp
  TupleOutputStream.cpp
  TupleOutputStreamProcessor.cpp
  MiscUtil.cpp

@@ -45,7 +45,7 @@ class StreamedTable : public Table {
 
   public:
     StreamedTable(bool exportEnabled);
-    static StreamedTable* createForTest(size_t, ExecutorContext*);
+    void setCapacityForTest(size_t wrapperBufSize);
 
     virtual ~StreamedTable();
 

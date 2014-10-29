@@ -17,10 +17,9 @@
 
 #ifndef JNITOPEND_H_
 #define JNITOPEND_H_
-#include "boost/shared_array.hpp"
+
 #include "common/Topend.h"
-#include "common/FatalException.hpp"
-#include "common/Pool.hpp"
+
 #include <jni.h>
 
 namespace voltdb {
@@ -36,7 +35,7 @@ public:
                 std::string lastAccessedTable, int64_t lastAccessedTableSize, int64_t tuplesProcessed,
                 int64_t currMemoryInBytes, int64_t peakMemoryInBytes);
     std::string planForFragmentId(int64_t fragmentId);
-    void crashVoltDB(FatalException e);
+    void crashVoltDB(const FatalException& e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(
             int64_t exportGeneration,

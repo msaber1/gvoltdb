@@ -18,18 +18,15 @@
 #ifndef VOLTDBIPC_H_
 #define VOLTDBIPC_H_
 
-#include <signal.h>
-#include <vector>
+#include "common/Topend.h"
+
 #include "common/ids.h"
 #include "logging/LogDefs.h"
 #include "logging/LogProxy.h"
-#include "common/FatalException.hpp"
-#include "common/Topend.h"
+
+#include <signal.h>
 
 namespace voltdb {
-class Pool;
-class StreamBlock;
-class Table;
 class VoltDBEngine;
 }
 
@@ -95,7 +92,7 @@ public:
      */
     void log(voltdb::LoggerId loggerId, voltdb::LogLevel level, const char *statement) const;
 
-    void crashVoltDB(voltdb::FatalException e);
+    void crashVoltDB(const voltdb::FatalException& e);
 
     /*
      * Cause the engine to terminate gracefully after finishing execution of the current command.

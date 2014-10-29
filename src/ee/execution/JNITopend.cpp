@@ -15,12 +15,13 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "JNITopend.h"
-#include <cassert>
-#include <iostream>
 
 #include "common/debuglog.h"
 #include "common/StreamBlock.h"
 #include "storage/table.h"
+
+#include <cassert>
+#include <iostream>
 
 using namespace std;
 
@@ -317,7 +318,7 @@ std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     }
 }
 
-void JNITopend::crashVoltDB(FatalException e) {
+void JNITopend::crashVoltDB(const FatalException& e) {
     //Enough references for the reason string, traces array, and traces strings
     JNILocalFrameBarrier jni_frame =
             JNILocalFrameBarrier(

@@ -21,18 +21,12 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <string>
-#include <boost/foreach.hpp>
-#include <boost/unordered_map.hpp>
-
 #include "harness.h"
-#include "common/executorcontext.hpp"
-#include "common/TupleSchema.h"
+#include "storage_test_support.h"
+
 #include "common/debuglog.h"
 #include "common/types.h"
 #include "common/NValue.hpp"
-#include "common/ValueFactory.hpp"
-#include "common/tabletuple.h"
 #include "storage/BinaryLogSink.h"
 #include "storage/persistenttable.h"
 #include "storage/tableiterator.h"
@@ -43,13 +37,20 @@
 #include "storage/DRTupleStream.h"
 #include "indexes/tableindex.h"
 
+#include <boost/foreach.hpp>
+#include <boost/unordered_map.hpp>
+
+#include <string>
+
 using namespace voltdb;
 using namespace std;
 
 class TableAndIndexTest : public Test {
-    public:
-        TableAndIndexTest() {
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, NULL, false, "", 0, &drStream);
+public:
+        TableAndIndexTest()
+          : m_env(&drStream, (TupleSchema*)NULL) // This test uses multiple non-dummy table schemas
+          , topend(m_env.m_topEnd)
+        {
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
             drStream.configure(44);
@@ -247,7 +248,9 @@ class TableAndIndexTest : public Test {
         }
 
         ~TableAndIndexTest() {
-            delete engine;
+            BOOST_FOREACH(NValue stringNValue, cachedStringValues) {
+                stringNValue.free();
+            }
             delete districtTable;
             delete districtTableReplica;
             delete districtTempTable;
@@ -257,13 +260,12 @@ class TableAndIndexTest : public Test {
             delete customerTempTable;
         }
 
-    protected:
+protected:
+        DRTupleStream drStream;
+        StorageTestEnvironment m_env;
+        AccessibleTopEnd& topend;
         int mem;
         TempTableLimits limits;
-        ExecutorContext *engine;
-        DRTupleStream drStream;
-        DummyTopend topend;
-        Pool pool;
         BinaryLogSink sink;
 
         TupleSchema      *districtTupleSchema;
@@ -294,6 +296,8 @@ class TableAndIndexTest : public Test {
         vector<int>       customerIndex3ColumnIndices;
         TableIndexScheme  customerIndex3Scheme;
         char signature[20];
+
+        vector<NValue> cachedStringValues;//To free at the end of the test
 };
 
 /*
@@ -301,7 +305,6 @@ class TableAndIndexTest : public Test {
  */
 TEST_F(TableAndIndexTest, DrTest) {
     drStream.m_enabled = true;
-    vector<NValue> cachedStringValues;//To free at the end of the test
     TableTuple temp_tuple = districtTempTable->tempTuple();
     temp_tuple.setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(7)));
     temp_tuple.setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(3)));
@@ -344,7 +347,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     //Add a length prefix for test, then apply it
     *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
-    sink.apply(&data[4], tables, &pool);
+    sink.apply(&data[4], tables, &(m_env.m_pool));
     drStream.m_enabled = true;
 
     //Should have one row from the insert
@@ -357,7 +360,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ(nextTuple.getNValue(7).compare(cachedStringValues.back()), 0);
 
     //Prepare to insert in a new txn
-    engine->setupForPlanFragments( NULL, 100, 100, 99, 72);
+    m_env.m_context.setupForPlanFragments( NULL, 100, 100, 99, 72);
 
     /*
      * Test that update propagates
@@ -383,7 +386,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     //Add a length prefix for test and apply it
     *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
-    sink.apply(&data[4], tables, &pool);
+    sink.apply(&data[4], tables, &(m_env.m_pool));
     drStream.m_enabled = true;
 
     //Expect one row with the update
@@ -394,7 +397,7 @@ TEST_F(TableAndIndexTest, DrTest) {
     EXPECT_EQ(0, toDelete.getNValue(3).compare(cachedStringValues.back()));
 
     //Prep another transaction to test propagating a delete
-    engine->setupForPlanFragments( NULL, 102, 102, 101, 89);
+    m_env.m_context.setupForPlanFragments( NULL, 102, 102, 101, 89);
 
     districtTable->deleteTuple( toDelete, true);
 
@@ -412,19 +415,14 @@ TEST_F(TableAndIndexTest, DrTest) {
     //Add a length prefix for test, and apply the update
     *reinterpret_cast<int32_t*>(&data.get()[4]) = htonl(static_cast<int32_t>(sb->offset()));
     drStream.m_enabled = false;
-    sink.apply(&data[4], tables, &pool);
+    sink.apply(&data[4], tables, &(m_env.m_pool));
     drStream.m_enabled = true;
 
     //Expect no rows after the delete propagates
     EXPECT_EQ( 0, districtTableReplica->activeTupleCount());
-
-    for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
-        (*i).free();
-    }
 }
 
 TEST_F(TableAndIndexTest, BigTest) {
-    vector<NValue> cachedStringValues;//To free at the end of the test
     TableTuple *temp_tuple = &districtTempTable->tempTuple();
     temp_tuple->setNValue(0, ValueFactory::getTinyIntValue(static_cast<int8_t>(7)));
     temp_tuple->setNValue(1, ValueFactory::getTinyIntValue(static_cast<int8_t>(3)));
@@ -568,10 +566,6 @@ TEST_F(TableAndIndexTest, BigTest) {
         }
     }
     customerTempTable->deleteAllTuplesNonVirtual(true);
-
-    for (vector<NValue>::const_iterator i = cachedStringValues.begin(); i != cachedStringValues.end(); i++) {
-        (*i).free();
-    }
 }
 
 int main() {

@@ -28,7 +28,7 @@
 #include "common/UndoQuantumReleaseInterest.h"
 #include "boost/unordered_set.hpp"
 
-class StreamedTableTest;
+class StorageTestEnvironment;
 class TableAndIndexTest;
 
 namespace voltdb {
@@ -39,7 +39,7 @@ class UndoQuantum {
     // and copying buffers into pooled storage. Anything else is reserved for friends.
     friend class UndoLog; // For management access -- allocation, deallocation, etc.
     friend class UndoAction; // For allocateAction.
-    friend class ::StreamedTableTest;
+    friend class ::StorageTestEnvironment;
 
 protected:
     void* operator new(size_t sz, Pool& pool) { return pool.allocate(sz); }
