@@ -1302,7 +1302,7 @@ public class TestSubQueries extends PlannerTestCase {
         // Distinct apply on replicated table only
         planNodes = compileToFragments(
                 "SELECT * FROM (SELECT P1.A, R1.C FROM R1, P1,  " +
-                "                (SELECT Distinct A, C FROM R2 where A > 3) T0 where R1.A = T0.A ) T1, " +
+                "                (SELECT Distinct A FROM R2 where A > 3) T0 where R1.A = T0.A ) T1, " +
                 "              P2 " +
                 "where T1.A = P2.A");
         for (AbstractPlanNode apn: planNodes) {
