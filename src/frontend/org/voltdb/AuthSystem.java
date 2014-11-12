@@ -62,7 +62,6 @@ import com.google_voltpatches.common.collect.ImmutableList;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.ImmutableSet;
 import java.util.EnumSet;
-import org.voltdb.catalog.Group;
 import org.voltdb.common.Permission;
 
 
@@ -183,7 +182,7 @@ public class AuthSystem {
      * clear text password.
      *
      */
-    class AuthUser {
+    public static class AuthUser {
         /**
          * SHA-1 double hashed copy of the users clear text password
          */
@@ -203,6 +202,8 @@ public class AuthSystem {
          * Fast iterable list of groups this user is a member of.
          */
         private List<AuthGroup> m_groups = new ArrayList<AuthGroup>();
+
+        private EnumSet<Permission> m_permissions = EnumSet.noneOf(Permission.class);
 
         /**
          * Fast membership check set of stored procedures this user has permission to invoke.
@@ -244,7 +245,7 @@ public class AuthSystem {
             if (proc == null) {
                 return false;
             }
-            return m_authorizedProcedures.contains(proc);
+            return hasPermission(Permission.ALLPROC) || m_authorizedProcedures.contains(proc);
         }
 
         /**
@@ -253,10 +254,8 @@ public class AuthSystem {
          */
         public boolean hasPermission(Permission... perms) {
             for (int i = 0; i < perms.length;i++) {
-                for (AuthGroup group : m_groups) {
-                    if (group.m_permissions.contains(perms[i])) {
-                        return true;
-                    }
+                if (m_permissions.contains(perms[i])) {
+                    return true;
                 }
             }
             return false;
@@ -411,6 +410,9 @@ public class AuthSystem {
                 } else {
                     group = m_groups.get(catalogGroup.getTypeName());
                 }
+
+                user.m_permissions.addAll(group.m_permissions);
+
                 group.m_users.add(user);
                 user.m_groups.add(group);
             }
@@ -515,7 +517,11 @@ public class AuthSystem {
         }
     }
 
-    private final AuthUser m_authDisabledUser = new AuthUser(null, null, null) {
+    public static class AuthDisabledUser extends AuthUser {
+        public AuthDisabledUser() {
+            super(null, null, null);
+        }
+
         @Override
         public boolean hasUserDefinedProcedurePermission(Procedure proc) {
             return true;
@@ -530,7 +536,9 @@ public class AuthSystem {
         public boolean authorizeConnector(String connectorName) {
             return true;
         }
-    };
+    }
+
+    private final AuthUser m_authDisabledUser = new AuthDisabledUser();
 
     AuthUser getUser(String name) {
         if (!m_enabled) {

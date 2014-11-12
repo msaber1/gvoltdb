@@ -18,13 +18,13 @@
 #ifndef _EXECUTORCONTEXT_HPP_
 #define _EXECUTORCONTEXT_HPP_
 
-#include <vector>
-#include <map>
-
 #include "Topend.h"
 #include "common/UndoQuantum.h"
 #include "common/valuevector.h"
 #include "common/subquerycontext.h"
+
+#include <vector>
+#include <map>
 
 namespace voltdb {
 
@@ -106,7 +106,7 @@ class ExecutorContext {
         m_undoQuantum = undoQuantum;
     }
 
-    void setupForExecutors(std::map<int, std::vector<AbstractExecutor*> >* executorsMap) {
+    void setupForExecutors(const std::map<int, std::vector<AbstractExecutor*> >* executorsMap) {
         assert(executorsMap != NULL);
         m_executorsMap = executorsMap;
         m_subqueryContextMap.clear();
@@ -205,6 +205,9 @@ class ExecutorContext {
     }
 
   private:
+
+    void cleanupExecutors(const std::vector<AbstractExecutor*>& executorList, bool throwingException) const;
+
     Topend *m_topEnd;
     Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
@@ -213,7 +216,7 @@ class ExecutorContext {
     NValueArray* m_staticParams;
     // Executor stack map. The key is the statement id (0 means the main/parent statement)
     // The value is the pointer to the executor stack for that statement
-    std::map<int, std::vector<AbstractExecutor*> >* m_executorsMap;
+    const std::map<int, std::vector<AbstractExecutor*> >* m_executorsMap;
     std::map<int, SubqueryContext> m_subqueryContextMap;
 
     DRTupleStream *m_drStream;

@@ -109,7 +109,7 @@ Table* ExecutorContext::executeExecutors(int subqueryId) const
         // Clean up any tempTables when the plan finishes abnormally.
         // This needs to be the caller's responsibility for normal returns because
         // the caller may want to first examine the final output table.
-        cleanupExecutors(subqueryId);
+        cleanupExecutors(executorList, true);
         if (subqueryId == 0) {
             VOLT_TRACE("The Executor's execution at position '%d' failed", ctr);
         } else {
@@ -123,9 +123,24 @@ Table* ExecutorContext::executeExecutors(int subqueryId) const
 void ExecutorContext::cleanupExecutors(int subqueryId) const
 {
     const std::vector<AbstractExecutor*>& executorList = getExecutors(subqueryId);
+    cleanupExecutors(executorList, false);
+}
+
+void ExecutorContext::cleanupExecutors(const std::vector<AbstractExecutor*>& executorList,
+        bool thrownOut) const
+{
     BOOST_FOREACH (AbstractExecutor *executor, executorList) {
         assert(executor);
         executor->cleanupTempOutputTable();
+        // Force the extra cleanup that might have been skipped because not all p_execute calls
+        // were run to completion.
+        if (thrownOut) {
+            AbstractPlanNode* node = executor->getPlanNode();
+            typedef std::pair<const voltdb::PlanNodeType, voltdb::AbstractPlanNode*> TypedInlineNode;
+            BOOST_FOREACH (TypedInlineNode typedInlineNode, node->getInlinePlanNodes()) {
+                typedInlineNode.second->getExecutor()->cleanupMemoryPool();
+            }
+        }
     }
 }
 

@@ -61,7 +61,6 @@
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
-#include "boost/shared_array.hpp"
 
 #include <map>
 #include <string>
@@ -99,6 +98,11 @@ class TheHashinator;
 
 const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
 
+/** A constant only being used temporarily for testing purposes
+ * for the LIMIT PARTITION ROWS EXECUTE DELETE fragment
+ */
+const int64_t MAGIC_PURGE_FRAGMENT_ID = 9223372036854775807LL; // 2^63 - 1
+
 /**
  * Represents an Execution Engine which holds catalog objects (i.e. table) and executes
  * plans on the objects. Every operation starts from this object.
@@ -106,8 +110,8 @@ const int64_t DEFAULT_TEMP_TABLE_MEMORY = 1024 * 1024 * 100;
  */
 // TODO(evanj): Used by JNI so must be exported. Remove when we only one .so
 class __attribute__((visibility("default"))) VoltDBEngine {
-    friend class ExecutorVector;
-
+////    friend class ExecutorVector;
+////
     public:
         /** The defaults apply to test code which does not enable JNI/IPC callbacks. */
         VoltDBEngine(Topend *topend = NULL, LogProxy *logProxy = new StdoutLogProxy());
@@ -163,6 +167,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         inline int64_t pushTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
         inline void pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed);
 
+        // If an insert will fail due to row limit constraint and user
+        // has defined a delete action to make space, this method
+        // executes the corresponding fragment.
+        //
+        // Returns ENGINE_ERRORCODE_SUCCESS on success
+        int executePurgeFragment(int64_t fragId);
+
         // -------------------------------------------------
         // Dependency Transfer Functions
         // -------------------------------------------------
@@ -195,6 +206,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         const char* getParameterBuffer() const { return m_parameterBuffer; }
         /** Returns the size of buffer for passing parameters to EE. */
         int getParameterBufferCapacity() const { return m_parameterBufferCapacity; }
+
+        /**
+         * Sets the output and exception buffer to be empty, and then
+         * serializes the exception. */
+        void serializeException(const SerializableEEException& e);
 
         /**
          * Retrieves the size in bytes of the data that has been placed in the reused result buffer
@@ -353,12 +369,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
-        void cleanupExecutorList(std::vector<AbstractExecutor*>& executorList);
-
-        ExecutorVector * getCurrentExecutorVector() {
-            return m_currExecutorVec;
-        }
-
     private:
         /*
          * Tasks dispatched by executeTask
@@ -370,8 +380,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-        bool initCluster();
-        AbstractExecutor* initPlanNode(AbstractPlanNode* node, TempTableLimits* limits, int64_t fragId);
+////        bool initCluster();
+////        AbstractExecutor* initPlanNode(AbstractPlanNode* node, TempTableLimits* limits, int64_t fragId);
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViews();
         bool updateCatalogDatabaseReference();
@@ -399,12 +409,10 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * If not, get a plan from the Java topend and load it up,
          * putting it in the cache and possibly bumping something else.
          */
-        void setExecutorVectorForFragmentId(const int64_t fragId);
-
+        void setExecutorVectorForFragmentId(int64_t fragId);
+        int executePlanFragmentById(int64_t);
         bool checkTempTableCleanup(ExecutorVector * execsForFrag);
-
-        void resetCurrentExecutorVec();
-
+        void resetExecutionMetadata();
         void cleanupExecutors();
 
         // -------------------------------------------------
@@ -598,7 +606,12 @@ inline int64_t VoltDBEngine::pushTuplesProcessedForProgressMonitoring(int64_t tu
 
 inline void VoltDBEngine::pushFinalTuplesProcessedForProgressMonitoring(int64_t tuplesProcessed)
 {
-    pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
+    try {
+        pushTuplesProcessedForProgressMonitoring(tuplesProcessed);
+    } catch(const SerializableEEException &e) {
+        e.serialize(getExceptionOutputSerializer());
+    }
+
     m_lastAccessedExec = NULL;
 }
 
