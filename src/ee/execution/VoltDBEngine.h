@@ -110,8 +110,6 @@ const int64_t MAGIC_PURGE_FRAGMENT_ID = 9223372036854775807LL; // 2^63 - 1
  */
 // TODO(evanj): Used by JNI so must be exported. Remove when we only one .so
 class __attribute__((visibility("default"))) VoltDBEngine {
-////    friend class ExecutorVector;
-////
     public:
         /** The defaults apply to test code which does not enable JNI/IPC callbacks. */
         VoltDBEngine(Topend *topend = NULL, LogProxy *logProxy = new StdoutLogProxy());
@@ -380,8 +378,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Initialization Functions
         // -------------------------------------------------
-////        bool initCluster();
-////        AbstractExecutor* initPlanNode(AbstractPlanNode* node, TempTableLimits* limits, int64_t fragId);
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViews();
         bool updateCatalogDatabaseReference();
