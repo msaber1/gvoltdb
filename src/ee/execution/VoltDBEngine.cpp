@@ -1826,37 +1826,37 @@ void VoltDBEngine::executeTask(TaskType taskType, const char* taskParams) {
 }
 
 struct SetAsideExecutorVectorWithContext {
-    SetAsideExecutorVectorWithContext(ExecutorVector* ev, ExecutorContext* executorContext)
-      : m_head(ev)
-      , m_element(ev)
+    SetAsideExecutorVectorWithContext(ExecutorVector** ev, ExecutorContext* executorContext)
+      : m_lhs(ev)
+      , m_rhs(*ev)
       , m_executorContext(executorContext)
     { }
 
     ~SetAsideExecutorVectorWithContext()
     {
         // restore the engine's m_currExecutorVec by reference
-        m_head = m_element;
+        *m_lhs = m_rhs;
         // restore the associated executor context state.
-        m_executorContext->setupForExecutors(m_element->getSubqueryExecutorsMap());
+        m_executorContext->setupForExecutors(m_rhs->getSubqueryExecutorsMap());
     }
 private:
-    // A writable reference to the engine's actual m_currExecutorVec pointer value.
-    ExecutorVector*& m_head;
+    // A writable pointer to the engine's actual m_currExecutorVec member.
+    ExecutorVector** m_lhs;
     // The original and future value of the engine's m_currExecutorVec.
-    ExecutorVector* m_element;
-    // The ExecutorContext that needs to be notified when value is switched back
+    ExecutorVector* m_rhs;
+    // The ExecutorContext that needs to be notified when the value is switched back.
     ExecutorContext* m_executorContext;
 };
 
 int VoltDBEngine::executePurgeFragment(int64_t fragId) {
-    SetAsideExecutorVectorWithContext restoreMeOnExit(m_currExecutorVec, m_executorContext);
+    SetAsideExecutorVectorWithContext restoresOnExit(&m_currExecutorVec, m_executorContext);
     // With the SetAside... standing guard over the original query's fragment state,
     // it is safe to temporarily push new state into the engine and context just long
     // enough to execute the purge fragment.
     setExecutorVectorForFragmentId(fragId);
     m_executorContext->setupForExecutors(m_currExecutorVec->getSubqueryExecutorsMap());
     int result = executePlanFragmentById(fragId);
-    // finally, let the SetAside state restore itself
+    // finally, let the SetAside state be automatically restored.
     return result;
 }
 
