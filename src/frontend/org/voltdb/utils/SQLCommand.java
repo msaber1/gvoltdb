@@ -366,12 +366,13 @@ public class SQLCommand
     private static final Pattern HelpToken = Pattern.compile("^\\s*help;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListProceduresToken = Pattern.compile("^\\s*((?:list|show) proc|(?:list|show) procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListTablesToken = Pattern.compile("^\\s*((?:list|show) tables);*\\s*$", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ListClassesToken = Pattern.compile("^\\s*((?:list|show) classes);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListProceduresToken = Pattern.compile("^\\s*((?:list|show)\\s+proc|(?:list|show)\\s+procedures);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListTablesToken = Pattern.compile("^\\s*((?:list|show)\\s+tables);*\\s*$", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ListClassesToken = Pattern.compile("^\\s*((?:list|show)\\s+classes);*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
+    private static final Pattern ErrorOptionToken = Pattern.compile("^\\s*set\\s+errors\\s+(stop|continue)\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
     private static int LineIndex = 1;
     private static List<String> Lines = new ArrayList<String>();
 
@@ -605,20 +606,28 @@ public class SQLCommand
                     printHelp(System.out); // Print readme to the screen
                 }
             }
-            // FILE command - include the content of the file into the query
             else {
                 // Was there a line-ending semicolon typed at the prompt?
                 boolean executeImmediate =
                         interactive && SemicolonToken.matcher(line).matches();
-                Matcher matcher = FileToken.matcher(line);
-                if (matcher.matches()) {
-                    line = readScriptFile(matcher.group(1));
-                    if (line == null) {
-                        // In the recursive call, stopOrContinue decided to continue.
-                        // So, continue.
-                        continue;
+                // If the line is a FILE command - include the content of the file into the query queue
+                Matcher fileMatcher = FileToken.matcher(line);
+                if (fileMatcher.matches()) {
+                    // Get the line(s) from the file(s) to queue as regular database commands
+                    // or get back a null if in the recursive call, stopOrContinue decided to continue.
+                    line = readScriptFile(fileMatcher.group(1));
+                } else {
+                    // process a reset of the error handling option, interactive or not
+                    Matcher errorMatcher = ErrorOptionToken.matcher(line);
+                    if (errorMatcher.matches()) {
+                        m_stopOnFirstError = "stop".equals(errorMatcher.group(1));
+                        line = null; // the command leaves nothing to add to the query queue.
                     }
-                    // else treat the line(s) from the file(s) as regular database commands
+                    // else treat the input line as a regular database command
+                }
+
+                if (line == null) {
+                    continue;
                 }
                 // else treat the input line as a regular database command
 
@@ -683,14 +692,22 @@ public class SQLCommand
                     continue;
                 }
                 // Recursively process FILE commands, any failure will cause a recursive failure
-                Matcher m = FileToken.matcher(line);
-                if (m.matches()) {
-                    line = readScriptFile(m.group(1));
-                    if (line == null) {
-                        // In the recursive call, stopOrContinue decided to continue.
-                        // So, continue.
-                        continue;
+                Matcher fileMatcher = FileToken.matcher(line);
+                if (fileMatcher.matches()) {
+                    // Get the line(s) from the file(s) to queue as regular database commands
+                    // or get back a null if in the recursive call, stopOrContinue decided to continue.
+                    line = readScriptFile(fileMatcher.group(1));
+                }
+                else {
+                    Matcher errorMatcher = ErrorOptionToken.matcher(line);
+                    if (errorMatcher.matches()) {
+                        m_stopOnFirstError = "stop".equals(errorMatcher.group(1));
+                        line = null; // the command leaves nothing to add to the query queue.
                     }
+                    // else treat the input line as a regular database command
+                }
+                if (line == null) {
+                    continue;
                 }
                 query.append(line);
                 query.append("\n");
