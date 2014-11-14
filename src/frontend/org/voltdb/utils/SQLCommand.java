@@ -71,8 +71,10 @@ public class SQLCommand
                                                   .put("integer", "numeric")
                                                   .put("bigint", "long numeric")
                                                   .build();
-    private static boolean m_stopOnFirstError = false;
+    private static boolean m_stopOnError = true;
     private static boolean m_debug = false;
+    private static boolean m_interactive;
+    private static boolean m_returningToPromptAfterError = false;
     private static int m_exitCode = 0;
 
     // SQL Parsing
@@ -363,6 +365,26 @@ public class SQLCommand
     private static SQLConsoleReader lineInputReader = null;
     private static FileHistory historyFile = null;
 
+    //TODO: It would be safer if the sqlcmd immediate commands that are represented by these patterns
+    // were more distinguishable from text you might accidentally encounter in a database command.
+    // That's a very general concept, covering whatever arbitrary string text a user might pass
+    // in sql statements or exec (procedure invocation) commands.
+    // Having non-overlapping sets of keywords between sqlcmd "immediate" commands and database
+    // commands is ONLY the tip of the iceberg.
+    // Consider that the "line" being matched by these sqlcmd immediate command patterns is an
+    // input line that may be continuing a multiline sql statement or exec command.
+    // Since sqlcmd never requires explicit line continuation characters, the "line" could even start
+    // with text from the middle of a quoted string value!
+    // Every time we add another immediate command token pattern, we further risk accidentally
+    // matching user schema names or user string data values.
+    // This whole problem would be much more easily managed if the sqlcmd immediate commands
+    // all began with an obscure but easy-to-type prefix like '#' or '@' or '--'.
+    // As an experiment, the ErrorOptionToken has been added with a hard-to-type but
+    // hard-to-mistake @sqlcmd prefix.
+    // Alternatives considered like "ON ERROR ..." or "SET ..." seemed too prone
+    // to false matches against user command parts, or if slightly mistyped,
+    // false recognition by @AdHoc as valid or nearly valid HSQL.
+    // That could have unpredictable effects or produce unintelligible error messages.
     private static final Pattern HelpToken = Pattern.compile("^\\s*help;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern GoToken = Pattern.compile("^\\s*go;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern ExitToken = Pattern.compile("^\\s*(exit|quit);*\\s*$", Pattern.CASE_INSENSITIVE);
@@ -372,7 +394,19 @@ public class SQLCommand
     private static final Pattern SemicolonToken = Pattern.compile("^.*\\s*;+\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern RecallToken = Pattern.compile("^\\s*recall\\s*([^;]+)\\s*;*\\s*$", Pattern.CASE_INSENSITIVE);
     private static final Pattern FileToken = Pattern.compile("^\\s*file\\s*['\"]*([^;'\"]+)['\"]*\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
-    private static final Pattern ErrorOptionToken = Pattern.compile("^\\s*set\\s+errors\\s+(stop|continue)\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
+    // This is the rationale for ErrorOptionToken being so ugly:
+    // Starts with "@" to make it unmistakably NOT a SQL keyword
+    // -- this could become a new standard prefix character for immediate commands --
+    // followed by "sqlcmd"
+    // -- this reminds the users that they are typing this command at sqlcmd (@sqlcmd)
+    //    vs. typing it at the database via sqlcmd.
+    // followed by "--on-error=(stop|continue)"
+    // -- this may look familiar as the sqlcmd command line
+    //    syntax for setting this same option.
+    //    This opens the door for a consistent pattern for overriding other options like output
+    //    format, etc. without extending the keyword space or inventing lots of new names.
+    private static final Pattern ErrorOptionToken = Pattern.compile("^\\s*@sqlcmd\\s*--on-error=(stop|continue)\\s*;*\\s*", Pattern.CASE_INSENSITIVE);
+    private static final String ErrorOptionStopValue = "stop"; // vs. continue
     private static int LineIndex = 1;
     private static List<String> Lines = new ArrayList<String>();
 
@@ -402,6 +436,13 @@ public class SQLCommand
         "UPDATE",
     };
 
+    //TODO: This function badly needs 3 things:
+    // 1. To lose the "interactive" flag that is now redundant with m_interactive.
+    // 2. To be two specialized functions -- one slightly simpler than this
+    //    for when m_interactive is true, and a tiny one for when m_interactive is false.
+    //    The flag was always hard-coded by the immediate callers and does not need
+    //    incessant re-checking.
+    // 3. A whitespace makeover.
     public static List<String> getQuery(boolean interactive) throws Exception
     {
         StringBuilder query = new StringBuilder();
@@ -616,14 +657,30 @@ public class SQLCommand
                     // Get the line(s) from the file(s) to queue as regular database commands
                     // or get back a null if in the recursive call, stopOrContinue decided to continue.
                     line = readScriptFile(fileMatcher.group(1));
+                    if (m_returningToPromptAfterError) {
+                        // readScriptFile stopped because of an error. Wipe the slate clean.
+                        query = new StringBuilder();
+                        line = null;
+                        m_returningToPromptAfterError = false;
+                    }
                 } else {
                     // process a reset of the error handling option, interactive or not
                     Matcher errorMatcher = ErrorOptionToken.matcher(line);
                     if (errorMatcher.matches()) {
-                        m_stopOnFirstError = "stop".equals(errorMatcher.group(1));
+                        m_stopOnError = ErrorOptionStopValue.equalsIgnoreCase(errorMatcher.group(1));
                         line = null; // the command leaves nothing to add to the query queue.
                     }
-                    // else treat the input line as a regular database command
+                    // else treat the input line as (part of) a regular database command
+                    //TODO: This is where the user can get into all kinds of trouble from having
+                    // entered various kinds of garbage which will be queued and parsed and
+                    // most-likely eventually processed and tersely rejected by @AdHoc.
+                    // This "garbage" may include garbled "immediate" (sqlcmd-specific)
+                    // commands that failed to match their intended pattern.
+                    // Things are slightly worse within readScriptFile where in addition to
+                    // typos, even some correctly typed immediate commands that are not supported
+                    // (as FILE is) or ignored (as RECALL, EXIT and GO are) simply get queued up
+                    // for @AdHoc to reject.
+                    // See the comment before the *Token pattern definitions for more info.
                 }
 
                 if (line == null) {
@@ -697,14 +754,23 @@ public class SQLCommand
                     // Get the line(s) from the file(s) to queue as regular database commands
                     // or get back a null if in the recursive call, stopOrContinue decided to continue.
                     line = readScriptFile(fileMatcher.group(1));
+                    if (m_returningToPromptAfterError) {
+                        // The recursive readScriptFile stopped because of an error.
+                        // Escape to the outermost readScriptFile caller so it can exit or
+                        // return to the interactive prompt.
+                        return null;
+                    }
                 }
                 else {
                     Matcher errorMatcher = ErrorOptionToken.matcher(line);
                     if (errorMatcher.matches()) {
-                        m_stopOnFirstError = "stop".equals(errorMatcher.group(1));
+                        m_stopOnError = ErrorOptionStopValue.equalsIgnoreCase(errorMatcher.group(1));
                         line = null; // the command leaves nothing to add to the query queue.
                     }
                     // else treat the input line as a regular database command
+                    // See the comment that follows the other use of ErrorOptionToken for a
+                    // description of the possible issues that can arise from various cases
+                    // of "garbage" input lines.
                 }
                 if (line == null) {
                     continue;
@@ -904,8 +970,11 @@ public class SQLCommand
         // This is useful for debugging a script that may have multiple errors
         // and multiple valid statements.
         m_exitCode = -1;
-        if (m_stopOnFirstError) {
-            System.exit(m_exitCode);
+        if (m_stopOnError) {
+            if ( ! m_interactive ) {
+                System.exit(m_exitCode);
+            }
+            m_returningToPromptAfterError = true;
         }
     }
 
@@ -1058,7 +1127,7 @@ public class SQLCommand
         + "              [--query=query]\n"
         + "              [--output-format=(fixed|csv|tab)]\n"
         + "              [--output-skip-metadata]\n"
-        + "              [--stop-on-first-error]\n"
+        + "              [--on-error=(stop|continue)]\n"
         + "              [--debug]\n"
         + "\n"
         + "[--servers=comma_separated_server_list]\n"
@@ -1094,8 +1163,10 @@ public class SQLCommand
         + "  Removes metadata information such as column headers and row count from\n"
         + "  produced output.\n"
         + "\n"
-        + "[--stop-on-first-error]\n"
-        + "  Causes the utility to stop execution on the first error detected.\n"
+        + "[--on-error=(stop|continue)]\n"
+        + "  Causes the utility to stop immediately or continue after detecting an error.\n"
+        + "  In interactive mode, \"stop\" discards any unprocessed input\n"
+        + "  and returns to the command prompt.\n"
         + "[--debug]\n"
         + "  Causes the utility to print out stack traces for all exceptions.\n"
         );
@@ -1297,8 +1368,17 @@ public class SQLCommand
             else if (arg.equals("--debug")) {
                 m_debug = true;
             }
-            else if (arg.equals("--stop-on-first-error")) {
-                m_stopOnFirstError = true;
+            else if (arg.startsWith("--on-error=")) {
+                String optionName = arg.split("=")[1].toLowerCase();
+                if (optionName.equals("stop")) {
+                    m_stopOnError = true;
+                }
+                else if (optionName.equals("continue")) {
+                    m_stopOnError = false;
+                }
+                else {
+                    printUsage("Invalid value for --on-error");
+                }
             }
             else if (arg.equals("--help")) {
                 printHelp(System.out); // Print readme to the screen
@@ -1380,19 +1460,19 @@ public class SQLCommand
             // Removed code to prevent Ctrl-C from exiting. The original code is visible
             // in Git history hash 837df236c059b5b4362ffca7e7a5426fba1b7f20.
 
-            boolean interactive = true;
+            m_interactive = true;
             if (queries != null && !queries.isEmpty()) {
                 // If queries are provided via command line options run them in
                 // non-interactive mode.
                 //TODO: Someday we should honor batching.
-                interactive = false;
+                m_interactive = false;
                 for (String query : queries) {
                     executeQuery(query);
                 }
             }
             if (System.in.available() > 0) {
                 // If Standard input comes loaded with data, run in non-interactive mode
-                interactive = false;
+                m_interactive = false;
                 queries = getQuery(false);
                 if (queries != null) {
                     for (String query : queries) {
@@ -1400,13 +1480,17 @@ public class SQLCommand
                     }
                 }
             }
-            if (interactive) {
+            if (m_interactive) {
                 // Print out welcome message
                 System.out.printf("SQL Command :: %s%s:%d\n", (user == "" ? "" : user + "@"), serverList, port);
 
                 while ((queries = getQuery(true)) != null) {
                     for (String query : queries) {
                         executeQuery(query);
+                        if (m_returningToPromptAfterError) {
+                            m_returningToPromptAfterError = false;
+                            break;
+                        }
                     }
                 }
             }
