@@ -57,7 +57,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
     private ServerThread m_server;
     private Client m_client;
 
-    private boolean m_verboseDebug;
+    private boolean m_verboseDebug = false;
 
     @Override
     public void setUp() throws Exception
@@ -94,9 +94,22 @@ public class TestSqlCmdErrorHandling extends TestCase {
         m_server.start();
         m_server.waitForInitialization();
 
-        Thread.sleep(1000);
         m_client = ClientFactory.createClient();
         m_client.createConnection("localhost");
+
+        // Execute the constrained write to end all constrained writes.
+        // This poisons all future executions of the badWriteCommand() query.
+        // It also validates that the VoltDB server is up and running.
+        ClientResponse response = m_client.callProcedure("@AdHoc", badWriteCommand());
+        assertEquals(ClientResponse.SUCCESS, response.getStatus());
+        VoltTable[] results = response.getResults();
+        assertEquals(1, results.length);
+        VoltTable result = results[0];
+        assertEquals(1, result.asScalarLong());
+
+        if (m_verboseDebug) {
+            System.out.println("Returned from initial adhoc statement.");
+        }
 
         assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
                 0, callSQLcmd(true, false, ";\n"));
@@ -110,14 +123,9 @@ public class TestSqlCmdErrorHandling extends TestCase {
         assertEquals("sqlcmd interactive --stop-on-error=false dry run failed.",
                 0, callSQLcmd(false, true, ";\n"));
 
-        // Execute the constrained write to end all constrained writes.
-        // This poisons all future executions of the badWriteCommand() query.
-        ClientResponse response = m_client.callProcedure("@AdHoc", badWriteCommand());
-        assertEquals(ClientResponse.SUCCESS, response.getStatus());
-        VoltTable[] results = response.getResults();
-        assertEquals(1, results.length);
-        VoltTable result = results[0];
-        assertEquals(1, result.asScalarLong());
+        if (m_verboseDebug) {
+            System.out.println("Returned from sqlcmd dry runs.");
+        }
 
         // Assert that the procs don't complain when fed good parameters.
         // Keep these dry run key values out of range of the test cases.
@@ -210,11 +218,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
         Process process = pb.start();
 
-        m_verboseDebug = true;
         OutputStream intoProcess = process.getOutputStream();
         if (interactive) {
             Thread.sleep(1000);
-            assert(intoProcess != null);
+            assertTrue(intoProcess != null);
             try {
                 int exitValue = process.exitValue();
                 System.err.println("External process (" + commandPath + ") exited before input could be queued.");
@@ -229,10 +236,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
                 intoProcess.close();
             }
         }
-        else {
-            assert(intoProcess == null);
-        }
-        // Set timeout to 1 minute
+
         long starttime = System.currentTimeMillis();
         long elapsedtime = 0;
         long pollcount = 1;
