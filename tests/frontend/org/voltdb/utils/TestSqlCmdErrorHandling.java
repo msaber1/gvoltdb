@@ -32,8 +32,10 @@ package org.voltdb.utils;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.OutputStream;
 
 import junit.framework.TestCase;
 
@@ -54,6 +56,8 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
     private ServerThread m_server;
     private Client m_client;
+
+    private boolean m_verboseDebug;
 
     @Override
     public void setUp() throws Exception
@@ -90,14 +94,21 @@ public class TestSqlCmdErrorHandling extends TestCase {
         m_server.start();
         m_server.waitForInitialization();
 
+        Thread.sleep(1000);
         m_client = ClientFactory.createClient();
         m_client.createConnection("localhost");
 
         assertEquals("sqlcmd dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
-                0, callSQLcmd(true, ";\n"));
+                0, callSQLcmd(true, false, ";\n"));
+
+        assertEquals("sqlcmd interactive dry run failed -- maybe some sqlcmd component (the voltdb jar file?) needs to be rebuilt.",
+                0, callSQLcmd(true, true, ";\n"));
 
         assertEquals("sqlcmd --stop-on-error=false dry run failed.",
-                0, callSQLcmd(false, ";\n"));
+                0, callSQLcmd(false, false, ";\n"));
+
+        assertEquals("sqlcmd interactive --stop-on-error=false dry run failed.",
+                0, callSQLcmd(false, true, ";\n"));
 
         // Execute the constrained write to end all constrained writes.
         // This poisons all future executions of the badWriteCommand() query.
@@ -176,15 +187,9 @@ public class TestSqlCmdErrorHandling extends TestCase {
         return 1 == result.asScalarLong();
     }
 
-    private int callSQLcmd(boolean stopOnError, String inputText) throws Exception {
+    private int callSQLcmd(boolean stopOnError, boolean interactive, String inputText) throws Exception {
         final String commandPath = "bin/sqlcmd";
         final long timeout = 60000; // 60,000 millis -- give up after 1 minute of trying.
-
-        File f = new File("ddl.sql");
-        f.deleteOnExit();
-        FileOutputStream fos = new FileOutputStream(f);
-        fos.write(inputText.getBytes());
-        fos.close();
 
         File out = new File("out.log");
 
@@ -192,11 +197,41 @@ public class TestSqlCmdErrorHandling extends TestCase {
 
         ProcessBuilder pb =
                 new ProcessBuilder(commandPath, "--stop-on-error=" + (stopOnError ? "true" : "false"));
-        pb.redirectInput(f);
         pb.redirectOutput(out);
         pb.redirectError(error);
+        if ( ! interactive) {
+            File f = new File("ddl.sql");
+            f.deleteOnExit();
+            FileOutputStream fos = new FileOutputStream(f);
+            fos.write(inputText.getBytes());
+            fos.close();
+            pb.redirectInput(f);
+        }
+
         Process process = pb.start();
 
+        m_verboseDebug = true;
+        OutputStream intoProcess = process.getOutputStream();
+        if (interactive) {
+            Thread.sleep(1000);
+            assert(intoProcess != null);
+            try {
+                int exitValue = process.exitValue();
+                System.err.println("External process (" + commandPath + ") exited before input could be queued.");
+                if (m_verboseDebug) {
+                    reportCommandOutput("preterminated " + commandPath, out, error);
+                }
+                return exitValue;
+            }
+            catch (Exception e) {
+                inputText += "\nEXIT;\n";
+                intoProcess.write(inputText.getBytes());
+                intoProcess.close();
+            }
+        }
+        else {
+            assert(intoProcess == null);
+        }
         // Set timeout to 1 minute
         long starttime = System.currentTimeMillis();
         long elapsedtime = 0;
@@ -212,9 +247,13 @@ public class TestSqlCmdErrorHandling extends TestCase {
                     System.err.println("External process (" + commandPath + ") exited after being polled " +
                             pollcount + " times over " + elapsedtime + "ms");
                 }
-                //*/enable for debug*/ System.err.println(commandPath + " returned " + exitValue);
-                //*/enable for debug*/ System.err.println(" in " + (System.currentTimeMillis() - starttime)+ "ms");
-                //*/enable for debug*/ System.err.println(" on input:\n" + inputText);
+                if (m_verboseDebug) {
+                    System.err.println(commandPath + " returned " + exitValue);
+                    System.err.println(" in " + (System.currentTimeMillis() - starttime)+ "ms");
+                    System.err.println(" on input:\n" + inputText);
+                    reportCommandOutput("successful " + commandPath, out, error);
+                }
+
                 return exitValue;
             }
             catch (Exception e) {
@@ -224,26 +263,33 @@ public class TestSqlCmdErrorHandling extends TestCase {
             }
         } while (elapsedtime < timeout);
 
-        System.err.println("Standard output from timed out " + commandPath + ":");
+        reportCommandOutput("timed out " + commandPath, out, error);
+        fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
+        return 0;
+    }
+
+    private void reportCommandOutput(final String commandPath, File out, File error)
+            throws FileNotFoundException, IOException
+    {
+        System.err.println("Standard output from " + commandPath + ":");
         FileInputStream cmdOut = new FileInputStream(out);
         byte[] transfer = new byte[1000];
         while (cmdOut.read(transfer) != -1) {
             System.err.write(transfer);
         }
         cmdOut.close();
-        System.err.println("Error outpout from timed out " + commandPath + ":");
+        System.err.println("Error output from " + commandPath + ":");
         FileInputStream cmdErr = new FileInputStream(error);
         while (cmdErr.read(transfer) != -1) {
             System.err.write(transfer);
         }
         cmdErr.close();
-        fail("External process (" + commandPath + ") timed out after " + elapsedtime + "ms on input:\n" + inputText);
-        return 0;
     }
 
     public void test10Error() throws Exception
     {
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, m_lastError));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, false, m_lastError));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, true, m_lastError));
     }
 
     public void test20ErrorThenWrite() throws Exception
@@ -251,7 +297,9 @@ public class TestSqlCmdErrorHandling extends TestCase {
         int id = 20;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id);
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, false, inputText));
+        assertTrue("skipped a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, true, inputText));
         assertTrue("skipped a post-error write", checkIfWritten(id));
     }
 
@@ -260,14 +308,17 @@ public class TestSqlCmdErrorHandling extends TestCase {
         int id = 30;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id) + m_lastError;
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, false, inputText));
+        assertTrue("skipped a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, true, inputText));
         assertTrue("skipped a post-error write", checkIfWritten(id));
     }
 
     public void test40BadWrite() throws Exception
     {
         String inputText = badWriteCommand();
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, false, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, true, inputText));
     }
 
     public void test50BadWriteThenWrite() throws Exception
@@ -275,7 +326,9 @@ public class TestSqlCmdErrorHandling extends TestCase {
         int id = 50;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badWriteCommand() + writeCommand(id);
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, false, inputText));
+        assertTrue("skipped a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, true, inputText));
         assertTrue("skipped a post-error write", checkIfWritten(id));
     }
 
@@ -284,7 +337,9 @@ public class TestSqlCmdErrorHandling extends TestCase {
         int id = 60;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badFileCommand() + writeCommand(id);
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, false, inputText));
+        assertTrue("skipped a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, true, inputText));
         assertTrue("skipped a post-error write", checkIfWritten(id));
     }
 
@@ -296,14 +351,18 @@ public class TestSqlCmdErrorHandling extends TestCase {
         String inputText = badFileCommand() + writeCommand( -id);
         String filename = createFileWithContent(inputText);
         inputText = "file '" + filename + "';\n" + writeCommand(id);
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, false, inputText));
+        assertTrue("skipped a file-scripted post-error write", checkIfWritten( -id));
+        assertTrue("skipped a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(false, true, inputText));
         assertTrue("skipped a file-scripted post-error write", checkIfWritten( -id));
         assertTrue("skipped a post-error write", checkIfWritten(id));
     }
 
     public void test11Error() throws Exception
     {
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, m_lastError));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, false, m_lastError));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, true, m_lastError));
     }
 
     public void test21ErrorThenStopBeforeWrite() throws Exception
@@ -311,8 +370,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
         int id = 21;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id);
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, false, inputText));
         assertFalse("did a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, true, inputText));
+        assertTrue("skipped an interactive post-error write", checkIfWritten(id));
     }
 
     public void test31ErrorThenStopBeforeWriteOrError() throws Exception
@@ -320,14 +381,17 @@ public class TestSqlCmdErrorHandling extends TestCase {
         int id = 31;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = m_lastError + writeCommand(id) + m_lastError;
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, false, inputText));
         assertFalse("did a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, true, inputText));
+        assertTrue("skipped an interactive post-error write", checkIfWritten(id));
     }
 
     public void test41BadWrite() throws Exception
     {
         String inputText = badWriteCommand();
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, false, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, true, inputText));
     }
 
     public void test51BadWriteThenStopBeforeWrite() throws Exception
@@ -335,8 +399,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
         int id = 51;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badWriteCommand() + writeCommand(id);
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, false, inputText));
         assertFalse("did a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, true, inputText));
+        assertTrue("skipped an interactive post-error write", checkIfWritten(id));
     }
 
     public void test61BadFileStoppedBeforeWrite() throws Exception
@@ -344,8 +410,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
         int id = 61;
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badFileCommand() + writeCommand(id);
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, false, inputText));
         assertFalse("did a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, true, inputText));
+        assertTrue("skipped an interactive post-error write", checkIfWritten(id));
     }
 
     public void test71BadNestedFileStoppedBeforeWrites() throws Exception
@@ -356,9 +424,12 @@ public class TestSqlCmdErrorHandling extends TestCase {
         String inputText = badFileCommand() + writeCommand( -id);
         String filename = createFileWithContent(inputText);
         inputText = "file '" + filename + "';\n" + writeCommand(id);
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, false, inputText));
         assertFalse("did a file-scripted post-error write", checkIfWritten( -id));
         assertFalse("did a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, true, inputText));
+        assertFalse("did a file-scripted post-error write", checkIfWritten( -id));
+        assertTrue("skipped an interactive post-error write", checkIfWritten(id));
     }
 
     // The point here is not so much the --stop-on-first-error behavior,
@@ -366,7 +437,7 @@ public class TestSqlCmdErrorHandling extends TestCase {
     //TODO: Unclear at this point is what advantage sqlcmd's custom handling has
     // over an alternative dumbed-down approach that let the server sort out the
     // parameter conversions and validations. Any known cases where sqlcmd does
-    // this better or differently than the server would be expected to are
+    // this better or differently than the server would be expected to be
     // good candidates for testing here so that if anyone messes with this code
     // we will at least know it is time to "release note" the change.
     public void test101BadExecsThenStopBeforeWrite() throws Exception
@@ -386,8 +457,10 @@ public class TestSqlCmdErrorHandling extends TestCase {
     {
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = badExecCommand(type, id, badValue) + writeCommand(id);
-        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, inputText));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, false, inputText));
         assertFalse("did a post-error write", checkIfWritten(id));
+        assertEquals("sqlcmd did not fail as expected", 255, callSQLcmd(true, true, inputText));
+        assertTrue("skipped an interactive post-error write", checkIfWritten(id));
     }
 
     public void test125ExecWithNulls() throws Exception
@@ -402,7 +475,9 @@ public class TestSqlCmdErrorHandling extends TestCase {
     private void subtestExecWithNull(String type, int id) throws Exception {
         assertFalse("pre-condition violated", checkIfWritten(id));
         String inputText = execWithNullCommand(type, id);
-        assertEquals("sqlcmd was expected to succeed, but failed", 0, callSQLcmd(true, inputText));
+        assertEquals("sqlcmd was expected to succeed, but failed", 0, callSQLcmd(true, false, inputText));
+        assertTrue("did not write row as expected", checkIfWritten(id));
+        assertEquals("sqlcmd was expected to succeed, but failed", 0, callSQLcmd(true, true, inputText));
         assertTrue("did not write row as expected", checkIfWritten(id));
     }
 }
