@@ -28,9 +28,8 @@ void TempTableLimits::reduceAllocated(int bytes)
 {
     m_currMemoryInBytes -= bytes;
     char msg[1024];
-    snprintf(msg, sizeof(msg), "%lld bytes of temp table memory used while executing SQL.\n", m_currMemoryInBytes);
-    std::cout << msg;
-    std::cout.flush();
+    snprintf(msg, sizeof(msg), "%d bytes of temp table memory used while executing SQL.", (int )m_currMemoryInBytes);
+    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
     if (m_currMemoryInBytes < m_logThreshold) {
         m_logLatch = false;
     }
@@ -40,12 +39,10 @@ void TempTableLimits::increaseAllocated(int bytes)
 {
     m_currMemoryInBytes += bytes;
     char msg[1024];
-    snprintf(msg, sizeof(msg), "%lld bytes of temp table memory used while executing SQL.\n", m_currMemoryInBytes);
-    std::cout << msg;
-    std::cout.flush();
+    snprintf(msg, sizeof(msg), "%d bytes of temp table memory used while executing SQL.", (int )m_currMemoryInBytes);
+    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_INFO, msg);
     if (m_memoryLimit > 0 && m_currMemoryInBytes > m_memoryLimit) {
         int limit_mb = static_cast<int>(m_memoryLimit / (1024 * 1024));
-        char msg[1024];
         snprintf(msg, 1024,
                  "More than %d MB of temp table memory used while executing SQL.  Aborting.",
                  limit_mb);
