@@ -136,7 +136,8 @@ public class ScanDeterminizer {
         }
 
         // make an index node from the scan node
-        IndexScanPlanNode indexScanNode = new IndexScanPlanNode(scanNode, null, indexToScan, SortDirectionType.ASC);
+        IndexScanPlanNode indexScanNode = new IndexScanPlanNode(scanNode, null,
+                indexToScan, SortDirectionType.ASC);
         indexScanNode.setForDeterminismOnly();
 
         return indexScanNode;

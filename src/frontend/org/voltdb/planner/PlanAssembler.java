@@ -2309,14 +2309,31 @@ public class PlanAssembler {
             return root;
         }
 
-        IndexScanPlanNode indexScanNode = new IndexScanPlanNode(
+        Collection<AbstractExpression> allExprs = ExpressionUtil.uncombineAny(root.getPredicate());
+        StmtTableScan tableScan = root.getTableScan();
+        AccessPath path = SubPlanAssembler.getRelevantAccessPathForIndex(tableScan,
+                allExprs, pickedUpIndex, null);
+        AbstractPlanNode planNode;
+        if (path == null) {
+            // The index did not optimize any predicates, just create a generic
+            // index scan just for its ordering effect.
+            planNode = new IndexScanPlanNode(
                 root, null, pickedUpIndex, SortDirectionType.INVALID);
-        indexScanNode.setForGroupingOnly();
-        indexScanNode.setBindings(maxCoveredBindings);
-
+        }
+        else {
+            // In addition to providing ordering, the index can also optimize one
+            // or more predicates,
+            // so initialize a more detailed (lower estimated cost) index scan.
+            planNode = SubPlanAssembler.getIndexAccessPlanForTable(tableScan, path);
+        }
+        if (planNode instanceof IndexScanPlanNode) {
+            IndexScanPlanNode indexScanNode = (IndexScanPlanNode) planNode;
+            indexScanNode.setForGroupingOnly();
+            indexScanNode.setBindings(maxCoveredBindings);
+        }
         gbInfo.m_coveredGroupByColumns = maxCoveredGroupByColumns;
         gbInfo.m_canBeFullySerialized = foundAllGroupByCoveredIndex;
-        return indexScanNode;
+        return planNode;
     }
 
     private List<Integer> calculateGroupbyColumnsCovered(Index index, String fromTableAlias,

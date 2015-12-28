@@ -95,9 +95,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
     public void testInlineSerialAgg_noGroupBy_special() {
       AbstractPlanNode p;
       pns = compileToFragments("SELECT AVG(A1) from T1");
-      for (AbstractPlanNode apn: pns) {
-          //* enable to debug */ System.out.println(apn.toExplainPlanString());
-      }
+      //* enable to debug */ printExplainPlan(pns);
       p = pns.get(0).getChild(0);
       assertTrue(p instanceof ProjectionPlanNode);
       assertTrue(p.getChild(0) instanceof AggregatePlanNode);
@@ -120,6 +118,7 @@ public class TestPlansGroupBy extends PlannerTestCase {
      * This could be implemented some day.
      */
     public void testAggregateOptimizationWithIndex() {
+        System.out.println("Testing AggregateOptimizationWithIndex");
         AbstractPlanNode p;
         pns = compileToFragments("SELECT A, count(B) from R2 where B > 2 group by A;");
         assertEquals(1, pns.size());
@@ -170,6 +169,26 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertNotNull(p.getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE));
         assertTrue(p.toExplainPlanString().contains("COL_F_TREE1"));
 
+        // Partition IndexScan with HASH aggregate is optimized to use Serial aggregate -
+        // index (F_D3, F_D2) is preferred over (F_D3) because it covers all of the GROUP BY columns
+        pns = compileToFragments("SELECT F_D3, F_D2, MAX(F_VAL3) FROM F WHERE F_D3 = 0 GROUP BY F_D2, F_D3");
+        /* enable to debug */ printExplainPlan(pns);
+        assertEquals(2, pns.size());
+        p = pns.get(1).getChild(0);
+        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
+        /* enable to debug */ System.out.println(p.toExplainPlanString());
+        /* pending fix for ENG-6586 */ assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        /* pending fix for ENG-6586 */ assertTrue(p.toExplainPlanString().contains("COL_F_TREE4"));
+
+        // repeat with an inequality
+        pns = compileToFragments("SELECT F_D3, F_D2, MAX(F_VAL3) FROM F WHERE F_D3 < 0 GROUP BY F_D2, F_D3");
+        assertEquals(2, pns.size());
+        p = pns.get(1).getChild(0);
+        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
+        /* enable to debug */ System.out.println(p.toExplainPlanString());
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("COL_F_TREE4"));
+
         // IndexScan with HASH aggregate is optimized to use Serial aggregate -
         // index (F_VAL1, F_VAL2) covers all of the GROUP BY columns
         pns = compileToFragments("SELECT F_VAL1, F_VAL2, MAX(F_VAL3) FROM RF WHERE F_VAL1 > 0 GROUP BY F_VAL2, F_VAL1");
@@ -178,6 +197,24 @@ public class TestPlansGroupBy extends PlannerTestCase {
         assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
         assertTrue(p.toExplainPlanString().contains("COL_RF_TREE2"));
+
+        // IndexScan with HASH aggregate is optimized to use Serial aggregate -
+        // index (F_D3, F_D2) is preferred over (F_D3) because it covers all of the GROUP BY columns
+        pns = compileToFragments("SELECT F_D3, F_D2, MAX(F_VAL3) FROM RF WHERE F_D3 = 0 GROUP BY F_D2, F_D3");
+        /* enable to debug */ printExplainPlan(pns);
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
+        /* pending fix for ENG-6586 */ assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        /* pending fix for ENG-6586 */ assertTrue(p.toExplainPlanString().contains("COL_RF_TREE4"));
+
+        // repeat with an inequality
+        pns = compileToFragments("SELECT F_D3, F_D2, MAX(F_VAL3) FROM RF WHERE F_D3 > 0 GROUP BY F_D2, F_D3");
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("COL_RF_TREE4"));
 
         // IndexScan with HASH aggregate remains not optimized -
         // The first column index (F_VAL1, F_VAL2) is not part of the GROUP BY
@@ -215,7 +252,9 @@ public class TestPlansGroupBy extends PlannerTestCase {
         p = p.getChild(0);
         assertTrue(p instanceof SeqScanPlanNode);
         assertNotNull(p.getInlinePlanNode(PlanNodeType.HASHAGGREGATE));
-    }
+
+        System.out.println("Finished AggregateOptimizationWithIndex");
+}
 
     public void testCountStar() {
         pns = compileToFragments("SELECT count(*) from T1");
@@ -1237,18 +1276,14 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
     private void checkMVFixWithWhere(String sql, String aggFilter, String scanFilter) {
         pns = compileToFragments(sql);
-        for (AbstractPlanNode apn: pns) {
-            //* enable to debug */ System.out.println(apn.toExplainPlanString());
-        }
+        //* enable to debug */ printExplainPlan(pns);
         checkMVFixWithWhere( aggFilter == null? null: new String[] {aggFilter},
                     scanFilter == null? null: new String[] {scanFilter});
     }
 
     private void checkMVFixWithWhere(String sql, Object aggFilters[]) {
         pns = compileToFragments(sql);
-        for (AbstractPlanNode apn: pns) {
-            //* enable to debug */ System.out.println(apn.toExplainPlanString());
-        }
+        //* enable to debug */ printExplainPlan(pns);
         checkMVFixWithWhere(aggFilters, null);
     }
 

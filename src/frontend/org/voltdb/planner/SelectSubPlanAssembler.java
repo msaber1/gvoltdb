@@ -272,12 +272,17 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             generateOuterAccessPaths((BranchNode)joinNode);
             generateInnerAccessPaths((BranchNode)joinNode);
             // An empty access path for the root
-            joinNode.m_accessPaths.add(new AccessPath());
+            joinNode.addAccessPath(new AccessPath());
             return;
         }
+
+        List<ParsedColInfo> orderByColumns = null;
+        if (m_parsedStmt.hasOrderByColumns()) {
+            orderByColumns = m_parsedStmt.orderByColumns();
+        }
         // This is a select from a single table
-        joinNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(joinNode.getTableScan(),
-                joinNode.m_joinInnerList, joinNode.m_whereInnerList, null));
+        addAllRelevantAccessPathsForTable(joinNode,
+                joinNode.m_joinInnerList, joinNode.m_whereInnerList, null, orderByColumns);
     }
 
     /**
@@ -298,14 +303,16 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             generateOuterAccessPaths((BranchNode)outerChildNode);
             generateInnerAccessPaths((BranchNode)outerChildNode);
             // The join node can have only sequential scan access
-            outerChildNode.m_accessPaths.add(getRelevantNaivePath(joinOuterList,
+            outerChildNode.addAccessPath(getRelevantNaivePath(joinOuterList,
                     parentNode.m_whereOuterList));
-            assert(outerChildNode.m_accessPaths.size() > 0);
             return;
         }
-        outerChildNode.m_accessPaths.addAll(
-                getRelevantAccessPathsForTable(outerChildNode.getTableScan(),
-                        joinOuterList, parentNode.m_whereOuterList, null));
+        List<ParsedColInfo> orderByColumns = null;
+        if (m_parsedStmt.hasOrderByColumns()) {
+            orderByColumns = m_parsedStmt.orderByColumns();
+        }
+        addAllRelevantAccessPathsForTable(outerChildNode,
+                joinOuterList, parentNode.m_whereOuterList, null, orderByColumns);
     }
 
     /**
@@ -330,16 +337,19 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             generateOuterAccessPaths((BranchNode)innerChildNode);
             generateInnerAccessPaths((BranchNode)innerChildNode);
             // The inner node is a join node itself. Only naive access path is possible
-            innerChildNode.m_accessPaths.add(
+            innerChildNode.addAccessPath(
                     getRelevantNaivePath(parentNode.m_joinInnerOuterList, parentNode.m_joinInnerList));
             return;
         }
 
         // The inner table can have multiple index access paths based on
         // inner and inner-outer join expressions plus the naive one.
-        innerChildNode.m_accessPaths.addAll(
-                getRelevantAccessPathsForTable(innerChildNode.getTableScan(),
-                        parentNode.m_joinInnerOuterList, parentNode.m_joinInnerList, null));
+        List<ParsedColInfo> orderByColumns = null;
+        if (m_parsedStmt.hasOrderByColumns()) {
+            orderByColumns = m_parsedStmt.orderByColumns();
+        }
+        addAllRelevantAccessPathsForTable(innerChildNode,
+                        parentNode.m_joinInnerOuterList, parentNode.m_joinInnerList, null, orderByColumns);
 
         // If there are inner expressions AND inner-outer expressions, it could be that there
         // are indexed access paths that use elements of both in the indexing expressions,
@@ -387,13 +397,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     innerOuterAccessPaths.add(innerAccessPath);
                 }
             }
-            Collection<AccessPath> nljAccessPaths =
-                    getRelevantAccessPathsForTable(innerChildNode.getTableScan(),
-                                                   null,
-                                                   parentNode.m_joinInnerList,
-                                                   parentNode.m_joinInnerOuterList);
             innerChildNode.m_accessPaths.clear();
-            innerChildNode.m_accessPaths.addAll(nljAccessPaths);
+            addAllRelevantAccessPathsForTable(innerChildNode,
+                    null,
+                    parentNode.m_joinInnerList,
+                    parentNode.m_joinInnerOuterList, orderByColumns);
             innerChildNode.m_accessPaths.addAll(innerOuterAccessPaths);
         }
 

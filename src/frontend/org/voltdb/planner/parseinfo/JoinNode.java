@@ -56,7 +56,7 @@ public abstract class JoinNode implements Cloneable {
     public final ArrayList<AbstractExpression> m_whereInnerOuterList = new ArrayList<AbstractExpression>();
 
     // All possible access paths for this node
-    public List<AccessPath> m_accessPaths = new ArrayList<AccessPath>();
+    public final List<AccessPath> m_accessPaths = new ArrayList<AccessPath>();
     // Access path under the evaluation
     public AccessPath m_currentAccessPath = null;
 
@@ -105,6 +105,10 @@ public abstract class JoinNode implements Cloneable {
 
     public void setWhereExpression(AbstractExpression expr) {
         m_whereExpr = expr;
+    }
+
+    public void addAccessPath(AccessPath path) {
+        m_accessPaths.add(path);
     }
 
     /// For debug purposes:

@@ -443,8 +443,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public void addEndExpression(AbstractExpression newExpr)
     {
-        if (newExpr != null)
-        {
+        if (newExpr != null) {
             List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombine(m_endExpression);
             newEndExpressions.add((AbstractExpression)newExpr.clone());
             m_endExpression = ExpressionUtil.combine(newEndExpressions);
@@ -458,8 +457,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public void addSearchKeyExpression(AbstractExpression expr)
     {
-        if (expr != null)
-        {
+        if (expr != null) {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
@@ -661,7 +659,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         }
 
-        LimitPlanNode limit = (LimitPlanNode)m_inlineNodes.get(PlanNodeType.LIMIT);
+        LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
         if (limit != null) {
             int limitInt = limit.getLimit();
             if (limitInt == -1) {
@@ -677,6 +675,23 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             }
         }
 
+        // Need a small tie-breaker for different indexes that enable faster aggs.
+        if (getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null) {
+            m_estimatedProcessedTupleCount += 300;
+        }
+        else if (getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE) != null) {
+            m_estimatedProcessedTupleCount += 200;
+        }
+        else {
+            AggregatePlanNode serial = (AggregatePlanNode) getInlinePlanNode(PlanNodeType.AGGREGATE);
+            if (serial != null) {
+                // Table-wide agg has 1 result column.
+                if (serial.getGroupByExpressions().isEmpty()) {
+                    m_estimatedOutputTupleCount = 1;
+                }
+                m_estimatedProcessedTupleCount += 100;
+            }
+        }
     }
 
     @Override

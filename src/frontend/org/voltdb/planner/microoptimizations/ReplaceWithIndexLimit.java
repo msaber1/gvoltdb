@@ -140,7 +140,9 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 // and replace the SEQSCAN node with it
                 // 2. we know which end row we want to fetch, so it's safe to
                 // specify sorting direction here
-                IndexScanPlanNode ispn = new IndexScanPlanNode((SeqScanPlanNode) child, aggplan, ret, sortDirection);
+                SeqScanPlanNode childSeqScan = (SeqScanPlanNode) child;
+                IndexScanPlanNode ispn = new IndexScanPlanNode(childSeqScan,
+                        aggplan, ret, sortDirection);
                 ispn.setBindings(bindings);
                 assert(ispn.getSearchKeyExpressions().size() == 0);
                 if (sortDirection == SortDirectionType.ASC) {

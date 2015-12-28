@@ -25,7 +25,6 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -66,7 +65,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         new ArrayList<AbstractExpression>();
 
     // At the moment these are guaranteed to be TVES.  This might always be true
-    protected List<AbstractExpression> m_groupByExpressions
+    protected final List<AbstractExpression> m_groupByExpressions
         = new ArrayList<AbstractExpression>();
 
     // This list is only used for the special case of instances of PartialAggregatePlanNode.

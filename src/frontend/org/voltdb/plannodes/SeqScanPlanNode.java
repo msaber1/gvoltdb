@@ -101,6 +101,29 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
         // here to make sure that SeqScanPlanNode never gains an unfair advantage over IndexScanPlanNode.
         m_estimatedProcessedTupleCount = tableEstimates.maxTuples;
         m_estimatedOutputTupleCount = tableEstimates.maxTuples;
+
+        // Need a small added cost for inline aggs
+        // to stay ahead of all indexscan costs.
+        if (getInlinePlanNode(PlanNodeType.HASHAGGREGATE) != null) {
+            m_estimatedProcessedTupleCount += 300;
+        }
+        // Actually, until the order of subquery results is recognized as something
+        // that can be leveraged in the parent query, there will be no use case for
+        // PARTIAL aggregation after a seq scan, but handling that case here just to
+        // be consistent with the index scan code and a little more future-proof.
+        else if (getInlinePlanNode(PlanNodeType.PARTIALAGGREGATE) != null) {
+            m_estimatedProcessedTupleCount += 200;
+        }
+        else {
+            AggregatePlanNode serial = (AggregatePlanNode) getInlinePlanNode(PlanNodeType.AGGREGATE);
+            if (serial != null) {
+                // Table-wide agg has 1 result column.
+                if (serial.getGroupByExpressions().isEmpty()) {
+                    m_estimatedOutputTupleCount = 1;
+                }
+                m_estimatedProcessedTupleCount += 100;
+            }
+        }
     }
 
     @Override

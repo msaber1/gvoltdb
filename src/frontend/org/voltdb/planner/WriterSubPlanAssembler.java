@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.ArrayDeque;
+import java.util.List;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -79,10 +80,14 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             // into the WHERE list.
             tableNode.m_whereInnerList.addAll(tableNode.m_joinInnerList);
             tableNode.m_joinInnerList.clear();
-            tableNode.m_accessPaths.addAll(getRelevantAccessPathsForTable(tableNode.getTableScan(),
+            List<ParsedColInfo> orderByColumns = null;
+            if (m_parsedStmt.hasOrderByColumns()) {
+                orderByColumns = m_parsedStmt.orderByColumns();
+            }
+            addAllRelevantAccessPathsForTable(tableNode,
                     null,
                     tableNode.m_whereInnerList,
-                    null));
+                    null, orderByColumns);
 
             for (AccessPath path : tableNode.m_accessPaths) {
                 tableNode.m_currentAccessPath = path;

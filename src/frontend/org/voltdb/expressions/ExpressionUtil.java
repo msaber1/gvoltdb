@@ -125,7 +125,7 @@ public abstract class ExpressionUtil {
      * Convert one or more predicates, potentially in an arbitrarily nested conjunction tree
      * into a flattened collection. Similar to uncombine but for arbitrary tree shapes and with no
      * guarantee of the result collection type or of any ordering within the collection.
-     * In fact, it currently fills an ArrayDeque via a left=to-right breadth first traversal,
+     * In fact, it currently fills an ArrayDeque via a left-to-right breadth first traversal,
      * but for no particular reason, so that's all subject to change.
      * @param expr
      * @return a Collection containing expr or if expr is a conjunction, its top-level non-conjunction

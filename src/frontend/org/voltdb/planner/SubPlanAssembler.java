@@ -112,17 +112,16 @@ public abstract class SubPlanAssembler {
      * Generate all possible access paths for given sets of join and filter expressions for a table.
      * The list includes the naive (scan) pass and possible index scans
      *
-     * @param table Table to generate access pass for
+     * @param joinNode provides the table to scan and the list of paths to append to.
      * @param joinExprs join expressions this table is part of
      * @param filterExprs filter expressions this table is part of
      * @param postExprs post expressions this table is part of
-     * @return List of valid access paths
      */
-    protected ArrayList<AccessPath> getRelevantAccessPathsForTable(StmtTableScan tableScan,
-                                                                   List<AbstractExpression> joinExprs,
-                                                                   List<AbstractExpression> filterExprs,
-                                                                   List<AbstractExpression> postExprs) {
-        ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
+    protected static void addAllRelevantAccessPathsForTable(JoinNode joinNode,
+            List<AbstractExpression> joinExprs,
+            List<AbstractExpression> filterExprs,
+            List<AbstractExpression> postExprs,
+            List<ParsedColInfo> orderByColumns) {
         List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
         List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
         // add the empty seq-scan access path
@@ -138,48 +137,43 @@ public abstract class SubPlanAssembler {
         }
 
         AccessPath naivePath = getRelevantNaivePath(allJoinExprs, filterExprs);
-        paths.add(naivePath);
+        joinNode.addAccessPath(naivePath);
 
+        StmtTableScan tableScan = joinNode.getTableScan();
         Collection<Index> indexes = tableScan.getIndexes();
         for (Index index : indexes) {
-            AccessPath path = getRelevantAccessPathForIndex(tableScan, allExprs, index);
-            if (path != null) {
-                assert (path.index != null);
-                if (!path.index.getPredicatejson().isEmpty()) {
-                    // One more check for partial indexes to make sure the index predicate is
-                    // completely covered by the query expressions.
-                    // Process the index WHERE clause into a list of anded sub-expressions and process each expression
-                    // separately searching the query (or matview) for a covering expression for each of these expressions.
-                    // All index WHERE sub-expressions must be covered to enable the index.
-                    // For optimization purposes, keep track of the covering (query) expressions that exactly match the
-                    // covered index sub-expression. They can be eliminated from the post-filter expressions.
-                    List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
-                    if (isPartialIndexPredicateIsCovered(tableScan, allExprs, path.index, exactMatchCoveringExprs)) {
-                        filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
-                    } else {
-                        path = null;
-                    }
-                }
-            } else if (!index.getPredicatejson().isEmpty()) {
+            AccessPath path = getRelevantAccessPathForIndex(tableScan, allExprs, index, orderByColumns);
+            if (!index.getPredicatejson().isEmpty()) {
                 // Partial index can be used solely to eliminate a post-filter
-                // even when the indexed columns are irrelevant
+                // even when the indexed columns are irrelevant.
+                AccessPath partialIndexPath = (path !=null) ? path : getRelevantNaivePath(allJoinExprs, filterExprs);
+                // Check that any partial index predicate is
+                // completely covered by the query expressions.
+                // Process the index WHERE clause into a list of anded sub-expressions and process each expression
+                // separately searching the query (or matview) for a covering expression for each of these expressions.
+                // All index WHERE sub-expressions must be covered to enable the index.
+                // For optimization purposes, keep track of the covering (query) expressions that exactly match the
+                // covered index sub-expression. They can be eliminated from the post-filter expressions.
                 List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
-                if (isPartialIndexPredicateIsCovered(tableScan, allExprs, index, exactMatchCoveringExprs)) {
-                    path = getRelevantNaivePath(allJoinExprs, filterExprs);
-                    filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
-                    path.index = index;
-                    path.lookupType = IndexLookupType.GTE;
+                if ( ! isPartialIndexPredicateIsCovered(tableScan, allExprs, index, exactMatchCoveringExprs)) {
+                    continue;
+                }
+                filterPostPredicateForPartialIndex(partialIndexPath, exactMatchCoveringExprs);
+                if (partialIndexPath != path) {
+                    partialIndexPath.index = index;
+                    partialIndexPath.lookupType = IndexLookupType.GTE;
+                    path = partialIndexPath;
                 }
             }
-            if (path != null) {
-                if (postExprs != null) {
-                    path.joinExprs.addAll(postExprs);
-                }
-                paths.add(path);
+            if (path == null) {
+                continue;
             }
+            assert (path.index == index);
+            if (postExprs != null) {
+                path.joinExprs.addAll(postExprs);
+            }
+            joinNode.addAccessPath(path);
         }
-
-        return paths;
     }
 
     /**
@@ -266,7 +260,8 @@ public abstract class SubPlanAssembler {
         AbstractExpression indexPredicate = null;
         try {
             indexPredicate = AbstractExpression.fromJSONString(predicatejson, tableScan);
-        } catch (JSONException e) {
+        }
+        catch (JSONException e) {
             e.printStackTrace();
             assert(false);
             return false;
@@ -314,15 +309,17 @@ public abstract class SubPlanAssembler {
      * @param index The index we want to use to access the data.
      * @return A valid access path using the data or null if none found.
      */
-    protected AccessPath getRelevantAccessPathForIndex(StmtTableScan tableScan, List<AbstractExpression> exprs, Index index)
+    static AccessPath getRelevantAccessPathForIndex(StmtTableScan tableScan,
+            Collection<AbstractExpression> exprs,
+            Index index,
+            List<ParsedColInfo> orderByColumns)
     {
         if (tableScan instanceof StmtTargetTableScan == false) {
             return null;
         }
 
-        // we copy the expressions to a new list because that we will remove expression from the list
-        List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
-        filtersToCover.addAll(exprs);
+        // Copy the expression collection into a mutable list for later pruning
+        List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>(exprs);
 
         String exprsjson = index.getExpressionsjson();
         // This list remains null if the index is just on simple columns.
@@ -342,13 +339,15 @@ public abstract class SubPlanAssembler {
             for (ColumnRef cr : indexedColRefs) {
                 indexedColIds[ii++] = cr.getColumn().getIndex();
             }
-        } else {
+        }
+        else {
             try {
                 // This MAY want to happen once when the plan is loaded from the catalog
                 // and cached in a sticky cached index-to-expressions map?
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
                 keyComponentCount = indexedExprs.size();
-            } catch (JSONException e) {
+            }
+            catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
                 return null;
@@ -367,9 +366,12 @@ public abstract class SubPlanAssembler {
         // provisional; it can be undone later in this function as new info comes to light.
         int orderSpoilers[] = new int[keyComponentCount];
         List<AbstractExpression> bindingsForOrder = new ArrayList<AbstractExpression>();
-        int nSpoilers = determineIndexOrdering(tableScan, keyComponentCount,
+        int nSpoilers = 0;
+        if (orderByColumns != null) {
+            nSpoilers = determineIndexOrdering(orderByColumns, tableScan, keyComponentCount,
                                                indexedExprs, indexedColRefs,
                                                retval, orderSpoilers, bindingsForOrder);
+        }
 
         // Use as many covering indexed expressions as possible to optimize comparator expressions that can use them.
 
@@ -403,7 +405,8 @@ public abstract class SubPlanAssembler {
         for ( ; (coveredCount < keyComponentCount) && ! filtersToCover.isEmpty(); ++coveredCount) {
             if (indexedExprs == null) {
                 coveringColId = indexedColIds[coveredCount];
-            } else {
+            }
+            else {
                 coveringExpr = indexedExprs.get(coveredCount);
             }
             // Equality filters get first priority.
@@ -583,7 +586,8 @@ public abstract class SubPlanAssembler {
             retval.bindings.addAll(startingBoundExpr.getBindings());
             if (lowerBoundExpr.getExpressionType() == ExpressionType.COMPARE_GREATERTHAN) {
                 retval.lookupType = IndexLookupType.GT;
-            } else {
+            }
+            else {
                 assert(lowerBoundExpr.getExpressionType() == ExpressionType.COMPARE_GREATERTHANOREQUALTO);
                 retval.lookupType = IndexLookupType.GTE;
             }
@@ -621,7 +625,8 @@ public abstract class SubPlanAssembler {
                         for (int ii = coveredCount + 1; ii < keyComponentCount; ++ii) {
                             if (indexedExprs == null) {
                                 coveringColId = indexedColIds[ii];
-                            } else {
+                            }
+                            else {
                                 coveringExpr = indexedExprs.get(ii);
                             }
                             // Equality filters get first priority.
@@ -647,7 +652,8 @@ public abstract class SubPlanAssembler {
                             retval.lookupType = IndexLookupType.LTE;
                         }
 
-                    } else {
+                    }
+                    else {
                         // set forward scan.
                         retval.sortDirection = SortDirectionType.INVALID;
                     }
@@ -668,12 +674,14 @@ public abstract class SubPlanAssembler {
                 if (retval.lookupType == IndexLookupType.EQ) {
                     retval.lookupType = IndexLookupType.GTE;
                 }
-            } else {
+            }
+            else {
                 // Optimizable to use reverse scan.
                 // only do reverse scan optimization when no lowerBoundExpr and lookup type is either < or <=.
                 if (upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHAN) {
                     retval.lookupType = IndexLookupType.LT;
-                } else {
+                }
+                else {
                     assert upperBoundComparator.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO;
                     retval.lookupType = IndexLookupType.LTE;
                 }
@@ -688,7 +696,8 @@ public abstract class SubPlanAssembler {
                     newComparator.getLeft().setLeft(upperBoundComparator.getLeft());
                     newComparator.finalizeValueTypes();
                     retval.otherExprs.add(newComparator);
-                } else {
+                }
+                else {
                     int lastIdx = retval.indexExprs.size() -1;
                     retval.indexExprs.remove(lastIdx);
 
@@ -733,7 +742,8 @@ public abstract class SubPlanAssembler {
                     // adjust the start of a reverse iteration after it had to initially settle
                     // for starting at "greater than a prefix key".
                     retval.initialExpr.addAll(retval.indexExprs);
-                } else {
+                }
+                else {
                     retval.lookupType = IndexLookupType.GTE;
                 }
             }
@@ -847,7 +857,7 @@ public abstract class SubPlanAssembler {
      * contain values that are constrained by the WHERE clause to be equal to constants or parameters
      * and the other ORDER BY columns match the index key components in the usual way.
      * Such a case will simply fail to match, here, possibly resulting in suboptimal plans that
-     * make unneccesary use of ORDER BY plan nodes, and possibly even use sequential scan plan nodes.
+     * make unnecessary use of ORDER BY plan nodes, and possibly even use sequential scan plan nodes.
      * The rationale for not complicating this code to handle that case is that the case should be
      * detected by a statement pre-processor that simplifies the ORDER BY clause prior to any
      * "scan planning".
@@ -871,87 +881,85 @@ public abstract class SubPlanAssembler {
      * is currently ALWAYS wasted, and in the future, would continue to be wasted effort for the
      * majority of index scans that do not fall into one of the narrow special cases just described.
      *
-     * @param table              only used here to validate base table names of ORDER BY columns' .
-     * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
-     *                           any ordering optimization determined here
+     * @param tableScan          only used here to validate base table aliases of ORDER BY columns
      * @param keyComponentCount  the length of indexedExprs or indexedColRefs,
      *                           ONE of which must be valid
      * @param indexedExprs       expressions for key components in the general case
      * @param indexedColRefs     column references for key components in the simpler case
-     * @param retval the eventual result of getRelevantAccessPathForIndex,
-     *               the bearer of a (tentative) sortDirection determined here
+     * @param resultPath         the eventual result of getRelevantAccessPathForIndex,
+     *                           the bearer of a (tentative) sortDirection determined here
      * @param orderSpoilers      positions of key components which MAY invalidate the tentative
      *                           sortDirection
-     * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to the
+     * @param bindingsForOrder   restrictions on parameter settings that are prerequisite to
      *                           any ordering optimization determined here
      * @return the number of discovered orderSpoilers that will need to be recovered from,
      *         to maintain the established sortDirection - always 0 if no sort order was determined.
      */
-    private int determineIndexOrdering(StmtTableScan tableScan, int keyComponentCount,
+    private static int determineIndexOrdering(List<ParsedColInfo> orderByColumns,
+            StmtTableScan tableScan, int keyComponentCount,
             List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs,
-            AccessPath retval, int[] orderSpoilers,
+            AccessPath resultPath, int[] orderSpoilers,
             List<AbstractExpression> bindingsForOrder)
     {
-        if (!m_parsedStmt.hasOrderByColumns()
-                || m_parsedStmt.orderByColumns().isEmpty()) {
+        int countOrderBys = orderByColumns.size();
+        // There need to be enough indexed expressions to provide full sort coverage.
+        if (countOrderBys == 0 || countOrderBys > keyComponentCount) {
             return 0;
         }
         int nSpoilers = 0;
-        int countOrderBys = m_parsedStmt.orderByColumns().size();
-        // There need to be enough indexed expressions to provide full sort coverage.
-        if (countOrderBys > 0 && countOrderBys <= keyComponentCount) {
-            boolean ascending = m_parsedStmt.orderByColumns().get(0).ascending;
-            retval.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
-            int jj = 0;
-            for (ParsedColInfo colInfo : m_parsedStmt.orderByColumns()) {
-                // This retry loop allows catching special cases that don't perfectly match the
-                // ORDER BY columns but may still be usable for ordering.
-                for ( ; jj < keyComponentCount; ++jj) {
-                    if (colInfo.ascending == ascending) {
-                        // Explicitly advance to the each indexed expression/column
-                        // to match them with the query's "ORDER BY" expressions.
-                        if (indexedExprs == null) {
-                            ColumnRef nextColRef = indexedColRefs.get(jj);
-                            if (colInfo.expression instanceof TupleValueExpression &&
-                                colInfo.tableAlias.equals(tableScan.getTableAlias()) &&
-                                colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
-                                break;
-                            }
-                        } else {
-                            assert(jj < indexedExprs.size());
-                            AbstractExpression nextExpr = indexedExprs.get(jj);
-                            List<AbstractExpression> moreBindings =
-                                colInfo.expression.bindingToIndexedExpression(nextExpr);
-                            // Non-null bindings (even an empty list) denotes a match.
-                            if (moreBindings != null) {
-                                bindingsForOrder.addAll(moreBindings);
-                                break;
-                            }
+        boolean ascending = orderByColumns.get(0).ascending;
+        resultPath.sortDirection = ascending ? SortDirectionType.ASC : SortDirectionType.DESC;
+        int jj = 0;
+        for (ParsedColInfo colInfo : orderByColumns) {
+            // This retry loop allows catching special cases that don't perfectly match the
+            // ORDER BY columns but may still be usable for ordering.
+            for ( ; jj < keyComponentCount; ++jj) {
+                if (colInfo.ascending == ascending) {
+                    // Explicitly advance to each indexed expression/column
+                    // to match them with the query's "ORDER BY" expressions.
+                    if (indexedExprs == null) {
+                        ColumnRef nextColRef = indexedColRefs.get(jj);
+                        if (colInfo.expression instanceof TupleValueExpression &&
+                            colInfo.tableAlias.equals(tableScan.getTableAlias()) &&
+                            colInfo.columnName.equals(nextColRef.getColumn().getTypeName())) {
+                            break;
                         }
                     }
-                    // The ORDER BY column did not match the established ascending/descending
-                    // pattern OR did not match the next index key component.
-                    // The only hope for the sort being preserved is that
-                    // (A) the ORDER BY column matches a later index key component
-                    // -- so keep searching -- AND
-                    // (B) the current (and each intervening) index key component is constrained
-                    // to a single value, i.e. it is equality-filtered.
-                    // -- so note the current component's position (jj).
-                    orderSpoilers[nSpoilers++] = jj;
+                    else {
+                        assert(jj < indexedExprs.size());
+                        AbstractExpression nextExpr = indexedExprs.get(jj);
+                        List<AbstractExpression> moreBindings =
+                            colInfo.expression.bindingToIndexedExpression(nextExpr);
+                        // Non-null bindings (even an empty list) denotes a match.
+                        if (moreBindings != null) {
+                            bindingsForOrder.addAll(moreBindings);
+                            break;
+                        }
+                    }
                 }
-                if (jj < keyComponentCount) {
-                    // The loop exited prematurely.
-                    // That means the current ORDER BY column matched the current key component,
-                    // so move on to the next key component (to match the next ORDER BY column).
-                    ++jj;
-                } else {
-                    // The current ORDER BY column ran out of key components to try to match.
-                    // This is an outright failure case.
-                    retval.sortDirection = SortDirectionType.INVALID;
-                    bindingsForOrder.clear(); // suddenly irrelevant
-                    return 0;  // Any orderSpoilers are also suddenly irrelevant.
-                }
+                // The ORDER BY column did not match the established ascending/descending
+                // pattern OR did not match the next index key component.
+                // The only hope for producing the result set in the correct order is that
+                // (A) the ORDER BY column matches a later index key component
+                // -- so keep searching -- AND
+                // (B) the current (and each intervening) index key component is constrained
+                // to a single value, i.e. it is equality-filtered.
+                // -- so note the current component's position (jj) as an order spoiler
+                // that will need to be resolved as equality constrained
+                // before the result set's ordering can be validated.
+                orderSpoilers[nSpoilers++] = jj;
             }
+            if (jj >= keyComponentCount) {
+                // The current ORDER BY column ran out of key components to try to match.
+                // This is an outright failure case.
+                resultPath.sortDirection = SortDirectionType.INVALID;
+                bindingsForOrder.clear(); // suddenly irrelevant
+                return 0;  // Any orderSpoilers are also suddenly irrelevant.
+            }
+            // The for loop exited prematurely.
+            // That means the current ORDER BY column matched the current key component,
+            // so move on to the next key component (to match the next ORDER BY column).
+            ++jj;
         }
         return nSpoilers;
     }
@@ -992,7 +1000,8 @@ public abstract class SubPlanAssembler {
             // so it will be picked up as a post-filter.
             if (indexedExprs == null) {
                 coveringColId = colIds[orderSpoilers[nRecoveredSpoilers]];
-            } else {
+            }
+            else {
                 coveringExpr = indexedExprs.get(orderSpoilers[nRecoveredSpoilers]);
             }
             // A key component filter based on another table's column is enough to maintain ordering
@@ -1108,7 +1117,8 @@ public abstract class SubPlanAssembler {
                                 new ArrayList<AbstractExpression>(binding);
                             moreBinding.add(pve);
                             binding = moreBinding;
-                        } else if (otherExpr instanceof ConstantValueExpression) {
+                        }
+                        else if (otherExpr instanceof ConstantValueExpression) {
                             // Can't use an index for non-prefix LIKE filters,
                             // e.g. " T1.column LIKE '%ish' "
                             ConstantValueExpression cve = (ConstantValueExpression)otherExpr;
@@ -1117,7 +1127,8 @@ public abstract class SubPlanAssembler {
                                 binding = null; // the filter is not usable, so the binding is invalid
                                 continue;
                             }
-                        } else {
+                        }
+                        else {
                             // Other cases are not indexable, e.g. " T1.column LIKE T2.column "
                             binding = null; // the filter is not usable, so the binding is invalid
                             continue;
@@ -1321,7 +1332,7 @@ public abstract class SubPlanAssembler {
      * @param scanNode that needs to be distributed
      * @return return the newly created receive node (which is linked to the new sends)
      */
-    protected static AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
+    static AbstractPlanNode addSendReceivePair(AbstractPlanNode scanNode) {
         SendPlanNode sendNode = new SendPlanNode();
         sendNode.addAndLinkChild(scanNode);
 
@@ -1348,7 +1359,8 @@ public abstract class SubPlanAssembler {
         // if no index, it is a sequential scan
         if (path.index == null) {
             scanNode = getScanAccessPlanForTable(tableScan, path.otherExprs);
-        } else {
+        }
+        else {
             scanNode = getIndexAccessPlanForTable(tableScan, path);
         }
         return scanNode;
@@ -1369,7 +1381,7 @@ public abstract class SubPlanAssembler {
         SeqScanPlanNode scanNode = new SeqScanPlanNode(tableScan);
         // build the predicate
         AbstractExpression localWhere = null;
-        if ((exprs != null) && ! exprs.isEmpty()){
+        if ((exprs != null) && ! exprs.isEmpty()) {
             localWhere = ExpressionUtil.combine(exprs);
             scanNode.setPredicate(localWhere);
         }
@@ -1380,18 +1392,18 @@ public abstract class SubPlanAssembler {
      * Get a index scan access plan for a table. For multi-site plans/tables,
      * scans at all partitions and sends to one partition.
      *
-     * @param tableAliasIndex The table to get data from.
-     * @param path The access path to access the data in the table (index/scan/etc).
+     * @param tableScan The table to get data from.
+     * @param path The index-based access path to access the data in the table.
      * @return An index scan plan node OR,
                in one edge case, an NLIJ of a MaterializedScan and an index scan plan node.
      */
-    protected static AbstractPlanNode getIndexAccessPlanForTable(StmtTableScan tableScan, AccessPath path)
+    static AbstractPlanNode getIndexAccessPlanForTable(StmtTableScan tableScan, AccessPath path)
     {
         // now assume this will be an index scan and get the relevant index
         Index index = path.index;
         IndexScanPlanNode scanNode = new IndexScanPlanNode(tableScan, index);
         AbstractPlanNode resultNode = scanNode;
-        // set sortDirection here becase it might be used for IN list
+        // set sortDirection here because it might be used for IN list
         scanNode.setSortDirection(path.sortDirection);
         // Build the list of search-keys for the index in question
         // They are the rhs expressions of the normalized indexExpr comparisons.
@@ -1476,13 +1488,15 @@ public abstract class SubPlanAssembler {
     }
 
     /**
-     * Partial index optimization: Remove query expressions that exactly match the index WHERE expression(s)
-     * from the access path.
+     * Partial index optimization: Remove query expressions that exactly match
+     * the index WHERE expression(s) from the access path.
      *
      * @param path - Partial Index access path
      * @param exprToRemove - expressions to remove
      */
-    private void filterPostPredicateForPartialIndex(AccessPath path, List<AbstractExpression> exprToRemove) {
+    private static void filterPostPredicateForPartialIndex(AccessPath path,
+            List<AbstractExpression> exprToRemove)
+    {
         path.otherExprs.removeAll(exprToRemove);
         // Keep the eliminated expressions for cost estimating purpose
         path.eliminatedPostExprs.addAll(exprToRemove);
