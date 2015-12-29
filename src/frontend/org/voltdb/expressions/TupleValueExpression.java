@@ -353,10 +353,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     public static boolean isOperandDependentOnTable(AbstractExpression expr, String tableAlias) {
         assert(tableAlias != null);
         for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            //TODO: This clumsy testing of table names regardless of table aliases is
-            // EXACTLY why we can't have nice things like self-joins.
-            if (tableAlias.equals(tve.getTableAlias()))
-            {
+            if (tableAlias.equals(tve.getTableAlias())) {
                 return true;
             }
         }
@@ -373,15 +370,13 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (m_verboseExplainForDebugging) {
             columnName += " (as JSON: ";
             JSONStringer stringer = new JSONStringer();
-            try
-            {
+            try {
                 stringer.object();
                 toJSONString(stringer);
                 stringer.endObject();
                 columnName += stringer.toString();
             }
-            catch (Exception e)
-            {
+            catch (Exception e) {
                 columnName += "CORRUPTED beyond the ability to format? " + e;
                 e.printStackTrace();
             }
@@ -396,7 +391,8 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
         else if ( ! tableName.equals(impliedTableName)) {
             return tableName + "." + columnName;
-        } else if (m_verboseExplainForDebugging) {
+        }
+        else if (m_verboseExplainForDebugging) {
             // In verbose mode, always show an "implied' tableName that would normally be left off.
             return "{" + tableName + "}." + columnName;
         }
@@ -404,24 +400,22 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     private String chooseTwoNames(String name, String alias) {
-        if (name != null) {
-            if (alias != null && !name.equals(alias)) {
-                return String.format("%s(%s)", name, alias);
-            } else {
-                return name;
+        if (name == null) {
+            if (alias == null) {
+                return "<none>";
             }
-        } else if (alias != null) {
             return String.format ("(%s)", alias);
-        } else {
-            return "<none>";
         }
+        if (alias == null || name.equals(alias)) {
+            return name;
+        }
+        return name + "(" + alias + ")";
     }
 
     @Override
     protected String getExpressionNodeNameForToString() {
-        return String.format("%s: %s.%s",
-                             super.getExpressionNodeNameForToString(),
-                             chooseTwoNames(m_tableName, m_tableAlias),
-                             chooseTwoNames(m_columnName, m_columnAlias));
+        return super.getExpressionNodeNameForToString() + ": " +
+                chooseTwoNames(m_tableName, m_tableAlias) + "." +
+                chooseTwoNames(m_columnName, m_columnAlias);
     }
 }
