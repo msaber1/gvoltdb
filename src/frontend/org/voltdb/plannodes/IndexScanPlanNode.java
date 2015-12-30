@@ -508,7 +508,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         return m_skip_null_predicate;
     }
 
+    @Override
     public StmtTargetTableScan getTargetTableScan() {
+        if (m_tableScan == null) {
+            return null;
+        }
         assert(m_tableScan instanceof StmtTargetTableScan);
         return (StmtTargetTableScan) m_tableScan;
     }
