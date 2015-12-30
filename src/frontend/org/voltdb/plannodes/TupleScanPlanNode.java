@@ -40,7 +40,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
 
     public TupleScanPlanNode() {
         super();
-        m_isSubQuery = true;
+        m_isSubquery = true;
         m_hasSignificantOutputSchema = true;
     }
 
@@ -50,7 +50,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
      */
     public TupleScanPlanNode(String subqueryName, List<AbstractExpression> columnExprs) {
         super(subqueryName, subqueryName);
-        m_isSubQuery = true;
+        m_isSubquery = true;
         m_hasSignificantOutputSchema = true;
         // copy columns
         for (AbstractExpression columnExpr : columnExprs) {

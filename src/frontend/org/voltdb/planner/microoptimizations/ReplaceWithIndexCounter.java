@@ -113,11 +113,6 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
 
         IndexScanPlanNode isp = (IndexScanPlanNode)child;
 
-        // Guard against (possible future?) cases of indexable subquery.
-        if (((IndexScanPlanNode)child).isSubQuery()) {
-            return plan;
-        }
-
         // An index count or table count can replace an index scan only if it has no (post-)predicates
         // except those (post-)predicates are artifact predicates we added for reverse scan purpose only
         if (isp.getPredicate() != null && !isp.isPredicatesOptimizableForAggregate()) {

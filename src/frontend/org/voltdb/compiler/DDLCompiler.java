@@ -78,7 +78,6 @@ import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.SubPlanAssembler;
-import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
@@ -2370,7 +2369,7 @@ public class DDLCompiler {
             Table srcTable, List<AbstractExpression> groupbyExprs, AbstractExpression minMaxAggExpr)
     {
         CatalogMap<Index> allIndexes = srcTable.getIndexes();
-        StmtTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
+        StmtTargetTableScan tableScan = new StmtTargetTableScan(srcTable, srcTable.getTypeName());
 
         // Candidate index. If we can find an index covering both group-by columns and aggExpr (optimal) then we will
         // return immediately.

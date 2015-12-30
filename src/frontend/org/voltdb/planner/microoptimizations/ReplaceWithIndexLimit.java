@@ -29,8 +29,8 @@ import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
@@ -119,28 +119,28 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
 
         // for a SEQSCAN, replace it with a INDEXSCAN node with an inline LIMIT plan node
         if (child instanceof SeqScanPlanNode) {
+            SeqScanPlanNode childSeqScan = (SeqScanPlanNode) child;
             // only replace SeqScan when no predicate
             // should have other index access plan if any qualified index found for the predicate
-            if (((SeqScanPlanNode)child).getPredicate() != null) {
+            if (childSeqScan.getPredicate() != null) {
                 return plan;
             }
 
-            if (((AbstractScanPlanNode)child).isSubQuery()) {
+            // Do not replace subquery scans
+            StmtTableScan tableScan = childSeqScan.getTableScan();
+            if ( ! (tableScan instanceof StmtTargetTableScan)) {
                 return plan;
             }
+            StmtTargetTableScan trueTableScan = (StmtTargetTableScan) tableScan;
 
             // create an empty bindingExprs list, used for store (possible) bindings for adHoc query
             ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
-            Index ret = findQualifiedIndex(((SeqScanPlanNode)child), aggExpr, bindings);
-
-            if (ret == null) {
-                return plan;
-            } else {
+            Index ret = findQualifiedIndex(childSeqScan, aggExpr, bindings);
+            if (ret != null) {
                 // 1. create one INDEXSCAN plan node with inlined LIMIT
                 // and replace the SEQSCAN node with it
                 // 2. we know which end row we want to fetch, so it's safe to
                 // specify sorting direction here
-                SeqScanPlanNode childSeqScan = (SeqScanPlanNode) child;
                 IndexScanPlanNode ispn = new IndexScanPlanNode(childSeqScan,
                         aggplan, ret, sortDirection);
                 ispn.setBindings(bindings);
@@ -159,12 +159,11 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
                 // remove old SeqScan node and link the new generated IndexScan node
                 plan.clearChildren();
                 plan.addAndLinkChild(ispn);
-
-                return plan;
             }
+            return plan;
         }
 
-        if ((child instanceof IndexScanPlanNode) == false) {
+        if ( ! (child instanceof IndexScanPlanNode)) {
             return plan;
         }
 
@@ -176,11 +175,6 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // we added for reverse scan purpose only
         if (((IndexScanPlanNode)child).getPredicate() != null &&
                 !((IndexScanPlanNode)child).isPredicatesOptimizableForAggregate()) {
-            return plan;
-        }
-
-        // Guard against (possible future?) cases of indexable subquery.
-        if (((AbstractScanPlanNode)child).isSubQuery()) {
             return plan;
         }
 
@@ -226,7 +220,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         String tableAlias = ispn.getTargetTableAlias();
         List<AbstractExpression> indexedExprs = null;
         if ( ! indexToUse.getExpressionsjson().isEmpty() ) {
-            StmtTableScan tableScan = m_parsedStmt.getStmtTableScanByAlias(tableAlias);
+            StmtTargetTableScan tableScan = ispn.getTargetTableScan();
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(indexToUse.getExpressionsjson(), tableScan);
             } catch (JSONException e) {
@@ -300,7 +294,8 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         // do not aggressively evaluate all indexes, just examine the index currently in use;
         // because for all qualified indexes, one access plan must have been generated already,
         // and we can take advantage of that
-        if (checkIndex(ispn.getCatalogIndex(), aggExpr, exprs, ispn.getBindings(), tableAlias)) {
+        if (checkIndex(ispn.getCatalogIndex(), aggExpr, exprs,
+                ispn.getBindings(), ispn.getTargetTableScan())) {
             // we know which end we want to fetch, set the sort direction
             ispn.setSortDirection(sortDirection);
 
@@ -353,12 +348,13 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
 
     private Index findQualifiedIndex(SeqScanPlanNode seqScan, AbstractExpression aggExpr, List<AbstractExpression> bindingExprs) {
         String tableName = seqScan.getTargetTableName();
+        StmtTargetTableScan tableScan = seqScan.getTargetTableScan();
+        if (tableScan == null) {
+            return null;
+        }
         CatalogMap<Index> allIndexes = m_parsedStmt.m_db.getTables().get(tableName).getIndexes();
-
-        String fromTableAlias = seqScan.getTargetTableAlias();
-
         for (Index index : allIndexes) {
-            if (checkIndex(index, aggExpr, new ArrayList<AbstractExpression>(), bindingExprs, fromTableAlias)) {
+            if (checkIndex(index, aggExpr, new ArrayList<AbstractExpression>(), bindingExprs, tableScan)) {
                 return index;
             }
         }
@@ -366,7 +362,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
     }
 
     private boolean checkIndex(Index index, AbstractExpression aggExpr,
-            List<AbstractExpression> filterExprs, List<AbstractExpression> bindingExprs, String fromTableAlias) {
+            List<AbstractExpression> filterExprs, List<AbstractExpression> bindingExprs, StmtTargetTableScan tableScan) {
 
         if (!IndexType.isScannable(index.getType())) {
             return false;
@@ -390,7 +386,6 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         } else {
             // either pure expression index or mix of expressions and simple columns
             List<AbstractExpression> indexedExprs = null;
-            StmtTableScan tableScan = m_parsedStmt.getStmtTableScanByAlias(fromTableAlias);
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
             } catch (JSONException e) {

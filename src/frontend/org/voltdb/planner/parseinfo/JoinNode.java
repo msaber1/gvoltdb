@@ -509,4 +509,8 @@ public abstract class JoinNode implements Cloneable {
             m_contentDeterminismMessage = msg;
         }
     }
+
+    public StmtTargetTableScan getTargetTableScan() {
+        return null;
+    }
 }

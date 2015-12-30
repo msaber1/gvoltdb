@@ -168,11 +168,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     public void setSkipNullPredicate(int nextKeyIndex) {
         assert(nextKeyIndex >= 0);
 
-        m_skip_null_predicate = buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
+        m_skip_null_predicate = buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, getTargetTableScan(), m_searchkeyExpressions);
     }
 
     public static AbstractExpression buildSkipNullPredicate(
-            int nextKeyIndex, Index catalogIndex, StmtTableScan tableScan,
+            int nextKeyIndex, Index catalogIndex, StmtTargetTableScan tableScan,
             List<AbstractExpression> searchkeyExpressions) {
 
         String exprsjson = catalogIndex.getExpressionsjson();
@@ -191,11 +191,13 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
                 indexedExprs.add(tve);
             }
-        } else {
+        }
+        else {
             try {
                 indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
                 assert(nextKeyIndex < indexedExprs.size());
-            } catch (JSONException e) {
+            }
+            catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
             }
@@ -210,7 +212,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             try {
                 indexPredicate = AbstractExpression.fromJSONString(indexPredicateJson, tableScan);
                 assert(indexPredicate != null);
-            } catch (JSONException e) {
+            }
+            catch (JSONException e) {
                 e.printStackTrace();
                 assert(false);
             }
@@ -344,7 +347,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // starting from the first one
         List<AbstractExpression> indexedExprs = new ArrayList<AbstractExpression>();
         List<ColumnRef> indexedColRefs = new ArrayList<ColumnRef>();
-        boolean columnIndex = CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTableScan(),
+        boolean columnIndex = CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTargetTableScan(),
                 indexedExprs, indexedColRefs);
         int indexExprCount = (columnIndex) ? indexedColRefs.size() : indexedExprs.size();
         if (indexExprCount < sortExpressions.size()) {
@@ -503,6 +506,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public AbstractExpression getSkipNullPredicate() {
         return m_skip_null_predicate;
+    }
+
+    public StmtTargetTableScan getTargetTableScan() {
+        assert(m_tableScan instanceof StmtTargetTableScan);
+        return (StmtTargetTableScan) m_tableScan;
     }
 
     public boolean isReverseScan() {
@@ -795,7 +803,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             else {
                 try {
                     List<AbstractExpression> indexExpressions =
-                        AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
+                        AbstractExpression.fromJSONArrayString(jsonExpr, getTargetTableScan());
                     int ii = 0;
                     for (AbstractExpression ae : indexExpressions) {
                         asIndexed[ii++] = ae.explain(getTableNameForExplain());

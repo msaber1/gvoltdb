@@ -319,7 +319,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * Generate all possible access paths for an inner node in a join.
      * The set of potential index expressions depends whether the inner node can be inlined
      * with the NLIJ or not. In the former case, inner and inner-outer join expressions can
-     * be considered for the index access. In the latter, only inner join expressions qualifies.
+     * be considered for the index access. In the latter, only inner join expressions qualify.
      *
      * @param parentNode A parent node to the node to generate paths to.
      */

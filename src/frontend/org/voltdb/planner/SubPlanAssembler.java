@@ -139,7 +139,11 @@ public abstract class SubPlanAssembler {
         AccessPath naivePath = getRelevantNaivePath(allJoinExprs, filterExprs);
         joinNode.addAccessPath(naivePath);
 
-        StmtTableScan tableScan = joinNode.getTableScan();
+        StmtTargetTableScan tableScan = joinNode.getTargetTableScan();
+        if (tableScan == null) {
+            // subqueries are not eligible for index scanning.
+            return;
+        }
         Collection<Index> indexes = tableScan.getIndexes();
         for (Index index : indexes) {
             AccessPath path = getRelevantAccessPathForIndex(tableScan, allExprs, index, orderByColumns);
@@ -309,15 +313,11 @@ public abstract class SubPlanAssembler {
      * @param index The index we want to use to access the data.
      * @return A valid access path using the data or null if none found.
      */
-    static AccessPath getRelevantAccessPathForIndex(StmtTableScan tableScan,
+    static AccessPath getRelevantAccessPathForIndex(StmtTargetTableScan tableScan,
             Collection<AbstractExpression> exprs,
             Index index,
             List<ParsedColInfo> orderByColumns)
     {
-        if (tableScan instanceof StmtTargetTableScan == false) {
-            return null;
-        }
-
         // Copy the expression collection into a mutable list for later pruning
         List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>(exprs);
 

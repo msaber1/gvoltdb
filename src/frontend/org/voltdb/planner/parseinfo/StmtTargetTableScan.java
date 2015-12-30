@@ -95,7 +95,6 @@ public class StmtTargetTableScan extends StmtTableScan {
         return m_partitioningColumns;
     }
 
-    @Override
     public List<Index> getIndexes() {
         if (m_indexes == null) {
             m_indexes = new ArrayList<Index>();

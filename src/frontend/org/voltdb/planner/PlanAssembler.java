@@ -51,6 +51,7 @@ import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtSubqueryScan;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
@@ -63,6 +64,7 @@ import org.voltdb.plannodes.InsertPlanNode;
 import org.voltdb.plannodes.LimitPlanNode;
 import org.voltdb.plannodes.MaterializePlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.plannodes.OrderByPlanNode;
@@ -1968,7 +1970,7 @@ public class PlanAssembler {
 
     private static AbstractPlanNode findSeqScanCandidateForGroupBy(AbstractPlanNode candidate) {
         if (candidate.getPlanNodeType() == PlanNodeType.SEQSCAN &&
-                ! candidate.isSubQuery()) {
+                ! candidate.hasSubquery()) {
             // scan on sub-query does not support index, early exit here
             // In future, support sub-query edge cases.
             return candidate;
@@ -2256,15 +2258,16 @@ public class PlanAssembler {
 
         ArrayList<AbstractExpression> bindings = new ArrayList<>();
         gbInfo.m_coveredGroupByColumns = calculateGroupbyColumnsCovered(
-                index, fromTableAlias, bindings);
+                index, fromTableAlias, root.getTargetTableScan(), bindings);
         gbInfo.m_canBeFullySerialized =
                 gbInfo.m_coveredGroupByColumns.size() == m_parsedSelect.m_groupByColumns.size();
     }
 
-    // Turn sequential scan to index scan for group by if possible
+    // Turn the sequential scan into an index scan for group by if possible
     private AbstractPlanNode indexAccessForGroupByExprs(SeqScanPlanNode root,
             IndexGroupByInfo gbInfo) {
-        if (root.isSubQuery()) {
+        StmtTargetTableScan tableScan = root.getTargetTableScan();
+        if (tableScan == null) {
             // sub-query edge case will not be handled now
             return root;
         }
@@ -2292,7 +2295,7 @@ public class PlanAssembler {
             }
             ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
             List<Integer> coveredGroupByColumns = calculateGroupbyColumnsCovered(
-                    index, fromTableAlias, bindings);
+                    index, fromTableAlias, tableScan, bindings);
 
             if (coveredGroupByColumns.size() > maxCoveredGroupByColumns.size()) {
                 maxCoveredGroupByColumns = coveredGroupByColumns;
@@ -2309,27 +2312,42 @@ public class PlanAssembler {
             return root;
         }
 
-        Collection<AbstractExpression> allExprs = ExpressionUtil.uncombineAny(root.getPredicate());
-        StmtTableScan tableScan = root.getTableScan();
+        Collection<AbstractExpression> allExprs =
+                ExpressionUtil.uncombineAny(root.getPredicate());
         AccessPath path = SubPlanAssembler.getRelevantAccessPathForIndex(tableScan,
                 allExprs, pickedUpIndex, null);
+        IndexScanPlanNode indexScanNode = null;
         AbstractPlanNode planNode;
         if (path == null) {
-            // The index did not optimize any predicates, just create a generic
-            // index scan just for its ordering effect.
-            planNode = new IndexScanPlanNode(
+            // The index does not optimize any predicates,
+            // create a generic index scan just for its ordering effect.
+            indexScanNode = new IndexScanPlanNode(
                 root, null, pickedUpIndex, SortDirectionType.INVALID);
+            indexScanNode.setForGroupingOnly();
+            indexScanNode.setBindings(maxCoveredBindings);
+            planNode = indexScanNode;
         }
         else {
             // In addition to providing ordering, the index can also optimize one
             // or more predicates,
             // so initialize a more detailed (lower estimated cost) index scan.
             planNode = SubPlanAssembler.getIndexAccessPlanForTable(tableScan, path);
-        }
-        if (planNode instanceof IndexScanPlanNode) {
-            IndexScanPlanNode indexScanNode = (IndexScanPlanNode) planNode;
-            indexScanNode.setForGroupingOnly();
-            indexScanNode.setBindings(maxCoveredBindings);
+            if (planNode instanceof IndexScanPlanNode) {
+                indexScanNode = (IndexScanPlanNode) planNode;
+            }
+            else if (planNode instanceof NestLoopIndexPlanNode) {
+                indexScanNode = (IndexScanPlanNode) planNode.getInlinePlanNode(PlanNodeType.INDEXSCAN);
+            }
+            // Index scan and NLIJ (optimizing an IN LIST predicate)
+            // should cover all cases of index-based access plans.
+            assert(indexScanNode != null);
+
+            //XXX: It's unclear whether simply adding bindings without any special handling of possible
+            // redundancies between the existing (filter-based) bindings
+            // and new (grouping-based) bindings could be dangerous.
+            if (indexScanNode != null) {
+                indexScanNode.addBindings(maxCoveredBindings);
+            }
         }
         gbInfo.m_coveredGroupByColumns = maxCoveredGroupByColumns;
         gbInfo.m_canBeFullySerialized = foundAllGroupByCoveredIndex;
@@ -2337,6 +2355,7 @@ public class PlanAssembler {
     }
 
     private List<Integer> calculateGroupbyColumnsCovered(Index index, String fromTableAlias,
+            StmtTargetTableScan tableScan,
             List<AbstractExpression> bindings) {
         List<Integer> coveredGroupByColumns = new ArrayList<>();
 
@@ -2379,12 +2398,12 @@ public class PlanAssembler {
             }
         }
         else {
-            StmtTableScan fromTableScan = m_parsedSelect.getStmtTableScanByAlias(fromTableAlias);
             // either pure expression index or mix of expressions and simple columns
             List<AbstractExpression> indexedExprs = null;
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, fromTableScan);
-            } catch (JSONException e) {
+                indexedExprs = AbstractExpression.fromJSONArrayString(exprsjson, tableScan);
+            }
+            catch (JSONException e) {
                 e.printStackTrace();
                 // This case sounds impossible
                 return coveredGroupByColumns;

@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
@@ -239,12 +238,6 @@ public class StmtSubqueryScan extends StmtTableScan {
         }
 
         return stmtTables;
-    }
-
-    static final List<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<Index>();
-    @Override
-    public List<Index> getIndexes() {
-        return noIndexesSupportedOnSubqueryScans;
     }
 
     public AbstractParsedStmt getSubqueryStmt() {

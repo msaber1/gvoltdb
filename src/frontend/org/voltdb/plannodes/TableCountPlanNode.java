@@ -41,8 +41,8 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
         m_estimatedOutputTupleCount = 1;
         m_tableSchema = child.getTableSchema();
 
-        m_isSubQuery = child.isSubQuery();
-        if (m_isSubQuery) {
+        m_isSubquery = child.hasSubquery();
+        if (m_isSubquery) {
             assert(child.getChildCount() == 1);
             AbstractPlanNode subChild = child.getChild(0);
             subChild.clearParents();
@@ -66,14 +66,14 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
 
     @Override
     public void generateOutputSchema(Database db){
-        if (m_isSubQuery){
+        if (m_isSubquery){
             m_children.get(0).generateOutputSchema(db);
         }
     }
 
     @Override
     public void resolveColumnIndexes(){
-        if (m_isSubQuery){
+        if (m_isSubquery){
             m_children.get(0).resolveColumnIndexes();
         }
     }
@@ -87,7 +87,7 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         String explainStr = "TABLE COUNT of \"" + m_targetTableName + "\"";
-        if (m_isSubQuery) {
+        if (m_isSubquery) {
             explainStr = "TEMPORARY " + explainStr;
         }
         return explainStr;

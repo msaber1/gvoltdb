@@ -62,7 +62,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     protected String m_targetTableAlias = null;
 
     // Flag marking the sub-query plan
-    protected boolean m_isSubQuery = false;
+    protected boolean m_isSubquery = false;
     protected StmtTableScan m_tableScan = null;
 
     protected AbstractScanPlanNode() {
@@ -133,7 +133,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
      * @param name
      */
     public void setTargetTableName(String name) {
-        assert(m_isSubQuery || name != null);
+        assert(m_isSubquery || name != null);
         m_targetTableName = name;
     }
 
@@ -155,7 +155,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     public void setTableScan(StmtTableScan tableScan) {
         m_tableScan = tableScan;
-        setSubQuery(tableScan instanceof StmtSubqueryScan);
+        setSubquery(tableScan instanceof StmtSubqueryScan);
         setTargetTableAlias(tableScan.getTableAlias());
         setTargetTableName(tableScan.getTableName());
         Collection<SchemaColumn> scanColumns = tableScan.getScanColumns();
@@ -166,6 +166,13 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     public StmtTableScan getTableScan() {
         return m_tableScan;
+    }
+
+    public StmtTargetTableScan getTargetTableScan() {
+        if (m_tableScan instanceof StmtTargetTableScan) {
+            return (StmtTargetTableScan) m_tableScan;
+        }
+        return null;
     }
 
     /**
@@ -209,19 +216,19 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     /**
      * Set the sub-query flag
-     * @param isSubQuery
+     * @param isSubquery
      */
-    public void setSubQuery(boolean isSubQuery) {
-        m_isSubQuery = isSubQuery;
+    public void setSubquery(boolean isSubquery) {
+        m_isSubquery = isSubquery;
     }
 
     /**
      * Accessor to return the sub-query flag
-     * @return m_isSubQuery
+     * @return m_isSubquery
      */
     @Override
-    public boolean isSubQuery() {
-        return m_isSubQuery;
+    public boolean hasSubquery() {
+        return m_isSubquery;
     }
 
     @Override
@@ -229,14 +236,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     {
         // fill in the table schema if we haven't already
         if (m_tableSchema == null) {
-            if (isSubQuery()) {
+            if (m_isSubquery) {
                 assert(m_children.size() == 1);
                 m_children.get(0).generateOutputSchema(db);
                 m_tableSchema = m_children.get(0).getOutputSchema();
                 // step to transfer derived table schema to upper level
                 m_tableSchema = m_tableSchema.replaceTableClone(getTargetTableAlias());
 
-            } else {
+            }
+            else {
                 m_tableSchema = new NodeSchema();
                 CatalogMap<Column> cols = db.getTables().getExact(m_targetTableName).getColumns();
                 // you don't strictly need to sort this, but it makes diff-ing easier
@@ -429,7 +437,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
-        if (m_isSubQuery) {
+        if (m_isSubquery) {
             stringer.key(Members.SUBQUERY_INDICATOR.name()).value("TRUE");
         }
     }
@@ -441,7 +449,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
         if (jobj.has("SUBQUERY_INDICATOR")) {
-            m_isSubQuery = "TRUE".equals(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
+            m_isSubquery = "TRUE".equals(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
         }
     }
 

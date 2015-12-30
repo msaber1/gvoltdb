@@ -69,6 +69,9 @@ public class TableLeafNode extends JoinNode {
     @Override
     public StmtTableScan getTableScan() { return m_tableScan; }
 
+    @Override
+    public StmtTargetTableScan getTargetTableScan() { return m_tableScan; }
+
     @Override public String getTableAlias() { return m_tableScan.getTableAlias(); }
 
     @Override

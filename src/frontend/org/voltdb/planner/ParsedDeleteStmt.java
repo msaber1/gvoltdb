@@ -87,7 +87,7 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
     /** Returns TRUE if this statement had an ORDER BY clause */
     @Override
     public boolean hasOrderByColumns() {
-        return m_orderColumns.size() > 0;
+        return ! m_orderColumns.isEmpty();
     }
 
     /** Returns items in ORDER BY clause as a list of ParsedColInfo */

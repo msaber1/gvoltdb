@@ -598,14 +598,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return m_isInline;
     }
 
-    public boolean isSubQuery() {
-        return false;
-    }
-
     public boolean hasSubquery() {
-        if (isSubQuery()) {
-            return true;
-        }
         for (AbstractPlanNode n : m_children) {
             if (n.hasSubquery()) {
                 return true;

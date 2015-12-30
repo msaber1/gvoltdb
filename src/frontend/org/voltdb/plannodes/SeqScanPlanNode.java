@@ -76,7 +76,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
     private static final TableEstimates SUBQUERY_TABLE_ESTIMATES_HACK = new TableEstimates();
     @Override
     public void computeCostEstimates(long childOutputTupleCountEstimate, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
-        if (m_isSubQuery) {
+        if (m_isSubquery) {
             // Get estimates from the sub-query
             // @TODO For the sub-query the cost estimates will be calculated separately
             // At the moment its contribution to the parent's cost plan is irrelevant because
@@ -128,7 +128,7 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
 
     @Override
     public void resolveColumnIndexes() {
-        if (m_isSubQuery) {
+        if (m_isSubquery) {
             assert(m_children.size() == 1);
             m_children.get(0).resolveColumnIndexes();
         }

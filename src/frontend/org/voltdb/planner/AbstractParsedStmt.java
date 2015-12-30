@@ -264,7 +264,8 @@ public abstract class AbstractParsedStmt {
         for (VoltXMLElement node : root.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
                 parseTable(node);
-            } else if (node.name.equalsIgnoreCase("tablescans")) {
+            }
+            else if (node.name.equalsIgnoreCase("tablescans")) {
                 parseTables(node);
             }
         }
@@ -503,10 +504,9 @@ public abstract class AbstractParsedStmt {
        // Short-circuit for COL IN (LIST) and COL IN (SELECT COL FROM ..)
        if (exprNode.children.size() == 1) {
            return parseExpressionNode(exprNode.children.get(0));
-       } else {
-           // (COL1, COL2) IN (SELECT C1, C2 FROM...)
-           return parseRowExpression(exprNode.children);
        }
+       // (COL1, COL2) IN (SELECT C1, C2 FROM...)
+       return parseRowExpression(exprNode.children);
    }
 
    /**
@@ -604,7 +604,8 @@ public abstract class AbstractParsedStmt {
 
         try {
             expr = exprType.getExpressionClass().newInstance();
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException(e.getMessage(), e);
         }
@@ -648,7 +649,8 @@ public abstract class AbstractParsedStmt {
             AbstractExpression rightExpr = parseExpressionNode(rightExprNode);
             assert(rightExpr != null);
             expr.setRight(rightExpr);
-        } else {
+        }
+        else {
             assert(rightExprNode == null);
             if (exprType == ExpressionType.OPERATOR_CAST) {
                 String valuetype = exprNode.attributes.get("valuetype");
@@ -667,7 +669,8 @@ public abstract class AbstractParsedStmt {
             // col IN ( queryA UNION queryB ) - > col IN (queryA) OR col IN (queryB)
             // col IN ( queryA INTERSECTS queryB ) - > col IN (queryA) AND col IN (queryB)
             expr = ParsedUnionStmt.breakUpSetOpSubquery(expr);
-        } else if (exprType == ExpressionType.OPERATOR_EXISTS) {
+        }
+        else if (exprType == ExpressionType.OPERATOR_EXISTS) {
             expr = optimizeExistsExpression(expr);
         }
         return expr;
@@ -935,7 +938,8 @@ public abstract class AbstractParsedStmt {
         int idArg = 0;
         try {
             idArg = Integer.parseInt(function_id);
-        } catch (NumberFormatException nfe) {}
+        }
+        catch (NumberFormatException nfe) {}
         assert(idArg > 0);
         String result_type_parameter_index = exprNode.attributes.get("result_type_parameter_index");
         String implied_argument = exprNode.attributes.get("implied_argument");
@@ -961,7 +965,8 @@ public abstract class AbstractParsedStmt {
             int parameter_idx = -1;
             try {
                 parameter_idx = Integer.parseInt(result_type_parameter_index);
-            } catch (NumberFormatException nfe) {}
+            }
+            catch (NumberFormatException nfe) {}
             assert(parameter_idx >= 0); // better be valid by now.
             assert(parameter_idx < args.size()); // must refer to a provided argument
             expr.setResultTypeParameterIndex(parameter_idx);
@@ -1020,7 +1025,8 @@ public abstract class AbstractParsedStmt {
             assert(table != null);
             m_tableList.add(table);
             tableScan = addTableToStmtCache(table, tableAlias);
-        } else {
+        }
+        else {
             AbstractParsedStmt subquery = parseFromSubQuery(subqueryElement);
             tableScan = addSubqueryToStmtCache(subquery, tableAlias);
         }
@@ -1035,7 +1041,8 @@ public abstract class AbstractParsedStmt {
         JoinNode leafNode;
         if (table != null) {
             leafNode = new TableLeafNode(nodeId, joinExpr, whereExpr, (StmtTargetTableScan)tableScan);
-        } else {
+        }
+        else {
             assert(tableScan instanceof StmtSubqueryScan);
             leafNode = new SubqueryLeafNode(nodeId, joinExpr, whereExpr, (StmtSubqueryScan)tableScan);
             leafNode.updateContentDeterminismMessage(((StmtSubqueryScan) tableScan).calculateContentDeterminismMessage());
@@ -1044,7 +1051,8 @@ public abstract class AbstractParsedStmt {
         if (m_joinTree == null) {
             // this is the first table
             m_joinTree = leafNode;
-        } else {
+        }
+        else {
             // Build the tree by attaching the next table always to the right
             // The node's join type is determined by the type of its right node
 
@@ -1290,9 +1298,8 @@ public abstract class AbstractParsedStmt {
         // the parent statement
         if (m_parentStmt != null) {
             return m_parentStmt.getParameters();
-        } else {
-            return m_paramsByIndex.values().toArray(new ParameterValueExpression[m_paramsByIndex.size()]);
         }
+        return m_paramsByIndex.values().toArray(new ParameterValueExpression[m_paramsByIndex.size()]);
     }
 
     public void setParentAsUnionClause() {
@@ -1413,7 +1420,8 @@ public abstract class AbstractParsedStmt {
                 String isParam = valueNode.attributes.get("isparam");
                 if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
                     limitParameterId = Long.parseLong(valueNode.attributes.get("id"));
-                } else {
+                }
+                else {
                     node = limitXml.attributes.get("limit");
                     assert(node != null);
                     limit = Long.parseLong(node);
@@ -1430,7 +1438,8 @@ public abstract class AbstractParsedStmt {
                     String isParam = valueNode.attributes.get("isparam");
                     if ((isParam != null) && (isParam.equalsIgnoreCase("true"))) {
                         offsetParameterId = Long.parseLong(valueNode.attributes.get("id"));
-                    } else {
+                    }
+                    else {
                         node = offsetXml.attributes.get("offset");
                         assert(node != null);
                         offset = Long.parseLong(node);
@@ -1529,9 +1538,11 @@ public abstract class AbstractParsedStmt {
                 return false;
             }
 
-            if (tableScan instanceof StmtSubqueryScan) {
+            if (! (tableScan instanceof StmtTargetTableScan)) {
                 return false; // don't yet handle FROM clause subquery, here.
             }
+
+            StmtTargetTableScan trueTableScan = (StmtTargetTableScan) tableScan;
 
             Table table = ((StmtTargetTableScan)tableScan).getTargetTable();
 
@@ -1563,8 +1574,9 @@ public abstract class AbstractParsedStmt {
                 // if this is a fancy expression-based index...
                 else {
                     try {
-                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, tableScan);
-                    } catch (JSONException e) {
+                        indexExpressions = AbstractExpression.fromJSONArrayString(jsonExpr, trueTableScan);
+                    }
+                    catch (JSONException e) {
                         e.printStackTrace();
                         assert(false);
                         continue;
@@ -1671,7 +1683,7 @@ public abstract class AbstractParsedStmt {
                     boolean addAllColumns = true;
                     for (ColumnRef cr : columns) {
                         Column col = cr.getColumn();
-                        if (orderByColumns.contains(col) == false) {
+                        if (! orderByColumns.contains(col)) {
                             addAllColumns = false;
                             break;
                         }
@@ -1697,7 +1709,7 @@ public abstract class AbstractParsedStmt {
         }
     }
 
-    /** May be true for DELETE or SELECT */
+    /** May be true for DELETE or SELECT/union */
     public boolean hasOrderByColumns() {
         return false;
     }

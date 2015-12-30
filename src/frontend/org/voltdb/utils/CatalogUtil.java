@@ -123,7 +123,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.importer.ImportDataProcessor;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.types.ConstraintType;
@@ -2294,7 +2293,7 @@ public abstract class CatalogUtil {
      * @param indexedColRefs indexed columns. This list remains empty if indexedExprs is in use.
      * @return true if this is a column based index
      */
-    public static boolean getCatalogIndexExpressions(Index index, StmtTableScan tableScan,
+    public static boolean getCatalogIndexExpressions(Index index, StmtTargetTableScan tableScan,
             List<AbstractExpression> indexedExprs, List<ColumnRef> indexedColRefs) {
         String exprsjson = index.getExpressionsjson();
         if (exprsjson.isEmpty()) {

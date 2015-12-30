@@ -21,7 +21,7 @@ import java.util.ArrayList;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.compiler.DeterminismMode;
-import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
@@ -90,44 +90,36 @@ public class ScanDeterminizer {
         }
         SeqScanPlanNode scanNode = (SeqScanPlanNode) plan;
 
-        if (scanNode.isSubQuery()) {
+        StmtTargetTableScan tableScan = scanNode.getTargetTableScan();
+        if (tableScan == null) {
             // This is a sub-query and can't have indexes
             return plan;
         }
 
         // got here? we're got ourselves a sequential scan over a real table
-        assert (scanNode.getChildCount() == 0);
-        StmtTableScan tableScan = scanNode.getTableScan();
-        assert(tableScan != null);
-
-        Index indexToScan = null;
+        assert(scanNode.getChildCount() == 0);
 
         // Pick the narrowest index from all of the unique tree indexes.
         // note: This is not the same as picking the narrowest key in c++,
         // which is probably what you want if it turns out this optimization
         // does anything for performance at all.
+        Index indexToScan = null;
         for (Index index : tableScan.getIndexes()) {
             // skip non-unique indexes
-            if (index.getUnique() == false) {
+            if ( ! index.getUnique()) {
                 continue;
             }
             // skip hash indexes
-            else if (index.getType() != IndexType.BALANCED_TREE.getValue()) {
+            if (index.getType() != IndexType.BALANCED_TREE.getValue()) {
                 continue;
             }
             // skip partial indexes
-            else if (!index.getPredicatejson().isEmpty()) {
+            if (!index.getPredicatejson().isEmpty()) {
                 continue;
             }
-            else {
-                if (indexToScan == null) {
-                    indexToScan = index;
-                }
-                else {
-                    if (CatalogUtil.getCatalogIndexSize(indexToScan) > CatalogUtil.getCatalogIndexSize(index)) {
-                        indexToScan = index;
-                    }
-                }
+            if (indexToScan == null ||
+                    CatalogUtil.getCatalogIndexSize(indexToScan) > CatalogUtil.getCatalogIndexSize(index)) {
+                indexToScan = index;
             }
         }
 

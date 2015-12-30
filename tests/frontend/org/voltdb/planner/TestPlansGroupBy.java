@@ -172,20 +172,32 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // Partition IndexScan with HASH aggregate is optimized to use Serial aggregate -
         // index (F_D3, F_D2) is preferred over (F_D3) because it covers all of the GROUP BY columns
         pns = compileToFragments("SELECT F_D3, F_D2, MAX(F_VAL3) FROM F WHERE F_D3 = 0 GROUP BY F_D2, F_D3");
-        /* enable to debug */ printExplainPlan(pns);
+        //* enable to debug */ printExplainPlan(pns);
         assertEquals(2, pns.size());
         p = pns.get(1).getChild(0);
         assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
-        /* enable to debug */ System.out.println(p.toExplainPlanString());
-        /* pending fix for ENG-6586 */ assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
-        /* pending fix for ENG-6586 */ assertTrue(p.toExplainPlanString().contains("COL_F_TREE4"));
+        //* enable to debug */ System.out.println(p.toExplainPlanString());
+        //* pending fix for ENG-9654 */ assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        //* pending fix for ENG-9654 */ assertTrue(p.toExplainPlanString().contains("COL_F_TREE4"));
+
+        // Partition IndexScan with HASH aggregate is optimized to use Serial aggregate -
+        // index (F_D3, F_D2) is preferred over (F_D3) because it covers all of the GROUP BY columns.
+        // Use version 2 of the table/index schema to avoid the pathological case described by ENG-9654.
+        pns = compileToFragments("SELECT F2_D3, F2_D2, MAX(F2_VAL3) FROM F2 WHERE F2_D3 = 0 GROUP BY F2_D2, F2_D3");
+        //* enable to debug */ printExplainPlan(pns);
+        assertEquals(2, pns.size());
+        p = pns.get(1).getChild(0);
+        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
+        //* enable to debug */ System.out.println(p.toExplainPlanString());
+        assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        assertTrue(p.toExplainPlanString().contains("COL_F2_TREE4"));
 
         // repeat with an inequality
         pns = compileToFragments("SELECT F_D3, F_D2, MAX(F_VAL3) FROM F WHERE F_D3 < 0 GROUP BY F_D2, F_D3");
         assertEquals(2, pns.size());
         p = pns.get(1).getChild(0);
         assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
-        /* enable to debug */ System.out.println(p.toExplainPlanString());
+        //* enable to debug */ System.out.println(p.toExplainPlanString());
         assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
         assertTrue(p.toExplainPlanString().contains("COL_F_TREE4"));
 
@@ -201,12 +213,24 @@ public class TestPlansGroupBy extends PlannerTestCase {
         // IndexScan with HASH aggregate is optimized to use Serial aggregate -
         // index (F_D3, F_D2) is preferred over (F_D3) because it covers all of the GROUP BY columns
         pns = compileToFragments("SELECT F_D3, F_D2, MAX(F_VAL3) FROM RF WHERE F_D3 = 0 GROUP BY F_D2, F_D3");
-        /* enable to debug */ printExplainPlan(pns);
+        //* enable to debug */ printExplainPlan(pns);
+        assertEquals(1, pns.size());
+        p = pns.get(0).getChild(0);
+        assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
+        //* enable to debug */ System.out.println(p.toExplainPlanString());
+        //* pending fix for ENG-9654 */ assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
+        //* pending fix for ENG-9654 */ assertTrue(p.toExplainPlanString().contains("COL_RF_TREE4"));
+
+        // IndexScan with HASH aggregate is optimized to use Serial aggregate -
+        // index (F_D3, F_D2) is preferred over (F_D3) because it covers all of the GROUP BY columns
+        // Use version 2 of the table/index schema to avoid the pathological case described by ENG-9654.
+        pns = compileToFragments("SELECT F2_D3, F2_D2, MAX(F2_VAL3) FROM RF2 WHERE F2_D3 = 0 GROUP BY F2_D2, F2_D3");
+        //* enable to debug */ printExplainPlan(pns);
         assertEquals(1, pns.size());
         p = pns.get(0).getChild(0);
         assertEquals(PlanNodeType.INDEXSCAN, p.getPlanNodeType());
         /* pending fix for ENG-6586 */ assertNotNull(p.getInlinePlanNode(PlanNodeType.AGGREGATE));
-        /* pending fix for ENG-6586 */ assertTrue(p.toExplainPlanString().contains("COL_RF_TREE4"));
+        /* pending fix for ENG-6586 */ assertTrue(p.toExplainPlanString().contains("COL_RF2_TREE4"));
 
         // repeat with an inequality
         pns = compileToFragments("SELECT F_D3, F_D2, MAX(F_VAL3) FROM RF WHERE F_D3 > 0 GROUP BY F_D2, F_D3");

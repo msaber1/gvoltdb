@@ -158,7 +158,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         if (nextKeyIndex < 0) {
             return ;
         }
-        m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(nextKeyIndex, m_catalogIndex, m_tableScan, m_searchkeyExpressions);
+        m_skip_null_predicate = IndexScanPlanNode.buildSkipNullPredicate(nextKeyIndex,
+                m_catalogIndex, getTargetTableScan(), m_searchkeyExpressions);
         if (m_skip_null_predicate != null) {
             m_skip_null_predicate.resolveForTable((Table)m_catalogIndex.getParent());
         }
@@ -212,7 +213,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             indexSize = indexedColRefs.size();
         } else {
             try {
-                indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, isp.getTableScan());
+                indexedExprs = AbstractExpression.fromJSONArrayString(jsonstring, isp.getTargetTableScan());
                 indexSize = indexedExprs.size();
             } catch (JSONException e) {
                 // TODO Auto-generated catch block
@@ -425,7 +426,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         else {
             try {
                 List<AbstractExpression> indexExpressions =
-                    AbstractExpression.fromJSONArrayString(jsonExpr, m_tableScan);
+                    AbstractExpression.fromJSONArrayString(jsonExpr, getTargetTableScan());
                 int ii = 0;
                 for (AbstractExpression ae : indexExpressions) {
                     asIndexed[ii++] = ae.explain(m_targetTableName);
@@ -486,6 +487,12 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     public ArrayList<AbstractExpression> getBindings() {
         return m_bindings;
+    }
+
+    @Override
+    public StmtTargetTableScan getTargetTableScan() {
+        assert(m_tableScan instanceof StmtTargetTableScan);
+        return (StmtTargetTableScan) m_tableScan;
     }
 
     @Override
