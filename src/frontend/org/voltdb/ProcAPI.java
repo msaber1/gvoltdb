@@ -1,0 +1,144 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb;
+
+import java.util.Date;
+import java.util.Random;
+
+public abstract class ProcAPI {
+
+    /**
+     * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
+     * TO GET GOOD BEHAVIOR FROM THIS METHOD - e.g. time always goes forward
+     *
+     * Allow VoltProcedures access to a unique ID generated for each transaction.
+     *
+     * The id consists of a time based component in the most significant bits followed
+     * by a counter, and then a generator id to allow parallel unique number generation
+     * @return An ID that is unique to this transaction
+     */
+    public abstract long getUniqueId();
+
+    /**
+     * Get the ID of cluster that the client connects to.
+     * @return An ID that identifies the VoltDB cluster
+     */
+    public abstract int getClusterId();
+
+    /**
+     * Get a Java RNG seeded with the current transaction id. This will ensure that
+     * two procedures for the same transaction, but running on different replicas,
+     * can generate an identical stream of random numbers. This is required to endure
+     * procedures have deterministic behavior. The RNG is memoized so you can invoke this
+     * multiple times within a single procedure.
+     *
+     * @return A deterministically-seeded java.util.Random instance.
+     */
+    public abstract Random getSeededRandomNumberGenerator();
+
+    /**
+     * YOU MUST BE RUNNING NTP AND START NTP WITH THE -x OPTION
+     * TO GET GOOD BEHAVIOR FROM THIS METHOD - e.g. time always goes forward
+     *
+     * Get the time that this procedure was accepted into the VoltDB cluster. This is the
+     * effective, but not always actual, moment in time this procedure executes. Use this
+     * method to get the current time instead of non-deterministic methods. Note that the
+     * value will not be unique across transactions as it is only millisecond granularity.
+     *
+     * @return A java.util.Date instance with deterministic time for all replicas using
+     * UTC (Universal Coordinated Time is like GMT).
+     */
+    public abstract Date getTransactionTime();
+
+    /**
+     * <p>Queue the SQL {@link org.voltdb.SQLStmt statement} for execution with the specified argument list,
+     * and an Expectation describing the expected results. If the Expectation is not met then VoltAbortException
+     * will be thrown with a description of the expectation that was not met. This exception must not be
+     * caught from within the procedure.</p>
+     *
+     * @param stmt {@link org.voltdb.SQLStmt Statement} to queue for execution.
+     * @param expectation Expectation describing the expected result of executing this SQL statement.
+     * @param args List of arguments to be bound as parameters for the {@link org.voltdb.SQLStmt statement}
+     * @see <a href="#allowable_params">List of allowable parameter types</a>
+     */
+    public abstract void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args);
+
+    /**
+     * Queue the SQL {@link org.voltdb.SQLStmt statement} for execution with the specified argument list.
+     *
+     * @param stmt {@link org.voltdb.SQLStmt Statement} to queue for execution.
+     * @param args List of arguments to be bound as parameters for the {@link org.voltdb.SQLStmt statement}
+     * @see <a href="#allowable_params">List of allowable parameter types</a>
+     */
+    public abstract void voltQueueSQL(final SQLStmt stmt, Object... args);
+
+    /**
+     * <p>Queue the adhoc SQL statement for execution. The adhoc SQL statement will have
+     * to be planned which is orders of magnitude slower then using a precompiled SQL statements.</p>
+     *
+     * <p>If the query is parameterized it is possible to pass in the parameters.</p>
+     *
+     * @deprecated This method is experimental and not intended for production use yet.
+     * @param sql An ad-hoc SQL string to be run transactionally in this procedure.
+     * @param args Parameter values for the SQL string.
+     */
+    @Deprecated
+    public abstract void voltQueueSQLExperimental(String sql, Object... args);
+
+    /**
+     * Execute the currently queued SQL {@link org.voltdb.SQLStmt statements} and return
+     * the result tables.
+     *
+     * @return Result {@link org.voltdb.VoltTable tables} generated by executing the queued
+     * query {@link org.voltdb.SQLStmt statements}
+     */
+    public abstract VoltTable[] voltExecuteSQL();
+
+    /**
+     * Execute the currently queued SQL {@link org.voltdb.SQLStmt statements} and return
+     * the result tables. Boolean option allows caller to indicate if this is the final
+     * batch for a procedure. If it's final, then additional optimizations can be enabled.
+     * Any call to voltExecuteSQL() after calling this with the argument set to true
+     * will cause the entire procedure to roll back.
+     *
+     * @param isFinalSQL Is this the final batch for a procedure?
+     * @return Result {@link org.voltdb.VoltTable tables} generated by executing the queued
+     * query {@link org.voltdb.SQLStmt statements}
+     */
+    public abstract VoltTable[] voltExecuteSQL(boolean isFinalSQL);
+
+    /**
+     * Set the status code that will be returned to the client. This is not the same as the status
+     * code returned by the server. If a procedure sets the status code and then rolls back or causes an error
+     * the status code will still be propagated back to the client so it is always necessary to check
+     * the server status code first.
+     *
+     * @param statusCode Byte-long application-specific status code.
+     */
+    public abstract void setAppStatusCode(byte statusCode);
+
+    /**
+     * Set the string that will be turned to the client. This is not the same as teh status string
+     * returned by the server. If a procedure sets the status string and then rolls back or causes an error
+     * the status string will still be propagated back to the client so it is always necessary to check
+     * the server status code first.
+     *
+     * @param statusString Application specific status string.
+     */
+    public abstract void setAppStatusString(String statusString);
+}

@@ -82,7 +82,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
 
             try {
                 // voltLoadTable is void. Assume success or exception.
-                voltLoadTable(context.getCluster().getTypeName(),
+                m_runner.voltLoadTable(context.getCluster().getTypeName(),
                                     context.getDatabase().getTypeName(),
                                     tableName,
                                     toInsert, false, false);

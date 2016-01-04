@@ -50,6 +50,8 @@
 package org.voltdb.benchmark.tpcc.procedures;
 
 import org.voltdb.ProcInfo;
+import org.voltdb.ProcedurePrivateHelper;
+import org.voltdb.ProcedureRunner;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
@@ -65,14 +67,18 @@ public class LoadWarehouse extends VoltProcedure {
     public VoltTable[] run(short w_id, VoltTable warehouses, VoltTable districts, VoltTable customers,
         VoltTable stocks, VoltTable orders, VoltTable neworders, VoltTable orderLines, VoltTable histories)
     throws VoltAbortException {
-        voltLoadTable("cluster", "database", "WAREHOUSE", warehouses, false, false);
-        voltLoadTable("cluster", "database", "DISTRICT", districts, false, false);
-        voltLoadTable("cluster", "database", "CUSTOMER", customers, false, false);
-        voltLoadTable("cluster", "database", "STOCK", stocks, false, false);
-        voltLoadTable("cluster", "database", "ORDERS", orders, false, false);
-        voltLoadTable("cluster", "database", "NEW_ORDER", neworders, false, false);
-        voltLoadTable("cluster", "database", "ORDER_LINE", orderLines, false, false);
-        voltLoadTable("cluster", "database", "HISTORY", histories, false, false);
+
+        ProcedureRunner pr = ProcedurePrivateHelper.getProcedureRunner(this);
+
+        pr.voltLoadTable("cluster", "database", "WAREHOUSE", warehouses, false, false);
+        pr.voltLoadTable("cluster", "database", "DISTRICT", districts, false, false);
+        pr.voltLoadTable("cluster", "database", "CUSTOMER", customers, false, false);
+        pr.voltLoadTable("cluster", "database", "STOCK", stocks, false, false);
+        pr.voltLoadTable("cluster", "database", "ORDERS", orders, false, false);
+        pr.voltLoadTable("cluster", "database", "NEW_ORDER", neworders, false, false);
+        pr.voltLoadTable("cluster", "database", "ORDER_LINE", orderLines, false, false);
+        pr.voltLoadTable("cluster", "database", "HISTORY", histories, false, false);
+
         return null;
     }
 }

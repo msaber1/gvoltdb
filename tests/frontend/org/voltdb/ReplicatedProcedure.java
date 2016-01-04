@@ -40,9 +40,11 @@ public class ReplicatedProcedure extends VoltProcedure {
             throw new VoltAbortException();
         }
 
+        ProcedureRunner runner = ProcedurePrivateHelper.getProcedureRunner(this);
+
         VoltTable result = new VoltTable(new ColumnInfo("txnId", VoltType.BIGINT),
                                          new ColumnInfo("timestamp", VoltType.BIGINT));
-        result.addRow(getVoltPrivateRealTransactionIdDontUseMe(), getUniqueId());
+        result.addRow(runner.getTransactionId(), getUniqueId());
 
         // replicated txns get their results replaced by a hash... so stash this here
         setAppStatusString(result.toJSONString());

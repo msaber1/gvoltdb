@@ -96,9 +96,15 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     }
 
     @Override
-    void init(ProcedureRunner procRunner) {
-        super.init(procRunner);
-        m_runner = procRunner;
+    public void init(ProcAPI procRunner) {
+        if (procRunner instanceof ProcedureRunner) {
+            super.init(procRunner);
+            m_runner = (ProcedureRunner) procRunner;
+        }
+        else {
+            throw new IllegalArgumentException(
+                    "System procs must be initialized with a ProcedureRunner instance.");
+        }
     }
 
     void initSysProc(SiteProcedureConnection site,

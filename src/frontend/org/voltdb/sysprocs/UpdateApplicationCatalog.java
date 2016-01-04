@@ -17,7 +17,6 @@
 
 package org.voltdb.sysprocs;
 
-import java.lang.Class;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -51,7 +50,6 @@ import org.voltdb.exceptions.SpecifiedException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CatalogUtil.CatalogAndIds;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.FakeStatsProducer;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.InMemoryJarfile.JarLoader;
 import org.voltdb.utils.VoltTableUtil;
@@ -278,7 +276,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         catalogStuff.catalogBytes,
                         catalogStuff.getCatalogHash(),
                         expectedCatalogVersion,
-                        getVoltPrivateRealTransactionIdDontUseMe(),
+                        m_runner.getTransactionId(),
                         getUniqueId(),
                         catalogStuff.deploymentBytes,
                         catalogStuff.getDeploymentHash());
@@ -452,7 +450,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         CatalogUtil.updateCatalogToZK(
                 zk,
                 expectedCatalogVersion + 1,
-                getVoltPrivateRealTransactionIdDontUseMe(),
+                m_runner.getTransactionId(),
                 getUniqueId(),
                 catalogBytes,
                 deploymentBytes);

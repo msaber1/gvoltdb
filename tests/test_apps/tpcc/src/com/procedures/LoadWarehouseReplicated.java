@@ -24,6 +24,8 @@
 package com.procedures;
 
 import org.voltdb.ProcInfo;
+import org.voltdb.ProcedurePrivateHelper;
+import org.voltdb.ProcedureRunner;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -43,6 +45,9 @@ public class LoadWarehouseReplicated extends VoltProcedure {
 
     public VoltTable[] run(short w_id, VoltTable items, VoltTable customerNames)
     throws VoltAbortException {
+
+        ProcedureRunner pr = ProcedurePrivateHelper.getProcedureRunner(this);
+
         if (items != null) {
             // check if we've already set up this partition
             voltQueueSQL(checkItemExists);
@@ -51,9 +56,9 @@ public class LoadWarehouseReplicated extends VoltProcedure {
                 return null;
 
             // now we know the partition is not loaded yet
-            voltLoadTable("cluster", "database", "ITEM", items, false, false);
+            pr.voltLoadTable("cluster", "database", "ITEM", items, false, false);
         }
-        voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames, false, false);
+        pr.voltLoadTable("cluster", "database", "CUSTOMER_NAME", customerNames, false, false);
         return null;
     }
 

@@ -65,7 +65,7 @@ import org.voltdb.utils.MiscUtils;
 
 import com.google_voltpatches.common.base.Charsets;
 
-public class ProcedureRunner {
+public class ProcedureRunner extends ProcAPI {
 
     private static final VoltLogger log = new VoltLogger("HOST");
     private static final boolean HOST_TRACE_ENABLED;
@@ -231,7 +231,7 @@ public class ProcedureRunner {
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
      */
-    long getTransactionId() {
+    public long getTransactionId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
         if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
             return invocation.getOriginalTxnId();
@@ -240,7 +240,8 @@ public class ProcedureRunner {
         }
     }
 
-    Random getSeededRandomNumberGenerator() {
+    @Override
+    public Random getSeededRandomNumberGenerator() {
         // this value is memoized here and reset at the beginning of call(...).
         if (m_cachedRNG == null) {
             m_cachedRNG = new Random(getUniqueId());
@@ -530,10 +531,12 @@ public class ProcedureRunner {
         return m_site.getNonVoltDBBackendIfExists();
     }
 
+    @Override
     public void setAppStatusCode(byte statusCode) {
         m_appStatusCode = statusCode;
     }
 
+    @Override
     public void setAppStatusString(String statusString) {
         m_appStatusString = statusString;
     }
@@ -552,6 +555,7 @@ public class ProcedureRunner {
      * that is now a unique id with a timestamp encoded in the most significant bits ala
      * a pre-IV2 transaction id.
      */
+    @Override
     public Date getTransactionTime() {
         return new Date(UniqueIdGenerator.getTimestampFromUniqueId(getUniqueId()));
     }
@@ -562,6 +566,7 @@ public class ProcedureRunner {
      * to allow matching partition counts with IV2. It's OK, still can do 512k txns/second per
      * partition so plenty of headroom.
      */
+    @Override
     public long getUniqueId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
         if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
@@ -574,6 +579,7 @@ public class ProcedureRunner {
     /*
      * Cluster id is immutable and be persisted during the snapshot
      */
+    @Override
     public int getClusterId() {
         return m_site.getCorrespondingClusterId();
     }
@@ -597,6 +603,7 @@ public class ProcedureRunner {
         }
     }
 
+    @Override
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
         if (stmt == null) {
             throw new IllegalArgumentException("SQLStmt parameter to voltQueueSQL(..) was null.");
@@ -610,11 +617,13 @@ public class ProcedureRunner {
         m_batch.add(queuedSQL);
     }
 
+    @Override
     public void voltQueueSQL(final SQLStmt stmt, Object... args) {
         voltQueueSQL(stmt, (Expectation) null, args);
     }
 
-    public void voltQueueSQL(final String sql, Object... args) {
+    @Override
+    public void voltQueueSQLExperimental(final String sql, Object... args) {
         if (sql == null || sql.isEmpty()) {
             throw new IllegalArgumentException("SQL statement '" + sql + "' is null or the empty string");
         }
@@ -699,6 +708,12 @@ public class ProcedureRunner {
         }
     }
 
+    @Override
+    public VoltTable[] voltExecuteSQL() {
+        return voltExecuteSQL(false);
+    }
+
+    @Override
     public VoltTable[] voltExecuteSQL(boolean isFinalSQL) {
         try {
             if (m_seenFinalBatch) {
