@@ -982,21 +982,20 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
             throw new EEException(result);
         }
-    /*
+        /*//
         // This code will hang expecting input that never arrives
         // until voltdbipc is extended to respond with information
         // negative or positive about "unique violations".
-        ByteBuffer responseBuffer = null;
         try {
-            responseBuffer = readMessage();
-        } catch (IOException e) {
+            ByteBuffer responseBuffer = readMessage();
+            if (responseBuffer != null) {
+                return responseBuffer.array();
+            }
+        }
+        catch (IOException e) {
             Throwables.propagate(e);
         }
-
-        if (responseBuffer != null) {
-            return responseBuffer.array();
-        }
-    */
+        //*/
         return null;
     }
 

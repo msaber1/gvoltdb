@@ -283,10 +283,12 @@ CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data
         // find a place to put the new node
         TreeNode *y = &NIL;
         TreeNode *x = m_root;
-        while (x != &NIL) {
+        TreeNode** pointerFromParent = NULL;
+        do {
             y = x;
             int cmp = m_comper(key, x->key());
             if (cmp < 0) {
+                pointerFromParent = &(x->left);
                 x = x->left;
             }
             else {
@@ -305,13 +307,16 @@ CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data
                     }
                     return collidingData;
                 }
+                pointerFromParent = &(x->right);
                 x = x->right;
             }
 
             if (hasRank) {
                 incSubct(y);
             }
-        }
+        } while (x != &NIL);
+
+        assert(y != &NIL);
 
         // create a new node
         void *memory = m_allocator.alloc();
@@ -328,15 +333,7 @@ CompactingMap<KeyValuePair, Compare, hasRank>::insert(const Key &key, const Data
         }
 
         // stitch it in
-        if (y == &NIL) {
-            m_root = z;
-        }
-        else if (m_comper(z->key(), y->key()) < 0) {
-            y->left = z;
-        }
-        else {
-            y->right = z;
-        }
+        *pointerFromParent = z;
 
         // rotate tree to balance if needed
         insertFixup(z);
