@@ -938,7 +938,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     throws EEException
     {
         if (returnUniqueViolations) {
-            throw new UnsupportedOperationException("Haven't added IPC support for returning unique violatiosn");
+            throw new UnsupportedOperationException("Haven't added IPC support for returning unique violations");
         }
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);
@@ -982,7 +982,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
             throw new EEException(result);
         }
-
+    /*
+        // This code will hang expecting input that never arrives
+        // until voltdbipc is extended to respond with information
+        // negative or positive about "unique violations".
         ByteBuffer responseBuffer = null;
         try {
             responseBuffer = readMessage();
@@ -990,7 +993,10 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             Throwables.propagate(e);
         }
 
-        if (responseBuffer != null) return responseBuffer.array();
+        if (responseBuffer != null) {
+            return responseBuffer.array();
+        }
+    */
         return null;
     }
 
