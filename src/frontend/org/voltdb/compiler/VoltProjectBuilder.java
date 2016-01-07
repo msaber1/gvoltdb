@@ -250,7 +250,7 @@ public class VoltProjectBuilder {
     int m_httpdPortNo = -1;
     boolean m_jsonApiEnabled = true;
 
-    BackendTarget m_target = BackendTarget.NATIVE_EE_JNI;
+    BackendTarget m_target = BackendTarget.NATIVE_EE_IPC;
     PrintStream m_compilerDebugPrintStream = null;
     boolean m_securityEnabled = false;
     String m_securityProvider = SecurityProviderString.HASH.value();

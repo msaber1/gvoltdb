@@ -94,6 +94,17 @@ public:
      */
     char *retrieveDependency(int32_t dependencyId, size_t *dependencySz);
 
+#define BYPASS_FRAGMENT_PROGRESS_UPDATE 1
+#ifdef BYPASS_FRAGMENT_PROGRESS_UPDATE
+    int64_t fragmentProgressUpdate(
+            int32_t batchIndex,
+            voltdb::PlanNodeType planNodeType,
+            int64_t tuplesProcessed,
+            int64_t currMemoryInBytes,
+            int64_t peakMemoryInBytes) { return 1000000000; }
+#define fragmentProgressUpdate fragmentProgressUpdateBypassed
+#endif
+
     int64_t fragmentProgressUpdate(
             int32_t batchIndex,
             voltdb::PlanNodeType planNodeType,
@@ -421,83 +432,112 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
     // could enumerate but they're only used in this one place.
     switch (ntohl(cmd->command)) {
       case 0:
+        // std::cout << "VoltDBIPC::initialize" << std::endl;
         result = initialize(cmd);
         break;
       case 2:
+        // std::cout << "VoltDBIPC::loadCatalog" << std::endl;
         result = loadCatalog(cmd);
         break;
       case 3:
+        std::cout << "VoltDBIPC::toggleProfiler" << std::endl;
         result = toggleProfiler(cmd);
         break;
       case 4:
+        // std::cout << "VoltDBIPC::tick" << std::endl;
         result = tick(cmd);
         break;
       case 5:
+        // std::cout << "VoltDBIPC::getStats" << std::endl;
         getStats(cmd);
         result = kErrorCode_None;
         break;
       case 6:
+        // std::cout << "VoltDBIPC::executePlanFragments" << std::endl;
         // also writes results directly
+    {
+      static int static_count = 0;
+      if ((static_count++) % 100 == 99) {
+        ThreadLocalPool::dumpDebugStats();
+      }
+    }
         executePlanFragments(cmd);
         result = kErrorCode_None;
         break;
       case 9:
+        // std::cout << "VoltDBIPC::loadTable" << std::endl;
         result = loadTable(cmd);
         break;
       case 10:
+        // std::cout << "VoltDBIPC::releaseUndoToken" << std::endl;
         result = releaseUndoToken(cmd);
         break;
       case 11:
+        // std::cout << "VoltDBIPC::undoUndoToken" << std::endl;
         result = undoUndoToken(cmd);
         break;
       case 13:
+        std::cout << "VoltDBIPC::setLogLevels" << std::endl;
         result = setLogLevels(cmd);
         break;
       case 16:
+        std::cout << "VoltDBIPC::quiesce" << std::endl;
         result = quiesce(cmd);
         break;
       case 17:
+        std::cout << "VoltDBIPC::activateTableStream" << std::endl;
         result = activateTableStream(cmd);
         break;
       case 18:
+        std::cout << "VoltDBIPC::tableStreamSerializeMore" << std::endl;
         tableStreamSerializeMore(cmd);
         result = kErrorCode_None;
         break;
       case 19:
+        std::cout << "VoltDBIPC::updateCatalog" << std::endl;
         result = updateCatalog(cmd);
         break;
       case 20:
+        std::cout << "VoltDBIPC::exportAction" << std::endl;
         exportAction(cmd);
         result = kErrorCode_None;
         break;
       case 21:
-          result = processRecoveryMessage(cmd);
+        std::cout << "VoltDBIPC::processRecoveryMessage" << std::endl;
+        result = processRecoveryMessage(cmd);
         break;
       case 22:
-          tableHashCode(cmd);
-          result = kErrorCode_None;
-          break;
+        std::cout << "VoltDBIPC::tableHashCode" << std::endl;
+        tableHashCode(cmd);
+        result = kErrorCode_None;
+        break;
       case 23:
-          hashinate(cmd);
-          result = kErrorCode_None;
-          break;
+        std::cout << "VoltDBIPC::hashinate" << std::endl;
+        hashinate(cmd);
+        result = kErrorCode_None;
+        break;
       case 24:
-          threadLocalPoolAllocations();
-          result = kErrorCode_None;
-          break;
+        // std::cout << "VoltDBIPC:threadLocalPoolAllocations:" << std::endl;
+        threadLocalPoolAllocations();
+        result = kErrorCode_None;
+        break;
       case 27:
-          updateHashinator(cmd);
-          result = kErrorCode_None;
-          break;
+        // std::cout << "VoltDBIPC::updateHashinator" << std::endl;
+        updateHashinator(cmd);
+        result = kErrorCode_None;
+        break;
       case 28:
-          executeTask(cmd);
-          result = kErrorCode_None;
-          break;
+        std::cout << "VoltDBIPC::executeTask" << std::endl;
+        executeTask(cmd);
+        result = kErrorCode_None;
+        break;
       case 29:
-          applyBinaryLog(cmd);
-          result = kErrorCode_None;
-          break;
+        std::cout << "VoltDBIPC::applyBinaryLog" << std::endl;
+        applyBinaryLog(cmd);
+        result = kErrorCode_None;
+        break;
       default:
+        std::cout << "VoltDBIPC::stub" << std::endl;
         result = stub(cmd);
     }
 
@@ -524,7 +564,6 @@ int8_t VoltDBIPC::stub(struct ipc_command *cmd) {
 }
 
 int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
-    printf("loadCatalog\n");
     assert(m_engine);
     if (!m_engine)
         return kErrorCode_Error;
@@ -811,6 +850,7 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int64_t uniqueId = ntohll(loadTableCommand->uniqueId);
     const int64_t undoToken = ntohll(loadTableCommand->undoToken);
     const bool returnUniqueViolations = loadTableCommand->returnUniqueViolations != 0;
+    assert(! returnUniqueViolations); // not yet implemented in IPC interface
     const bool shouldDRStream = loadTableCommand->shouldDRStream != 0;
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;

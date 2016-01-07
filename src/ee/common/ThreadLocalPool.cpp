@@ -61,7 +61,108 @@ typedef boost::unordered_map<std::size_t, PoolForObjectSizePtr> PoolsByObjectSiz
 typedef std::pair<int, PoolsByObjectSize* > PairType;
 typedef PairType* PairTypePtr;
 
-typedef boost::unordered_map<int32_t, boost::shared_ptr<CompactingPool> > CompactingStringStorage;
+typedef boost::unordered_map<int32_t, boost::shared_ptr<CompactingPool> > CompactingStringStorageBase;
+
+static const size_t N_CACHED_ALLOCATION_SIZES = 33;
+// These cached values for the rounded up over-head padded allocation
+// sizes for strings of minimal length happen to match the formula:
+// result = (((length + 12) / 4) * 4)?
+// IS this faster to lookup than to calculate?
+// A lookup is more flexible.
+// Would other specific values work better to minimize time/space overhead?
+// For very small strings, would it be worth trying to "INTERN" a single
+// eternal unique copy of each value rather than manage high-overhead copies?
+// Maybe not -- keep in mind that MANY small strings already bypass this code
+// by being DECLARED of inline-able size.
+static const int32_t static_cached_allocation_size[N_CACHED_ALLOCATION_SIZES] =
+{
+    12,             // for length 0
+    16, 16, 16, 16, // for lengths 1-4
+    20, 20, 20, 20, // for lengths 5-8, saves 4 bytes vs. the usual algorithm
+    24, 24, 24, 24, // for lengths 9-12
+    28, 28, 28, 28, // for lengths 13-16, saves 4 bytes vs. the usual algorithm
+    32, 32, 32, 32, // for lengths 17-20
+    36, 36, 36, 36, // for lengths 21-24, saves 12 bytes! vs. the usual algorithm
+    40, 40, 40, 40, // for lengths 25-28, saves 8 bytes vs. the usual algorithm
+    44, 44, 44, 44  // for lengths 29-32, saves 4 bytes vs. the usual algorithm
+};
+
+static int32_t static_cached_allocation_uses[N_CACHED_ALLOCATION_SIZES] =
+{
+    0,             // for length 0
+    0, 0, 0, 0, // for lengths 1-4
+    0, 0, 0, 0, // for lengths 5-8, saves 4 bytes vs. the usual algorithm
+    0, 0, 0, 0, // for lengths 9-12
+    0, 0, 0, 0, // for lengths 13-16, saves 4 bytes vs. the usual algorithm
+    0, 0, 0, 0, // for lengths 17-20
+    0, 0, 0, 0, // for lengths 21-24, saves 12 bytes! vs. the usual algorithm
+    0, 0, 0, 0, // for lengths 25-28, saves 8 bytes vs. the usual algorithm
+    0, 0, 0, 0  // for lengths 29-32, saves 4 bytes vs. the usual algorithm
+};
+
+  struct CompactingStringStorage : public CompactingStringStorageBase {
+    CompactingStringStorage()
+      : bumps(0)
+      , bloat_bumps(0)
+      , tot_size(0)
+      , tot_alloc_size(0)
+      , tot_bloat(0)
+      , max_bloat(0)
+    {}
+    int64_t bumps;
+    int64_t bloat_bumps;
+    int64_t near_bumps;
+    int64_t tot_size;
+    int64_t tot_alloc_size;
+    double tot_bloat;
+    double max_bloat;
+    void bumpToDump(int32_t sz, int32_t alloc_size)
+    {
+      bumps++;
+      tot_size += sz;
+      tot_alloc_size += alloc_size;
+      double bloat = (double)alloc_size / (double)sz;
+      if (bloat > max_bloat) {
+        bloat_bumps++;
+        max_bloat = bloat;
+        std::cout << "New max bloat " << bloat
+                  << " from " << sz << " to " << alloc_size
+                  << std::endl;
+      }
+      else if (bloat / max_bloat > 0.99) {
+        near_bumps++;
+      }
+      if (sz > 0) {
+        tot_bloat += bloat;
+      }
+    }
+    void dumpBumps()
+    {
+      if (bumps == 0) {
+        std::cout << "No bumps yet."
+                  << std::endl;
+        return;
+      }
+      std::cout << "After " << bumps << " bumps,"
+                << " avg. size = " << (tot_size / bumps)
+                << " avg. alloc_size = " << (tot_alloc_size / bumps)
+                << " avg. bloat = " << (tot_bloat / (double)bumps)
+                << " max. bloat = " << max_bloat
+                << " ratio of bloat bumps = " << ((double)bloat_bumps / (double)bumps)
+                << " ratio of near bumps = " << ((double)near_bumps / (double)bumps)
+                << std::endl;
+      for (int use = 0; use < N_CACHED_ALLOCATION_SIZES; ++use) {
+	std::cout << use << ":" << static_cached_allocation_uses[use]
+                  << std::endl;
+      }
+    }
+  };
+
+void ThreadLocalPool::dumpDebugStats() { 
+    CompactingStringStorage& result =
+      *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+    result.dumpBumps();
+}
 
 static void createThreadLocalKey() {
     (void)pthread_key_create( &m_key, NULL);
@@ -111,6 +212,16 @@ static int32_t getAllocationSizeForObject(int length)
         NVALUE_LONG_OBJECT_LENGTHLENGTH +
         CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
 
+    // The allocation sizes for some common tiny lengths are fetched from a
+    // hard-coded cache.
+    if (length < N_CACHED_ALLOCATION_SIZES) {
+        // Careful: this table bakes in an assumption: so assert it here.
+        assert(NVALUE_LONG_OBJECT_LENGTHLENGTH +
+               ThreadLocalPool::POOLED_MAX_VALUE_LENGTH == 12);
+	++(static_cached_allocation_uses[length]);
+        return static_cached_allocation_size[length];
+    }
+
     int length_to_fit = length +
         NVALUE_LONG_OBJECT_LENGTHLENGTH +
         CompactingPool::FIXED_OVERHEAD_PER_ENTRY();
@@ -131,7 +242,7 @@ static int32_t getAllocationSizeForObject(int length)
     // at slightly different scales, but the arithmetic mean (3/4 of the power)
     // is fast to calculate and close enough for our purposes.
     int threeQuartersTarget = target - (target>>2);
-    if (length_to_fit < threeQuartersTarget) {
+    if (length_to_fit <= threeQuartersTarget) {
         target = threeQuartersTarget;
     }
     if (target <= MAX_ALLOCATION) {
@@ -169,9 +280,14 @@ void ThreadLocalPool::freeRelocatable(Sized* data)
 
 #else // not MEMCHECK
 
-static CompactingStringStorage& getStringPoolMap()
+static CompactingStringStorage& getStringPoolMap(int32_t sz = -2, int32_t alloc_size = -2)
 {
-    return *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+    CompactingStringStorage& result =
+      *static_cast<CompactingStringStorage*>(pthread_getspecific(m_stringKey));
+    if (sz != -2) {
+        result.bumpToDump(sz, alloc_size);
+    }
+    return result;
 }
 
 ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, int32_t sz)
@@ -190,7 +306,7 @@ ThreadLocalPool::Sized* ThreadLocalPool::allocateRelocatable(char** referrer, in
     // For now, to keep the allocator simple and abstract,
     // NValue and the allocator each keep their own accounting.
     int32_t alloc_size = getAllocationSizeForObject(sz);
-    CompactingStringStorage& poolMap = getStringPoolMap();
+    CompactingStringStorage& poolMap = getStringPoolMap(sz, alloc_size);
     CompactingStringStorage::iterator iter = poolMap.find(alloc_size);
     void* allocation;
     if (iter == poolMap.end()) {

@@ -31,6 +31,7 @@ namespace voltdb {
  */
 class ThreadLocalPool {
 public:
+static void dumpDebugStats();
     ThreadLocalPool();
     ~ThreadLocalPool();
 
