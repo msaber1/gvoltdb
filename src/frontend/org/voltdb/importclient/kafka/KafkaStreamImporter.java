@@ -66,7 +66,6 @@ import kafka.network.BlockingChannel;
 
 import org.osgi.framework.BundleActivator;
 import org.osgi.framework.BundleContext;
-import org.voltdb.VoltDB;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.importclient.ImportBaseException;
@@ -302,6 +301,20 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
         return false;
     }
 
+    private final class FailedMetaDataAttempt {
+        final String msg;
+        final Throwable cause;
+
+        FailedMetaDataAttempt(String msg, Throwable cause) {
+            this.cause = cause;
+            this.msg = msg;
+        }
+
+        private void log() {
+            error(cause, msg);
+        }
+    }
+
     //This is called to get all available resources. So called once during startup or catalog update.
     private Set<URI> buildTopicLeaderMetadata() {
 
@@ -312,23 +325,28 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             int consumerSocketTimeout = m_brokerSOTimeout.get(key);
             int fetchsize = m_brokerFetchSize.get(key);
             try {
+                List<FailedMetaDataAttempt> attempts = new ArrayList<>();
                 for (String topic : m_brokerTopicList.get(key)) {
-                    consumer = new SimpleConsumer(m_brokerList.get(key).get(0).getHost(), m_brokerList.get(key).get(0).getPort(), consumerSocketTimeout, fetchsize, CLIENT_ID);
+                    String host = m_brokerList.get(key).get(0).getHost();
+                    consumer = new SimpleConsumer(host, m_brokerList.get(key).get(0).getPort(), consumerSocketTimeout, fetchsize, CLIENT_ID);
 
                     TopicMetadataRequest req = new TopicMetadataRequest(singletonList(topic));
                     kafka.javaapi.TopicMetadataResponse resp = null;
                     try {
                         resp = consumer.send(req);
                     } catch (Exception ex) {
-                        //Only called once.
-                        error(ex, "Failed to send topic metadata request for topic " + topic);
+                        attempts.add(new FailedMetaDataAttempt(
+                                "Failed to send topic metadata request for topic " + topic + " from host " + host, ex
+                                ));
                         continue;
                     }
 
                     List<TopicMetadata> metaData = resp.topicsMetadata();
                     if (metaData == null) {
                         //called once.
-                        error("Failed to get topic metadata for topic " + topic);
+                        attempts.add(new FailedMetaDataAttempt(
+                                "Topic metadata for" + topic + " is not available from host " + host, null
+                                ));
                         continue;
                     }
                     m_topicPartitionMetaData.put(topic, metaData);
@@ -354,6 +372,13 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                         }
                     }
                 }
+                if (availableResources.isEmpty()) {
+                    for (FailedMetaDataAttempt attempt: attempts) {
+                        attempt.log();
+                    }
+                    attempts.clear();
+                    error(null, "Unable to get topic metadata for %s", m_brokerTopicList.values());
+                }
             } finally {
                 closeConsumer(consumer);
             }
@@ -373,7 +398,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             //Build all available topic URIs
             availableResources = buildTopicLeaderMetadata();
         } catch (Exception ex) {
-            VoltDB.crashLocalVoltDB("Failed to get available resources for kafka importer", true, ex);
+            crashLocalNode("Failed to get available resources for kafka importer", true, ex);
         }
         return availableResources;
     }
@@ -746,6 +771,10 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             continue;
                         }
                         long lastOffset = getLastOffset();
+                        if (lastOffset == -1) {
+                            sleepCounter = backoffSleep(sleepCounter);
+                            continue;
+                        }
 
                         m_gapTracker.resetTo(lastOffset);
                         m_lastCommittedOffset = lastOffset;
@@ -929,7 +958,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             }
 
             private final int idx(long offset) {
-                return (int)offset % lag.length;
+                return (int)(offset % lag.length);
             }
 
             synchronized void resetTo(long offset) {
@@ -983,7 +1012,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
     public void onChange(ImporterChannelAssignment assignment) {
         if (m_es == null) {
             //Create executor with sufficient threads.
-            VoltDB.crashLocalVoltDB("buildTopicLeaderMetadata must be called before getting an onChange", false, null);
+            crashLocalNode("buildTopicLeaderMetadata must be called before getting an onChange", false, null);
         }
         //For removed shutdown the fetchers if all are removed the importer will be closed/shutdown?
         for (URI r : assignment.getRemoved()) {
@@ -1020,7 +1049,7 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                 List<Integer> topicPartitions = m_topicPartitions.get(topic);
                 if (topicPartitions == null) {
                     //I got a change for added partition that I am not aware of die die.
-                    VoltDB.crashLocalVoltDB("Unknown kafka topic added for this node", false, null);
+                    crashLocalNode("Unknown kafka topic added for this node", false, null);
                 }
                 String proc = topicProc.get(topic);
                 for (int partition : topicPartitions) {

@@ -54,6 +54,7 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     private Method m_info_enabled;
     private Method m_statsFailureCall;
     private Method m_statsQueuedCall;
+    private Method m_crashLocalNode;
 
     @Override
     public boolean canContinue() {
@@ -140,6 +141,7 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
         m_warn_log_rateLimited = m_handler.getClass().getMethod("rateLimitedWarn", Throwable.class, String.class, Object[].class);
         m_statsFailureCall = m_handler.getClass().getMethod("reportFailure", String.class, String.class, boolean.class);
         m_statsQueuedCall = m_handler.getClass().getMethod("reportQueued", String.class, String.class);
+        m_crashLocalNode = m_handler.getClass().getMethod("crashLocalNode", String.class, Boolean.TYPE, Throwable.class);
     }
 
     @Override
@@ -258,6 +260,15 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     @Override
     public boolean isRunEveryWhere() {
         return true;
+    }
+
+    public void crashLocalNode(String msg, boolean produceStackTrace, Throwable cause) {
+        try {
+           m_crashLocalNode.invoke(m_handler, msg, cause);
+        } catch (InvocationTargetException|IllegalAccessException  e) { // this shouldn't happen
+            error(e, "failed to crash. Forcing program exit");
+            System.exit(-1);
+        }
     }
 
     @Override

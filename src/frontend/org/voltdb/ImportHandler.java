@@ -187,4 +187,8 @@ public class ImportHandler {
     public void rateLimitedWarn(Throwable t, String format, Object...args) {
         m_logger.rateLimitedLog(SUPPRESS_INTERVAL, Level.WARN, t, format, args);
     }
+
+    public void crashLocalNode(String errMsg, boolean stackTrace, Throwable thrown) {
+        VoltDB.crashLocalVoltDB(errMsg, stackTrace, thrown);
+    }
 }
