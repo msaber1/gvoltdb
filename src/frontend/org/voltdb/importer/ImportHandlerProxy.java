@@ -265,7 +265,10 @@ public abstract class ImportHandlerProxy implements ImportContext, ChannelChange
     public void crashLocalNode(String msg, boolean produceStackTrace, Throwable cause) {
         try {
            m_crashLocalNode.invoke(m_handler, msg, cause);
-        } catch (InvocationTargetException|IllegalAccessException  e) { // this shouldn't happen
+        } catch (IllegalAccessException  e) { // this shouldn't happen
+            error(e, "failed to crash. Forcing program exit");
+            System.exit(-1);
+        } catch (InvocationTargetException e) { // this shouldn't happen
             error(e, "failed to crash. Forcing program exit");
             System.exit(-1);
         }
