@@ -324,9 +324,9 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
             SimpleConsumer consumer = null;
             int consumerSocketTimeout = m_brokerSOTimeout.get(key);
             int fetchsize = m_brokerFetchSize.get(key);
-            try {
-                List<FailedMetaDataAttempt> attempts = new ArrayList<>();
-                for (String topic : m_brokerTopicList.get(key)) {
+            List<FailedMetaDataAttempt> attempts = new ArrayList<>();
+            for (String topic : m_brokerTopicList.get(key)) {
+                try {
                     String host = m_brokerList.get(key).get(0).getHost();
                     consumer = new SimpleConsumer(host, m_brokerList.get(key).get(0).getPort(), consumerSocketTimeout, fetchsize, CLIENT_ID);
 
@@ -371,16 +371,17 @@ public class KafkaStreamImporter extends ImportHandlerProxy implements BundleAct
                             m_topicPartitionLeader.put(leaderKey, new HostAndPort(leader.host(), leader.port()));
                         }
                     }
+                } finally {
+                    closeConsumer(consumer);
                 }
-                if (availableResources.isEmpty()) {
-                    for (FailedMetaDataAttempt attempt: attempts) {
-                        attempt.log();
-                    }
-                    attempts.clear();
-                    error(null, "Unable to get topic metadata for %s", m_brokerTopicList.values());
+            }   // for (String topic : m_brokerTopicList.get(key))
+
+            if (availableResources.isEmpty()) {
+                for (FailedMetaDataAttempt attempt: attempts) {
+                    attempt.log();
                 }
-            } finally {
-                closeConsumer(consumer);
+                attempts.clear();
+                error(null, "Unable to get topic metadata for %s", m_brokerTopicList.values());
             }
         }
 
