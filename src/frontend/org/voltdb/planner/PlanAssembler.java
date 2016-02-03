@@ -458,15 +458,7 @@ public class PlanAssembler {
 
             // guards against IN/EXISTS/Scalar subqueries
             if ( ! m_partitioning.wasSpecifiedAsSingle() ) {
-                // no partition tables in parent query
-                for (Table tb: parsedStmt.m_tableList) {
-                    if (! tb.getIsreplicated()) {
-                        m_recentErrorMsg = IN_EXISTS_SCALAR_ERROR_MESSAGE;
-                        return null;
-                    }
-                }
-
-                // no partition tables in subqueries
+                // For now, allow no partitioned tables in subqueries
                 for (AbstractExpression e: subqueryExprs) {
                     assert(e instanceof SelectSubqueryExpression);
                     SelectSubqueryExpression subExpr = (SelectSubqueryExpression)e;
