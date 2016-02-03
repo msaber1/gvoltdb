@@ -575,7 +575,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         if (canHaveNLJ) {
             NestLoopPlanNode nljNode = new NestLoopPlanNode();
             // get all the clauses that join the applicable two tables
-            ArrayList<AbstractExpression> joinClauses = innerAccessPath.joinExprs;
+            // Copy innerAccessPath.joinExprs to leave it unchanged,
+            // avoiding accumulation of redundant expressions as joinClauses
+            // gets built up for various alternative plans.
+            ArrayList<AbstractExpression> joinClauses = new ArrayList<>(innerAccessPath.joinExprs);
             if (innerPlan instanceof IndexScanPlanNode) {
                 // InnerPlan is an IndexScan. In this case the inner and inner-outer
                 // non-index join expressions (if any) are in the otherExpr. The former should stay as
