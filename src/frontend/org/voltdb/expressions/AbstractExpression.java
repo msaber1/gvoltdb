@@ -1270,4 +1270,12 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
         return true;
     }
+
+    public boolean isValueTypeUniqueIndexable(StringBuffer msg) {
+        if(!m_valueType.isUniqueIndexable()) {
+            msg.append("expression of type " + getValueType().getName());
+            return false;
+        }
+        return true;
+    }
 }

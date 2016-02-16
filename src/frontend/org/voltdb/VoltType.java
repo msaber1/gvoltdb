@@ -807,6 +807,17 @@ public enum VoltType {
         }
     }
 
+    public boolean isUniqueIndexable() {
+        switch(this) {
+        case GEOGRAPHY_POINT:
+        case GEOGRAPHY:
+        case BOOLEAN:
+            return false;
+        default:
+            return true;
+        }
+    }
+
     /**
      * Is the type a number and is it an exact value (no rounding errors)?
      * @return true for integers and decimals. False for floats and strings
@@ -1086,4 +1097,5 @@ public enum VoltType {
 
         return MAX_ROW_SIZE / MAX_COLUMNS;
     }
+
 }

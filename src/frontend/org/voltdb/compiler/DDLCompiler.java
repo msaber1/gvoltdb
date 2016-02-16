@@ -1849,14 +1849,20 @@ public class DDLCompiler {
                     AbstractExpression expr = dummy.parseExpressionTree(exprNode);
                     expr.resolveForTable(table);
                     expr.finalizeValueTypes();
-                    // string will will be populated expression details whose value
-                    // type are not indexable
+                    // string will be populated with an expression's details when
+                    // its value type is not indexable
                     StringBuffer exprMsg = new StringBuffer();
                     if (!expr.isValueTypeIndexable(exprMsg)) {
                         // indexing on expression with boolean result is not supported.
                         throw compiler.new VoltCompilerException("Cannot create index \""+ name +
                                 "\" because it contains " + exprMsg + ", which is not supported.");
                     }
+                    if ((unique || assumeUnique) && !expr.isValueTypeUniqueIndexable(exprMsg)) {
+                        // indexing on expression with boolean result is not supported.
+                        throw compiler.new VoltCompilerException("Cannot create unique index \""+ name +
+                                "\" because it contains " + exprMsg + ", which is not supported.");
+                    }
+
                     // rest of the validity gaurds will be evaluated after collecting all the expressions.
                     checkExpressions.add(expr);
                     exprs.add(expr);
@@ -1895,6 +1901,11 @@ public class DDLCompiler {
 
                 if (! colType.isIndexable()) {
                     String emsg = colType.getName() + " values are not currently supported as index keys: '" + colNames[i] + "'";
+                    throw compiler.new VoltCompilerException(emsg);
+                }
+
+                if (! colType.isUniqueIndexable()) {
+                    String emsg = colType.getName() + " values are not currently supported as unique index keys: '" + colNames[i] + "'";
                     throw compiler.new VoltCompilerException(emsg);
                 }
 
@@ -2737,9 +2748,9 @@ public class DDLCompiler {
                 msg.append("must exactly match the GROUP BY clause at index " + String.valueOf(i) + " of SELECT list.");
                 throw compiler.new VoltCompilerException(msg.toString());
             }
-            // check if the expression return type is not indexable
+            // check if the expression return type is not unique indexable
             StringBuffer exprMsg = new StringBuffer();
-            if (!outcol.expression.isValueTypeIndexable(exprMsg)) {
+            if (!outcol.expression.isValueTypeUniqueIndexable(exprMsg)) {
                 msg.append("with " + exprMsg + " in GROUP BY clause not supported.");
                 throw compiler.new VoltCompilerException(msg.toString());
             }
