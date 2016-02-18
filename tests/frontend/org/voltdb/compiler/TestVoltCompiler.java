@@ -4396,7 +4396,7 @@ public class TestVoltCompiler extends TestCase {
 
     public void testBadDropStream() throws Exception {
         // non-existent stream
-        badDDLAgainstSimpleSchema(".+user lacks privilege or object not found: e1.*",
+        badDDLAgainstSimpleSchema(".+user lacks privilege or object not found: E1.*",
                "DROP STREAM e1;\n"
                 );
 
