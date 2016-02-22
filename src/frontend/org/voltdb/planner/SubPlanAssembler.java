@@ -24,6 +24,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
 import org.json_voltpatches.JSONException;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
@@ -35,6 +36,7 @@ import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.OperatorExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
@@ -820,10 +822,11 @@ public abstract class SubPlanAssembler {
             if (args.size() != 2) {
                 continue;
             }
-            //FunctionExpression fn = (FunctionExpression) filter;
-            //if ( ! fn.???) { //XXX: need to define a test for CONTAINS (?or APPROX_CONTAINS?)
-            //    continue;
-            //}
+            FunctionExpression fn = (FunctionExpression) filter;
+            //TODO: also support explicit APPROX_CONTAINS
+            if ( ! fn.hasFunctionId(FunctionForVoltDB.FUNC_VOLT_ID_FOR_CONTAINS) ) {
+                continue;
+            }
 
             AbstractExpression indexableArg = args.get(0);
             assert indexableArg instanceof TupleValueExpression;
@@ -844,10 +847,10 @@ public abstract class SubPlanAssembler {
                 continue;
             }
 
-            retval.lookupType = IndexLookupType.GEO_CONTAINS;
             filtersToCover.remove(searchKeyArg);
             retval.indexExprs.add(searchKeyArg);
             retval.otherExprs.addAll(filtersToCover);
+            retval.lookupType = IndexLookupType.GEO_CONTAINS;
             // It's unlikely but possible that the query has more than one
             // CONTAINS filter that uses the same geography column, e.g.
             //  "WHERE CONTAINS(place, point) AND CONTAINS(place, ?)"
