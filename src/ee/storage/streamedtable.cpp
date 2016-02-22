@@ -218,6 +218,11 @@ bool StreamedTable::insertTuple(TableTuple &source)
             return true;
         }
         uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
+    } else {
+        // handle any materialized views even though we dont have any connector.
+        for (int i = 0; i < m_views.size(); i++) {
+            m_views[i]->processTupleInsert(source, true);
+        }
     }
     return true;
 }

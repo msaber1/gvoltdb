@@ -2461,7 +2461,6 @@ public class DDLCompiler {
             // prepare info for aggregation columns.
             List<AbstractExpression> aggregationExprs = new ArrayList<AbstractExpression>();
             boolean hasAggregationExprs = false;
-            boolean hasMinOrMaxAgg = false;
             ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
             for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
                 ParsedColInfo col = stmt.m_displayColumns.get(i);
@@ -2472,10 +2471,8 @@ public class DDLCompiler {
                 aggregationExprs.add(aggExpr);
                 if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
                         col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
-                    hasMinOrMaxAgg = true;
                     minMaxAggs.add(aggExpr);
-                }
-            }
+                }            }
 
             // Generate query XMLs for min/max recalculation (ENG-8641)
             MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns);
@@ -2494,23 +2491,14 @@ public class DDLCompiler {
                 matviewinfo.setAggregationexpressionsjson(aggregationExprsJson);
             }
 
-            if (hasMinOrMaxAgg) {
-                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
-                boolean needsWarning = false;
-                for (Integer i=0; i<minMaxAggs.size(); ++i) {
-                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
-                    IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
-                    if (found != null) {
-                        refFound.setName(found.getTypeName());
-                    } else {
-                        refFound.setName("");
-                        needsWarning = true;
-                    }
-                }
-                if (needsWarning) {
-                    m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
-                            matviewinfo.getTypeName() +
-                            ", and a sequential scan might be issued when current min / max value is updated / deleted.");
+            // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
+            for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
+                IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
+                if (found != null) {
+                    refFound.setName(found.getTypeName());
+                } else {
+                    refFound.setName("");
                 }
             }
 
@@ -2530,6 +2518,87 @@ public class DDLCompiler {
                 // Correctly set the type of the column so that it's consistent.
                 // Otherwise HSQLDB might promote types differently than Volt.
                 destColumn.setType(col.expression.getValueType().getValue());
+            }
+        }
+    }
+
+    /**
+     * Process materialized view warnings.
+     */
+    public void processMaterializedViewWarnings(Database db) throws VoltCompilerException {
+        HashSet <String> viewTableNames = new HashSet<>();
+        for (Entry<Table, String> entry : m_matViewMap.entrySet()) {
+            viewTableNames.add(entry.getKey().getTypeName());
+        }
+
+
+        for (Entry<Table, String> entry : m_matViewMap.entrySet()) {
+            Table destTable = entry.getKey();
+            String query = entry.getValue();
+
+            // get the xml for the query
+            VoltXMLElement xmlquery = null;
+            try {
+                xmlquery = m_hsql.getXMLCompiledStatement(query);
+            }
+            catch (HSQLParseException e) {
+                e.printStackTrace();
+            }
+            assert(xmlquery != null);
+
+            // parse the xml like any other sql statement
+            ParsedSelectStmt stmt = null;
+            try {
+                stmt = (ParsedSelectStmt) AbstractParsedStmt.parse(query, xmlquery, null, db, null);
+            }
+            catch (Exception e) {
+                throw m_compiler.new VoltCompilerException(e.getMessage());
+            }
+            assert(stmt != null);
+
+            String viewName = destTable.getTypeName();
+            // create the materializedviewinfo catalog node for the source table
+            Table srcTable = stmt.m_tableList.get(0);
+            //export table does not need agg min and max warning.
+            if (CatalogUtil.isTableExportOnly(db, srcTable)) continue;
+
+            MaterializedViewInfo matviewinfo = srcTable.getViews().get(viewName);
+
+            boolean hasMinOrMaxAgg = false;
+            ArrayList<AbstractExpression> minMaxAggs = new ArrayList<AbstractExpression>();
+            for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                ParsedColInfo col = stmt.m_displayColumns.get(i);
+                AbstractExpression aggExpr = col.expression.getLeft();
+                if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
+                        col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
+                    hasMinOrMaxAgg = true;
+                    minMaxAggs.add(aggExpr);
+                }
+            }
+
+            if (hasMinOrMaxAgg) {
+                List<AbstractExpression> groupbyExprs = null;
+
+                if (stmt.hasComplexGroupby()) {
+                    groupbyExprs = new ArrayList<AbstractExpression>();
+                    for (ParsedColInfo col: stmt.m_groupByColumns) {
+                        groupbyExprs.add(col.expression);
+                    }
+                }
+
+                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
+                boolean needsWarning = false;
+                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
+                    if (found == null) {
+                        needsWarning = true;
+                    }
+                }
+                if (needsWarning) {
+                    m_compiler.addWarn("No index found to support UPDATE and DELETE on some of the min() / max() columns in the Materialized View " +
+                            matviewinfo.getTypeName() +
+                            ", and a sequential scan might be issued when current min / max value is updated / deleted.");
+                }
             }
         }
     }

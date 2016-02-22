@@ -4,6 +4,7 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
+<!-- If you are running community edition disable export section -->
     <export>
         <configuration target="oldfile" enabled="true" type="file">
             <property name="type">csv</property>

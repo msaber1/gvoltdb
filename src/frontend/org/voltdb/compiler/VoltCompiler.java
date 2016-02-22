@@ -1256,7 +1256,7 @@ public class VoltCompiler {
                 addExportTableToConnector(targetName, tableName, db);
             }
         }
-
+        ddlcompiler.processMaterializedViewWarnings(db);
         // Process and add exports and connectors to the catalog
         // Must do this before compiling procedures to deny updates
         // on append-only tables.
