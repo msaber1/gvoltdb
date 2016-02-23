@@ -154,7 +154,7 @@ CREATE TABLE partitioned_export
 , value      varbinary(1048576) NOT NULL
 );
 PARTITION TABLE partitioned_export ON COLUMN cid;
-EXPORT TABLE partitioned_export to stream partstream;
+EXPORT TABLE partitioned_export;
 
 CREATE VIEW ex_partview (
     cid,
@@ -193,7 +193,7 @@ CREATE TABLE replicated_export
 , adhocjmp   bigint             NOT NULL
 , value      varbinary(1048576) NOT NULL
 );
-EXPORT TABLE replicated_export to stream replstream;
+EXPORT TABLE replicated_export;
 
 -- For loadsinglepartition
 CREATE TABLE loadp
@@ -279,6 +279,8 @@ CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.DeleteLoadPartitionedBase;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.SetupAdHocTables;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedSP;
 PARTITION PROCEDURE UpdatePartitionedSP ON TABLE partitioned COLUMN cid;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedStreamView;
+PARTITION PROCEDURE UpdatePartitionedStreamView ON TABLE partitioned COLUMN cid;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateReplicatedMP;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBothMP;

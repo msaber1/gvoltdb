@@ -191,6 +191,29 @@ public class ClientThread extends BenchmarkThread {
                         shouldRollback + " data: " + data);
                 throw vae;
             }
+
+            // Try some SQL ops on the stream view if transaction choice is in the partitioned family
+            if (procName.contains("Partitioned")) {
+                try {
+                    response = m_client.callProcedure("UpdatePartitionedStreamView",
+                    m_cid,
+                    m_nextRid,
+                    payload,
+                    shouldRollback);
+                } catch (Exception e) {
+                    if (shouldRollback == 0) {
+                    log.warn("ClientThread threw after " + m_txnsRun.get() +
+                    " calls while calling procedure: " + procName +
+                    " with args: cid: " + m_cid + ", nextRid: " + m_nextRid +
+                    ", payload: " + payload +
+                    ", shouldRollback: " + shouldRollback);
+                    }
+                    throw e;
+                }
+                // second increment of txn counter for this transaction
+                m_txnsRun.incrementAndGet();
+            }
+
         }
         finally {
             // ensure rid is incremented (if not rolled back intentionally)

@@ -94,6 +94,8 @@ public class UpdateBaseProc extends VoltProcedure {
         VoltTable dim = results[2];
         VoltTable view = results[3];
 
+        usestreamviews = false;
+
         final long txnid = getUniqueId();
         final long ts = getTransactionTime().getTime();
         long prevtxnid = 0;
@@ -182,11 +184,6 @@ public class UpdateBaseProc extends VoltProcedure {
         voltQueueSQL(p_getExViewData, cid);
         voltQueueSQL(p_getExViewShadowData, cid);
         VoltTable[] streamresults = voltExecuteSQL();
-//        for (int i = 0; i < 5; i++) {
-//          String n = streamresults[0].getColumnName(i);
-//          VoltType  t = streamresults[0].getColumnType(i);
-//          System.out.println("+++ " + n + ": " + t.toSQLString());
-//        }
         validateStreamData(type, streamresults[0], streamresults[1], cid, cnt);
     }
 

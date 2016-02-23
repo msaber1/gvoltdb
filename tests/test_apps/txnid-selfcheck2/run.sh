@@ -38,7 +38,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
+    javac -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -source 1.8 -target 1.8 -classpath $CLASSPATH -d obj \
         src/txnIdSelfCheck/*.java \
         src/txnIdSelfCheck/procedures/*.java
     # stop if compilation fails
