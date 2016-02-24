@@ -94,7 +94,7 @@ public class UpdateBaseProc extends VoltProcedure {
         VoltTable dim = results[2];
         VoltTable view = results[3];
 
-        usestreamviews = false;
+        // don't assume usestreamviews = false;
 
         final long txnid = getUniqueId();
         final long ts = getTransactionTime().getTime();
@@ -149,26 +149,26 @@ public class UpdateBaseProc extends VoltProcedure {
         validateCIDData(data, view, getClass().getName());
 
         // insert to export table done, check corresponding materialized view
-        if (usestreamviews) {
-            validateView(cid, cnt, "insert");
-        }
+        //if (usestreamviews) {
+        //    validateView(cid, cnt, "insert");
+        // }
 
         // update export materialized view & validate
-        int someData = (int)System.currentTimeMillis();
-        if (usestreamviews) {
-            voltQueueSQL(p_updateExViewData, someData, someData, someData, someData, cid);
-            voltQueueSQL(p_updateExViewShadowData, someData, someData, someData, someData, cid);
-            voltExecuteSQL();
-            validateView(cid, cnt, "update");
-        }
+        // int someData = (int)System.currentTimeMillis();
+        // if (usestreamviews) {
+            // voltQueueSQL(p_updateExViewData, someData, someData, someData, someData, cid);
+            // voltQueueSQL(p_updateExViewShadowData, someData, someData, someData, someData, cid);
+            // voltExecuteSQL();
+            // validateView(cid, cnt, "update");
+        // }
 
         // delete from export materialized view & validate
-        if (usestreamviews) {
-            voltQueueSQL(p_deleteExViewData, cid);
-            voltQueueSQL(p_deleteExViewShadowData, cid);
-            voltExecuteSQL();
-            validateView(cid, cnt, "delete");
-        }
+        // if (usestreamviews) {
+            // voltQueueSQL(p_deleteExViewData, cid);
+            // voltQueueSQL(p_deleteExViewShadowData, cid);
+            // voltExecuteSQL();
+            // validateView(cid, cnt, "delete");
+        // }
 
         if (shouldRollback != 0) {
             throw new VoltAbortException("EXPECTED ROLLBACK");

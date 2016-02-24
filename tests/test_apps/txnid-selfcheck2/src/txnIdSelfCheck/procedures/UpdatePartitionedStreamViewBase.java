@@ -162,10 +162,11 @@ public class UpdatePartitionedStreamViewBase extends VoltProcedure {
         //}
 
         // update export materialized view & validate
-        int someData = (int)System.currentTimeMillis();
+        // int someData = (int)System.currentTimeMillis();
+        int someData = 5;
         //if (usestreamviews) {
-            voltQueueSQL(p_updateExViewData, someData, someData, someData, someData, cid);
-            voltQueueSQL(p_updateExViewShadowData, someData, someData, someData, someData, cid);
+            voltQueueSQL(p_updateExViewData, someData, someData, someData+1, someData+2, cid);
+            voltQueueSQL(p_updateExViewShadowData, someData, someData, someData+1, someData+2, cid);
             voltExecuteSQL();
             validateView(cid, cnt, "update");
         //}

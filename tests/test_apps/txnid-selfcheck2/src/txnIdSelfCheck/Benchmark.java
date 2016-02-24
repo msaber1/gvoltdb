@@ -169,6 +169,9 @@ public class Benchmark {
         @Option(desc = "Allow set ratio of upsert to insert workload.")
         float upsertratio = (float)0.50;
 
+        @Option(desc = "Include stream view SQL in the workload.")
+        boolean streamview = false;
+
         @Option(desc = "Allow set ratio of upsert against exist column.")
         float upserthitratio = (float)0.20;
 
@@ -606,7 +609,7 @@ public class Benchmark {
         if (!config.disabledThreads.contains("clients")) {
             for (byte cid = (byte) config.threadoffset; cid < config.threadoffset + config.threads; cid++) {
                 ClientThread clientThread = new ClientThread(cid, txnCount, client, processor, permits,
-                        config.allowinprocadhoc, config.mpratio);
+                        config.allowinprocadhoc, config.mpratio, config.streamview);
                 //clientThread.start(); # started after preload is complete
                 clientThreads.add(clientThread);
             }

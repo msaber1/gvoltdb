@@ -29,6 +29,6 @@ public class UpdatePartitionedSP extends UpdateBaseProc {
 
     public VoltTable[] run(byte cid, long rid, byte[] value, byte rollback) {
         return doWork(p_getCIDData, p_cleanUp, p_insert, p_export, p_getAdhocData, p_getViewData,
-                cid, rid, value, rollback, false);
+                cid, rid, value, rollback, true);
     }
 }

@@ -70,9 +70,10 @@ public class ClientThread extends BenchmarkThread {
     static Random rn = new Random(31); // deterministic sequence
     final Random m_random = new Random();
     final Semaphore m_permits;
+    final boolean m_streamview;
 
     ClientThread(byte cid, AtomicLong txnsRun, Client client, TxnId2PayloadProcessor processor, Semaphore permits,
-            boolean allowInProcAdhoc, float mpRatio)
+            boolean allowInProcAdhoc, float mpRatio, boolean streamview)
         throws Exception
     {
         setName("ClientThread(CID=" + String.valueOf(cid) + ")");
@@ -81,6 +82,7 @@ public class ClientThread extends BenchmarkThread {
         m_client = client;
         m_processor = processor;
         m_txnsRun = txnsRun;
+        m_streamview = streamview;
         m_permits = permits;
         log.info("ClientThread(CID=" + String.valueOf(cid) + ") " + m_type.toString());
 
@@ -193,7 +195,7 @@ public class ClientThread extends BenchmarkThread {
             }
 
             // Try some SQL ops on the stream view if transaction choice is in the partitioned family
-            if (procName.contains("Partitioned")) {
+            if (m_streamview && procName.contains("Partitioned")) {
                 try {
                     response = m_client.callProcedure("UpdatePartitionedStreamView",
                     m_cid,
