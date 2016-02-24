@@ -270,6 +270,7 @@ PARTITION TABLE capp ON COLUMN p;
 
 -- base procedures you shouldn't call
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdateBaseProc;
+CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.UpdatePartitionedStreamViewBase;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.ReplicatedUpdateBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.PoisonBaseProc;
 CREATE PROCEDURE FROM CLASS txnIdSelfCheck.procedures.CopyLoadPartitionedBase;
