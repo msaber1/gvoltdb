@@ -170,7 +170,7 @@ public class Benchmark {
         float upsertratio = (float)0.50;
 
         @Option(desc = "Include stream view SQL in the workload.")
-        boolean streamview = false;
+        boolean streamview = true;
 
         @Option(desc = "Allow set ratio of upsert against exist column.")
         float upserthitratio = (float)0.20;
