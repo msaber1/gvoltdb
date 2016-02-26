@@ -151,19 +151,12 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 static inline bool getAnotherTuple(IndexLookupType lookupType,
                                    TableTuple* tuple,
                                    TableIndex* index,
-                                   IndexCursor* cursor,
-                                   int activeNumOfSearchKeys) {
+                                   IndexCursor* cursor) {
     if (lookupType == INDEX_LOOKUP_TYPE_EQ
         || lookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
         *tuple = index->nextValueAtKey(*cursor);
-        if (! tuple->isNullTuple()) {
-            return true;
-        }
     }
-
-    if ((lookupType != INDEX_LOOKUP_TYPE_EQ
-         && lookupType != INDEX_LOOKUP_TYPE_GEO_CONTAINS)
-        || activeNumOfSearchKeys == 0) {
+    else {
         *tuple = index->nextValue(*cursor);
     }
 
@@ -451,8 +444,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
            getAnotherTuple(localLookupType,
                            &tuple,
                            tableIndex,
-                           &indexCursor,
-                           activeNumOfSearchKeys)) {
+                           &indexCursor)) {
 
         if (tuple.isPendingDelete()) {
             continue;

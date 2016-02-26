@@ -156,22 +156,14 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
 static inline bool getAnotherTuple(IndexLookupType lookupType,
                                    TableTuple* tuple,
                                    TableIndex *index,
-                                   IndexCursor *cursor,
-                                   int numOfSearchKeys) {
+                                   IndexCursor *cursor) {
 
     if (lookupType == INDEX_LOOKUP_TYPE_EQ
         || lookupType == INDEX_LOOKUP_TYPE_GEO_CONTAINS) {
 
         *tuple = index->nextValueAtKey(*cursor);
-
-        if (! tuple->isNullTuple()) {
-            return true;
-        }
     }
-
-    if ((lookupType != INDEX_LOOKUP_TYPE_EQ
-         && lookupType != INDEX_LOOKUP_TYPE_GEO_CONTAINS)
-        || numOfSearchKeys == 0) {
+    else {
         *tuple = index->nextValue(*cursor);
     }
 
@@ -500,8 +492,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                        getAnotherTuple(localLookupType,
                                        &inner_tuple,
                                        index,
-                                       &indexCursor,
-                                       num_of_searchkeys)) {
+                                       &indexCursor)) {
 
                     VOLT_TRACE("inner_tuple:%s",
                                inner_tuple.debug(inner_table->name()).c_str());
