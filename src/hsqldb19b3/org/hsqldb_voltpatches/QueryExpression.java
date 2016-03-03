@@ -207,7 +207,7 @@ public class QueryExpression {
                 rightQueryExpression.unionColumnMap = new int[columnCount];
 
             ArrayUtil.fillSequence(leftQueryExpression.unionColumnMap);
-            resolveColumnRefernecesInUnionOrderBy();
+            resolveColumnReferencesInUnionOrderBy();
 
             return;
         }
@@ -266,14 +266,13 @@ public class QueryExpression {
         columnCount      = unionCorrespondingColumns.size();
         unionColumnTypes = new Type[columnCount];
 
-        resolveColumnRefernecesInUnionOrderBy();
+        resolveColumnReferencesInUnionOrderBy();
     }
 
     /**
      * Only simple column reference or column position allowed
      */
-    void resolveColumnRefernecesInUnionOrderBy() {
-
+    private void resolveColumnReferencesInUnionOrderBy() {
         int orderCount = sortAndSlice.getOrderLength();
 
         if (orderCount == 0) {

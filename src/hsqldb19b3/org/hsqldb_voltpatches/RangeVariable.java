@@ -164,7 +164,7 @@ final class RangeVariable {
         usedColumns[columnIndex] = true;
     }
 
-    void addNamedJoinColumnExpression(String name, Expression e) {
+    void addNamedJoinColumnExpression(String name, ExpressionColumn e) {
 
         if (namedJoinColumnExpressions == null) {
             namedJoinColumnExpressions = new HashMap();

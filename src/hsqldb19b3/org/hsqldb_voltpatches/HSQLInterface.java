@@ -328,20 +328,20 @@ public class HSQLInterface {
             throw new HSQLParseException(result.getMainString());
         }
 
-        VoltXMLElement xml = null;
-        xml = cs.voltGetStatementXML(sessionProxy);
-       if (m_logger.isDebugEnabled()) {
-           try {
-               /*
-                * Sometimes exceptions happen.
-                */
-               m_logger.debug(String.format("SQL: %s\n", sql));;
-               m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
-               m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
-           } catch (Exception ex) {
-               System.out.printf("Exception: %s\n", ex.getMessage());
-               ex.printStackTrace(System.out);
-           }
+        VoltXMLElement xml = cs.voltGetStatementXML(sessionProxy);
+        if (m_logger.isDebugEnabled()) {
+            try {
+                /*
+                 * Sometimes exceptions happen.
+                 */
+                m_logger.debug(String.format("SQL: %s\n", sql));;
+                m_logger.debug(String.format("HSQLDB:\n%s", (cs == null) ? "<NULL>" : cs.describe(sessionProxy)));
+                m_logger.debug(String.format("VOLTDB:\n%s", (xml == null) ? "<NULL>" : xml));
+            }
+            catch (Exception ex) {
+                System.out.printf("Exception: %s\n", ex.getMessage());
+                ex.printStackTrace(System.out);
+            }
         }
 
         // this releases some small memory hsql uses that builds up over time if not

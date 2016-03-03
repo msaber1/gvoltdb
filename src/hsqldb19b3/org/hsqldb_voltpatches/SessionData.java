@@ -348,7 +348,9 @@ public class SessionData {
 
                     i--;
                 } else if (!session.isBatch) {
-                    database.lobManager.adjustUsageCount(lobID, delta - 1);
+                    // lobManager is not initialized in VoltDB
+                    assert false;
+                    ////database.lobManager.adjustUsageCount(lobID, delta - 1);
                     lobUsageCount.remove(lobID);
                     createdLobs.remove(i);
 
@@ -360,10 +362,11 @@ public class SessionData {
                 Iterator it = lobUsageCount.keySet().iterator();
 
                 while (it.hasNext()) {
-                    long lobID = it.nextLong();
-                    int  delta = lobUsageCount.get(lobID);
-
-                    database.lobManager.adjustUsageCount(lobID, delta - 1);
+                    // lobManager is not initialized in VoltDB
+                    assert false;
+                    ////long lobID = it.nextLong();
+                    ////int  delta = lobUsageCount.get(lobID);
+                    ////database.lobManager.adjustUsageCount(lobID, delta - 1);
                 }
 
                 lobUsageCount.clear();
@@ -372,9 +375,10 @@ public class SessionData {
             return;
         } else {
             for (int i = 0; i < createdLobs.size(); i++) {
-                long lobID = createdLobs.get(i);
-
-                database.lobManager.deleteLob(lobID);
+                // lobManager is not initialized in VoltDB
+                assert false;
+                ////long lobID = createdLobs.get(i);
+                ////database.lobManager.deleteLob(lobID);
             }
 
             createdLobs.clear();
@@ -388,8 +392,9 @@ public class SessionData {
 
         for (int i = 0; i < createdLobs.size(); i++) {
             long lobID = createdLobs.get(i);
-
-            database.lobManager.deleteLob(lobID);
+            // lobManager is not initialized in VoltDB
+            assert false;
+            ////database.lobManager.deleteLob(lobID);
         }
 
         createdLobs.clear();
@@ -449,8 +454,11 @@ public class SessionData {
                 countStream = new CountdownInputStream(inputStream);
 
                 countStream.setCount(blobLength);
-                database.lobManager.setBytesForNewBlob(
-                    blobId, countStream, result.getBlockLength());
+
+                // lobManager is not initialized in VoltDB
+                assert false;
+                ////database.lobManager.setBytesForNewBlob(
+                ////    blobId, countStream, result.getBlockLength());
 
                 break;
             }
@@ -478,8 +486,10 @@ public class SessionData {
                 countStream = new CountdownInputStream(inputStream);
 
                 countStream.setCount(clobLength * 2);
-                database.lobManager.setCharsForNewClob(
-                    clobId, countStream, result.getBlockLength());
+                // lobManager is not initialized in VoltDB
+                assert false;
+                ////database.lobManager.setCharsForNewClob(
+                ////    clobId, countStream, result.getBlockLength());
 
                 break;
             }
@@ -495,15 +505,17 @@ public class SessionData {
 
             for (int i = 0; i < data.length; i++) {
                 if (data[i] instanceof BlobData) {
-                    BlobData blob = (BlobData) data[i];
-                    long     id   = resultLobs.get(blob.getId());
-
-                    data[i] = database.lobManager.getBlob(session, id);
+                    // lobManager is not initialized in VoltDB
+                    assert false;
+                    ////BlobData blob = (BlobData) data[i];
+                    ////long     id   = resultLobs.get(blob.getId());
+                    ////data[i] = database.lobManager.getBlob(session, id);
                 } else if (data[i] instanceof ClobData) {
-                    ClobData clob = (ClobData) data[i];
-                    long     id   = resultLobs.get(clob.getId());
-
-                    data[i] = database.lobManager.getClob(session, id);
+                    // lobManager is not initialized in VoltDB
+                    assert false;
+                    ////ClobData clob = (ClobData) data[i];
+                    ////long     id   = resultLobs.get(clob.getId());
+                    ////data[i] = database.lobManager.getClob(session, id);
                 }
             }
         }

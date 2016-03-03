@@ -112,7 +112,6 @@ public class QuerySpecification extends QueryExpression {
     //
     int[]                  columnMap;
     private Table          baseTable;
-    private OrderedHashSet conditionTables;      // for view super-view references
 
     //
     public Index groupIndex;
@@ -200,10 +199,12 @@ public class QuerySpecification extends QueryExpression {
         isGrouped         = true;
     }
 
+    @Override
     void addSortAndSlice(SortAndSlice sortAndSlice) {
         this.sortAndSlice = sortAndSlice;
     }
 
+    @Override
     public void resolveReferences(Session session) {
 
         finaliseRangeVariables();
@@ -350,7 +351,7 @@ public class QuerySpecification extends QueryExpression {
     }
     /**********************************************************************/
 
-    void resolveColumnReferencesInOrderBy(SortAndSlice sortAndSlice) {
+    private void resolveColumnReferencesInOrderBy(SortAndSlice sortAndSlice) {
 
         // replace the aliases with expressions
         // replace column names with expressions and resolve the table columns
@@ -605,11 +606,9 @@ public class QuerySpecification extends QueryExpression {
             exprColumns[i].queryTableColumnIndex = i;
         }
 
-        if (sortAndSlice.hasOrder()) {
-            for (int i = 0; i < sortAndSlice.getOrderLength(); i++) {
-                exprColumns[indexStartOrderBy + i] =
-                    (Expression) sortAndSlice.exprList.get(i);
-            }
+        for (int i = 0; i < sortAndSlice.getOrderLength(); i++) {
+            exprColumns[indexStartOrderBy + i] =
+                (Expression) sortAndSlice.exprList.get(i);
         }
     }
 
@@ -649,6 +648,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public boolean hasReference(RangeVariable range) {
 
         if (unresolvedExpressions == null) {
@@ -789,6 +789,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     public boolean areColumnsResolved() {
         return unresolvedExpressions == null
                || unresolvedExpressions.isEmpty();
@@ -807,6 +808,7 @@ public class QuerySpecification extends QueryExpression {
 //        queryCondition = null;
     }
 
+    @Override
     public void resolveTypes(Session session) {
 
         if (isResolved) {
@@ -829,6 +831,7 @@ public class QuerySpecification extends QueryExpression {
         return;
     }
 
+    @Override
     void resolveTypesPartOne(Session session) {
 
         resolveExpressionTypes(session);
@@ -841,6 +844,7 @@ public class QuerySpecification extends QueryExpression {
         }
     }
 
+    @Override
     void resolveTypesPartTwo(Session session) {
 
         resolveGroups();

@@ -75,7 +75,6 @@ import org.hsqldb_voltpatches.lib.FileUtil;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.persist.HsqlDatabaseProperties;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
-import org.hsqldb_voltpatches.persist.LobManager;
 import org.hsqldb_voltpatches.persist.Logger;
 import org.hsqldb_voltpatches.persist.PersistentStoreCollectionDatabase;
 import org.hsqldb_voltpatches.result.Result;
@@ -178,7 +177,7 @@ public class Database {
     public PersistentStoreCollectionDatabase persistentStoreCollection;
 
     //
-    public LobManager lobManager;
+    //// NOT USED IN VoltDB public LobManager lobManager;
     public Collation  collation;
 
     //
@@ -219,7 +218,7 @@ public class Database {
 
 // oj@openoffice.org - changed to file access api
         String fileaccess_class_name =
-            (String) urlProperties.getProperty("fileaccess_class_name");
+            urlProperties.getProperty("fileaccess_class_name");
 
         if (fileaccess_class_name != null) {
             String storagekey = urlProperties.getProperty("storage_key");
@@ -250,7 +249,7 @@ public class Database {
                 "false").equals("true");
         logger                   = new Logger();
         compiledStatementManager = new StatementManager(this);
-        lobManager               = new LobManager(this);
+        ////DISABLED for VOLTDB. lobManager               = new LobManager(this);
     }
 
     /**
@@ -311,7 +310,7 @@ public class Database {
                 schemaManager.createPublicSchema();
             }
 
-            lobManager.createSchema();
+            ////DISABLED for VOLTDB. lobManager.createSchema();
 
             if (DatabaseURL.isFileBasedDatabaseType(databaseType)) {
                 logger.openLog(this);
@@ -360,11 +359,11 @@ public class Database {
                         session, "SET DATABASE DEFAULT TABLE TYPE CACHED");
                 }
 
-                lobManager.initialiseLobSpace();
+                ////DISABLED for VOLTDB. lobManager.initialiseLobSpace();
                 logger.synchLogForce();
             }
 
-            lobManager.open();
+            ////DISABLED for VOLTDB. lobManager.open();
             dbInfo.setWithContent(true);
         } catch (Throwable e) {
             logger.closeLog(Database.CLOSEMODE_IMMEDIATELY);
@@ -556,6 +555,7 @@ public class Database {
      *  Called by the garbage collector on this Databases object when garbage
      *  collection determines that there are no more references to it.
      */
+    @Override
     protected void finalize() {
 
         if (getState() != DATABASE_ONLINE) {
@@ -612,7 +612,7 @@ public class Database {
          * should be investigated for the CLOSEMODE_COMPACT mode
          */
         logger.closeLog(closemode);
-        lobManager.close();
+        ////DISABLED for VOLTDB. lobManager.close();
 
         try {
             if (closemode == CLOSEMODE_COMPACT) {
