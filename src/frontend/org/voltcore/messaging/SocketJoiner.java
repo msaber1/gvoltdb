@@ -643,9 +643,6 @@ public class SocketJoiner {
                 overallSkew = Math.abs(minSkew);
             }
             if (overallSkew > 100) {
-                VoltDB.crashLocalVoltDB("Clock skew is " + overallSkew +
-                        " which is > than the 100 millisecond limit. Make sure NTP is running.", false, null);
-            } else if (overallSkew > 10) {
                 final String msg = "Clock skew is " + overallSkew +
                         " which is high. Ideally it should be sub-millisecond. Make sure NTP is running.";
                 hostLog.warn(msg);
