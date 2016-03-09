@@ -87,9 +87,12 @@ public class AsyncBenchmark {
     Timer timer;
     // Benchmark start time
     long benchmarkStartTS;
-    // Statistics manager objects from the client
-    final ClientStatsContext periodicStatsContext;
-    final ClientStatsContext fullStatsContext;
+    // Statistics manager object from the client
+    final ClientStatsContext statsContext;
+    // tags to differentiate between since benchmark start
+    // and since last status update report
+    final String LAST_REPORT_TAG = "LASTREPORT";
+    final String BENCHMARK_START_TAG = "BENCHMARKSTART";
 
     // voter benchmark state
     AtomicLong totalVotes = new AtomicLong(0);
@@ -176,8 +179,7 @@ public class AsyncBenchmark {
 
         client = ClientFactory.createClient(clientConfig);
 
-        periodicStatsContext = client.createStatsContext();
-        fullStatsContext = client.createStatsContext();
+        statsContext = client.createStatsContext();
 
         switchboard = new PhoneCallGenerator(config.contestants);
 
@@ -261,7 +263,9 @@ public class AsyncBenchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
-        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
+        ClientStats stats = statsContext.fetch().getStatsSinceTag(LAST_REPORT_TAG);
+        statsContext.tag(LAST_REPORT_TAG);
+
         long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
 
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
@@ -282,7 +286,7 @@ public class AsyncBenchmark {
      * @throws Exception if anything unexpected happens.
      */
     public synchronized void printResults() throws Exception {
-        ClientStats stats = fullStatsContext.fetch().getStats();
+        ClientStats stats = statsContext.fetch().getStatsSinceTag(BENCHMARK_START_TAG);
 
         // 1. Voting Board statistics, Voting results and performance statistics
         String display = "\n" +
@@ -406,8 +410,7 @@ public class AsyncBenchmark {
         }
 
         // reset the stats after warmup
-        fullStatsContext.fetchAndResetBaseline();
-        periodicStatsContext.fetchAndResetBaseline();
+        statsContext.fetch().tag(BENCHMARK_START_TAG).tag(LAST_REPORT_TAG);
 
         // print periodic statistics to the console
         benchmarkStartTS = System.currentTimeMillis();

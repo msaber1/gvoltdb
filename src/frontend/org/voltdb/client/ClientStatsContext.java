@@ -38,15 +38,41 @@ import java.util.TreeMap;
  */
 public class ClientStatsContext {
 
+    class FullStats {
+        final Map<Long, Map<String, ClientStats>> baseStats;
+        final Map<Long, ClientIOStats> ioStats;
+        final Map<Integer, ClientAffinityStats> affinityStats;
+        final long ts;
+
+        FullStats() {
+            baseStats = new TreeMap<Long, Map<String, ClientStats>>();
+            ioStats = new TreeMap<Long, ClientIOStats>();
+            affinityStats = new HashMap<Integer, ClientAffinityStats>();
+            ts = System.currentTimeMillis();
+        }
+
+        FullStats(Map<Long, Map<String, ClientStats>> base,
+                  Map<Long, ClientIOStats> io,
+                  Map<Integer, ClientAffinityStats> affinity,
+                  long ts) {
+            baseStats = base;
+            ioStats = io;
+            affinityStats = affinity;
+            this.ts = ts;
+        }
+    }
+
+    static final long DEFAULT_TAG = 0;
+
     final Distributer m_distributor;
-    Map<Long, Map<String, ClientStats>> m_baseline;
-    Map<Long, Map<String, ClientStats>> m_current;
-    Map<Long, ClientIOStats> m_baselineIO;
-    Map<Long, ClientIOStats> m_currentIO;
-    Map<Integer, ClientAffinityStats> m_baselineAffinity;
-    Map<Integer, ClientAffinityStats> m_currentAffinity;
-    long m_baselineTS;
-    long m_currentTS;
+    FullStats m_current;
+    HashMap<Object, FullStats> m_taggedBaselines = new HashMap<Object, FullStats>();
+
+    ClientStatsContext(Distributer distributor, FullStats stats, HashMap<Object, FullStats> taggedBaselines) {
+        m_distributor = distributor;
+        m_taggedBaselines.putAll(taggedBaselines);
+        m_current = stats;
+    }
 
     ClientStatsContext(Distributer distributor,
                        Map<Long, Map<String, ClientStats>> current,
@@ -54,13 +80,14 @@ public class ClientStatsContext {
                        Map<Integer, ClientAffinityStats> currentAffinity)
     {
         m_distributor = distributor;
-        m_baseline = new TreeMap<Long, Map<String, ClientStats>>();
-        m_baselineIO = new TreeMap<Long, ClientIOStats>();
-        m_baselineAffinity = new HashMap<Integer, ClientAffinityStats>();
-        m_current = current;
-        m_currentIO = currentIO;
-        m_currentAffinity = currentAffinity;
-        m_baselineTS = m_currentTS = System.currentTimeMillis();
+        FullStats baseline = new FullStats();
+        m_taggedBaselines.put(DEFAULT_TAG, baseline);
+        m_current = new FullStats(current, currentIO, currentAffinity, baseline.ts);
+    }
+
+    public ClientStatsContext tag(Object tagLabel) {
+        m_taggedBaselines.put(tagLabel, m_current);
+        return this;
     }
 
     /**
@@ -72,10 +99,10 @@ public class ClientStatsContext {
      * @return A <code>this</code> pointer for chaining calls.
      */
     public ClientStatsContext fetch() {
-        m_current = m_distributor.getStatsSnapshot();
-        m_currentIO = m_distributor.getIOStatsSnapshot();
-        m_currentTS = System.currentTimeMillis();
-        m_currentAffinity = m_distributor.getAffinityStatsSnapshot();
+        m_current = new FullStats(m_distributor.getStatsSnapshot(),
+                                  m_distributor.getIOStatsSnapshot(),
+                                  m_distributor.getAffinityStatsSnapshot(),
+                                  System.currentTimeMillis());
         return this;
     }
 
@@ -86,19 +113,13 @@ public class ClientStatsContext {
      *
      * @return A new ClientStatsContext object that uses the newly fetched stats with the old baseline.
      */
+    @Deprecated
     public ClientStatsContext fetchAndResetBaseline() {
         fetch();
-        ClientStatsContext retval = new ClientStatsContext(m_distributor, m_current, m_currentIO,
-                m_currentAffinity);
-        retval.m_baseline = m_baseline;
-        retval.m_baselineIO = m_baselineIO;
-        retval.m_baselineTS = m_baselineTS;
-        retval.m_baselineAffinity = m_baselineAffinity;
-        retval.m_currentTS = m_currentTS;
-        m_baseline = m_current;
-        m_baselineIO = m_currentIO;
-        m_baselineTS = m_currentTS;
-        m_baselineAffinity = m_currentAffinity;
+        ClientStatsContext retval = new ClientStatsContext(m_distributor,
+                                                           m_current,
+                                                           m_taggedBaselines);
+        tag(DEFAULT_TAG);
         return retval;
     }
 
@@ -110,8 +131,25 @@ public class ClientStatsContext {
      * @return A {@link ClientStats} instance.
      */
     public ClientStats getStats() {
-        return ClientStats.merge(getStatsByConnection().values());
+        return getStatsSinceTag(DEFAULT_TAG);
     }
+
+    /**
+     * Return a {@link ClientStats} that covers all procedures and
+     * all connection ids. The {@link ClientStats} instance will
+     * apply to the time period currently covered by the context.
+     *
+     * @return A {@link ClientStats} instance.
+     */
+    public ClientStats getStatsSinceTag(Object tagLabel) {
+        Map<Long, ClientStats> stats = getStatsByConnectionSinceTag(tagLabel);
+        if (stats == null) {
+            return null;
+        }
+
+        return ClientStats.merge(stats.values());
+    }
+
 
     /**
      * Return a map of {@link ClientStats} by procedure name. This will
@@ -122,7 +160,15 @@ public class ClientStatsContext {
      * @return A map from procedure name to {@link ClientStats} instances.
      */
     public Map<String, ClientStats> getStatsByProc() {
-        Map<Long, Map<String, ClientStats>> complete = getCompleteStats();
+        return getStatsByProcSinceTag(DEFAULT_TAG);
+    }
+
+    public Map<String, ClientStats> getStatsByProcSinceTag(Object tagLabel) {
+        Map<Long, Map<String, ClientStats>> complete = getCompleteStatsSinceTag(tagLabel);
+        if (complete == null) {
+            return null;
+        }
+
         Map<String, ClientStats> retval = new TreeMap<String, ClientStats>();
         for (Entry<Long, Map<String, ClientStats>> e : complete.entrySet()) {
             for (Entry<String, ClientStats> e2 : e.getValue().entrySet()) {
@@ -151,8 +197,17 @@ public class ClientStatsContext {
      * @return A map from connection id to {@link ClientStats} instances.
      */
     public Map<Long, ClientStats> getStatsByConnection() {
-        Map<Long, Map<String, ClientStats>> complete = getCompleteStats();
-        Map<Long, ClientIOStats> completeIO = diffIO(m_currentIO, m_baselineIO);
+        return getStatsByConnectionSinceTag(DEFAULT_TAG);
+    }
+
+    public Map<Long, ClientStats> getStatsByConnectionSinceTag(Object tagLabel) {
+        FullStats baseline = m_taggedBaselines.get(tagLabel);
+        if (baseline == null) {
+            return null;
+        }
+
+        Map<Long, Map<String, ClientStats>> complete = getCompleteStatsSinceTag(tagLabel);
+        Map<Long, ClientIOStats> completeIO = diffIO(m_current.ioStats, baseline.ioStats);
         Map<Long, ClientStats> retval = new TreeMap<Long, ClientStats>();
         for (Entry<Long, Map<String, ClientStats>> e : complete.entrySet()) {
             ClientStats cs = ClientStats.merge(e.getValue().values());
@@ -178,12 +233,21 @@ public class ClientStatsContext {
      * @return A map from connection id to {@link ClientStats} instances.
      */
     public Map<Long, Map<String, ClientStats>> getCompleteStats() {
+        return getCompleteStatsSinceTag(DEFAULT_TAG);
+    }
+
+    public Map<Long, Map<String, ClientStats>> getCompleteStatsSinceTag(Object tagLabel) {
         Map<Long, Map<String, ClientStats>> retval =
                 new TreeMap<Long, Map<String, ClientStats>>();
 
-        for (Entry<Long, Map<String, ClientStats>> e : m_current.entrySet()) {
-            if (m_baseline.containsKey(e.getKey())) {
-                retval.put(e.getKey(), diff(e.getValue(), m_baseline.get(e.getKey())));
+        FullStats baseline = m_taggedBaselines.get(tagLabel);
+        if (baseline == null) {
+            return null;
+        }
+
+        for (Entry<Long, Map<String, ClientStats>> e : m_current.baseStats.entrySet()) {
+            if (baseline.baseStats.containsKey(e.getKey())) {
+                retval.put(e.getKey(), diff(e.getValue(), baseline.baseStats.get(e.getKey())));
             }
             else {
                 retval.put(e.getKey(), dup(e.getValue()));
@@ -194,8 +258,8 @@ public class ClientStatsContext {
         for (Entry<Long, Map<String, ClientStats>> e : retval.entrySet()) {
             for (Entry<String, ClientStats> e2 : e.getValue().entrySet()) {
                 ClientStats cs = e2.getValue();
-                cs.m_startTS = m_baselineTS;
-                cs.m_endTS = m_currentTS;
+                cs.m_startTS = baseline.ts;
+                cs.m_endTS = m_current.ts;
                 assert(cs.m_startTS != Long.MAX_VALUE);
                 assert(cs.m_endTS != Long.MIN_VALUE);
             }
@@ -209,12 +273,21 @@ public class ClientStatsContext {
      *
      * @return A map from an internal partition id to a {@link ClientAffinityStats} instance.
      */
-    public Map<Integer, ClientAffinityStats> getAffinityStats()
-    {
+    public Map<Integer, ClientAffinityStats> getAffinityStats() {
+        return getAffinityStatsSinceTag(DEFAULT_TAG);
+    }
+
+    public Map<Integer, ClientAffinityStats> getAffinityStatsSinceTag(Object tagLabel) {
         Map<Integer, ClientAffinityStats> retval = new TreeMap<Integer, ClientAffinityStats>();
-        for (Entry<Integer, ClientAffinityStats> e : m_currentAffinity.entrySet()) {
-            if (m_baselineAffinity.containsKey(e.getKey())) {
-                retval.put(e.getKey(), ClientAffinityStats.diff(e.getValue(), m_baselineAffinity.get(e.getKey())));
+
+        FullStats baseline = m_taggedBaselines.get(tagLabel);
+        if (baseline == null) {
+            return null;
+        }
+
+        for (Entry<Integer, ClientAffinityStats> e : m_current.affinityStats.entrySet()) {
+            if (baseline.affinityStats.containsKey(e.getKey())) {
+                retval.put(e.getKey(), ClientAffinityStats.diff(e.getValue(), baseline.affinityStats.get(e.getKey())));
             }
             else {
                 retval.put(e.getKey(), (ClientAffinityStats) e.getValue().clone());
@@ -231,11 +304,20 @@ public class ClientStatsContext {
      */
     public ClientAffinityStats getAggregateAffinityStats()
     {
+        return getAggregateAffinityStatsSinceTag(DEFAULT_TAG);
+    }
+
+    public ClientAffinityStats getAggregateAffinityStatsSinceTag(Object tagLabel) {
         long afWrites = 0;
         long afReads = 0;
         long rrWrites = 0;
         long rrReads = 0;
-        Map<Integer, ClientAffinityStats> affinityStats = getAffinityStats();
+
+        Map<Integer, ClientAffinityStats> affinityStats = getAffinityStatsSinceTag(tagLabel);
+        if (affinityStats == null) {
+            return null;
+        }
+
         for (Entry<Integer, ClientAffinityStats> e : affinityStats.entrySet()) {
             afWrites += e.getValue().getAffinityWrites();
             afReads += e.getValue().getAffinityReads();
@@ -257,7 +339,11 @@ public class ClientStatsContext {
      * @return A {@link ClientStats} instance.
      */
     public ClientStats getStatsForProcedure(String procedureName) {
-        Map<Long, Map<String, ClientStats>> complete = getCompleteStats();
+        return getStatsForProcedureSinceTag(DEFAULT_TAG, procedureName);
+    }
+
+    public ClientStats getStatsForProcedureSinceTag(Object tagLabel, String procedureName) {
+        Map<Long, Map<String, ClientStats>> complete = getCompleteStatsSinceTag(tagLabel);
         List<ClientStats> statsForProc = new ArrayList<ClientStats>();
         for (Entry<Long, Map<String, ClientStats>> e : complete.entrySet()) {
             ClientStats procStats = e.getValue().get(procedureName);
