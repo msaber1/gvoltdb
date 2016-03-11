@@ -937,7 +937,11 @@ public class RegressionSuite extends TestCase {
             assertTrue(diagnostic, pattern.matcher(msg).find());
             return;
         }
-
+        catch (Throwable t) {
+            String diagnostic = "Expected " + what + " to throw an exception matching the pattern \"" +
+                    expectedPattern + "\", but instead it threw: " + t;
+            fail(diagnostic);
+        }
         String diagnostic = "Expected " + what + " to throw an exception matching the pattern \"" +
                 expectedPattern + "\", but instead it threw nothing.";
         fail(diagnostic);

@@ -173,8 +173,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                 "";
         try {
             project.addLiteralSchema(literalSchema);
-        } catch (IOException e) {
-            assertFalse(true);
+        }
+        catch (IOException e) {
+            fail();
         }
 
         // load the procedures for the test
@@ -465,17 +466,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
 
-     // try char_length on incompatible data type
-        try {
-            cr = client.callProcedure("@AdHoc",
-                    "select bdata, CHAR_LENGTH(bdata) from BINARYTEST where ID = 1");
-          fail("char_length on columns which are not string expression is not supported");
-        }
-        catch (ProcCallException pce) {
-            assertTrue(pce.getMessage().contains("incompatible data type in operation"));
-
-        }
-
+        // try char_length on incompatible data type
+        verifyStmtFails(client,
+                "select bdata, CHAR_LENGTH(bdata) from BINARYTEST where ID = 1",
+                "incompatible data type in operation");
     }
 
     public void testDECODE() throws NoConnectionsException, IOException, ProcCallException {
@@ -578,8 +572,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         try {
             cr = client.callProcedure("DECODE_PARAM_INFER_CONFLICTING", 1000, 1);
             assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        } catch (ProcCallException pce) {
-            fail("Should have thrown unfortunate type error.");
+        }
+        catch (ProcCallException pce) {
+            fail("Threw: " + pce);
         }
     }
 
@@ -678,9 +673,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(1, result.getRowCount());
             assertTrue(result.advanceRow());
             assertEquals("zheng",result.getString(0));
-
-
-        } catch (ProcCallException pce) {
+        }
+        catch (ProcCallException pce) {
             System.out.println(pce);
             fail("Looks like a regression of ENG-5078 inline varchar column pass-through by decode");
         }
@@ -723,14 +717,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(2,result.getLong(0));
 
         // use DECODE as integer input to operator, with used incompatible option
-        try {
-            cr = client.callProcedure("@AdHoc", "select id + DECODE(id, 1, 0, 'incompatible') from P1 where id = 2");
-            fail("failed to except incompatible option");
-        } catch (ProcCallException pce) {
-            String message = pce.getMessage();
-            // It's about that string argument to the addition operator.
-            assertTrue(message.contains("varchar"));
-        }
+        verifyStmtFails(client,
+                "select id + DECODE(id, 1, 0, 'incompatible') from P1 where id = 2",
+                "varchar");
     }
 
     private void checkDecodeNullResult (ClientResponse cr, Object input) {
@@ -749,11 +738,13 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                     assertTrue(Math.abs(
                             Double.valueOf(expected[i]) - Double.valueOf(result.getString(i))
                             ) < 0.00001);
-                } else {
+                }
+                else {
                     assertEquals(expected[i],result.getString(i));
                 }
             }
-        } else if  (input instanceof Long[]) {
+        }
+        else if  (input instanceof Long[]) {
             Long[] expected = (Long[]) input;
             for (int i = 0; i < expected.length; i++) {
                 assertEquals(expected[i],Long.valueOf(result.getLong(i)));
@@ -876,13 +867,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(result.getTimestampAsLong(0), result.getTimestampAsLong(1));
 
         // Test user error input, Only accept JDBC's timestamp format: YYYY-MM-DD-SS.sss.
-        try {
-            cr = client.callProcedure("@AdHoc", "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5");
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("PlanningErrorException"));
-            assertTrue(ex.getMessage().contains("incompatible data type in conversion"));
-        }
+        verifyStmtFails(client,
+                "select SINCE_EPOCH (MICROS, 'I am a timestamp')  from P2 where id = 5",
+                "incompatible data type in conversion");
 
         String[] procedures = {"SINCE_EPOCH_SECOND", "SINCE_EPOCH_MILLIS",
                 "SINCE_EPOCH_MILLISECOND", "SINCE_EPOCH_MICROS", "SINCE_EPOCH_MICROSECOND"};
@@ -897,9 +884,11 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(result.advanceRow());
             if (proc == "SINCE_EPOCH_SECOND") {
                 assertEquals(0, result.getLong(0));
-            } else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
+            }
+            else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
                 assertEquals(0, result.getLong(0));
-            } else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
+            }
+            else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
                 assertEquals(0, result.getLong(0));
             }
 
@@ -910,11 +899,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(result.advanceRow());
             if (proc == "SINCE_EPOCH_SECOND") {
                 assertEquals(0, result.getLong(0));
-            } else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
+            }
+            else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
                 assertEquals(1, result.getLong(0));
-            } else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
+            }
+            else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
                 assertEquals(1000, result.getLong(0));
-            } else {
+            }
+            else {
                 fail();
             }
 
@@ -925,11 +917,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(result.advanceRow());
             if (proc == "SINCE_EPOCH_SECOND") {
                 assertEquals(1, result.getLong(0));
-            } else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
+            }
+            else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
                 assertEquals(1000, result.getLong(0));
-            } else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
+            }
+            else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
                 assertEquals(1000000, result.getLong(0));
-            } else {
+            }
+            else {
                 fail();
             }
 
@@ -940,11 +935,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(result.advanceRow());
             if (proc == "SINCE_EPOCH_SECOND") {
                 assertEquals(-1, result.getLong(0));
-            } else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
+            }
+            else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
                 assertEquals(-1000, result.getLong(0));
-            } else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
+            }
+            else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
                 assertEquals(-1000000, result.getLong(0));
-            } else {
+            }
+            else {
                fail();
             }
 
@@ -955,11 +953,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(result.advanceRow());
             if (proc == "SINCE_EPOCH_SECOND") {
                 assertEquals(1371808830L, result.getLong(0));
-            } else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
+            }
+            else if (proc == "SINCE_EPOCH_MILLIS" || proc == "SINCE_EPOCH_MILLISECOND") {
                 assertEquals(1371808830000L, result.getLong(0));
-            } else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
+            }
+            else if (proc == "SINCE_EPOCH_MICROS" || proc == "SINCE_EPOCH_MICROSECOND") {
                 assertEquals(1371808830000000L, result.getLong(0));
-            } else {
+            }
+            else {
                fail();
             }
         }
@@ -979,7 +980,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
                     "      SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME) );",
                     10, 5000);
             //* enable for debug */ System.out.println(cr.getResults()[0]);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             fail();
         }
 
@@ -992,7 +994,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = cr.getResults()[0];
             assertEquals(0, result.getRowCount());
             //* enable for debug */ System.out.println(result);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             fail();
         }
 
@@ -1001,7 +1004,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = cr.getResults()[0];
             assertEquals(0, result.getRowCount());
             //* enable for debug */ System.out.println(result);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             fail();
         }
 
@@ -1010,7 +1014,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             result = cr.getResults()[0];
             assertEquals(0, result.getRowCount());
             //* enable for debug */ System.out.println(result);
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             fail();
         }
 
@@ -1019,8 +1024,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             cr = client.callProcedure("@Explain", "SELECT TOP ? FROM PAULTEST WHERE NAME IS NOT NULL AND (LOCK_TIME IS NULL OR SINCE_EPOCH(MILLIS,CURRENT_TIMESTAMP)-? < SINCE_EPOCH(MILLIS,LOCK_TIME));");
             //* enable for debug */ System.out.println(cr.getResults()[0]);
             fail("Expected to detect missing SELECT columns");
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("PlanningErrorException"));
+        }
+        catch (Exception ex) {
+            assertTrue(ex.getMessage().contains("Planning Error"));
             assertTrue(ex.getMessage().contains("unexpected token: FROM"));
             return;
         }
@@ -1047,13 +1053,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1372640523 * 1000000L, result.getTimestampAsLong(0));
 
         // Test string input number, expect error
-        try {
-            cr = client.callProcedure("@AdHoc", "select to_timestamp(second, '1372640523') from P2 limit 1");
-            fail();
-        } catch (Exception ex) {
-            assertTrue(ex.getMessage().contains("PlanningErrorException"));
-            assertTrue(ex.getMessage().contains("incompatible data type"));
-        }
+        verifyStmtFails(client,
+                "select to_timestamp(second, '1372640523') from P2 limit 1",
+                "incompatible data type");
 
         String[] procedures = {"FROM_UNIXTIME", "TO_TIMESTAMP_SECOND", "TO_TIMESTAMP_MILLIS",
                 "TO_TIMESTAMP_MILLISECOND", "TO_TIMESTAMP_MICROS", "TO_TIMESTAMP_MICROSECOND"};
@@ -1068,11 +1070,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(result.advanceRow());
             if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
                 assertEquals(0L, result.getTimestampAsLong(0));
-            } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
+            }
+            else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
                 assertEquals(0L, result.getTimestampAsLong(0));
-            } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
+            }
+            else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
                 assertEquals(0L, result.getTimestampAsLong(0));
-            } else {
+            }
+            else {
                 fail();
             }
 
@@ -1083,11 +1088,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(result.advanceRow());
             if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
                 assertEquals(1000000L, result.getTimestampAsLong(0));
-            } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
+            }
+            else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
                 assertEquals(1000L, result.getTimestampAsLong(0));
-            } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
+            }
+            else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
                 assertEquals(1L, result.getTimestampAsLong(0));
-            } else {
+            }
+            else {
                 fail();
             }
 
@@ -1098,11 +1106,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(result.advanceRow());
             if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
                 assertEquals(1000000000L, result.getTimestampAsLong(0));
-            } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
+            }
+            else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
                 assertEquals(1000000L, result.getTimestampAsLong(0));
-            } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
+            }
+            else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
                 assertEquals(1000L, result.getTimestampAsLong(0));
-            } else {
+            }
+            else {
                 fail();
             }
 
@@ -1113,11 +1124,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(result.advanceRow());
             if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
                 assertEquals(-1000000000L, result.getTimestampAsLong(0));
-            } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
+            }
+            else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
                 assertEquals(-1000000L, result.getTimestampAsLong(0));
-            } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
+            }
+            else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
                 assertEquals(-1000L, result.getTimestampAsLong(0));
-            } else {
+            }
+            else {
                 fail();
             }
 
@@ -1128,11 +1142,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertTrue(result.advanceRow());
             if (proc == "TO_TIMESTAMP_SECOND" || proc == "FROM_UNIXTIME") {
                 assertEquals(1371808830000000000L, result.getTimestampAsLong(0));
-            } else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
+            }
+            else if (proc == "TO_TIMESTAMP_MILLIS" || proc == "TO_TIMESTAMP_MILLISECOND") {
                 assertEquals(1371808830000000L, result.getTimestampAsLong(0));
-            } else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
+            }
+            else if (proc == "TO_TIMESTAMP_MICROS" || proc == "TO_TIMESTAMP_MICROSECOND") {
                 assertEquals(1371808830000L, result.getTimestampAsLong(0));
-            } else {
+            }
+            else {
                 fail();
             }
         }
@@ -1151,29 +1168,22 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         Date time = null;
 
         // Test Standard TRUNCATE function for floating numbers
-        Exception ex = null;
-        try {
-            cr = client.callProcedure("@AdHoc", "select TRUNCATE (1.2, 1), TM from P2 where id = 0");
-        } catch (Exception e) {
-            System.out.println(e.getMessage());
-            ex = e;
-        } finally {
-            assertNotNull(ex);
-            assertTrue((ex.getMessage().contains("PlanningErrorException")));
-            assertTrue((ex.getMessage().contains("TRUNCATE")));
-        }
+        verifyStmtFails(client,
+                "select TRUNCATE (1.2, 1), TM from P2 where id = 0", "TRUNCATE");
 
         // Test date before Gregorian calendar beginning.
         cr = client.callProcedure("P2.insert", 0, Timestamp.valueOf("1582-03-06 13:56:40.123456"));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        ex = null;
+        Exception ex = null;
         try {
             cr = client.callProcedure("TRUNCATE", 0);
-        } catch (Exception e) {
+        }
+        catch (Exception e) {
             System.out.println(e.getMessage());
             ex = e;
-        } finally {
+        }
+        finally {
             assertNotNull(ex);
             assertTrue((ex.getMessage().contains("SQL ERROR")));
         }
@@ -1345,37 +1355,10 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         String[] jsonProcs = { "BadIdFieldProc", "BadIdArrayProc", "BadIdArrayLengthProc" };
 
         for (String procname : jsonProcs) {
-            try {
-                cr = client.callProcedure(procname, 1, "id", "1");
-                fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
-                assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 9"));
-            }
-
-            try {
-                cr = client.callProcedure(procname, 2, "id", "2");
-                fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
-                assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 16"));
-            }
-
-            try {
-                cr = client.callProcedure(procname, 3, "id", "3");
-                fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
-                assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 30"));
-            }
-
-            try {
-                cr = client.callProcedure(procname, 4, "id", "4");
-                fail("document validity check failed for " + procname);
-            }
-            catch(ProcCallException pcex) {
-                assertTrue(pcex.getMessage().contains("Invalid JSON * Line 1, Column 11"));
-            }
+            verifyProcFails(client, " Line 1, Column 9", procname, 1, "id", "1");
+            verifyProcFails(client, " Line 1, Column 16", procname, 2, "id", "2");
+            verifyProcFails(client, " Line 1, Column 30", procname, 3, "id", "3");
+            verifyProcFails(client, " Line 1, Column 11", procname, 4, "id", "4");
         }
     }
 
@@ -1553,71 +1536,38 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         // out of int64_t range
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from D1 where id = 8");
-            fail("range validity check failed for FORMAT_CURRENCY");
-        }
-        catch (ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains("out of range"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(dec, 2) from D1 where id = 9");
-            fail("range validity check failed for FORMAT_CURRENCY");
-        }
-        catch (ProcCallException pcex) {
-            assertTrue(pcex.getMessage().contains("out of range"));
-        }
+        verifyStmtFails(client,
+                "select FORMAT_CURRENCY(dec, 2) from D1 where id = 8",
+                "out of range");
+        verifyStmtFails(client,
+                "select FORMAT_CURRENCY(dec, 2) from D1 where id = 9",
+                "out of range");
 
         // check invalid type
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(id, 2) from R3 where id = 1");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tiny, 2) from R3 where id = 1");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(small, 2) from R3 where id = 1");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(num, 2) from R3 where id = 1");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(big, 2) from R3 where id = 1");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(ratio, 2) from R3 where id = 1");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as DECIMAL"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(tm, 2) from R3 where id = 1");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            // TODO: I have no idea why the exception is different
-            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
-        }
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(var, 2) from R3 where id = 1");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("incompatible data type in operation"));
-        }
+        verifyStmtFails(client,
+                "select FORMAT_CURRENCY(id, 2) from R3 where id = 1",
+                "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                "select FORMAT_CURRENCY(tiny, 2) from R3 where id = 1",
+                "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                "select FORMAT_CURRENCY(small, 2) from R3 where id = 1",
+                "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                "select FORMAT_CURRENCY(num, 2) from R3 where id = 1",
+                "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                "select FORMAT_CURRENCY(big, 2) from R3 where id = 1",
+                "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                "select FORMAT_CURRENCY(ratio, 2) from R3 where id = 1",
+                "can't be cast as DECIMAL");
+        verifyStmtFails(client,
+                "select FORMAT_CURRENCY(tm, 2) from R3 where id = 1",
+                "incompatible data type in operation");
+        verifyStmtFails(client,
+                "select FORMAT_CURRENCY(var, 2) from R3 where id = 1",
+                "incompatible data type in operation");
 
         String[] s = {"1,000,000.00", "100,000.00", "10,000.00", "1,000.00", "100.00", "10.00", "1.00", "0.10", "0.01", "0.00"};
         for (int i = 0; i < 10; i++){
@@ -1659,12 +1609,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(str, s2[11-i]);
         }
         // it will go out of the range of int64_t
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -19) from D1 where id = 12");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("out of range"));
-        }
+        verifyStmtFails(client, "select FORMAT_CURRENCY(DEC, -19) from D1 where id = 12", "out of range");
+
         // now it is zero
         for (int i=-20; i >= -25; i--){
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 12");
@@ -1693,12 +1639,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertEquals(str, s3[11-i]);
         }
         // it will go out of the range of int64_t
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -19) from D1 where id = 13");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("out of range"));
-        }
+        verifyStmtFails(client, "select FORMAT_CURRENCY(DEC, -19) from D1 where id = 13", "out of range");
+
         // now it is zero
         for (int i=-20; i >= -25; i--){
             cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, "+i+") from D1 where id = 13");
@@ -1711,19 +1653,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
 
         // check the validity of the second parameter
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, 15) from D1 where id = 0");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("the second parameter"));
-        }
-
-        try {
-            cr = client.callProcedure("@AdHoc", "select FORMAT_CURRENCY(DEC, -26) from D1 where id = 0");
-            fail("type validity check failed for FORMAT_CURRENCY");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("the second parameter"));
-        }
+        verifyStmtFails(client, "select FORMAT_CURRENCY(DEC, 15) from D1 where id = 0", "the second parameter");
+        verifyStmtFails(client, "select FORMAT_CURRENCY(DEC, -26) from D1 where id = 0", "the second parameter");
     }
 
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
@@ -1803,11 +1734,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         result = cr.getResults()[0];
         validateTableColumnOfScalarVarchar(result, 1, new String[]{"Yetian@VoltDB1"});
 
-        try {
-            cr = client.callProcedure("@AdHoc", "select CONCAT('a', 'b', id) from p1 where id = 1");
-        } catch (ProcCallException pcex){
-            assertTrue(pcex.getMessage().contains("can't be cast as VARCHAR"));
-        }
+        verifyStmtFails(client, "select CONCAT('a', 'b', id) from p1 where id = 1", "can't be cast as VARCHAR");
     }
 
     static private long[] bitnotInterestingValues = new long[] {
@@ -1903,7 +1830,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             System.out.println(vt);
             if (big >= 64) {
                 validateRowOfLongs(vt, new long[]{0, 0});
-            } else {
+            }
+            else {
                 validateRowOfLongs(vt, new long[]{param << big, param >>> big });
             }
         }
@@ -1913,7 +1841,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             System.out.println(vt);
             if (param >= 64) {
                 validateRowOfLongs(vt, new long[]{0, 0});
-            } else {
+            }
+            else {
                 validateRowOfLongs(vt, new long[]{big << param, big >>> param });
             }
         }
@@ -1921,23 +1850,14 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
     public void testBitwiseShift() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test bitwise shifting tests");
-
         bitwiseShiftChecker(1, 1, 1); bitwiseShiftChecker(2, -1, 1);
-
         bitwiseShiftChecker(3, 3, 60); bitwiseShiftChecker(4, -3, 60);
-
         bitwiseShiftChecker(5, 3, 64); bitwiseShiftChecker(6, -3, 64);
-
         bitwiseShiftChecker(7, 3, 65); bitwiseShiftChecker(8, -3, 65);
-
         bitwiseShiftChecker(9, 3, 127); bitwiseShiftChecker(10, -3, 127);
-
         bitwiseShiftChecker(11, 3, 128); bitwiseShiftChecker(12, -3, 128);
-
         bitwiseShiftChecker(13, 3, 129); bitwiseShiftChecker(14, -3, 129);
-
         bitwiseShiftChecker(15, 8, 63); bitwiseShiftChecker(16, -8, 63);
-
         bitwiseShiftChecker(17, 8, 0); bitwiseShiftChecker(18, -8, 0);
 
         // Min/MAX
@@ -1949,14 +1869,16 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         try {
             bitwiseShiftChecker(19, 3, 63);
             fail();
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             assertTrue(ex.getMessage().contains("would produce INT64_MIN, which is reserved for SQL NULL values"));
         }
 
         try {
             bitwiseShiftChecker(20, -3, 63);
             fail();
-        } catch (Exception ex) {
+        }
+        catch (Exception ex) {
             assertTrue(ex.getMessage().contains("would produce INT64_MIN, which is reserved for SQL NULL values"));
         }
 
@@ -2313,206 +2235,65 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(null, vt.getTimestampAsTimestamp(8));
 
         // Test null or illegal datepart
-        boolean throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(NULL, 1, TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("Unexpected Ad Hoc Planning Error"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(WEEK, 1, TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("Unexpected Ad Hoc Planning Error"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
+        verifyStmtFails(client,
+                "SELECT DATEADD(NULL, 1, TM) FROM P2 WHERE ID = 20005;", "Ad Hoc Planning Error");
+        verifyStmtFails(client,
+                "SELECT DATEADD(WEEK, 1, TM) FROM P2 WHERE ID = 20005;", "Ad Hoc Planning Error");
         // Test large intervals caused exceptions
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(YEAR, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-       assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(YEAR, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(QUARTER, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(QUARTER, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(MONTH, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(MONTH, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(DAY, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(DAY, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(HOUR, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(HOUR, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(MINUTE, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(MINUTE, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(SECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(SECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(MILLISECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(MILLISECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(MICROSECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
-
-        throwed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT DATEADD(MICROSECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;");
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("interval is too large for DATEADD function"));
-            throwed = true;
-        }
-        assertTrue(throwed);
+        verifyStmtFails(client,
+                "SELECT DATEADD(YEAR, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(YEAR, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(QUARTER, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(QUARTER, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(MONTH, " + ((long) Integer.MAX_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(MONTH, " + ((long) Integer.MIN_VALUE - 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(DAY, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(DAY, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(HOUR, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(HOUR, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(MINUTE, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(MINUTE, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(SECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(SECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(MILLISECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(MILLISECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(MICROSECOND, " + Long.MAX_VALUE + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
+        verifyStmtFails(client,
+                "SELECT DATEADD(MICROSECOND, " + (Long.MIN_VALUE + 1) + ", TM) FROM P2 WHERE ID = 20005;",
+                "interval is too large for DATEADD function");
     }
 
     public void testRegexpPosition() throws Exception {
@@ -2531,7 +2312,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             "PRIMARY KEY (ID) ); " +
          */
 
-       cr = client.callProcedure("@AdHoc", "INSERT INTO P1 (ID, DESC) VALUES (200, 'TEST reGexp_poSiTion123456Test')");
+        cr = client.callProcedure("@AdHoc", "INSERT INTO P1 (ID, DESC) VALUES (200, 'TEST reGexp_poSiTion123456Test')");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, 'TEST') FROM P1 WHERE REGEXP_POSITION(DESC, 'TEST') > 0;").getResults()[0];
@@ -2557,27 +2338,12 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(vt.advanceRow());
         assertEquals(20, vt.asScalarLong());
 
-        boolean expectedExceptionThrowed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](a]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](a]') > 0");
-            assertFalse("Expected exception for illegal regular expression in regexp_position.", true);
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("Regular Expression Compilation Error: missing closing parenthesis"));
-            expectedExceptionThrowed = true;
-        }
-        assertTrue(expectedExceptionThrowed);
-
-        expectedExceptionThrowed = false;
-        try {
-            client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') > 0");
-            assertFalse("Expected exception for illegal match flag in regexp_position.", true);
-        } catch (ProcCallException e) {
-            assertEquals(ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-            assertTrue(e.getClientResponse().getStatusString().contains("Illegal Match Flags"));
-            expectedExceptionThrowed = true;
-        }
-        assertTrue(expectedExceptionThrowed);
+        verifyStmtFails(client,
+                "SELECT REGEXP_POSITION(DESC, '[a-z](a]') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](a]') > 0",
+                "Regular Expression Compilation Error: missing closing parenthesis");
+        verifyStmtFails(client,
+                "SELECT REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') FROM P1 WHERE REGEXP_POSITION(DESC, '[a-z](\\d+)[A-Z]', 'k') > 0",
+                "Illegal Match Flags");
 
         // test null strings
         vt = client.callProcedure("@AdHoc", "SELECT REGEXP_POSITION(DESC, NULL) FROM P1 WHERE ID = 200").getResults()[0];

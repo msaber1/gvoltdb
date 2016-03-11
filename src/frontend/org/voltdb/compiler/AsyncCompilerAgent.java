@@ -42,6 +42,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.parser.SQLLexer;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.utils.MiscUtils;
 
@@ -106,7 +107,8 @@ public class AsyncCompilerAgent {
                             handleMailboxMessage(message);
                         }
                     });
-                } catch (RejectedExecutionException rejected) {
+                }
+                catch (RejectedExecutionException rejected) {
                     final LocalObjectMessage wrapper = (LocalObjectMessage)message;
                     AsyncCompilerWork work = (AsyncCompilerWork)(wrapper.payload);
                     generateErrorResult("Ad Hoc Planner task queue is full. Try again.", work);
@@ -230,7 +232,7 @@ public class AsyncCompilerAgent {
             w.completionHandler.onCompletion(errResult);
             return;
         }
-        else if (!hasDDL) {
+        if (!hasDDL) {
             final AsyncCompilerResult result = compileAdHocPlan(w);
             w.completionHandler.onCompletion(result);
         }
@@ -301,7 +303,7 @@ public class AsyncCompilerAgent {
             w.completionHandler.onCompletion(errResult);
             return;
         }
-        else if (w.invocationName.equals("@UpdateClasses") && !w.useAdhocDDL) {
+        if (w.invocationName.equals("@UpdateClasses") && !w.useAdhocDDL) {
             AsyncCompilerResult errResult =
                 AsyncCompilerResult.makeErrorResult(w,
                         "Cluster is configured to use @UpdateApplicationCatalog " +
@@ -379,7 +381,8 @@ public class AsyncCompilerAgent {
             }
             else if (work.userPartitionKey == null) {
                 partitioning = StatementPartitioning.forceMP();
-            } else {
+            }
+            else {
                 partitioning = StatementPartitioning.forceSP();
             }
             try {
@@ -394,9 +397,13 @@ public class AsyncCompilerAgent {
                 }
                 stmts.add(result);
             }
+            catch (PlanningErrorException pe) {
+                errorMsgs.add("Ad Hoc Planning Error: " + pe.getMessage());
+            }
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
-            } catch (AssertionError ae) {
+            }
+            catch (AssertionError ae) {
                 errorMsgs.add("Assertion Error in Ad Hoc Planning: " + ae);
             }
         }

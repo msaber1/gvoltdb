@@ -268,18 +268,17 @@ public class PlannerTool {
                 if (plan != null && plan.getStatementPartitioning() != null) {
                     partitioning = plan.getStatementPartitioning();
                 }
-            } catch (Exception e) {
-                /*
-                 * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
-                 * they are at least somewhat expected.
-                 */
-                String loggedMsg = "";
-                if (!((e instanceof PlanningErrorException) || (e instanceof HSQLParseException))) {
-                    logException(e, "Error compiling query");
-                    loggedMsg = " (Stack trace has been written to the log.)";
-                }
-                throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
-                                           e);
+            }
+            catch (PlanningErrorException e) {
+                throw e;
+            }
+            catch (HSQLParseException e) {
+                throw new PlanningErrorException(e.getMessage());
+            }
+            catch (Exception e) {
+                logException(e, "Error compiling query");
+                throw new PlanningErrorException("Error compiling query: " + e +
+                        " (Stack trace has been written to the log.)");
             }
 
             if (plan == null) {

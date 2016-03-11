@@ -231,10 +231,17 @@ class ParameterizationInfo {
         }
 
         // leverage existing (rather heavyweight) code to convert param types
-        Object retval = ParameterConverter.tryToMakeCompatible(type.classFromType(), value);
-        // check the result type in an assert
-        assert(ParameterConverter.verifyParameterConversion(retval, type.classFromType()));
-        return retval;
+        try {
+            Object retval = ParameterConverter.tryToMakeCompatible(type.classFromType(), value);
+            // check the result type in an assert
+            assert(ParameterConverter.verifyParameterConversion(retval, type.classFromType()));
+            return retval;
+        }
+        catch (RuntimeException conversionError) {
+            // Promote this expectable runtime error to a
+            // planning error for better handling.
+            throw new PlanningErrorException(conversionError.getMessage());
+        }
     }
 
     public ParameterSet extractedParamValues(VoltType[] parameterTypes) {
