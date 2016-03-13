@@ -28,7 +28,7 @@ import java.util.regex.Pattern;
 
 import junit.framework.TestCase;
 
-public class TestGeographyPointValue extends TestCase {
+public class TestGeographyPointValueAsType extends TestCase {
     // Points should have this much precision.
     private final double EPSILON = 1.0e-14;
 
