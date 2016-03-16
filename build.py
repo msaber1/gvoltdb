@@ -214,6 +214,8 @@ CTX.INPUT['catalog'] = """
  indexref.cpp
  materializedviewinfo.cpp
  planfragment.cpp
+ userdefinedfunction.cpp
+ udfparameter.cpp
  statement.cpp
  table.cpp
 """
