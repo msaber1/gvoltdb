@@ -62,6 +62,7 @@ function server() {
 function init() {
     jars-ifneeded
     sqlcmd < ddl.sql
+    csvloader state_boundaries -skip 1 < state_boundaries.csv
 }
 
 # run the client that drives the example

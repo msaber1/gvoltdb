@@ -603,6 +603,102 @@ public class GeographyValue {
         }
     }
 
+    private static List<List<XYZPoint>> loopsFromWkt(String wkt) throws IllegalArgumentException {
+        String msgPrefix = "Improperly formatted WKT for geography: ";
+        StreamTokenizer tokenizer = new StreamTokenizer(new StringReader(wkt));
+        tokenizer.lowerCaseMode(true);
+        tokenizer.eolIsSignificant(false);
+        List<List<XYZPoint>> loops = null;
+
+        try {
+            int token = tokenizer.nextToken();
+            if (token != StreamTokenizer.TT_WORD) {
+                throw new IllegalArgumentException(msgPrefix + "expected WKT to start with POLYGON or MULTIPOLYGON");
+            }
+
+            String geoType = tokenizer.sval;
+            if (geoType.equals("polygon")) {
+                loops = loopsFromPolygonWktStream(tokenizer);
+            }
+            else if (geoType.equals("multipolygon")) {
+                loops = loopsFromMultipolygonWktStream(tokenizer);
+            }
+            else {
+                throw new IllegalArgumentException(msgPrefix + "expected WKT to start with POLYGON or MULTIPOLYGON");
+            }
+
+            token = tokenizer.nextToken();
+            if (token != StreamTokenizer.TT_EOF) {
+                throw new IllegalArgumentException(msgPrefix + "unrecognized input after WKT");
+            }
+
+
+        } catch (IOException e) {
+            throw new IllegalArgumentException(msgPrefix + "error tokenizing string");
+        }
+
+        return loops;
+    }
+
+    private static List<List<XYZPoint>> loopsFromMultipolygonWktStream(
+            StreamTokenizer tokenizer) throws IOException {
+        String msgPrefix = "Improperly formatted WKT for multipolygon: ";
+
+        // The initial opening parenthesis
+        int token = tokenizer.nextToken();
+        if (token != '(') {
+            throw new IllegalArgumentException(msgPrefix + "expected left parenthesis after MULTIPOLYGON");
+        }
+
+        List<List<XYZPoint>> loops = new ArrayList<>();
+        boolean morePolygons = true;
+        while (morePolygons) {
+            token = tokenizer.nextToken();
+            if (token != '(') {
+                throw new IllegalArgumentException(msgPrefix + "expected left parenthesis to start a polygon in a MULTIPOLYGON");
+            }
+
+            loops.addAll(shellAndHolesFromWktStream(tokenizer));
+
+            token = tokenizer.nextToken();
+            assert (token == ')');
+
+            token = tokenizer.nextToken();
+            if (token == ')') {
+                morePolygons = false;
+                tokenizer.pushBack();
+            }
+            else if (token != ',') {
+                throw new IllegalArgumentException(msgPrefix + "unexpected input after a polygon in a MULTIPOLYGON");
+            }
+        }
+
+        token = tokenizer.nextToken();
+        assert(token == ')'); // callee should have just pushed this back into the stream.
+
+        for (List<XYZPoint> loop : loops) {
+            reverseLoop(loop);
+        }
+
+        return loops;
+    }
+
+    private static List<List<XYZPoint>> loopsFromPolygonWktStream(
+            StreamTokenizer tokenizer) throws IOException {
+        String msgPrefix = "Improperly formatted WKT for polygon: ";
+        int token = tokenizer.nextToken();
+        if (token != '(') {
+            throw new IllegalArgumentException(msgPrefix + "expected left parenthesis after POLYGON");
+        }
+
+        List<List<XYZPoint>> loops = shellAndHolesFromWktStream(tokenizer);
+
+        token = tokenizer.nextToken();
+        assert(token == ')'); // callee should have just pushed this back into the stream.
+
+        return loops;
+    }
+
     /**
      * A helper method to parse WKT and produce a list of polygon loops.
      * Anything more complicated than this and we probably want a dedicated parser.
@@ -612,115 +708,100 @@ public class GeographyValue {
      * definition.  When we send these to the EE we need to put them all into counter-clockwise
      * order.  So, we need to reverse the order of all but the first loop.
      */
-    private static List<List<XYZPoint>> loopsFromWkt(String wkt) throws IllegalArgumentException {
-        final String msgPrefix = "Improperly formatted WKT for polygon: ";
-
-        StreamTokenizer tokenizer = new StreamTokenizer(new StringReader(wkt));
-        tokenizer.lowerCaseMode(true);
-        tokenizer.eolIsSignificant(false);
-
+    private static List<List<XYZPoint>> shellAndHolesFromWktStream(StreamTokenizer tokenizer) throws IllegalArgumentException, IOException {
+        String msgPrefix = "Improperly formatted WKT for polygon: ";
         List<XYZPoint> currentLoop = null;
         List<List<XYZPoint>> loops = new ArrayList<List<XYZPoint>>();
         boolean is_shell = true;
-        try {
-            int token = tokenizer.nextToken();
-            if (token != StreamTokenizer.TT_WORD
-                    || ! tokenizer.sval.equals("polygon")) {
-                throw new IllegalArgumentException(msgPrefix + "expected WKT to start with POLYGON");
-            }
+        boolean polygonOpen = true;
+        int token;
+
+        while (polygonOpen) {
 
             token = tokenizer.nextToken();
-            if (token != '(') {
-                throw new IllegalArgumentException(msgPrefix + "expected left parenthesis after POLYGON");
-            }
+            switch (token) {
+            case '(':
+                if (currentLoop != null) {
+                    throw new IllegalArgumentException(msgPrefix + "missing closing parenthesis");
+                }
+                currentLoop = new ArrayList<XYZPoint>();
+                break;
+            case StreamTokenizer.TT_NUMBER:
+                if (currentLoop == null) {
+                    throw new IllegalArgumentException(msgPrefix + "missing opening parenthesis");
+                }
 
-            boolean polygonOpen = true;
-
-            while (polygonOpen) {
+                double lng = tokenizer.nval;
+                token = tokenizer.nextToken();
+                if (token != StreamTokenizer.TT_NUMBER) {
+                    throw new IllegalArgumentException(msgPrefix + "missing latitude in long lat pair");
+                }
+                double lat = tokenizer.nval;
+                currentLoop.add(XYZPoint.fromGeographyPointValue(new GeographyPointValue(lng, lat)));
 
                 token = tokenizer.nextToken();
-                switch (token) {
-                case '(':
-                    if (currentLoop != null) {
-                        throw new IllegalArgumentException(msgPrefix + "missing closing parenthesis");
+                if (token != ',') {
+                    if (token != ')') {
+                        throw new IllegalArgumentException(msgPrefix + "missing comma between long lat pairs");
                     }
-                    currentLoop = new ArrayList<XYZPoint>();
-                    break;
-                case StreamTokenizer.TT_NUMBER:
-                    if (currentLoop == null) {
-                        throw new IllegalArgumentException(msgPrefix + "missing opening parenthesis");
-                    }
+                    tokenizer.pushBack();
+                }
+                break;
+            case ')':
+                // perform basic validation of loop
+                diagnoseLoop(currentLoop, msgPrefix);
+                // Following the OGC standard, the first loop should be CCW, and subsequent loops
+                // should be CW.  But we will be building the S2 polygon here,
+                // and S2 wants everything to be CCW.  So, we need to
+                // reverse all but the first loop.
+                //
+                // Note also that we don't want to touch the vertex at index 0, and we want
+                // to remove the vertex at index currentLoop.size() - 1.  We want to hold the first
+                // vertex invariant.  The vertex at currentLoop.size() - 1 should be a duplicate
+                // of the vertex at index 0, and should be removed before pushing it into the
+                // list of loops.
+                //
+                // We are also allowed to swap these out, because they have been
+                // created and are owned by us.
+                //
+                currentLoop.remove(currentLoop.size() - 1);
+                if (!is_shell) {
+                    reverseLoop(currentLoop);
+                }
+                is_shell = false;
+                loops.add(currentLoop);
+                currentLoop = null;
 
-                    double lng = tokenizer.nval;
-                    token = tokenizer.nextToken();
-                    if (token != StreamTokenizer.TT_NUMBER) {
-                        throw new IllegalArgumentException(msgPrefix + "missing latitude in long lat pair");
-                    }
-                    double lat = tokenizer.nval;
-                    currentLoop.add(XYZPoint.fromGeographyPointValue(new GeographyPointValue(lng, lat)));
-
-                    token = tokenizer.nextToken();
-                    if (token != ',') {
-                        if (token != ')') {
-                            throw new IllegalArgumentException(msgPrefix + "missing comma between long lat pairs");
-                        }
-                        tokenizer.pushBack();
-                    }
-                    break;
-                case ')':
-                    // perform basic validation of loop
-                    diagnoseLoop(currentLoop, msgPrefix);
-                    // Following the OGC standard, the first loop should be CCW, and subsequent loops
-                    // should be CW.  But we will be building the S2 polygon here,
-                    // and S2 wants everything to be CCW.  So, we need to
-                    // reverse all but the first loop.
-                    //
-                    // Note also that we don't want to touch the vertex at index 0, and we want
-                    // to remove the vertex at index currentLoop.size() - 1.  We want to hold the first
-                    // vertex invariant.  The vertex at currentLoop.size() - 1 should be a duplicate
-                    // of the vertex at index 0, and should be removed before pushing it into the
-                    // list of loops.
-                    //
-                    // We are also allowed to swap these out, because they have been
-                    // created and are owned by us.
-                    //
-                    currentLoop.remove(currentLoop.size() - 1);
-                    if (!is_shell) {
-                        for (int fidx = 1, lidx = currentLoop.size() - 1; fidx < lidx; ++fidx, --lidx) {
-                            Collections.swap(currentLoop, fidx, lidx);
-                        }
-                    }
-                    is_shell = false;
-                    loops.add(currentLoop);
-                    currentLoop = null;
-
-                    token = tokenizer.nextToken();
-                    if (token == ')') {
-                        polygonOpen = false;
-                    }
-                    else if (token != ',') {
-                        throw new IllegalArgumentException(msgPrefix + "unrecognized token in WKT: " + Character.toString((char)token));
-                    }
-
-                    break;
-
-                case StreamTokenizer.TT_EOF:
-                    throw new IllegalArgumentException(msgPrefix + "premature end of input");
-
-                default:
+                token = tokenizer.nextToken();
+                if (token == ')') {
+                    tokenizer.pushBack();
+                    polygonOpen = false;
+                }
+                else if (token != ',') {
                     throw new IllegalArgumentException(msgPrefix + "unrecognized token in WKT: " + Character.toString((char)token));
                 }
-            }
 
-            token = tokenizer.nextToken();
-            if (token != StreamTokenizer.TT_EOF) {
-                throw new IllegalArgumentException(msgPrefix + "unrecognized input after WKT");
+                break;
+
+            case StreamTokenizer.TT_EOF:
+                throw new IllegalArgumentException(msgPrefix + "premature end of input");
+
+            default:
+                throw new IllegalArgumentException(msgPrefix + "unrecognized token in WKT: " + Character.toString((char)token));
             }
-        } catch (IOException e) {
-            throw new IllegalArgumentException(msgPrefix + "error tokenizing string");
         }
 
         return loops;
+    }
+
+    /**
+     * Accepts a loop whose trailing closing index has been removed.
+     * @param currentLoop
+     */
+    private static void reverseLoop(List<XYZPoint> currentLoop) {
+        for (int fidx = 1, lidx = currentLoop.size() - 1; fidx < lidx; ++fidx, --lidx) {
+            Collections.swap(currentLoop, fidx, lidx);
+        }
     }
 
     /**

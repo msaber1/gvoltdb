@@ -25,16 +25,17 @@ CREATE TABLE votes
 
 PARTITION TABLE votes ON COLUMN phone_number;
 
--- Map of Area Codes and States for geolocation classification of incoming calls
-CREATE TABLE area_code_state
+CREATE TABLE state_boundaries
 (
-  area_code smallint   NOT NULL
-, state     varchar(2) NOT NULL
-, CONSTRAINT PK_area_code_state PRIMARY KEY
-  (
-    area_code
-  )
+  boundary GEOGRAPHY(1000000) NOT NULL
+, name VARCHAR(128) NOT NULL
+, id INTEGER PRIMARY KEY
+, fips INTEGER NOT NULL -- what is this
+, region varchar(64) NOT NULL
+, abbrev varchar(2) NOT NULL
 );
+
+CREATE INDEX geoidx ON state_boundaries(boundary);
 
 -- rollup of votes by phone number, used to reject excessive voting
 CREATE VIEW v_votes_by_phone_number

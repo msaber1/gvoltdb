@@ -30,10 +30,10 @@
 
 package voter;
 
-import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.types.GeographyPointValue;
 
 public class Vote extends VoltProcedure {
 
@@ -52,18 +52,18 @@ public class Vote extends VoltProcedure {
 
     // Checks an area code to retrieve the corresponding state
     public final SQLStmt checkStateStmt = new SQLStmt(
-            "SELECT state FROM area_code_state WHERE area_code = ?;");
+            "SELECT abbrev FROM state_boundaries WHERE CONTAINS(boundary, ?);");
 
     // Records a vote
     public final SQLStmt insertVoteStmt = new SQLStmt(
             "INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);");
 
-    public long run(long phoneNumber, int contestantNumber, long maxVotesPerPhoneNumber) {
+    public long run(long phoneNumber, GeographyPointValue location, int contestantNumber, long maxVotesPerPhoneNumber) {
 
         // Queue up validation statements
         voltQueueSQL(checkContestantStmt, EXPECT_ZERO_OR_ONE_ROW, contestantNumber);
         voltQueueSQL(checkVoterStmt, EXPECT_ZERO_OR_ONE_ROW, phoneNumber);
-        voltQueueSQL(checkStateStmt, EXPECT_ZERO_OR_ONE_ROW, (short)(phoneNumber / 10000000l));
+        voltQueueSQL(checkStateStmt, EXPECT_ZERO_OR_ONE_ROW, location);
         VoltTable validation[] = voltExecuteSQL();
 
         if (validation[0].getRowCount() == 0) {

@@ -306,6 +306,15 @@ public class TestGeographyValue extends TestCase {
                 + "(\n-68.874 28.066,\t    -68.855\n25.361\n,      -73.381\t28.376,\n\n-68.874\t28.066\t)\n)\t"));
     }
 
+    public void testWktMultipolygonParsingPositive() {
+        String wkt = "MULTIPOLYGON (((40 40, 20 45, 45 30, 40 40)),"
+                + "((20 35, 10 30, 10 10, 30 5, 45 20, 20 35),"
+                + "(30 20, 20 15, 20 25, 30 20)))";
+        // Should not throw
+        GeographyValue gv = GeographyValue.fromWKT(wkt);
+        assertEquals(3, gv.getRings().size());
+    }
+
     private void assertWktParseError(String error, String wkt) {
         try {
             new GeographyValue(wkt);

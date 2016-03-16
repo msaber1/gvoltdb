@@ -558,8 +558,8 @@ template<> NValue NValue::callUnary<FUNC_VOLT_VALIDATE_POLYGON>() const {
     // Extract the polygon and check its validity.
     Polygon poly;
     poly.initFromGeography(getGeographyValue());
-    if (!poly.IsValid(NULL)
-            || isMultiPolygon(poly, NULL)) {
+    if (!poly.IsValid(NULL)) {
+        //            || isMultiPolygon(poly, NULL)) {
         returnval = false;
     }
     return ValueFactory::getBooleanValue(returnval);
@@ -574,9 +574,10 @@ template<> NValue NValue::callUnary<FUNC_VOLT_POLYGON_INVALID_REASON>() const {
     std::stringstream msg;
     Polygon poly;
     poly.initFromGeography(getGeographyValue());
-    if (poly.IsValid(&msg)) {
-        isMultiPolygon(poly, &msg);
-    }
+    poly.IsValid(&msg);
+    //     isMultiPolygon(poly, &msg);
+    // }
+
     std::string res (msg.str());
     if (res.size() == 0) {
         res = std::string("Valid Polygon");

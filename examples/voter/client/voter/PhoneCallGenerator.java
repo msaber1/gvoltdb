@@ -25,6 +25,8 @@ package voter;
 
 import java.util.Random;
 
+import org.voltdb.types.GeographyPointValue;
+
 public class PhoneCallGenerator {
 
     // Initialize some common constants and variables
@@ -58,28 +60,71 @@ public class PhoneCallGenerator {
     public static class PhoneCall {
         public final int contestantNumber;
         public final long phoneNumber;
+        public final GeographyPointValue location;
 
-        protected PhoneCall(int contestantNumber, long phoneNumber) {
+        protected PhoneCall(int contestantNumber, long phoneNumber, GeographyPointValue location) {
             this.contestantNumber = contestantNumber;
             this.phoneNumber = phoneNumber;
+            this.location = location;
         }
     }
 
     private final int contestantCount;
     private final Random rand = new Random();
-    private final int[] votingMap = new int[AREA_CODES.length];
 
     public PhoneCallGenerator(final int contestantCount)
     {
         this.contestantCount = contestantCount;
+    }
 
-        // This is a just a small fudge to make the geographical voting map more interesting for the benchmark!
-        for(int i = 0; i < votingMap.length; i++) {
-            votingMap[i] = 1;
-            if (rand.nextInt(100) >= 30) {
-                votingMap[i] = (int) (Math.abs(Math.sin(i)* contestantCount) % contestantCount) + 1;
+    static private final GeographyPointValue cities[] = {
+        GeographyPointValue.fromWKT("point(-73.929 40.823)"),  // New York City
+        GeographyPointValue.fromWKT("point(-87.625 41.874)"),  // Chicago
+        GeographyPointValue.fromWKT("point(-118.234 34.027)"), // LA
+        GeographyPointValue.fromWKT("point(-80.227 25.768)"),  // Miami
+        GeographyPointValue.fromWKT("point(-122.648 45.512)"), // Portland
+        GeographyPointValue.fromWKT("point(-96.792 32.773)"),  // Dallas
+        GeographyPointValue.fromWKT("point(-103.230 44.077)"), // Rapid City, SD
+        GeographyPointValue.fromWKT("point(-105.032 39.743)") // Denver
+    };
+
+    static private final GeographyPointValue hawaii = GeographyPointValue.fromWKT("point(-155.456 19.635)"); // Mauna Kea, HI
+    static private final GeographyPointValue alaska = GeographyPointValue.fromWKT("point(-158.724 64.327)"); // Kaltag, AK
+
+    private GeographyPointValue generateRandomLocation(int contestantNumber) {
+
+        final double maxLat = 48.886116; // NW corner of WA
+        final double minLat = 27.088100; // somewhere in the Atlantic
+
+        final double maxLng = -65.841424; // somewhere in the Atlantic
+        final double minLng = -124.200801; // NW corner of WA
+
+        if (rand.nextInt(20) < 5) {
+            // 5% of the time, give a vote to Alaska or Hawaii.
+            if (rand.nextBoolean()) {
+                return hawaii;
+            }
+            else {
+                return alaska;
             }
         }
+
+        double lng;
+        double lat;
+
+        GeographyPointValue city = cities[contestantNumber % cities.length];
+
+        do {
+           lng = city.getLongitude() + rand.nextGaussian() * 8.0;
+        }
+        while (lng < minLng || lng > maxLng);
+
+        do {
+           lat = city.getLatitude() + rand.nextGaussian() * 8.0;
+        }
+        while (lat < minLat || lat > maxLat);
+
+        return new GeographyPointValue(lng, lat);
     }
 
     /**
@@ -89,15 +134,16 @@ public class PhoneCallGenerator {
     public PhoneCall receive()
     {
         // For the purpose of a benchmark, issue random voting activity
-        // (including invalid votes to demonstrate transaction validationg in the database)
+        // (including invalid votes to demonstrate transaction validating in the database)
 
         // Pick a random area code for the originating phone call
         int areaCodeIndex = rand.nextInt(AREA_CODES.length);
 
         // Pick a contestant number
-        int contestantNumber = votingMap[areaCodeIndex];
-        if (rand.nextBoolean()) {
-            contestantNumber = rand.nextInt(contestantCount) + 1;
+        int contestantNumber = rand.nextInt(contestantCount) + 1;
+        if (rand.nextInt(50) == 0) {
+            // 2 percent of the time, force the vote so there is a clear winner.
+            contestantNumber = contestantCount / 2 + 1;
         }
 
         //  introduce an invalid contestant every 100 call or so to simulate fraud
@@ -109,7 +155,9 @@ public class PhoneCallGenerator {
         // Build the phone number
         long phoneNumber = AREA_CODES[areaCodeIndex] * 10000000L + rand.nextInt(10000000);
 
+        GeographyPointValue location = generateRandomLocation(contestantNumber);
+
         // Return the generated phone number
-        return new PhoneCall(contestantNumber, phoneNumber);
+        return new PhoneCall(contestantNumber, phoneNumber, location);
     }
 }
