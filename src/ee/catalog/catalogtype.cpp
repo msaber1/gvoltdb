@@ -15,9 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* WARNING: THIS FILE IS AUTO-GENERATED
-            DO NOT MODIFY THIS SOURCE
-            ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
+// THIS FILE IS NOT AUTO-GENERATED. MODIFY IT AS NEEDED.
 
 #include <cctype>
 #include <cstdlib>
@@ -82,8 +80,7 @@ void CatalogType::set(const string &field, const string &value) {
         val.intValue = atoi(value.c_str());
     else {
         string msg = "Invalid value '" + value + "' for field '" + field + "'";
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      msg.c_str());
+        throw UnexpectedEEException(msg);
     }
 
     m_fields[field] = val;

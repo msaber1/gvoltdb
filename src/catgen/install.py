@@ -22,12 +22,21 @@ import os
 # avoid unecessarily dirtying build dependencies when no
 # changes are necessary
 
-exit_status = os.system("diff -x .svn -x .fake -x .DS_Store out/cppsrc/ ../ee/catalog/")
+os.system("rm -f exclusions")
+os.system("fgrep --files-with-matches 'THIS FILE IS NOT AUTO-GENERATED' ../ee/catalog/* | xargs basename >> exclusions")
+os.system("fgrep --files-with-matches 'THIS FILE IS NOT AUTO-GENERATED' ../frontend/org/voltdb/catalog/*.java | xargs basename >> exclusions")
+os.system("echo .svn >> exclusions")
+os.system("echo .fake >> exclusions")
+os.system("echo .DS_Store >> exclusions")
+os.system("echo package.html >> exclusions")
+os.system("echo .svn >> exclusions")
+exit_status = os.system("diff -X exclusions out/cppsrc/ ../ee/catalog/")
 if (exit_status != 0):
-    os.system("rm ../ee/catalog/*")
+    os.system("fgrep --files-with-matches 'WARNING: THIS FILE IS AUTO-GENERATED' ../ee/catalog/* | xargs rm -f")
     os.system("cp out/cppsrc/* ../ee/catalog/")
 
-exit_status = os.system("diff -x .svn -x gui  -x package.html -x .DS_Store out/javasrc/ ../frontend/org/voltdb/catalog/")
+exit_status = os.system("diff -X exclusions out/javasrc/ ../frontend/org/voltdb/catalog/")
 if (exit_status != 0):
-    os.system("rm ../frontend/org/voltdb/catalog/*.java")
+    os.system("fgrep --files-with-matches 'WARNING: THIS FILE IS AUTO-GENERATED' ../frontend/org/voltdb/catalog/*.java | xargs rm -f")
     os.system("cp out/javasrc/* ../frontend/org/voltdb/catalog/")
+os.system("rm -f exclusions")

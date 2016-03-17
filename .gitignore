@@ -44,10 +44,13 @@ doc/tutorials/auction/csvloader_*.csv
 /src/ee/.settings/
 /src/catgen/out
 /src/ee/catalog/*
+!/src/ee/catalog/*catalog*
 /src/ee/tags
 /src/ee/org_voltdb_jni_ExecutionEngine.h
 /src/ee/org_voltcore_utils_DBBPool.h
 /src/frontend/org/voltdb/catalog/*.java
+!/src/frontend/org/voltdb/catalog/*Catalog*.java
+!/src/frontend/org/voltdb/catalog/*Configuration*.java
 /voltdb/libvoltdb*.so
 /voltdb/voltdb*.jar
 /examples/*/*.jar

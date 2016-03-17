@@ -15,9 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* WARNING: THIS FILE IS AUTO-GENERATED
-            DO NOT MODIFY THIS SOURCE
-            ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
+// THIS FILE IS NOT AUTO-GENERATED. MODIFY IT AS NEEDED.
 
 #ifndef CATALOG_CATALOG_MAP_H_
 #define CATALOG_CATALOG_MAP_H_
