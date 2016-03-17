@@ -99,7 +99,8 @@ public class PhoneCallGenerator {
         final double maxLng = -65.841424; // somewhere in the Atlantic
         final double minLng = -124.200801; // NW corner of WA
 
-        if (rand.nextInt(20) < 5) {
+        int randVal = rand.nextInt(100);
+        if (randVal < 5) {
             // 5% of the time, give a vote to Alaska or Hawaii.
             if (rand.nextBoolean()) {
                 return hawaii;
@@ -112,17 +113,30 @@ public class PhoneCallGenerator {
         double lng;
         double lat;
 
-        GeographyPointValue city = cities[contestantNumber % cities.length];
+        if (randVal < 11) {
+            // Another 1% of the time, generate a location near a city
+            // chosen by the contestant the vote is for.  This will
+            // add a geographic bias and make the heat map more
+            // interesting.
+            GeographyPointValue city = cities[contestantNumber % cities.length];
 
-        do {
-           lng = city.getLongitude() + rand.nextGaussian() * 8.0;
-        }
-        while (lng < minLng || lng > maxLng);
+            do {
+                lng = city.getLongitude() + rand.nextGaussian() * 8.0;
+            }
+            while (lng < minLng || lng > maxLng);
 
-        do {
-           lat = city.getLatitude() + rand.nextGaussian() * 8.0;
+            do {
+                lat = city.getLatitude() + rand.nextGaussian() * 8.0;
+            }
+            while (lat < minLat || lat > maxLat);
         }
-        while (lat < minLat || lat > maxLat);
+        else {
+            // The rest of the time, just choose a random location within a bounding box.
+            final double lngRange = maxLng - minLng;
+            final double latRange = maxLat - minLat;
+            lng = minLng + rand.nextDouble() * lngRange;
+            lat = minLat + rand.nextDouble() * latRange;
+        }
 
         return new GeographyPointValue(lng, lat);
     }
