@@ -86,8 +86,7 @@ subqueryFactory(ExpressionType subqueryType, PlannerDomValue obj, const std::vec
         int paramSize = params.arrayLen();
         paramIdxs.reserve(paramSize);
         if (args == NULL || args->size() != paramSize) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "subqueryFactory: parameter indexes/tve count mismatch");
+            throw UnexpectedEEException("subqueryFactory: parameter indexes/tve count mismatch");
         }
         for (int i = 0; i < paramSize; ++i) {
             int paramIdx = params.valueAtIndex(i).asInt();
@@ -149,7 +148,7 @@ subqueryComparisonFactory(PlannerDomValue obj,
             snprintf(message, 256, "Invalid ExpressionType '%s' called"
                 " for VectorComparisonExpression",
                 expressionToString(c).c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            throw UnexpectedEEException(message);
         }
     } else if (l_subquery != NULL) {
         switch (c) {
@@ -172,7 +171,7 @@ subqueryComparisonFactory(PlannerDomValue obj,
             snprintf(message, 256, "Invalid ExpressionType '%s' called"
                 " for VectorComparisonExpression",
                 expressionToString(c).c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            throw UnexpectedEEException(message);
         }
     } else {
         assert(r_subquery != NULL);
@@ -196,7 +195,7 @@ subqueryComparisonFactory(PlannerDomValue obj,
             snprintf(message, 256, "Invalid ExpressionType '%s' called"
                 " for VectorComparisonExpression",
                 expressionToString(c).c_str());
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            throw UnexpectedEEException(message);
         }
     }
 }
@@ -232,7 +231,7 @@ getGeneral(ExpressionType c,
         snprintf(message, 256, "Invalid ExpressionType '%s' called"
                 " for ComparisonExpression",
                 expressionToString(c).c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw UnexpectedEEException(message);
     }
 }
 
@@ -266,7 +265,7 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called for"
                 " ComparisonExpression",expressionToString(c).c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw UnexpectedEEException(message);
     }
 }
 
@@ -321,50 +320,28 @@ static AbstractExpression *
 operatorFactory(ExpressionType et,
                 AbstractExpression *lc, AbstractExpression *rc)
 {
-    AbstractExpression *ret = NULL;
-
-   switch(et) {
-     case (EXPRESSION_TYPE_OPERATOR_PLUS):
-       ret = new OperatorExpression<OpPlus>(et, lc, rc);
-       break;
-
-     case (EXPRESSION_TYPE_OPERATOR_MINUS):
-       ret = new OperatorExpression<OpMinus>(et, lc, rc);
-       break;
-
-     case (EXPRESSION_TYPE_OPERATOR_MULTIPLY):
-       ret = new OperatorExpression<OpMultiply>(et, lc, rc);
-       break;
-
-     case (EXPRESSION_TYPE_OPERATOR_DIVIDE):
-       ret = new OperatorExpression<OpDivide>(et, lc, rc);
-       break;
-
-     case (EXPRESSION_TYPE_OPERATOR_NOT):
-       ret = new OperatorNotExpression(lc);
-       break;
-
-     case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
-         ret = new OperatorIsNullExpression(lc);
-         break;
-
-     case (EXPRESSION_TYPE_OPERATOR_EXISTS):
-         ret = new OperatorExistsExpression(lc);
-         break;
-
-     case (EXPRESSION_TYPE_OPERATOR_MOD):
-       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "Mod operator is not yet supported.");
-
-     case (EXPRESSION_TYPE_OPERATOR_CONCAT):
-       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "Concat operator not yet supported.");
-
-     default:
-       throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                     "operator ctor helper out of sync");
-   }
-   return ret;
+    switch(et) {
+    case (EXPRESSION_TYPE_OPERATOR_PLUS):
+        return new OperatorExpression<OpPlus>(et, lc, rc);
+    case (EXPRESSION_TYPE_OPERATOR_MINUS):
+        return new OperatorExpression<OpMinus>(et, lc, rc);
+    case (EXPRESSION_TYPE_OPERATOR_MULTIPLY):
+        return new OperatorExpression<OpMultiply>(et, lc, rc);
+    case (EXPRESSION_TYPE_OPERATOR_DIVIDE):
+        return new OperatorExpression<OpDivide>(et, lc, rc);
+    case (EXPRESSION_TYPE_OPERATOR_NOT):
+        return new OperatorNotExpression(lc);
+    case (EXPRESSION_TYPE_OPERATOR_IS_NULL):
+        return new OperatorIsNullExpression(lc);
+    case (EXPRESSION_TYPE_OPERATOR_EXISTS):
+        return new OperatorExistsExpression(lc);
+    case (EXPRESSION_TYPE_OPERATOR_MOD):
+        throw UnexpectedEEException("Mod operator is not yet supported.");
+    case (EXPRESSION_TYPE_OPERATOR_CONCAT):
+        throw UnexpectedEEException("Concat operator not yet supported.");
+    default:
+        throw UnexpectedEEException("operator ctor helper out of sync");
+    }
 }
 
 static AbstractExpression* castFactory(ValueType vt,
@@ -379,8 +356,7 @@ static AbstractExpression* caseWhenFactory(ValueType vt,
 
     OperatorAlternativeExpression* alternative = dynamic_cast<OperatorAlternativeExpression*> (rc);
     if (!rc) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "operator case when has incorrect expression");
+        throw UnexpectedEEException("operator case when has incorrect expression");
     }
     return new OperatorCaseWhenExpression(vt, lc, alternative);
 }
@@ -396,8 +372,7 @@ constantValueFactory(PlannerDomValue obj,
     // read before ctor - can then instantiate fully init'd obj.
     NValue newvalue;
     bool isNull = obj.valueForKey("ISNULL").asBool();
-    if (isNull)
-    {
+    if (isNull) {
         newvalue = NValue::getNullValue(vt);
         return new ConstantValueExpression(newvalue);
     }
@@ -405,14 +380,6 @@ constantValueFactory(PlannerDomValue obj,
     PlannerDomValue valueValue = obj.valueForKey("VALUE");
 
     switch (vt) {
-    case VALUE_TYPE_INVALID:
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "constantValueFactory: Value type should"
-                                      " never be VALUE_TYPE_INVALID");
-    case VALUE_TYPE_NULL:
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "constantValueFactory: And they should be"
-                                      " never be this either! VALUE_TYPE_NULL");
     case VALUE_TYPE_TINYINT:
         newvalue = ValueFactory::getTinyIntValue(static_cast<int8_t>(valueValue.asInt64()));
         break;
@@ -444,10 +411,14 @@ constantValueFactory(PlannerDomValue obj,
     case VALUE_TYPE_BOOLEAN:
         newvalue = ValueFactory::getBooleanValue(valueValue.asBool());
         break;
+    case VALUE_TYPE_INVALID:
+        throw UnexpectedEEException("constantValueFactory: Value type should"
+                                    " never be VALUE_TYPE_INVALID");
+    case VALUE_TYPE_NULL:
+        throw UnexpectedEEException("constantValueFactory: Value type should"
+                                    " never be VALUE_TYPE_NULL");
     default:
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "constantValueFactory: Unrecognized value"
-                                      " type");
+        throw UnexpectedEEException("constantValueFactory: Unrecognized value type");
     }
 
     return new ConstantValueExpression(newvalue);
@@ -488,7 +459,6 @@ tupleValueFactory(PlannerDomValue obj, ExpressionType et,
                 StackTrace::stringStackTrace();
         throw UnexpectedEEException(message.str());
     }
-
     return new TupleValueExpression(tableIdx, columnIndex);
 }
 
@@ -504,7 +474,6 @@ ExpressionUtil::conjunctionFactory(ExpressionType et, AbstractExpression *lc, Ab
     default:
         return NULL;
     }
-
 }
 
 static void raiseFunctionFactoryError(const std::string& nameString, int functionId,
@@ -522,7 +491,7 @@ static void raiseFunctionFactoryError(const std::string& nameString, int functio
              nameString.c_str(), functionId);
     }
     DEBUG_ASSERT_OR_THROW_OR_CRASH(false, fn_message);
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
+    throw UnexpectedEEException(fn_message);
 }
 
 
@@ -651,7 +620,7 @@ ExpressionUtil::expressionFactory(PlannerDomValue obj,
         char message[256];
         snprintf(message,256, "Invalid ExpressionType '%s' (%d) requested from factory",
                 expressionToString(et).c_str(), (int)et);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw UnexpectedEEException(message);
     }
 
     ret->setValueType(vt);

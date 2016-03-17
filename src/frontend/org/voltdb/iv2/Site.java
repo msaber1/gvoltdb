@@ -95,9 +95,9 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import vanilla.java.affinity.impl.PosixJNAAffinity;
-
 import com.google_voltpatches.common.base.Preconditions;
+
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -245,9 +245,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     /**
      * SystemProcedures are "friends" with ExecutionSites and granted
-     * access to internal state via m_systemProcedureContext.
+     * access to internal state via m_sysprocContext.
      */
-    SystemProcedureExecutionContext m_sysprocContext = new SystemProcedureExecutionContext() {
+    PerSiteSystemProcedureExecutionContext m_sysprocContext =
+            new PerSiteSystemProcedureExecutionContext();
+    class PerSiteSystemProcedureExecutionContext implements SystemProcedureExecutionContext
+    {
         @Override
         public Database getDatabase() {
             return m_context.database;
@@ -399,7 +402,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             ProcedureRunner runner = Site.this.m_loadedProcedures.getProcByName(procName);
             return runner.getCatalogProcedure();
         }
-    };
+    }
 
     /** Create a new execution site and the corresponding EE */
     public Site(
@@ -1364,8 +1367,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
-        return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                            remoteClusterId, getNextUndoToken(m_currentTxnId));
+        return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle,
+                m_lastCommittedSpHandle, uniqueId,
+                remoteClusterId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override

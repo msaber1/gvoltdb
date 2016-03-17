@@ -49,12 +49,11 @@ public:
         }
 };
 
-    virtual voltdb::NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+    virtual NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert(tuple1);
         if ( ! tuple1 ) {
-            throw SerializableEEException(
-                    "TupleValueExpression::"
-                    "eval:"
+            throw UnexpectedEEException(
+                    "TupleValueExpression::eval:"
                     " Couldn't find tuple 1 (possible index scan planning error)");
         }
         const int32_t hash = tuple1->getNValue(this->value_idx).murmurHash3();

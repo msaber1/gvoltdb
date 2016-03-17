@@ -97,22 +97,22 @@ TupleSchema *TableCatalogDelegate::createTupleSchema(catalog::Database const &ca
     return schemaBuilder.build();
 }
 
-bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
+bool FORCE_ERROR_IN_INDEX_CONSTRUCTION = true;
+
+void TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
                                           catalog::Index const &catalogIndex,
                                           const TupleSchema *schema,
                                           TableIndexScheme *scheme)
 {
-    vector<int> index_columns;
     vector<ValueType> column_types;
 
-    // The catalog::Index object now has a list of columns that are to be
-    // used
-    if (catalogIndex.columns().size() == (size_t)0) {
-        VOLT_ERROR("Index '%s' in table '%s' does not declare any columns"
-                   " to use",
-                   catalogIndex.name().c_str(),
-                   catalogTable.name().c_str());
-        return false;
+    // The catalog::Index has a list of re-index trigger columns.
+    assert(catalogIndex.columns().size());
+    if ( ! catalogIndex.columns().size()) {
+        throwFatalException("Index '%s' in table '%s' is corrupted."
+                            " It does not declare any base columns",
+                            catalogIndex.name().c_str(),
+                            catalogTable.name().c_str());
     }
 
     vector<AbstractExpression*> indexedExpressions = TableIndex::simplyIndexColumns();
@@ -124,22 +124,23 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
     // Since the columns are not going to come back in the proper order from
     // the catalogs, we'll use the index attribute to make sure we put them
     // in the right order
-    index_columns.resize(catalogIndex.columns().size());
+    vector<int> index_columns(catalogIndex.columns().size());
     map<string, catalog::ColumnRef*>::const_iterator colref_iterator;
     for (colref_iterator = catalogIndex.columns().begin();
          colref_iterator != catalogIndex.columns().end();
          colref_iterator++) {
         catalog::ColumnRef *catalog_colref = colref_iterator->second;
-        if (catalog_colref->index() < 0) {
-            VOLT_ERROR("Invalid column '%d' for index '%s' in table '%s'",
+        assert(catalog_colref->index() >= 0);
+        assert(catalog_colref->index() < index_columns.size());
+        if (catalog_colref->index() < 0 ||
+                catalog_colref->index() >= index_columns.size()) {
+            throwFatalException("Invalid column '%d' for index '%s' in table '%s'",
                        catalog_colref->index(),
                        catalogIndex.name().c_str(),
                        catalogTable.name().c_str());
-            return false;
         }
         index_columns[catalog_colref->index()] = catalog_colref->column()->index();
     }
-    // partial index predicate
     const std::string predicateAsText = catalogIndex.predicatejson();
     AbstractExpression* predicate = NULL;
     if (!predicateAsText.empty()) {
@@ -155,7 +156,6 @@ bool TableCatalogDelegate::getIndexScheme(catalog::Table const &catalogTable,
                                expressionsAsText,
                                predicateAsText,
                                schema);
-    return true;
 }
 
 /**
@@ -291,9 +291,8 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
         catalog::Index *catalog_index = idx_iterator->second;
 
         TableIndexScheme index_scheme;
-        if (getIndexScheme(catalogTable, *catalog_index, schema, &index_scheme)) {
-            index_map[catalog_index->name()] = index_scheme;
-        }
+        getIndexScheme(catalogTable, *catalog_index, schema, &index_scheme);
+        index_map[catalog_index->name()] = index_scheme;
     }
 
     // Constraints
@@ -437,14 +436,12 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
     return table;
 }
 
-int
-TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
-                           catalog::Table const &catalogTable)
+void TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
+                                catalog::Table const &catalogTable)
 {
-    m_table = constructTableFromCatalog(catalogDatabase,
-                                        catalogTable);
+    m_table = constructTableFromCatalog(catalogDatabase, catalogTable);
     if (!m_table) {
-        return false; // mixing ints and booleans here :(
+        return;
     }
 
     m_exportEnabled = evaluateExport(catalogDatabase, catalogTable);
@@ -454,7 +451,6 @@ TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
     m_table->configureIndexStats(databaseId);
 
     m_table->incrementRefcount();
-    return 0;
 }
 
 //After catalog is updated call this to ensure your export tables are connected correctly.

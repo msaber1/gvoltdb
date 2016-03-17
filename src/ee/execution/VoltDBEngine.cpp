@@ -166,18 +166,18 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
 {
 }
 
-bool
-VoltDBEngine::initialize(int32_t clusterIndex,
-                         int64_t siteId,
-                         int32_t partitionId,
-                         int32_t hostId,
-                         std::string hostname,
-                         int32_t drClusterId,
-                         int32_t defaultDrBufferSize,
-                         int64_t tempTableMemoryLimit,
-                         bool createDrReplicatedStream,
-                         int32_t compactionThreshold)
+void VoltDBEngine::initialize(int32_t clusterIndex,
+                              int64_t siteId,
+                              int32_t partitionId,
+                              int32_t hostId,
+                              std::string hostname,
+                              int32_t drClusterId,
+                              int32_t defaultDrBufferSize,
+                              int64_t tempTableMemoryLimit,
+                              bool createDrReplicatedStream,
+                              int32_t compactionThreshold)
 {
+    VOLT_DEBUG("calling initialize...");
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_partitionId = partitionId;
@@ -243,7 +243,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_drStream,
                                             m_drReplicatedStream,
                                             drClusterId);
-    return true;
+    VOLT_DEBUG("...initialize succeeded");
 }
 
 VoltDBEngine::~VoltDBEngine() {
@@ -517,7 +517,7 @@ void VoltDBEngine::resetExecutionMetadata() {
 
 void VoltDBEngine::serializeException(const SerializableEEException& e) {
     resetReusedResultOutputBuffer();
-    e.serialize(getExceptionOutputSerializer());
+    e.serialize(m_exceptionOutput);
 }
 
 // -------------------------------------------------
@@ -539,23 +539,7 @@ int VoltDBEngine::loadNextDependency(Table* destination) {
 // -------------------------------------------------
 // Catalog Functions
 // -------------------------------------------------
-bool VoltDBEngine::updateCatalogDatabaseReference() {
-    catalog::Cluster *cluster = m_catalog->clusters().get("cluster");
-    if (!cluster) {
-        VOLT_ERROR("Unable to find cluster catalog information");
-        return false;
-    }
-
-    m_database = cluster->databases().get("database");
-    if (!m_database) {
-        VOLT_ERROR("Unable to find database catalog information");
-        return false;
-    }
-
-    return true;
-}
-
-bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catalogPayload) {
+void VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catalogPayload) {
     assert(m_executorContext != NULL);
     ExecutorContext* executorContext = ExecutorContext::getExecutorContext();
     if (executorContext == NULL) {
@@ -567,13 +551,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
 
-
     m_catalog->execute(catalogPayload);
-
-
-    if (updateCatalogDatabaseReference() == false) {
-        return false;
-    }
 
     // Set DR flag based on current catalog state
     catalog::Cluster* catalogCluster = m_catalog->clusters().get("cluster");
@@ -584,10 +562,13 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
 
-    // load up all the tables, adding all tables
-    if (processCatalogAdditions(timestamp) == false) {
-        return false;
+    m_database = catalogCluster->databases().get("database");
+    if (!m_database) {
+        throwFatalException("Error caching references from corrupted catalog.");
     }
+
+    // load up all the tables, adding all tables
+    processCatalogAdditions(timestamp);
 
     rebuildTableCollections();
 
@@ -598,7 +579,6 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     initMaterializedViewsAndLimitDeletePlans();
 
     VOLT_DEBUG("Loaded catalog...");
-    return true;
 }
 
 /*
@@ -727,11 +707,9 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
  * Create the tables themselves when new tables are needed.
  * Add and remove indexes if indexes are added or removed from an
  * existing table.
- * Use the txnId of the catalog update as the generation for export
- * data.
+ * Use the txnId of the catalog update as the generation for export data.
  */
-bool
-VoltDBEngine::processCatalogAdditions(int64_t timestamp)
+void VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
@@ -751,11 +729,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                                            m_compactionThreshold);
 
             // use the delegate to init the table and create indexes n' stuff
-            if (tcd->init(*m_database, *catalogTable) != 0) {
-                VOLT_ERROR("Failed to initialize table '%s' from catalog",
-                           catalogTable->name().c_str());
-                return false;
-            }
+            tcd->init(*m_database, *catalogTable);
             m_catalogDelegates[catalogTable->path()] = tcd;
             Table* table = tcd->getTable();
             m_delegatesByName[table->name()] = tcd;
@@ -931,16 +905,10 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                     VOLT_TRACE("create and add the index...");
                     // create and add the index
                     TableIndexScheme scheme;
-                    bool success = TableCatalogDelegate::getIndexScheme(*catalogTable,
-                                                                        *foundIndex,
-                                                                        persistenttable->schema(),
-                                                                        &scheme);
-                    if (!success) {
-                        VOLT_ERROR("Failed to initialize index '%s' from catalog",
-                                   foundIndex->name().c_str());
-                        return false;
-                    }
-
+                    TableCatalogDelegate::getIndexScheme(*catalogTable,
+                                                         *foundIndex,
+                                                         persistenttable->schema(),
+                                                         &scheme);
                     TableIndex *index = TableIndexFactory::getInstance(scheme);
                     assert(index);
 
@@ -1031,9 +999,6 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
             }
         }
     }
-
-    // new plan fragments are handled differently.
-    return true;
 }
 
 
@@ -1042,8 +1007,7 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
  * current and the desired catalog. Execute those commands and create,
  * delete or modify the corresponding exectution engine objects.
  */
-bool
-VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogPayload)
+void VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogPayload)
 {
     // clean up execution plans when the tables underneath might change
     if (m_plans) {
@@ -1067,17 +1031,14 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         m_executorContext->drReplicatedStream()->m_flushInterval = m_executorContext->drStream()->m_flushInterval;
     }
 
-    if (updateCatalogDatabaseReference() == false) {
-        VOLT_ERROR("Error re-caching catalog references.");
-        return false;
+    m_database = catalogCluster->databases().get("database");
+    if (!m_database) {
+        throwFatalException("Error re-caching references from corrupted catalog.");
     }
 
     processCatalogDeletes(timestamp);
 
-    if (processCatalogAdditions(timestamp) == false) {
-        VOLT_ERROR("Error processing catalog additions.");
-        return false;
-    }
+    processCatalogAdditions(timestamp);
 
     rebuildTableCollections();
 
@@ -1085,18 +1046,15 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
 
     m_catalog->purgeDeletions();
     VOLT_DEBUG("Updated catalog...");
-    return true;
 }
 
-bool
-VoltDBEngine::loadTable(int32_t tableId,
+bool VoltDBEngine::loadTable(int32_t tableId,
                         ReferenceSerializeInputBE &serializeIn,
                         int64_t txnId, int64_t spHandle, int64_t lastCommittedSpHandle,
                         int64_t uniqueId,
                         bool returnUniqueViolations,
                         bool shouldDRStream)
 {
-    //Not going to thread the unique id through.
     //The spHandle and lastCommittedSpHandle aren't really used in load table
     //since their only purpose as of writing this (1/2013) they are only used
     //for export data and we don't technically support loading into an export table
@@ -1121,11 +1079,7 @@ VoltDBEngine::loadTable(int32_t tableId,
         return false;
     }
 
-    try {
-        table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
-    } catch (const SerializableEEException &e) {
-        throwFatalException("%s", e.message().c_str());
-    }
+    table->loadTuplesFrom(serializeIn, NULL, returnUniqueViolations ? &m_resultOutput : NULL, shouldDRStream);
     return true;
 }
 
@@ -1209,7 +1163,7 @@ void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
         snprintf(msg, 1024, "Fetched empty plan from frontend for PlanFragment '%jd'",
                  (intmax_t)fragId);
         VOLT_ERROR("%s", msg);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+        throw UnexpectedEEException(msg);
     }
 
     boost::shared_ptr<ExecutorVector> ev_guard = ExecutorVector::fromJsonPlan(this, plan, fragId);
@@ -1411,8 +1365,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                     snprintf(message, 256,  "getStats() called with selector %d, and"
                             " an invalid locator %d that does not correspond to"
                             " a table", selector, locator);
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                  message);
+                    throw UnexpectedEEException(message);
                 }
             }
 
@@ -1428,8 +1381,7 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                     snprintf(message, 256,  "getStats() called with selector %d, and"
                             " an invalid locator %d that does not correspond to"
                             " a table", selector, locator);
-                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                  message);
+                    throw UnexpectedEEException(message);
                 }
             }
 
@@ -1441,10 +1393,10 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
             char message[256];
             snprintf(message, 256, "getStats() called with an unrecognized selector"
                     " %d", selector);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          message);
+            throw UnexpectedEEException(message);
         }
-    } catch (const SerializableEEException &e) {
+    }
+    catch (const SerializableEEException &e) {
         serializeException(e);
         return -1;
     }
@@ -1455,9 +1407,8 @@ int VoltDBEngine::getStats(int selector, int locators[], int numLocators,
                                   static_cast<int32_t>(m_resultOutput.size()
                                                        - sizeof(int32_t)));
         return 1;
-    } else {
-        return 0;
     }
+    return 0;
 }
 
 
@@ -1553,7 +1504,7 @@ int64_t VoltDBEngine::tableStreamSerializeMore(const CatalogId tableId,
         VOLT_DEBUG("tableStreamSerializeMore: deserialized %d buffers, %ld remaining",
                    (int)positions.size(), (long)remaining);
     }
-    catch (SerializableEEException &e) {
+    catch (const SerializableEEException &e) {
         serializeException(e);
         remaining = TABLE_STREAM_SERIALIZATION_ERROR;
     }
@@ -1883,7 +1834,8 @@ void VoltDBEngine::executePurgeFragment(PersistentTable* table) {
 
     try {
         m_executorContext->executeExecutors(0);
-    } catch (const SerializableEEException &e) {
+    }
+    catch (const SerializableEEException &e) {
         // restore original DML statement state.
         m_currExecutorVec->setupContext(m_executorContext);
         m_tuplesModifiedStack.pop();

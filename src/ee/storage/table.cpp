@@ -555,8 +555,7 @@ void Table::loadTuplesFrom(SerializeInputBE &serialize_io,
             message << "column " << i << ": " << names[i]
                     << ", type = " << getTypeName(types[i]) << std::endl;
         }
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      message.str().c_str());
+        throw UnexpectedEEException(message.str());
     }
 
     loadTuplesFromNoHeader(serialize_io, stringPool, uniqueViolationOutput, shouldDRStreamRow);

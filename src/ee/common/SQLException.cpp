@@ -15,7 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/SQLException.h"
-#include "common/SerializableEEException.h"
 #include "common/serializeio.h"
 #include <iostream>
 #include <cassert>
@@ -65,9 +64,9 @@ SQLException::SQLException(std::string sqlState, std::string message, int intern
     assert(m_sqlState.length() == 5);
 }
 
-void SQLException::p_serialize(ReferenceSerializeOutput *output) const {
+void SQLException::p_serialize(ReferenceSerializeOutput& output) const {
     const char* sqlState = m_sqlState.c_str();
     for (int ii = 0; ii < 5; ii++) {
-        output->writeByte(sqlState[ii]);
+        output.writeByte(sqlState[ii]);
     }
 }

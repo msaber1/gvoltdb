@@ -149,8 +149,62 @@ class ExecutorContext {
         return getExecutorContext()->m_undoQuantum;
     }
 
-    Topend* getTopend() {
-        return m_topEnd;
+    static void pushExportBuffer(int64_t exportGeneration,
+                                 int32_t partitionId,
+                                 std::string signature,
+                                 StreamBlock *block,
+                                 bool sync,
+                                 bool endOfStream) {
+        return getExecutorContext()->m_topEnd->pushExportBuffer(exportGeneration,
+                                                                partitionId,
+                                                                signature,
+                                                                block,
+                                                                sync,
+                                                                endOfStream);
+    }
+
+    static void fallbackToEEAllocatedBuffer(char *buffer, size_t length) {
+        getExecutorContext()->m_topEnd->fallbackToEEAllocatedBuffer(buffer, length);
+    }
+
+    static int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) {
+        return getExecutorContext()->m_topEnd->pushDRBuffer(partitionId, block);
+    }
+
+    static int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) {
+        return getExecutorContext()->m_topEnd->getQueuedExportBytes(partitionId, signature);
+    }
+
+    static int reportDRConflict(int32_t partitionId,
+                                int32_t remoteClusterId,
+                                int64_t remoteTimestamp,
+                                std::string tableName,
+                                DRRecordType action,
+                                DRConflictType deleteConflict,
+                                Table *existingMetaTableForDelete,
+                                Table *existingTupleTableForDelete,
+                                Table *expectedMetaTableForDelete,
+                                Table *expectedTupleTableForDelete,
+                                DRConflictType insertConflict,
+                                Table *existingMetaTableForInsert,
+                                Table *existingTupleTableForInsert,
+                                Table *newMetaTableForInsert,
+                                Table *newTupleTableForInsert) {
+        return getExecutorContext()->m_topEnd->reportDRConflict(partitionId,
+                                                                remoteClusterId,
+                                                                remoteTimestamp,
+                                                                tableName,
+                                                                action,
+                                                                deleteConflict,
+                                                                existingMetaTableForDelete,
+                                                                existingTupleTableForDelete,
+                                                                expectedMetaTableForDelete,
+                                                                expectedTupleTableForDelete,
+                                                                insertConflict,
+                                                                existingMetaTableForInsert,
+                                                                existingTupleTableForInsert,
+                                                                newMetaTableForInsert,
+                                                                newTupleTableForInsert);
     }
 
     /** Current or most recent sp handle */

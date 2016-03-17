@@ -39,7 +39,8 @@
 #include <sys/socket.h>
 #include <netinet/tcp.h> // for TCP_NODELAY
 
-// Please don't make this different from the JNI result buffer size.
+// Please don't make this different from the JNI result buffer size
+// defined in ExecutionEngineJNI.java .
 // This determines the size of the EE results buffer and it's nice
 // if IPC and JNI are matched.
 #define MAX_MSG_SZ (1024*1024*10)
@@ -524,19 +525,20 @@ int8_t VoltDBIPC::stub(struct ipc_command *cmd) {
 int8_t VoltDBIPC::loadCatalog(struct ipc_command *cmd) {
     printf("loadCatalog\n");
     assert(m_engine);
-    if (!m_engine)
+    if (!m_engine) {
         return kErrorCode_Error;
-
+    }
     catalog_load *msg = reinterpret_cast<catalog_load*>(cmd);
     try {
-        if (m_engine->loadCatalog(ntohll(msg->timestamp), std::string(msg->data)) == true) {
-            return kErrorCode_Success;
-        }
+        m_engine->loadCatalog(ntohll(msg->timestamp), std::string(msg->data));
+        return kErrorCode_Success;
     //TODO: FatalException and SerializableException should be universally caught and handled in "execute",
     // rather than in hard-to-maintain "execute method" boilerplate code like this.
-    } catch (const FatalException& e) {
+    }
+    catch (const FatalException& e) {
         crashVoltDB(e);
-    } catch (const SerializableEEException &e) {} //TODO: We don't really want to quietly SQUASH non-fatal exceptions.
+    }
+    catch (const SerializableEEException &e) {} //TODO: We don't really want to quietly SQUASH non-fatal exceptions.
 
     return kErrorCode_Error;
 }
@@ -554,10 +556,10 @@ int8_t VoltDBIPC::updateCatalog(struct ipc_command *cmd) {
     };
     struct updatecatalog *uc = (struct updatecatalog*)cmd;
     try {
-        if (m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data)) == true) {
-            return kErrorCode_Success;
-        }
-    } catch (const FatalException &e) {
+        m_engine->updateCatalog(ntohll(uc->timestamp), std::string(uc->data));
+        return kErrorCode_Success;
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -602,28 +604,28 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->hostnameLength = ntohl(cs->hostnameLength);
 
     std::string hostname(cs->data, cs->hostnameLength);
-    try {
-        m_engine = new VoltDBEngine(this, new voltdb::StdoutLogProxy());
-        m_engine->getLogManager()->setLogLevels(cs->logLevels);
-        m_reusedResultBuffer = new char[MAX_MSG_SZ];
-        m_exceptionBuffer = new char[MAX_MSG_SZ];
-        m_engine->setBuffers( NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
-        // The tuple buffer gets expanded (doubled) as needed, but never compacted.
-        m_tupleBufferSize = MAX_MSG_SZ;
-        m_tupleBuffer = new char[m_tupleBufferSize];
+    m_engine = new VoltDBEngine(this, new voltdb::StdoutLogProxy());
+    m_engine->getLogManager()->setLogLevels(cs->logLevels);
+    m_reusedResultBuffer = new char[MAX_MSG_SZ];
+    m_exceptionBuffer = new char[MAX_MSG_SZ];
+    m_engine->setBuffers(NULL, 0, m_reusedResultBuffer, MAX_MSG_SZ, m_exceptionBuffer, MAX_MSG_SZ);
+    // The tuple buffer gets expanded (doubled) as needed, but never compacted.
+    m_tupleBufferSize = MAX_MSG_SZ;
+    m_tupleBuffer = new char[m_tupleBufferSize];
 
-        if (m_engine->initialize(cs->clusterId,
-                                 cs->siteId,
-                                 cs->partitionId,
-                                 cs->hostId,
-                                 hostname,
-                                 cs->drClusterId,
-                                 cs->defaultDrBufferSize,
-                                 cs->tempTableMemory,
-                                 createDrReplicatedStream) == true) {
-            return kErrorCode_Success;
-        }
-    } catch (const FatalException &e) {
+    try {
+        m_engine->initialize(cs->clusterId,
+                             cs->siteId,
+                             cs->partitionId,
+                             cs->hostId,
+                             hostname,
+                             cs->drClusterId,
+                             cs->defaultDrBufferSize,
+                             cs->tempTableMemory,
+                             createDrReplicatedStream);
+        return kErrorCode_Success;
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -657,7 +659,8 @@ int8_t VoltDBIPC::releaseUndoToken(struct ipc_command *cmd) {
 
     try {
         m_engine->releaseUndoToken(ntohll(cs->token));
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -674,7 +677,8 @@ int8_t VoltDBIPC::undoUndoToken(struct ipc_command *cmd) {
 
     try {
         m_engine->undoUndoToken(ntohll(cs->token));
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -698,7 +702,8 @@ int8_t VoltDBIPC::tick(struct ipc_command *cmd) {
     try {
         // no return code. can't fail!
         m_engine->tick(ntohll(cs->time), ntohll(cs->lastSpHandle));
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -715,7 +720,8 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
 
     try {
         m_engine->quiesce(ntohll(cs->lastSpHandle));
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -777,7 +783,8 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
         char *resultBuffer = m_engine->getReusedResultBuffer();
         resultBuffer[0] = kErrorCode_Success;
         writeOrDie(m_fd, (unsigned char*)resultBuffer, size);
-    } else {
+    }
+    else {
         sendException(kErrorCode_Error);
     }
 }
@@ -785,8 +792,7 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
 void VoltDBIPC::sendException(int8_t errorCode) {
     writeOrDie(m_fd, (unsigned char*)&errorCode, sizeof(int8_t));
 
-    const void* exceptionData =
-      m_engine->getExceptionOutputSerializer()->data();
+    const void* exceptionData = m_engine->getExceptionOutputData();
     int32_t exceptionLength =
       static_cast<int32_t>(ntohl(*reinterpret_cast<const int32_t*>(exceptionData)));
     printf("Sending exception length %d\n", exceptionLength);
@@ -825,10 +831,9 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
                                            returnUniqueViolations, shouldDRStream);
         if (success) {
             return kErrorCode_Success;
-        } else {
-            return kErrorCode_Error;
         }
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -838,7 +843,8 @@ int8_t VoltDBIPC::setLogLevels(struct ipc_command *cmd) {
     int64_t logLevels = *((int64_t*)&cmd->data[0]);
     try {
         m_engine->getLogManager()->setLogLevels(logLevels);
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Success;
@@ -901,7 +907,8 @@ char *VoltDBIPC::retrieveDependency(int32_t dependencyId, size_t *dependencySz) 
     // deal with error response codes
     if (kErrorCode_DependencyNotFound == responseCode) {
         return NULL;
-    } else if (kErrorCode_DependencyFound != responseCode) {
+    }
+    else if (kErrorCode_DependencyFound != responseCode) {
         printf("Received unexpected response code %d to retrieve dependency request\n",
                 (int)responseCode);
         fflush(stdout);
@@ -1180,10 +1187,12 @@ void VoltDBIPC::getStats(struct ipc_command *cmd) {
                 int32_t zero = 0;
                 writeOrDie(m_fd, (const unsigned char*)&zero, sizeof(int32_t));
             }
-        } else {
+        }
+        else {
             sendException(kErrorCode_Error);
         }
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
 }
@@ -1203,10 +1212,12 @@ int8_t VoltDBIPC::activateTableStream(struct ipc_command *cmd) {
     try {
         if (m_engine->activateTableStream(tableId, streamType, undoToken, serialize_in)) {
             return kErrorCode_Success;
-        } else {
+        }
+        else {
             return kErrorCode_Error;
         }
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
     return kErrorCode_Error;
@@ -1292,7 +1303,8 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
                 *reinterpret_cast<int32_t*>(&m_tupleBuffer[offset]) = htonl(length);
                 offset += length + sizeof(int32_t);
             }
-        } else {
+        }
+        else {
             // If we failed or finished, we've set the count, so stop right there.
             outputSize = offset;
         }
@@ -1300,7 +1312,8 @@ void VoltDBIPC::tableStreamSerializeMore(struct ipc_command *cmd) {
         // Ship it.
         writeOrDie(m_fd, (unsigned char*)m_tupleBuffer, outputSize);
 
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
 }
@@ -1378,7 +1391,8 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
     default:
         try {
             throwFatalException("Unrecognized hashinator type %d", hashinatorType);
-        } catch (const FatalException &e) {
+        }
+        catch (const FatalException &e) {
             crashVoltDB(e);
         }
     }
@@ -1395,7 +1409,8 @@ void VoltDBIPC::hashinate(struct ipc_command* cmd) {
         retval =
             hashinator->hashinate(params[0]);
         pool->purge();
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
 
@@ -1411,7 +1426,8 @@ void VoltDBIPC::updateHashinator(struct ipc_command *cmd) {
     HashinatorType hashinatorType = static_cast<HashinatorType>(ntohl(hash->hashinatorType));
     try {
         m_engine->updateHashinator(hashinatorType, hash->data, NULL, 0);
-    } catch (const FatalException &e) {
+    }
+    catch (const FatalException &e) {
         crashVoltDB(e);
     }
 }
@@ -1489,7 +1505,8 @@ void VoltDBIPC::pushExportBuffer(
     index += static_cast<int32_t>(signature.size());
     if (block != NULL) {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = htonll(block->uso());
-    } else {
+    }
+    else {
         *reinterpret_cast<int64_t*>(&m_reusedResultBuffer[index]) = 0;
     }
     index += 8;
@@ -1507,7 +1524,8 @@ void VoltDBIPC::pushExportBuffer(
         writeOrDie(m_fd, (unsigned char*)block->rawPtr(), block->rawLength());
         // Need the delete in the if statement for valgrind
         delete [] block->rawPtr();
-    } else {
+    }
+    else {
         *reinterpret_cast<int32_t*>(&m_reusedResultBuffer[index]) = htonl(0);
         writeOrDie(m_fd, (unsigned char*)m_reusedResultBuffer, index + 4);
     }
@@ -1522,7 +1540,8 @@ void VoltDBIPC::executeTask(struct ipc_command *cmd) {
         int32_t responseLength = m_engine->getResultsSize();
         char *resultsBuffer = m_engine->getReusedResultBuffer();
         writeOrDie(m_fd, (unsigned char*)resultsBuffer, responseLength);
-    } catch (const FatalException& e) {
+    }
+    catch (const FatalException& e) {
         crashVoltDB(e);
     }
 }
@@ -1542,7 +1561,8 @@ void VoltDBIPC::applyBinaryLog(struct ipc_command *cmd) {
         response[0] = kErrorCode_Success;
         *reinterpret_cast<int64_t*>(&response[1]) = htonll(rows);
         writeOrDie(m_fd, (unsigned char*)response, 9);
-    } catch (const FatalException& e) {
+    }
+    catch (const FatalException& e) {
         crashVoltDB(e);
     }
 }
@@ -1591,7 +1611,8 @@ void *eethread(void *ptr) {
                 printf("client eof\n");
                 close(fd);
                 return NULL;
-            } else if (b == -1) {
+            }
+            if (b == -1) {
                 printf("client error\n");
                 close(fd);
                 return NULL;
@@ -1599,7 +1620,7 @@ void *eethread(void *ptr) {
             bytesread += b;
         }
 
-        // read the message body in to the same data buffer
+        // read the message body from the same data buffer
         int msg_size = ntohl(((struct ipc_command*) data.get())->msgsize);
         //printf("Received message size %d\n", msg_size);
         if (msg_size > max_ipc_message_size) {
@@ -1616,7 +1637,8 @@ void *eethread(void *ptr) {
                 printf("client eof\n");
                 close(fd);
                 return NULL;
-            } else if (b == -1) {
+            }
+            if (b == -1) {
                 printf("client error\n");
                 close(fd);
                 return NULL;

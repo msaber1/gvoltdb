@@ -26,25 +26,26 @@ import java.nio.ByteBuffer;
  * Instead, this Exception has an error code which specifies the
  * reason of the exception. Generally these should
  * be errors that are not caused by the user and that are unexpected.
- * They may be fatal and bring down the cluster, but they dont' have to
+ * They may be fatal and bring down the cluster, but they don't have to
  * if the code throwing the Exception knows that no data has been corrupted
  * and that operation can continue.
  */
 public class EEException extends SerializableException {
     public static final long serialVersionUID = 0L;
 
+    private final int m_errorCode;
+
     public EEException(int errorCode) {
         super();
-        this.m_errorCode = errorCode;
+        m_errorCode = errorCode;
     }
 
     public EEException(ByteBuffer b) {
         super(b);
-        this.m_errorCode = b.getInt();
+        m_errorCode = b.getInt();
     }
 
     public int getErrorCode() { return m_errorCode;}
-    private final int m_errorCode;
 
     @Override
     protected SerializableExceptions getExceptionType() {

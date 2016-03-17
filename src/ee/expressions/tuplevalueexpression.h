@@ -66,18 +66,16 @@ class TupleValueExpression : public AbstractExpression {
         if (tuple_idx == 0) {
             assert(tuple1);
             if ( ! tuple1 ) {
-                throw SerializableEEException("TupleValueExpression::"
-                                              "eval:"
-                                              " Couldn't find tuple 1 (possible index scan planning error)");
+                throw UnexpectedEEException("TupleValueExpression::eval:"
+                                            " Couldn't find tuple 1 (possible index scan planning error)");
             }
             return tuple1->getNValue(value_idx);
         }
         else {
             assert(tuple2);
             if ( ! tuple2 ) {
-                throw SerializableEEException("TupleValueExpression::"
-                                              "eval:"
-                                              " Couldn't find tuple 2 (possible index scan planning error)");
+                throw UnexpectedEEException("TupleValueExpression::eval:"
+                                            " Couldn't find tuple 2 (possible index scan planning error)");
             }
             return tuple2->getNValue(value_idx);
         }

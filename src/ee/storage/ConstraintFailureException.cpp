@@ -57,26 +57,25 @@ ConstraintFailureException::ConstraintFailureException(
     assert(!tuple.isNullTuple());
 }
 
-void ConstraintFailureException::p_serialize(ReferenceSerializeOutput *output) const {
+void ConstraintFailureException::p_serialize(ReferenceSerializeOutput& output) const
+{
     SQLException::p_serialize(output);
-    output->writeInt(m_type);
-    output->writeTextString(m_table->name());
-    size_t tableSizePosition = output->reserveBytes(4);
+    output.writeInt(m_type);
+    output.writeTextString(m_table->name());
+    size_t tableSizePosition = output.reserveBytes(4);
     TableTuple tuples[] = { m_tuple, m_otherTuple };
     if (m_otherTuple.isNullTuple()) {
-        m_table->serializeTupleTo(*output, tuples, 1);
-    } else {
-        m_table->serializeTupleTo(*output, tuples, 2);
+        m_table->serializeTupleTo(output, tuples, 1);
     }
-    output->writeIntAt(tableSizePosition, static_cast<int32_t>(output->position() - tableSizePosition - 4));
+    else {
+        m_table->serializeTupleTo(output, tuples, 2);
+    }
+    output.writeIntAt(tableSizePosition, static_cast<int32_t>(output.position() - tableSizePosition - 4));
 }
 
-ConstraintFailureException::~ConstraintFailureException() {
-    // TODO Auto-generated destructor stub
-}
+ConstraintFailureException::~ConstraintFailureException() { }
 
-const string
-ConstraintFailureException::message() const
+string ConstraintFailureException::message() const
 {
     // This should probably be an override of the << operator and then used here, but meh
     string msg = SQLException::message();

@@ -70,8 +70,6 @@
 #include "catalog/cluster.h"
 #include "catalog/table.h"
 #include "catalog/database.h"
-#include "catalog/constraint.h"
-
 
 using namespace std;
 using namespace voltdb;
@@ -86,17 +84,16 @@ using namespace voltdb;
 // configurations without having to dig down into the code
 //
 ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_INTEGER,
-                                                    VALUE_TYPE_VARCHAR,
-                                                    VALUE_TYPE_VARCHAR,
-                                                    VALUE_TYPE_INTEGER };
-int COLUMN_SIZES[NUM_OF_COLUMNS]                = { 4, 8, 8, 4};
-bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS]         = { false, true, true, false };
+                                            VALUE_TYPE_VARCHAR,
+                                            VALUE_TYPE_VARCHAR,
+                                            VALUE_TYPE_INTEGER };
+int COLUMN_SIZES[NUM_OF_COLUMNS]        = { 4, 8, 8, 4 };
+bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS] = { false, true, true, false };
 
 class ExecutionEngineTest : public Test {
     public:
         ExecutionEngineTest() {
-            srand((unsigned int)time(NULL));
-            catalog_string =
+            string catalog_string =
                     "add / clusters cluster"
                     "\nset /clusters#cluster localepoch 1199145600"
                     "\nadd /clusters#cluster databases database"
@@ -221,52 +218,34 @@ class ExecutionEngineTest : public Test {
             /*
              * Initialize the engine
              */
-            engine = new VoltDBEngine();
+            srand((unsigned int)time(NULL));
+            engine.initialize(0, 0, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
             int partitionCount = 3;
-            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false));
-            engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
-            ASSERT_TRUE(engine->loadCatalog( -2, catalog_string));
+            engine.updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
+            engine.loadCatalog(-2, catalog_string);
 
             /*
              * Get a link to the catalog and pull out information about it
              */
-            catalog = engine->getCatalog();
-            cluster = catalog->clusters().get("cluster");
-            database = cluster->databases().get("database");
-            database_id = database->relativeIndex();
+            catalog::Catalog* catalog = engine.getCatalog();
+            catalog::Cluster* cluster = catalog->clusters().get("cluster");
+            catalog::Database* database = cluster->databases().get("database");
+            cout << "DEBUG: " << database->relativeIndex() << std::endl;
+            ASSERT_EQ(1, database->relativeIndex());
             catalog::Table *catalog_table_customer = database->tables().get("CUSTOMER");
-            customer_table_id = catalog_table_customer->relativeIndex();
-            customer_table = engine->getTable(customer_table_id);
+            int customer_table_id = catalog_table_customer->relativeIndex();
+            customer_table = engine.getTable(customer_table_id);
             //
             // Fill in tuples
             //
             ASSERT_TRUE(customer_table);
             ASSERT_TRUE(tableutil::addRandomTuples(customer_table, NUM_OF_TUPLES));
         }
-        ~ExecutionEngineTest() {
-            //
-            // We just need to delete the VoltDBEngine
-            // It will cleanup all the tables for us
-            //
-            delete(this->engine);
-        }
 
     protected:
-        CatalogId cluster_id;
-        CatalogId database_id;
-        CatalogId site_id;
-        VoltDBEngine *engine;
-        string catalog_string;
-        catalog::Catalog *catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
-        catalog::Cluster *cluster;
-        catalog::Database *database;
-        catalog::Constraint *constraint;
-
+        // The VoltDBEngine will cleanup all the tables for us.
+        VoltDBEngine engine;
         Table* customer_table;
-
-        int customer_table_id;
-
-        void compareTables(Table *first, Table* second);
 };
 
 /* Check the order of index vector

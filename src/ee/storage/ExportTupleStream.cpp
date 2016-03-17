@@ -53,7 +53,7 @@ void ExportTupleStream::setSignatureAndGeneration(std::string signature, int64_t
     //Don't send the end of stream notice.
     if (generation != m_generation && m_generation > 0) {
         //Notify that no more data is coming from this generation.
-        ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+        ExecutorContext::pushExportBuffer(
                 m_generation,
                 m_partitionId,
                 m_signature,
@@ -187,8 +187,8 @@ ExportTupleStream::computeOffsets(TableTuple &tuple,
     return *rowHeaderSz + metadataSz + dataSz;
 }
 
-void ExportTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
-    ExecutorContext::getExecutorContext()->getTopend()->pushExportBuffer(
+void ExportTupleStream::pushExportBufXXXfer(StreamBlock *block, bool sync, bool endOfStream) {
+    ExecutorContext::pushExportBuffer(
                     m_generation,
                     m_partitionId,
                     m_signature,

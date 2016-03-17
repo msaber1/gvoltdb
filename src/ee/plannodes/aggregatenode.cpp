@@ -116,10 +116,9 @@ void AggregatePlanNode::loadFromJSONObject(PlannerDomValue obj)
             m_aggregateInputExpressions.push_back(AbstractExpression::buildExpressionTree(exprDom));
         }
 
-        if(!(containsType && containsDistinct && containsOutputColumn)) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "AggregatePlanNode::loadFromJSONObject:"
-                                      " Missing type, distinct, or outputcolumn.");
+        if (!(containsType && containsDistinct && containsOutputColumn)) {
+            throw UnexpectedEEException("AggregatePlanNode::loadFromJSONObject:"
+                                        " Missing type, distinct, or outputcolumn.");
         }
         if ( ! containsExpression) {
             m_aggregateInputExpressions.push_back(NULL);

@@ -18,10 +18,13 @@
 #ifndef STREAMPREDICATELIST_H_
 #define STREAMPREDICATELIST_H_
 
+#include "expressions/abstractexpression.h"
+
 #include <boost/shared_ptr.hpp>
 #include <boost/ptr_container/ptr_vector.hpp>
-#include "SerializableEEException.h"
-#include "expressions/abstractexpression.h"
+
+#include <string>
+#include <vector>
 
 namespace voltdb
 {

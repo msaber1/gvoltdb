@@ -15,10 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "common/debuglog.h"
 #include "common/SerializableEEException.h"
+
+#include "common/debuglog.h"
 #include "common/serializeio.h"
-#include "execution/VoltDBEngine.h"
 
 #include <stdint.h>
 
@@ -45,29 +45,24 @@ SerializableEEException::SerializableEEException(VoltEEExceptionType exceptionTy
                translateVoltEEExceptionTypeToString(exceptionType), message.c_str());
 }
 
-SerializableEEException::SerializableEEException(std::string message) :
-    m_exceptionType(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION), m_message(message)
+void SerializableEEException::serialize(ReferenceSerializeOutput& output) const
 {
-    VOLT_DEBUG("Created SerializableEEException: default type, %s",
-               message.c_str());
-}
-
-void SerializableEEException::serialize(ReferenceSerializeOutput *output) const {
-    const std::size_t lengthPosition = output->reserveBytes(sizeof(int32_t));
-    output->writeByte(static_cast<int8_t>(m_exceptionType));
+    const std::size_t lengthPosition = output.reserveBytes(sizeof(int32_t));
+    output.writeByte(static_cast<int8_t>(m_exceptionType));
     const char *messageBytes = m_message.c_str();
     const std::size_t messageLength = m_message.length();
-    output->writeInt(static_cast<int32_t>(messageLength));
-    output->writeBytes(messageBytes, messageLength);
+    output.writeInt(static_cast<int32_t>(messageLength));
+    output.writeBytes(messageBytes, messageLength);
     p_serialize(output);
-    if (m_exceptionType == VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION)
-        output->writeInt(ENGINE_ERRORCODE_ERROR);
-    const int32_t length = static_cast<int32_t>(output->position() - (lengthPosition + sizeof(int32_t)));
-    output->writeIntAt( lengthPosition, length);
+    const int32_t length = static_cast<int32_t>(output.position() - (lengthPosition + sizeof(int32_t)));
+    output.writeIntAt(lengthPosition, length);
 }
 
-SerializableEEException::~SerializableEEException() {
-    // TODO Auto-generated destructor stub
+SerializableEEException::~SerializableEEException() { }
+
+void UnexpectedEEException::p_serialize(ReferenceSerializeOutput& output) const
+{
+    output.writeInt(ENGINE_ERRORCODE_ERROR);
 }
 
-}
+} // end namespace voltdb

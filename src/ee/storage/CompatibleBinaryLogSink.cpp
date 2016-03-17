@@ -370,21 +370,21 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                   drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
     }
 
-    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
-                                                                                      remoteClusterId,
-                                                                                      UniqueId::timestampAndCounter(uniqueId),
-                                                                                      drTable->name(),
-                                                                                      actionType,
-                                                                                      deleteConflict,
-                                                                                      existingMetaTableForDelete.get(),
-                                                                                      existingTupleTableForDelete.get(),
-                                                                                      expectedMetaTableForDelete.get(),
-                                                                                      expectedTupleTableForDelete.get(),
-                                                                                      insertConflict,
-                                                                                      existingMetaTableForInsert.get(),
-                                                                                      existingTupleTableForInsert.get(),
-                                                                                      newMetaTableForInsert.get(),
-                                                                                      newTupleTableForInsert.get());
+    int retval = ExecutorContext::reportDRConflict(UniqueId::pid(uniqueId),
+                                                   remoteClusterId,
+                                                   UniqueId::timestampAndCounter(uniqueId),
+                                                   drTable->name(),
+                                                   actionType,
+                                                   deleteConflict,
+                                                   existingMetaTableForDelete.get(),
+                                                   existingTupleTableForDelete.get(),
+                                                   expectedMetaTableForDelete.get(),
+                                                   expectedTupleTableForDelete.get(),
+                                                   insertConflict,
+                                                   existingMetaTableForInsert.get(),
+                                                   existingTupleTableForInsert.get(),
+                                                   newMetaTableForInsert.get(),
+                                                   newTupleTableForInsert.get());
     bool applyRemoteChange = isApplyNewRow(retval);
     bool resolved = isResolved(retval);
     // if conflict is not resolved, don't delete any existing rows.

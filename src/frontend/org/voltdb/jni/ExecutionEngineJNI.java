@@ -70,7 +70,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     static {
         EE_COMPACTION_THRESHOLD = Integer.getInteger("EE_COMPACTION_THRESHOLD", 95);
         if (EE_COMPACTION_THRESHOLD < 0 || EE_COMPACTION_THRESHOLD > 99) {
-            VoltDB.crashLocalVoltDB("EE_COMPACTION_THRESHOLD " + EE_COMPACTION_THRESHOLD + " is not valid, must be between 0 and 99", false, null);
+            VoltDB.crashLocalVoltDB("EE_COMPACTION_THRESHOLD " + EE_COMPACTION_THRESHOLD +
+                    " is not valid, must be between 0 and 99", false, null);
         }
         HOST_TRACE_ENABLED = LOG.isTraceEnabled();
     }
@@ -81,7 +82,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /** Create a ByteBuffer (in a container) for serializing arguments to C++. Use a direct
     ByteBuffer as it will be passed directly to the C++ code. */
-    private BBContainer psetBufferC = null;
+    private BBContainer psetBufferGuard = null;
     private ByteBuffer psetBuffer = null;
 
     /**
@@ -94,9 +95,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * that rely on being able to serialize large results sets will get the same amount of storage
      * when using the IPC backend.
      **/
-    private final BBContainer deserializerBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+    private final int MAX_MSG_SZ = (1024*1024*10);
+    private final BBContainer deserializerBufferGuard = DBBPool.allocateDirect(MAX_MSG_SZ);
     private FastDeserializer deserializer =
-        new FastDeserializer(deserializerBufferOrigin.b());
+        new FastDeserializer(deserializerBufferGuard.b());
 
     /*
      * For large result sets the EE will allocate new memory for the results
@@ -104,23 +106,24 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     private ByteBuffer fallbackBuffer = null;
 
-    private final BBContainer exceptionBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 5);
-    private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b();
+    // voltdbipc uses MAX_MSG_SZ for this buffer, too. Do we care?
+    private final BBContainer exceptionBufferGuard = DBBPool.allocateDirect(1024 * 1024 * 5);
+    private ByteBuffer exceptionBuffer = exceptionBufferGuard.b();
 
     /**
      * initialize the native Engine object.
      */
     public ExecutionEngineJNI(
-            final int clusterIndex,
-            final long siteId,
-            final int partitionId,
-            final int hostId,
-            final String hostname,
-            final int drClusterId,
-            final int defaultDrBufferSize,
-            final int tempTableMemory,
-            final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream)
+            int clusterIndex,
+            long siteId,
+            int partitionId,
+            int hostId,
+            String hostname,
+            int drClusterId,
+            int defaultDrBufferSize,
+            int tempTableMemory,
+            HashinatorConfig hashinatorConfig,
+            boolean createDrReplicatedStream)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -135,6 +138,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
          */
         pointer = nativeCreate(System.getProperty("java.vm.vendor")
                                .toLowerCase().contains("sun microsystems"));
+        assert(pointer != 0);
+        if (pointer == 0) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeInitialize", true, null);
+        }
         nativeSetLogLevels(pointer, EELoggers.getLogLevels());
         int errorCode =
             nativeInitialize(
@@ -149,7 +156,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     tempTableMemory * 1024 * 1024,
                     createDrReplicatedStream,
                     EE_COMPACTION_THRESHOLD);
-        checkErrorCode(errorCode);
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
 
         setupPsetBuffer(256 * 1024); // 256k seems like a reasonable per-ee number (but is totally pulled from my a**)
 
@@ -157,25 +166,36 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //LOG.info("Initialized Execution Engine");
     }
 
-    final void setupPsetBuffer(int size) {
+    private void setupPsetBuffer(int size)
+    {
         if (psetBuffer != null) {
-            psetBufferC.discard();
+            psetBufferGuard.discard();
             psetBuffer = null;
         }
 
-        psetBufferC = DBBPool.allocateDirect(size);
-        psetBuffer = psetBufferC.b();
+        psetBufferGuard = DBBPool.allocateDirect(size);
+        psetBuffer = psetBufferGuard.b();
 
+        assert(pointer != 0);
+        if (pointer == 0) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeSetBuffers", true, null);
+        }
         int errorCode = nativeSetBuffers(pointer, psetBuffer,
                 psetBuffer.capacity(),
                 deserializer.buffer(), deserializer.buffer().capacity(),
                 exceptionBuffer, exceptionBuffer.capacity());
-        checkErrorCode(errorCode);
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
     }
 
-    final void clearPsetAndEnsureCapacity(int size) {
+    private void clearPsetAndEnsureCapacity(int size)
+    {
         assert(psetBuffer != null);
         if (size > psetBuffer.capacity()) {
+            //TODO: It MAY be worth logging this source of memory growth,
+            // even if it does eventually level off to a worst-case value.
+            // The memory is never reclaimed, even on a quiescent system.
             setupPsetBuffer(size);
         }
         else {
@@ -183,19 +203,23 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-    /** Utility method to throw a Runtime exception based on the error code and serialized exception **/
-    @Override
-    final protected void throwExceptionForError(final int errorCode) throws RuntimeException {
-        exceptionBuffer.clear();
-        final int exceptionLength = exceptionBuffer.getInt();
+    /**
+     * Utility method to throw a Runtime exception based on the error code and
+     * serialized exception details. The exact value of the error code only
+     * matters for an EEException produced when no exception details were
+     * serialized.
+     **/
+    private void throwSerializedException(int errorCode)
+    {
+        exceptionBuffer.clear(); // resets position, not content.
+        int exceptionLength = exceptionBuffer.getInt();
 
         if (exceptionLength == 0) {
             throw new EEException(errorCode);
-        } else {
-            exceptionBuffer.position(0);
-            exceptionBuffer.limit(4 + exceptionLength);
-            throw SerializableException.deserializeFromBuffer(exceptionBuffer);
         }
+        exceptionBuffer.position(0);
+        exceptionBuffer.limit(4 + exceptionLength);
+        throw SerializableException.deserializeFromBuffer(exceptionBuffer);
     }
 
     /**
@@ -205,20 +229,26 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * using the object.
      */
     @Override
-    public void release() throws EEException {
+    public boolean release() throws EEException
+    {
         LOG.trace("Releasing Execution Engine... " + pointer);
         if (pointer != 0L) {
-            final int errorCode = nativeDestroy(pointer);
+            int errorCode = nativeDestroy(pointer);
             pointer = 0L;
-            checkErrorCode(errorCode);
+            if (errorCode != ERRORCODE_SUCCESS) {
+                throwSerializedException(errorCode);
+            }
         }
         deserializer = null;
-        deserializerBufferOrigin.discard();
+        deserializerBufferGuard.discard();
         exceptionBuffer = null;
-        exceptionBufferOrigin.discard();
-        psetBufferC.discard();
-        psetBuffer = null;
+        exceptionBufferGuard.discard();
+        if (psetBuffer != null) {
+            psetBuffer = null;
+            psetBufferGuard.discard();
+        }
         LOG.trace("Released Execution Engine.");
+        return true;
     }
 
     /**
@@ -226,12 +256,19 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      *  catalog.
      */
     @Override
-    protected void loadCatalog(long timestamp, final byte[] catalogBytes) throws EEException {
+    protected boolean loadCatalog(long timestamp, byte[] catalogBytes) throws EEException
+    {
         LOG.trace("Loading Application Catalog...");
-        int errorCode = 0;
-        errorCode = nativeLoadCatalog(pointer, timestamp, catalogBytes);
-        checkErrorCode(errorCode);
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeLoadCatalog", true, null);
+        }
+        int errorCode = nativeLoadCatalog(pointer, timestamp, catalogBytes);
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
         //LOG.info("Loaded Catalog.");
+        return true;
     }
 
     /**
@@ -239,11 +276,18 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * engine's catalog.
      */
     @Override
-    public void updateCatalog(long timestamp, final String catalogDiffs) throws EEException {
+    public boolean updateCatalog(long timestamp, String catalogDiffs) throws EEException
+    {
         LOG.trace("Loading Application Catalog...");
-        int errorCode = 0;
-        errorCode = nativeUpdateCatalog(pointer, timestamp, getStringBytes(catalogDiffs));
-        checkErrorCode(errorCode);
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeUpdateCatalog", true, null);
+        }
+        int errorCode = nativeUpdateCatalog(pointer, timestamp, getStringBytes(catalogDiffs));
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
+        return true;
     }
 
     /**
@@ -251,21 +295,21 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     protected VoltTable[] coreExecutePlanFragments(
-            final int numFragmentIds,
-            final long[] planFragmentIds,
-            final long[] inputDepIds,
-            final Object[] parameterSets,
-            final long txnId,
-            final long spHandle,
-            final long lastCommittedSpHandle,
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            long txnId,
+            long spHandle,
+            long lastCommittedSpHandle,
             long uniqueId,
-            final long undoToken) throws EEException
+            long undoToken) throws EEException
     {
         // plan frag zero is invalid
         assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
 
         if (numFragmentIds == 0) return new VoltTable[0];
-        final int batchSize = numFragmentIds;
+        int batchSize = numFragmentIds;
         if (HOST_TRACE_ENABLED) {
             for (int i = 0; i < batchSize; ++i) {
                 LOG.trace("Batch Executing planfragment:" + planFragmentIds[i] + ", params=" + parameterSets[i].toString());
@@ -294,7 +338,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 try {
                     pset.flattenToBuffer(psetBuffer);
                 }
-                catch (final IOException exception) {
+                catch (IOException exception) {
                     throw new RuntimeException("Error serializing parameters for SQL batch element: " +
                                                i + " with plan fragment ID: " + planFragmentIds[i] +
                                                " and with params: " +
@@ -307,7 +351,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // Execute the plan, passing a raw pointer to the byte buffers for input and output
         //Clear is destructive, do it before the native call
         deserializer.clear();
-        final int errorCode =
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeExecutePlanFragments", true, null);
+        }
+        int errorCode =
             nativeExecutePlanFragments(
                     pointer,
                     numFragmentIds,
@@ -320,64 +368,70 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     undoToken);
 
         try {
-            checkErrorCode(errorCode);
-            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
-            // get a copy of the result buffers and make the tables
-            // use the copy
-            try {
-                // read the complete size of the buffer used
-                final int totalSize = fds.readInt();
-                // check if anything was changed
-                final boolean dirty = fds.readBoolean();
-                if (dirty)
-                    m_dirty = true;
-                // get a copy of the buffer
-                final ByteBuffer fullBacking = fds.readBuffer(totalSize);
-                final VoltTable[] results = new VoltTable[batchSize];
-                for (int i = 0; i < batchSize; ++i) {
-                    final int numdeps = fullBacking.getInt(); // number of dependencies for this frag
-                    assert(numdeps == 1);
-                    @SuppressWarnings("unused")
-                    final
-                    int depid = fullBacking.getInt(); // ignore the dependency id
-                    final int tableSize = fullBacking.getInt();
-                    // reasonableness check
-                    assert(tableSize < 50000000);
-                    final ByteBuffer tableBacking = fullBacking.slice();
-                    fullBacking.position(fullBacking.position() + tableSize);
-                    tableBacking.limit(tableSize);
-
-                    results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBacking, true);
-                }
-                return results;
-            } catch (final IOException ex) {
-                LOG.error("Failed to deserialze result table" + ex);
-                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+            if (errorCode != ERRORCODE_SUCCESS) {
+                throwSerializedException(errorCode);
             }
+            FastDeserializer fds = (fallbackBuffer == null) ?
+                    deserializer :
+                    new FastDeserializer(fallbackBuffer);
+            // read the complete size of the buffer used
+            int totalSize = fds.readInt();
+            // check if anything was changed
+            boolean dirty = fds.readBoolean();
+            if (dirty) {
+                m_dirty = true;
+            }
+            // get a copy of the buffer
+            ByteBuffer fullBacking = fds.readBuffer(totalSize);
+            VoltTable[] results = new VoltTable[batchSize];
+            for (int i = 0; i < batchSize; ++i) {
+                int numdeps = fullBacking.getInt(); // number of dependencies for this frag
+                assert(numdeps == 1);
+                @SuppressWarnings("unused")
+                final
+                int depid = fullBacking.getInt(); // ignore the dependency id
+                int tableSize = fullBacking.getInt();
+                // reasonableness check
+                assert(tableSize < 50000000);
+                ByteBuffer tableBacking = fullBacking.slice();
+                fullBacking.position(fullBacking.position() + tableSize);
+                tableBacking.limit(tableSize);
+
+                results[i] = PrivateVoltTableFactory.createVoltTableFromBuffer(tableBacking, true);
+            }
+            return results;
         } finally {
             fallbackBuffer = null;
         }
     }
 
     @Override
-    public VoltTable serializeTable(final int tableId) throws EEException {
+    public VoltTable serializeTable(int tableId) throws EEException
+    {
         if (HOST_TRACE_ENABLED) {
             LOG.trace("Retrieving VoltTable:" + tableId);
         }
         //Clear is destructive, do it before the native call
         deserializer.clear();
-        final int errorCode = nativeSerializeTable(pointer, tableId, deserializer.buffer(),
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeSerializeTable", true, null);
+        }
+        int errorCode = nativeSerializeTable(pointer, tableId, deserializer.buffer(),
                 deserializer.buffer().capacity());
-        checkErrorCode(errorCode);
-
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
         return PrivateVoltTableFactory.createVoltTableFromSharedBuffer(deserializer.buffer());
     }
 
     @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long spHandle,
-        final long lastCommittedSpHandle,
-        final long uniqueId,
+    public byte[] loadTable(int tableId,
+        VoltTable table,
+        long txnId,
+        long spHandle,
+        long lastCommittedSpHandle,
+        long uniqueId,
         boolean returnUniqueViolations,
         boolean shouldDRStream,
         long undoToken) throws EEException
@@ -392,24 +446,29 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         //Clear is destructive, do it before the native call
         deserializer.clear();
-        final int errorCode = nativeLoadTable(pointer, tableId, serialized_table,
-                                              txnId, spHandle, lastCommittedSpHandle, uniqueId,
-                                              returnUniqueViolations, shouldDRStream, undoToken);
-        checkErrorCode(errorCode);
-
-        try {
-            int length = deserializer.readInt();
-            if (length == 0) return null;
-            if (length < 0) VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
-
-            byte uniqueViolations[] = new byte[length];
-            deserializer.readFully(uniqueViolations);
-
-            return uniqueViolations;
-        } catch (final IOException ex) {
-            LOG.error("Failed to retrieve unique violations: " + tableId, ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeLoadTable", true, null);
         }
+        int errorCode = nativeLoadTable(pointer, tableId, serialized_table, txnId,
+                                              spHandle, uniqueId, lastCommittedSpHandle, returnUniqueViolations, shouldDRStream,
+                                              undoToken);
+        if (errorCode != ERRORCODE_SUCCESS) {
+            throwSerializedException(errorCode);
+        }
+
+        int length = deserializer.readInt();
+        if (length == 0) {
+           return null;
+        }
+        if (length < 0) {
+            VoltDB.crashLocalVoltDB("Length shouldn't be < 0", true, null);
+        }
+
+        byte uniqueViolations[] = new byte[length];
+        deserializer.readFully(uniqueViolations);
+
+        return uniqueViolations;
     }
 
     /**
@@ -419,13 +478,25 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * System.currentTimeMillis();
      */
     @Override
-    public void tick(final long time, final long lastCommittedTxnId) {
+    public boolean tick(long time, long lastCommittedTxnId)
+    {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeTick", true, null);
+        }
         nativeTick(pointer, time, lastCommittedTxnId);
+        return true;
     }
 
     @Override
-    public void quiesce(long lastCommittedTxnId) {
+    public boolean quiesce(long lastCommittedTxnId)
+    {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeQuiesce", true, null);
+        }
         nativeQuiesce(pointer, lastCommittedTxnId);
+        return true;
     }
 
     /**
@@ -438,49 +509,66 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      */
     @Override
     public VoltTable[] getStats(
-            final StatsSelector selector,
-            final int locators[],
-            final boolean interval,
-            final Long now)
+            StatsSelector selector,
+            int locators[],
+            boolean interval,
+            Long now)
     {
         //Clear is destructive, do it before the native call
         deserializer.clear();
-        final int numResults = nativeGetStats(pointer, selector.ordinal(), locators, interval, now);
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeGetStats", true, null);
+        }
+        int numResults = nativeGetStats(pointer, selector.ordinal(), locators, interval, now);
         if (numResults == -1) {
-            throwExceptionForError(ERRORCODE_ERROR);
+            throwSerializedException(ERRORCODE_ERROR);
         }
 
-        try {
-            deserializer.readInt();//Ignore the length of the result tables
+        deserializer.readInt();//Ignore the length of the result tables
 
-            ByteBuffer buf = fallbackBuffer == null ? deserializer.buffer() : fallbackBuffer;
-            final VoltTable results[] = new VoltTable[numResults];
-            for (int ii = 0; ii < numResults; ii++) {
-                int len = buf.getInt();
-                byte[] bufCopy = new byte[len];
-                buf.get(bufCopy);
-                results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), true);
-            }
-            return results;
-        } catch (final IOException ex) {
-            LOG.error("Failed to deserialze result table for getStats" + ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+        ByteBuffer buf = (fallbackBuffer == null) ? deserializer.buffer() : fallbackBuffer;
+        VoltTable results[] = new VoltTable[numResults];
+        for (int ii = 0; ii < numResults; ii++) {
+            int len = buf.getInt();
+            byte[] bufCopy = new byte[len];
+            buf.get(bufCopy);
+            results[ii] = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(bufCopy), true);
         }
+        return results;
     }
 
     @Override
-    public void toggleProfiler(final int toggle) {
+    public boolean toggleProfiler(int toggle)
+    {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeToggleProfiler", true, null);
+        }
         nativeToggleProfiler(pointer, toggle);
+        return true;
     }
 
     @Override
-    public boolean releaseUndoToken(final long undoToken) {
-        return nativeReleaseUndoToken(pointer, undoToken);
+    public boolean releaseUndoToken(long undoToken)
+    {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeReleaseUndoToken", true, null);
+        }
+        nativeReleaseUndoToken(pointer, undoToken);
+        return true;
     }
 
     @Override
-    public boolean undoUndoToken(final long undoToken) {
-        return nativeUndoUndoToken(pointer, undoToken);
+    public boolean undoUndoToken(long undoToken)
+    {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeUndoUndoToken", true, null);
+        }
+        nativeUndoUndoToken(pointer, undoToken);
+        return true;
     }
 
     /**
@@ -490,14 +578,26 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @returns true on success false on failure
      */
     @Override
-    public boolean setLogLevels(final long logLevels) throws EEException {
-        return nativeSetLogLevels(pointer, logLevels);
+    public boolean setLogLevels(long logLevels) throws EEException
+    {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeSetLogLevels", true, null);
+        }
+        nativeSetLogLevels(pointer, logLevels);
+        return true;
     }
 
     @Override
-    public boolean activateTableStream(int tableId, TableStreamType streamType,
+    public boolean activateTableStream(int tableId,
+                                       TableStreamType streamType,
                                        long undoQuantumToken,
-                                       byte[] predicates) {
+                                       byte[] predicates)
+    {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeActivateTableStream", true, null);
+        }
         return nativeActivateTableStream(pointer, tableId, streamType.ordinal(),
                                          undoQuantumToken, predicates);
     }
@@ -505,12 +605,16 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public Pair<Long, int[]> tableStreamSerializeMore(int tableId,
                                                       TableStreamType streamType,
-                                                      List<BBContainer> outputBuffers) {
+                                                      List<BBContainer> outputBuffers)
+    {
         //Clear is destructive, do it before the native call
         deserializer.clear();
-        byte[] bytes = outputBuffers != null
-                            ? SnapshotUtil.OutputBuffersToBytes(outputBuffers)
-                            : null;
+        byte[] bytes = (outputBuffers == null) ?
+                null : SnapshotUtil.OutputBuffersToBytes(outputBuffers);
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeTableStreamSerializeMore", true, null);
+        }
         long remaining = nativeTableStreamSerializeMore(pointer,
                                                         tableId,
                                                         streamType.ordinal(),
@@ -518,18 +622,13 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         int[] positions = null;
         assert(deserializer != null);
         int count;
-        try {
-            count = deserializer.readInt();
-            if (count > 0) {
-                positions = new int[count];
-                for (int i = 0; i < count; i++) {
-                    positions[i] = deserializer.readInt();
-                }
-                return Pair.of(remaining, positions);
+        count = deserializer.readInt();
+        if (count > 0) {
+            positions = new int[count];
+            for (int i = 0; i < count; i++) {
+                positions[i] = deserializer.readInt();
             }
-        } catch (final IOException ex) {
-            LOG.error("Failed to deserialize position array" + ex);
-            throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
+            return Pair.of(remaining, positions);
         }
 
         return Pair.of(remaining, new int[] {0});
@@ -540,11 +639,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * data is returned in the usual results buffer, length preceded as usual.
      */
     @Override
-    public void exportAction(boolean syncAction,
+    public boolean exportAction(boolean syncAction,
             long ackTxnId, long seqNo, int partitionId, String tableSignature)
     {
         //Clear is destructive, do it before the native call
         deserializer.clear();
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeExportAction", true, null);
+        }
         long retval = nativeExportAction(pointer,
                                          syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
         if (retval < 0) {
@@ -552,20 +655,37 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     ackTxnId + ", seqNo: " + seqNo + ", partitionId: " + partitionId +
                     ", tableSignature: " + tableSignature);
         }
+        return true;
     }
 
     @Override
-    public long[] getUSOForExportTable(String tableSignature) {
+    public long[] getUSOForExportTable(String tableSignature)
+    {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeGetUSOForExportTable", true, null);
+        }
         return nativeGetUSOForExportTable(pointer, getStringBytes(tableSignature));
     }
 
     @Override
-    public void processRecoveryMessage( ByteBuffer buffer, long bufferPointer) {
-        nativeProcessRecoveryMessage( pointer, bufferPointer, buffer.position(), buffer.remaining());
+    public boolean processRecoveryMessage(ByteBuffer buffer, long bufferPointer)
+    {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeProcessRecoveryMessage", true, null);
+        }
+        nativeProcessRecoveryMessage(pointer, bufferPointer, buffer.position(), buffer.remaining());
+        return true;
     }
 
     @Override
-    public long tableHashCode(int tableId) {
+    public long tableHashCode(int tableId)
+    {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeTableHashCode", true, null);
+        }
         return nativeTableHashCode(pointer, tableId);
     }
 
@@ -580,15 +700,20 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
         try {
             parameterSet.flattenToBuffer(psetBuffer);
-        } catch (final IOException exception) {
+        }
+        catch (IOException exception) {
             throw new RuntimeException(exception); // can't happen
         }
 
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeHashinate", true, null);
+        }
         return nativeHashinate(pointer, config.configPtr, config.numTokens);
     }
 
     @Override
-    public void updateHashinator(HashinatorConfig config)
+    public boolean updateHashinator(HashinatorConfig config)
     {
         if (config.configPtr == 0) {
             ParameterSet parameterSet = ParameterSet.fromArrayNoCopy(config.configBytes);
@@ -597,27 +722,38 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             clearPsetAndEnsureCapacity(parameterSet.getSerializedSize());
             try {
                 parameterSet.flattenToBuffer(psetBuffer);
-            } catch (final IOException exception) {
+            }
+            catch (IOException exception) {
                 throw new RuntimeException(exception); // can't happen
             }
         }
 
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeUpdateHashinator", true, null);
+        }
         nativeUpdateHashinator(pointer, config.type.typeId(), config.configPtr, config.numTokens);
+        return true;
     }
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
                                int remoteClusterId, long undoToken) throws EEException
     {
+        assert(pointer != 0L);
+        if (pointer == 0L) {
+            VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeApplyBinaryLog", true, null);
+        }
         long rowCount = nativeApplyBinaryLog(pointer, txnId, spHandle, lastCommittedSpHandle, uniqueId, remoteClusterId, undoToken);
         if (rowCount < 0) {
-            throwExceptionForError((int)rowCount);
+            throwSerializedException((int)rowCount);
         }
         return rowCount;
     }
 
     @Override
-    public long getThreadLocalPoolAllocations() {
+    public long getThreadLocalPoolAllocations()
+    {
         return nativeGetThreadLocalPoolAllocations();
     }
 
@@ -625,30 +761,40 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * Instead of using the reusable output buffer to get results for the next batch,
      * use this buffer allocated by the EE. This is for one time use.
      */
-    public void fallbackToEEAllocatedBuffer(ByteBuffer buffer) {
+    public void fallbackToEEAllocatedBuffer(ByteBuffer buffer)
+    {
         assert(buffer != null);
         assert(fallbackBuffer == null);
         fallbackBuffer = buffer;
     }
 
     @Override
-    public byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException {
+    public byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException
+    {
         try {
             psetBuffer.putLong(0, taskType.taskId);
 
             //Clear is destructive, do it before the native call
             deserializer.clear();
-            final int errorCode = nativeExecuteTask(pointer);
-            checkErrorCode(errorCode);
-            return (byte[])deserializer.readArray(byte.class);
-        } catch (IOException e) {
+            assert(pointer != 0L);
+            if (pointer == 0L) {
+                VoltDB.crashLocalVoltDB("Engine pointer should be set prior to nativeExecuteTask", true, null);
+            }
+            int errorCode = nativeExecuteTask(pointer);
+            if (errorCode != ERRORCODE_SUCCESS) {
+                throwSerializedException(errorCode);
+            }
+            return deserializer.readByteArray();
+        }
+        catch (IOException e) {
             Throwables.propagate(e);
         }
         return null;
     }
 
     @Override
-    public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
+    public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity)
+    {
         clearPsetAndEnsureCapacity(8 + requiredCapacity);
         psetBuffer.position(8);
         return psetBuffer;

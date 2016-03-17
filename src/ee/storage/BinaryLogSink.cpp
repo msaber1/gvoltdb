@@ -70,8 +70,8 @@ public:
         }
         std::pair<const TableIndex*, uint32_t> index = table->getUniqueIndexForDR();
         if (!index.first || indexCrc != index.second) {
-            throwSerializableEEException("Unable to find unique index %u while applying a binary log record",
-                                         indexCrc);
+            throwUnexpectedEEExceptionStreamed("Unable to find unique index " <<
+                                               indexCrc << " while applying a binary log record");
         }
         const TupleSchema* schema = index.first->getKeySchema();
         size_t tupleLength = schema->tupleLength() + TUPLE_HEADER_SIZE;
@@ -204,7 +204,9 @@ typedef std::pair<boost::shared_ptr<TableTuple>, bool>  LabeledTableTuple;
    * Find all rows in a @table that conflict with the @searchTuple (unique key violation) except the @expectedTuple
    * All conflicting rows are put into @conflictRows.
    */
-void findConflictTuple(Table *table, const TableTuple *existingTuple, const TableTuple *searchTuple, const TableTuple *expectedTuple, std::vector< LabeledTableTuple > &conflictRows) {
+void findConflictTuple(Table *table,
+        const TableTuple *existingTuple, const TableTuple *searchTuple, const TableTuple *expectedTuple,
+        std::vector< LabeledTableTuple > &conflictRows) {
     boost::unordered_set<char*> redundancyFilter;
     BOOST_FOREACH(TableIndex* index, table->allIndexes()) {
         if (index->isUniqueIndex()) {
@@ -215,7 +217,8 @@ void findConflictTuple(Table *table, const TableTuple *existingTuple, const Tabl
                     if (expectedTuple->equals(conflictTuple)) {
                         // exclude the expected tuple in update
                         continue;
-                    } else if (existingTuple && existingTuple->equals(conflictTuple)) {
+                    }
+                    if (existingTuple && existingTuple->equals(conflictTuple)) {
                         // in update this row was already listed in existingTableForDelete,
                         // don't include it in existingTableForInsert.
                         continue;
@@ -224,10 +227,9 @@ void findConflictTuple(Table *table, const TableTuple *existingTuple, const Tabl
                 if (redundancyFilter.find(conflictTuple.address()) != redundancyFilter.end()) {
                     // skip the conflict tuples that are already found
                     continue;
-                } else {
-                    conflictRows.push_back(std::make_pair(boost::shared_ptr<TableTuple>(new TableTuple(conflictTuple)), table->primaryKeyIndex() == index ? true : false));
-                    redundancyFilter.insert(conflictTuple.address());
                 }
+                conflictRows.push_back(std::make_pair(boost::shared_ptr<TableTuple>(new TableTuple(conflictTuple)), table->primaryKeyIndex() == index));
+                redundancyFilter.insert(conflictTuple.address());
             }
         }
     }
@@ -236,8 +238,10 @@ void findConflictTuple(Table *table, const TableTuple *existingTuple, const Tabl
 /**
  * create conflict export tuple from the conflict tuple
  */
-void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupleTable, PersistentTable *drTable, Pool *pool, const TableTuple *tupleToBeWrote,
-        DRConflictOnPK conflictOnPKType, DRRecordType actionType, DRConflictType conflictType, DRConflictRowType rowType) {
+void createConflictExportTuple(TempTable *outputMetaTable, TempTable *outputTupleTable,
+        PersistentTable *drTable, Pool *pool, const TableTuple *tupleToBeWrote,
+        DRConflictOnPK conflictOnPKType, DRRecordType actionType,
+        DRConflictType conflictType, DRConflictRowType rowType) {
     TableTuple tempMetaTuple = outputMetaTable->tempTuple();
     NValue hiddenValue = tupleToBeWrote->getHiddenNValue(drTable->getDRTimestampColumnIndex());
     tempMetaTuple.setNValue(DR_ROW_TYPE_COLUMN_INDEX, ValueFactory::getTempStringValue(DRConflictRowTypeStr(rowType)));
@@ -300,8 +304,10 @@ void validateChecksum(uint32_t checksum, const char *start, const char *end) {
     }
 }
 
-bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, TableTuple *existingTuple, const TableTuple *expectedTuple, TableTuple *newTuple,
-        int64_t uniqueId, int32_t remoteClusterId, DRRecordType actionType, DRConflictType deleteConflict, DRConflictType insertConflict) {
+bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool,
+        TableTuple *existingTuple, const TableTuple *expectedTuple, TableTuple *newTuple,
+        int64_t uniqueId, int32_t remoteClusterId, DRRecordType actionType,
+        DRConflictType deleteConflict, DRConflictType insertConflict) {
     if (!engine) {
         return false;
     }
@@ -371,21 +377,21 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                   drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
     }
 
-    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
-                                                                                      remoteClusterId,
-                                                                                      UniqueId::timestampAndCounter(uniqueId),
-                                                                                      drTable->name(),
-                                                                                      actionType,
-                                                                                      deleteConflict,
-                                                                                      existingMetaTableForDelete.get(),
-                                                                                      existingTupleTableForDelete.get(),
-                                                                                      expectedMetaTableForDelete.get(),
-                                                                                      expectedTupleTableForDelete.get(),
-                                                                                      insertConflict,
-                                                                                      existingMetaTableForInsert.get(),
-                                                                                      existingTupleTableForInsert.get(),
-                                                                                      newMetaTableForInsert.get(),
-                                                                                      newTupleTableForInsert.get());
+    int retval = ExecutorContext::reportDRConflict(UniqueId::pid(uniqueId),
+                                                   remoteClusterId,
+                                                   UniqueId::timestampAndCounter(uniqueId),
+                                                   drTable->name(),
+                                                   actionType,
+                                                   deleteConflict,
+                                                   existingMetaTableForDelete.get(),
+                                                   existingTupleTableForDelete.get(),
+                                                   expectedMetaTableForDelete.get(),
+                                                   expectedTupleTableForDelete.get(),
+                                                   insertConflict,
+                                                   existingMetaTableForInsert.get(),
+                                                   existingTupleTableForInsert.get(),
+                                                   newMetaTableForInsert.get(),
+                                                   newTupleTableForInsert.get());
     bool applyRemoteChange = isApplyNewRow(retval);
     bool resolved = isResolved(retval);
     // if conflict is not resolved, don't delete any existing rows.
@@ -480,8 +486,8 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log insert record",
-                                         (intmax_t)tableHandle);
+            throwUnexpectedEEExceptionStreamed("Unable to find table hash " <<
+                                               tableHandle << " while applying a binary log insert record");
         }
         PersistentTable *table = tableIter->second;
 
@@ -512,8 +518,8 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log delete record",
-                                         (intmax_t)tableHandle);
+            throwUnexpectedEEExceptionStreamed("Unable to find table hash " << tableHandle <<
+                                               " while applying a binary log delete record");
         }
         PersistentTable *table = tableIter->second;
 
@@ -525,12 +531,15 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         TableTuple deleteTuple = table->lookupTupleForDR(tempTuple);
         if (deleteTuple.isNullTuple()) {
             if (engine->getIsActiveActiveDREnabled()) {
-                if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL, *uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
+                if (handleConflict(engine, table, pool, NULL, &tempTuple, NULL,
+                                   *uniqueId, remoteClusterId,
+                                   DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISSING, NO_CONFLICT)) {
                     break;
                 }
             }
-            throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                             type, (intmax_t)*sequenceNumber, (intmax_t)*uniqueId, tempTuple.debug(table->name()).c_str());
+            throwUnexpectedEEExceptionStreamed("Unable to find tuple for deletion: binary log type (" << type <<
+                                               "), DR ID (" << *sequenceNumber << "), unique ID (" << *uniqueId <<
+                                               "), tuple " << tempTuple.debug(table->name()));
         }
 
         // we still run in risk of having timestamp mismatch, need to check.
@@ -541,7 +550,9 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
             int64_t remoteTimestamp = ExecutorContext::getDRTimestampFromHiddenNValue(remoteHiddenColumn);
             if (localTimestamp != remoteTimestamp) {
                 // timestamp mismatch conflict
-                if (handleConflict(engine, table, pool, &deleteTuple, &tempTuple, NULL, *uniqueId, remoteClusterId, DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
+                if (handleConflict(engine, table, pool, &deleteTuple, &tempTuple, NULL,
+                                   *uniqueId, remoteClusterId,
+                                   DR_RECORD_DELETE, CONFLICT_EXPECTED_ROW_MISMATCH, NO_CONFLICT)) {
                     break;
                 }
             }
@@ -561,8 +572,8 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log update record",
-                                         (intmax_t)tableHandle);
+            throwUnexpectedEEExceptionStreamed("Unable to find table hash " << tableHandle <<
+                                               " while applying a binary log update record");
         }
         PersistentTable *table = tableIter->second;
 
@@ -590,8 +601,9 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
                     break;
                 }
             }
-            throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                     type, (intmax_t)*sequenceNumber, (intmax_t)*uniqueId, tempTuple.debug(table->name()).c_str());
+            throwUnexpectedEEExceptionStreamed("Unable to find tuple for update: binary log type (" << type <<
+                                               "), DR ID (" << *sequenceNumber << "), unique ID (" << *uniqueId <<
+                                               "), tuple " << tempTuple.debug(table->name()));
         }
 
         // Timestamp mismatch conflict
@@ -635,8 +647,8 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log delete record",
-                                         (intmax_t)tableHandle);
+            throwUnexpectedEEExceptionStreamed("Unable to find table hash " << tableHandle <<
+                                               " while applying a binary log delete record");
         }
         PersistentTable *table = tableIter->second;
 
@@ -650,8 +662,9 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         index->moveToKey(&tempTuple, indexCursor);
         TableTuple deleteTuple = index->nextValueAtKey(indexCursor);
         if (deleteTuple.isNullTuple()) {
-            throwSerializableEEException("Unable to find tuple for deletion: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                         type, (intmax_t)*sequenceNumber, (intmax_t)*uniqueId, tempTuple.debug(table->name()).c_str());
+            throwUnexpectedEEExceptionStreamed("Unable to find tuple for deletion: binary log type (" << type <<
+                                               "), DR ID (" << *sequenceNumber << "), unique ID (" << *uniqueId <<
+                                               "), tuple " << tempTuple.debug(table->name()));
         }
 
         table->deleteTuple(deleteTuple, true);
@@ -669,8 +682,8 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table hash %jd while applying a binary log update record",
-                                         (intmax_t)tableHandle);
+            throwUnexpectedEEExceptionStreamed("Unable to find table hash " << tableHandle <<
+                                               " while applying a binary log update record");
         }
         PersistentTable *table = tableIter->second;
 
@@ -684,10 +697,10 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
         index->moveToKey(&tempTuple, indexCursor);
         TableTuple oldTuple = index->nextValueAtKey(indexCursor);
         if (oldTuple.isNullTuple()) {
-            throwSerializableEEException("Unable to find tuple for update: binary log type (%d), DR ID (%jd), unique ID (%jd), tuple %s\n",
-                                        type, (intmax_t)*sequenceNumber, (intmax_t)*uniqueId, tempTuple.debug(table->name()).c_str());
+            throwUnexpectedEEExceptionStreamed("Unable to find tuple for update: binary log type (" << type <<
+                                               "), DR ID (" << *sequenceNumber << "), unique ID (" << *uniqueId <<
+                                               "), tuple " << tempTuple.debug(table->name()));
         }
-
         tempTuple = table->tempTuple();
         ReferenceSerializeInputLE newRowInput(newRowData, newRowLength);
         tempTuple.deserializeFromDR(newRowInput, pool);
@@ -702,10 +715,12 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
             if (tempSequenceNumber < *sequenceNumber) {
                 throwFatalException("Found out of order sequencing inside a binary log segment. Expected %jd but found %jd",
                                     (intmax_t)(*sequenceNumber + 1), (intmax_t)tempSequenceNumber);
-            } else if (tempSequenceNumber == *sequenceNumber) {
+            }
+            else if (tempSequenceNumber == *sequenceNumber) {
                 throwFatalException("Found duplicate transaction %jd in a binary log segment",
                                     (intmax_t)tempSequenceNumber);
-            } else if (tempSequenceNumber > *sequenceNumber + 1) {
+            }
+            else if (tempSequenceNumber > *sequenceNumber + 1) {
                 throwFatalException("Found sequencing gap inside a binary log segment. Expected %jd but found %jd",
                                     (intmax_t)(*sequenceNumber + 1), (intmax_t)tempSequenceNumber);
             }
@@ -734,8 +749,9 @@ int64_t BinaryLogSink::apply(ReferenceSerializeInputLE *taskInfo, boost::unorder
 
         boost::unordered_map<int64_t, PersistentTable*>::iterator tableIter = tables.find(tableHandle);
         if (tableIter == tables.end()) {
-            throwSerializableEEException("Unable to find table %s hash %jd while applying binary log for truncate record",
-                                         tableName.c_str(), (intmax_t)tableHandle);
+            throwUnexpectedEEExceptionStreamed("Unable to find table " << tableName <<
+                                               " hash " << tableHandle <<
+                                               " while applying binary log for truncate record");
         }
 
         PersistentTable *table = tableIter->second;
