@@ -30,6 +30,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.LoadedUserDefinedFunctionSet;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.StarvationTracker;
 
@@ -51,6 +52,7 @@ class MpRoSitePool {
         final private CatalogContext m_catalogContext;
         final private ProcedureRunnerFactory m_prf;
         final private LoadedProcedureSet m_loadedProcedures;
+        final private LoadedUserDefinedFunctionSet m_loadedUserDefinedFunctions;
         final private Thread m_siteThread;
 
         MpRoSiteContext(long siteId, BackendTarget backend,
@@ -70,6 +72,9 @@ class MpRoSitePool {
                     initiatorMailbox.getHSId(), 0); // Stale constructor arg, fill with bleh
             m_loadedProcedures.loadProcedures(m_catalogContext, m_backend, csp);
             m_site.setLoadedProcedures(m_loadedProcedures);
+            m_loadedUserDefinedFunctions = new LoadedUserDefinedFunctionSet();
+            m_loadedUserDefinedFunctions.loadUserDefinedFunctions(m_catalogContext);
+            m_site.setUserDefinedFunctions(m_loadedUserDefinedFunctions);
             m_siteThread = threadFactory.newThread(m_site);
             m_siteThread.start();
         }

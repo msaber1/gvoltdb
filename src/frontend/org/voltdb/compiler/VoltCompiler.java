@@ -22,6 +22,9 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.Method;
+import java.lang.reflect.Modifier;
+import java.lang.reflect.Parameter;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -52,7 +55,9 @@ import javax.xml.validation.SchemaFactory;
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.hsqldb_voltpatches.types.Type;
 import org.json_voltpatches.JSONException;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -63,6 +68,7 @@ import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltType;
+import org.voltdb.VoltUserDefinedFunction;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -74,6 +80,8 @@ import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.UDFParameter;
+import org.voltdb.catalog.UserDefinedFunction;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.projectfile.ClassdependenciesType.Classdependency;
@@ -90,6 +98,9 @@ import org.voltdb.compilereport.ReportMaker;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.StatementPartitioning;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -108,6 +119,10 @@ import com.google_voltpatches.common.collect.ImmutableList;
  *
  */
 public class VoltCompiler {
+    private static class UDFParameterType {
+
+    }
+
     /** Represents the level of severity for a Feedback message generated during compiling. */
     public static enum Severity { INFORMATIONAL, WARNING, ERROR, UNEXPECTED }
     public static final int NO_LINE_NUMBER = -1;
@@ -170,7 +185,7 @@ public class VoltCompiler {
 
     private ClassLoader m_classLoader = ClassLoader.getSystemClassLoader();
 
-    /**
+    /**`
      * Represents output from a compile. This works similarly to Log4j; there
      * are different levels of feedback including info, warning, error, and
      * unexpected error. Feedback can be output to a printstream (like stdout)
@@ -900,7 +915,6 @@ public class VoltCompiler {
     {
         // Compiler instance is reusable. Clear the cache.
         cachedAddedClasses.clear();
-
         m_catalog = new Catalog();
         // Initialize the catalog for one cluster
         m_catalog.execute("add / clusters cluster");
@@ -930,6 +944,201 @@ public class VoltCompiler {
         m_catalog.getClusters().get("cluster").setLocalepoch(epoch);
 
         return m_catalog;
+    }
+
+    private void fetchUserDefinedFunctions(InMemoryJarfile jarOutput, HSQLInterface hsql) throws VoltCompilerException {
+        ClassLoader jarLoader = jarOutput.getLoader();
+        for (Entry<String, byte[]> e : jarOutput.entrySet()) {
+            String filename = e.getKey();
+            if (!filename.endsWith(".class")) {
+                continue;
+            }
+            String className = filename.substring(0, filename.length()-6).replace("/", ".");
+            try {
+                Class<?> udfClass = jarLoader.loadClass(className);
+                Method[] methods = udfClass.getMethods();
+                for (Method method : methods) {
+                    int mod = method.getModifiers();
+                    if (Modifier.isPublic(mod) && Modifier.isStatic(mod)) {
+                        // Is this method marked as a UDF?  If not,
+                        // then just continue.
+                        if (method.isAnnotationPresent(VoltUserDefinedFunction.class)) {
+                            VoltUserDefinedFunction udf =  method.getAnnotation(VoltUserDefinedFunction.class);
+                            if (udf == null) {
+                                continue;
+                            }
+                            // Ok, we now have a UDF method.  Fetch all the bits we need to
+                            // define the function.  This is somewhat odd, because we need to
+                            // fetch all the pieces before we can actually define the function.
+                            // We need to know all the pieces are valid before defining anything.
+                            // This will throw on errors.  We don't care.
+                            //
+                            // Note that these are hsql types.  We could have done
+                            // it the other way, and chosen VoltType types, but then
+                            // we would have had to translate to HSQL types.
+                            Type [] udfParams = fetchParameters(method);
+                            Type returnType = getHSQLType(method.getReturnType());
+                            if (returnType == null) {
+                                throw new VoltCompilerException(
+                                        String.format("User defined function \"%s\" has an unsupported return type.",
+                                                      method.getName()));
+                            }
+                            // We are happy with this method as a UDF.  Register
+                            // it with HSQL and add it to the catalog.
+                            String sqlName = udf.CallName();
+                            String methodName = method.getName();
+                            // This may throw if hsql thinks the sqlName is
+                            // already defined.  If so, then just let it.
+                            int funcIdx = -1;
+                            try {
+                                funcIdx = hsql.registerUserDefinedFunction(sqlName, udfParams, returnType);
+                            } catch (HSQLParseException ex) {
+                                throw new VoltCompilerException(ex.getMessage());
+                            }
+                            UserDefinedFunction func = addUDFToCatalog(className,
+                                                                       sqlName,
+                                                                       "java",
+                                                                       methodName,
+                                                                       getVoltType(returnType));
+                            func.setFuncidx(funcIdx);
+                            // Add the parameters.
+                            CatalogMap<UDFParameter> catalogParams = func.getParameters();
+                            int paramIdx = 0;
+                            for (Type hsqltype : udfParams) {
+                                String paramName = String.format("param%d", paramIdx);
+                                UDFParameter param = catalogParams.add(paramName);
+                                param.setIndex(paramIdx);
+                                VoltType vt = getVoltType(hsqltype);
+                                if (vt == null) {
+                                    throw new VoltCompilerException(
+                                            String.format(
+                                                    "User defined function \"%s\" has an unsupported parameter type at parameter %d",
+                                                    method.getName(),
+                                                    paramIdx));
+                                }
+                                param.setType(vt.getValue());
+                                paramIdx += 1;
+                            }
+
+                        }
+                    }
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                continue;
+            }
+        }
+    }
+
+    private UserDefinedFunction addUDFToCatalog(String classname,
+                                                String sqlname,
+                                                String language,
+                                                String methodName,
+                                                VoltType retType) throws VoltCompilerException {
+        Database db = m_catalog.getClusters().get("cluster").getDatabases().get("database");
+        UserDefinedFunction udf = db.getUdfs().get(sqlname);
+        if (udf != null) {
+            throw new VoltCompilerException(String.format(
+                    "User defined function \"%s\" is multiply defined as \"%s\" and \"%s\"",
+                    sqlname,
+                    classname + "." + methodName,
+                    udf.getClassname() + "." + udf.getMethodname()));
+        }
+        udf = db.getUdfs().add(sqlname);
+        udf.setClassname(classname);
+        udf.setSqlname(sqlname);
+        udf.setLanguage(language);
+        udf.setMethodname(methodName);
+        udf.setReturntype(retType.getValue());
+        return udf;
+    }
+
+    private Type[] fetchParameters(Method method) throws VoltCompilerException {
+        Parameter[] params = method.getParameters();
+        Type[] answer = new Type[params.length];
+        int paramIdx = 0;
+        for (Parameter param : params) {
+            Class<?> paramType = param.getType();
+            // No array type parameters.
+            if (paramType.isArray()) {
+                throw new VoltCompilerException("User defined function \"" + method.getName()
+                                                + "\" has an array parameter.");
+            }
+            Type hsqltype = getHSQLType(paramType);
+            if (hsqltype == null) {
+                throw new VoltCompilerException(
+                        String.format(
+                                "User Defined Function \"%s\" has an unsupported parameter type at index %d",
+                                method.getName(),
+                                paramIdx));
+            }
+            answer[paramIdx] = hsqltype;
+            paramIdx += 1;
+        }
+        return answer;
+    }
+
+    private static VoltType getVoltType(Type HSQLType) {
+        if (HSQLType == Type.SQL_DOUBLE) {
+                return VoltType.FLOAT;
+        }
+        if (HSQLType == Type.SQL_CHAR) {
+                return VoltType.TINYINT;
+        }
+        if (HSQLType == Type.SQL_SMALLINT) {
+                return VoltType.SMALLINT;
+        }
+        if (HSQLType == Type.SQL_INTEGER) {
+                return VoltType.INTEGER;
+        }
+        if (HSQLType == Type.SQL_BIGINT) {
+                return VoltType.BIGINT;
+        }
+        if (HSQLType == Type.SQL_TIMESTAMP) {
+                return VoltType.TIMESTAMP;
+        }
+        if (HSQLType == Type.VOLT_GEOGRAPHY_POINT) {
+                return VoltType.GEOGRAPHY_POINT;
+        }
+        if (HSQLType == Type.VOLT_GEOGRAPHY) {
+                return VoltType.GEOGRAPHY;
+        }
+        if (HSQLType == Type.SQL_VARCHAR) {
+                return VoltType.STRING;
+        }
+        return null;
+    }
+
+    private static Type getHSQLType(Class<?> paramType) throws VoltCompilerException {
+        // Isn't there an easier way to do this?
+        if (paramType == Double.class || paramType == Double.TYPE) {
+            return Type.SQL_DOUBLE;
+        }
+        if (paramType == Byte.class || paramType == Byte.TYPE) {
+            return Type.SQL_CHAR;
+        }
+        if (paramType == Short.class || paramType == Short.TYPE) {
+            return Type.SQL_SMALLINT;
+        }
+        if (paramType == Integer.class || paramType == Integer.TYPE) {
+            return  Type.SQL_INTEGER;
+        }
+        if (paramType == Long.class || paramType == Long.TYPE) {
+            return  Type.SQL_BIGINT;
+        }
+        if (paramType == TimestampType.class) {
+            return  Type.SQL_TIMESTAMP;
+        }
+        if (paramType == GeographyPointValue.class) {
+            return  Type.VOLT_GEOGRAPHY_POINT;
+        }
+        if (paramType == GeographyValue.class) {
+            return  Type.VOLT_GEOGRAPHY;
+        }
+        if (paramType == String.class) {
+            return  Type.SQL_VARCHAR;
+        }
+        return null;
     }
 
     ProcInfoData getProcInfoOverride(final String procName) {
@@ -1112,6 +1321,7 @@ public class VoltCompiler {
 
         // shutdown and make a new hsqldb
         HSQLInterface hsql = HSQLInterface.loadHsqldb();
+        fetchUserDefinedFunctions(jarOutput, hsql);
         compileDatabase(db, hsql, voltDdlTracker, cannonicalDDLIfAny, previousDBIfAny, ddlReaderList, database.getExport(), classDependencies,
                         DdlProceduresToLoad.ALL_DDL_PROCEDURES, jarOutput);
     }

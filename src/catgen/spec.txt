@@ -128,10 +128,12 @@ end
 
 begin UserDefinedFunction
   string classname          "The full class name for the Java class for this procedure"
-  string implName           "Name of the implementation of this function"
+  string methodname         "Name of the method implementing this function.
+  string sqlname            "Name this function will have in SQL"
   string language           "What language is the procedure implemented using"
-  int    paramIdx           "The id by which the EE and Java know this function"
+  int    funcidx            "The id by which the EE and Java know this function"
   UDFParameter* parameters  "The set of parameters to this stored procedure"
+  int    returntype         "The return type of the function"
 end
 
 begin Table                        "A table (relation) in the database"

@@ -88,6 +88,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         // These ID numbers need to be unique values for FunctionSQL.functType.
         // Assume that 1-19999 are reserved for existing HSQL functions.
         // That leaves new VoltDB-specific functions free to use values in the 20000s.
+        //
+        // We allocate function ids in the range [1000000, 2000000) for VoltDB
+        // User Defined Functions.
         static final int FUNC_CONCAT                     = 124;
 
         private static final int FUNC_VOLT_SQL_ERROR     = 20000;
@@ -164,7 +167,11 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_DWITHIN_POLYGON_POINT        = 21019;    // if a polygon and a point are within certain distance of each other
         static final int FUNC_VOLT_POLYGONFROMVALIDTEXT         = 21020;    // list polygonFromText, but validates after construction
 
-
+        /*
+         * All VoltDB User Defined Functions must have ids in this range.
+         */
+        static final int FUNC_VOLT_BEGIN_UDF_ID                  = 1000000;
+        static final int FUNC_VOLT_END_UDF_ID                    = 2000000;
         /*
          * Note: The name must be all lower case.
          */
@@ -362,6 +369,28 @@ public class FunctionForVoltDB extends FunctionSQL {
             return m_typeParameter;
         }
 
+        public static int addUserDefinedFunctionId(String name, Type[] params, Type returnType, short[] syntax) {
+            int newId = getNewUDFId();
+            FunctionId fid = new FunctionId(name, returnType, newId, -1, params, syntax);
+            by_LC_name.put(name, fid);
+            return newId;
+        }
+
+        public void deleteUserDefinedFunction(int fid) {
+            by_LC_name.remove(fid);
+        }
+
+        private static int nextUDFId = FUNC_VOLT_BEGIN_UDF_ID;
+
+        /**
+         * Get the next UDF Id.  We don't actually have to worry about
+         * garbage collecting them, since when one changes we recompile
+         * the entire catalog, causing them all to change.
+         * @return
+         */
+        private static int getNewUDFId() {
+            return nextUDFId++;
+        }
     }
 
     public static final int FUNC_VOLT_ID_FOR_CONTAINS = FunctionId.FUNC_VOLT_CONTAINS;
@@ -711,6 +740,16 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
         sb.append(Tokens.T_CLOSEBRACKET);
         return sb.toString();
+    }
+
+    public static int registerUserDefinedFunction(String sqlName, Type[] udfParams, Type returnType) {
+        short [] syntax = new short[udfParams.length + 2];
+        syntax[0] = Tokens.OPENBRACKET;
+        for (int idx = 1; idx <= udfParams.length; idx += 1) {
+            syntax[idx] = Tokens.QUESTION;
+        }
+        syntax[udfParams.length + 1] = Tokens.OPENBRACKET;
+        return FunctionId.addUserDefinedFunctionId(sqlName, udfParams, returnType, syntax);
     }
 
 }

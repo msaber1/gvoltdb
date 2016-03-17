@@ -31,6 +31,7 @@ import org.voltdb.CommandLog;
 import org.voltdb.ConsumerDRGateway;
 import org.voltdb.DRLogSegmentId;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.LoadedUserDefinedFunctionSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunnerFactory;
@@ -179,6 +180,9 @@ public abstract class BaseInitiator implements Initiator
                     0); // this has no meaning
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
+            LoadedUserDefinedFunctionSet udfSet = new LoadedUserDefinedFunctionSet();
+            udfSet.loadUserDefinedFunctions(catalogContext);
+            m_executionSite.setUserDefinedFunctions(udfSet);
             m_scheduler.setCommandLog(cl);
 
             m_siteThread = new Thread(m_executionSite);

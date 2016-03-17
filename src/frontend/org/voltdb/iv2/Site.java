@@ -45,6 +45,7 @@ import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.HsqlBackend;
 import org.voltdb.IndexStats;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.LoadedUserDefinedFunctionSet;
 import org.voltdb.MemoryStats;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
@@ -95,9 +96,9 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import vanilla.java.affinity.impl.PosixJNAAffinity;
-
 import com.google_voltpatches.common.base.Preconditions;
+
+import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -160,6 +161,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Currently available procedure
     volatile LoadedProcedureSet m_loadedProcedures;
+    volatile LoadedUserDefinedFunctionSet m_loadedUserDefinedFunctions;
+
+    // Currently available user defined functions.
+    private LoadedUserDefinedFunctionSet m_userDefinedFunctions;
 
     // Cache the DR gateway here so that we can pass it to tasks as they are reconstructed from
     // the task log
@@ -462,6 +467,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     void setLoadedProcedures(LoadedProcedureSet loadedProcedure)
     {
         m_loadedProcedures = loadedProcedure;
+    }
+
+    /** Update the loaded procedures */
+    public void setUserDefinedFunctions(LoadedUserDefinedFunctionSet udfSet) {
+        m_userDefinedFunctions = udfSet;
     }
 
     /** Thread specific initialization */
@@ -1245,6 +1255,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
+        m_userDefinedFunctions.loadUserDefinedFunctions(m_context);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs
@@ -1385,4 +1396,5 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_ee.executeTask(TaskType.SET_DR_PROTOCOL_VERSION, paramBuffer);
         hostLog.info("DR protocol version has been set to " + drVersion);
     }
+
 }

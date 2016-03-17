@@ -31,6 +31,7 @@ import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.LoadedUserDefinedFunctionSet;
 import org.voltdb.NonVoltDBBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.PostGISBackend;
@@ -85,6 +86,9 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
 
     // Currently available procedure
     volatile LoadedProcedureSet m_loadedProcedures;
+
+    // Currently available user defined functions.
+    volatile LoadedUserDefinedFunctionSet m_loadedUserDefinedFunctions;
 
     // Current topology
     int m_partitionId;
@@ -268,6 +272,10 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
     void setLoadedProcedures(LoadedProcedureSet loadedProcedure)
     {
         m_loadedProcedures = loadedProcedure;
+    }
+    /** Update the loaded user defined functions */
+    void setUserDefinedFunctions(LoadedUserDefinedFunctionSet loadedUDFs) {
+        m_loadedUserDefinedFunctions = loadedUDFs;
     }
 
     /** Thread specific initialization */

@@ -28,6 +28,7 @@ import org.hsqldb_voltpatches.index.Index;
 import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.persist.HsqlProperties;
 import org.hsqldb_voltpatches.result.Result;
+import org.hsqldb_voltpatches.types.Type;
 import org.voltcore.logging.VoltLogger;
 
 /**
@@ -589,5 +590,16 @@ public class HSQLInterface {
         // search all the tables XXX probably could do this non-linearly,
         //  but i don't know about case-insensitivity yet
         return schemaManager.getTables(schemaName);
+    }
+
+    /**
+     * Register a user defined function with HSQLDB.  Note that this may
+     * throw if the function seems already to be defined.
+     * @param sqlName
+     * @param returnType
+     * @return
+     */
+    public int registerUserDefinedFunction(String sqlName, Type[] udfParams, Type returnType) throws HSQLParseException {
+        return FunctionForVoltDB.registerUserDefinedFunction(sqlName, udfParams, returnType);
     }
 }
