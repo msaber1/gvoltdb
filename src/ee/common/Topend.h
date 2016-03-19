@@ -79,6 +79,8 @@ class Topend {
     /** Calls the java method in org.voltdb.utils.Encoder */
     virtual std::string decodeBase64AndDecompress(const std::string& buffer) = 0;
 
+    virtual double callUserDefinedFunction(int32_t fid, double param) = 0;
+
     virtual ~Topend()
     {
     }

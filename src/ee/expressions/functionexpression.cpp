@@ -14,12 +14,15 @@
  * You should have received a copy of the GNU Affero General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-
+#include <algorithm>
 #include "expressions/functionexpression.h"
 #include "expressions/geofunctions.h"
 #include "expressions/expressionutil.h"
 
+
 namespace voltdb {
+
+class UserDefinedFunctionDescriptor;
 
 /** implement a forced SQL ERROR function (for test and example purposes) for either integer or string types **/
 template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
@@ -185,8 +188,76 @@ public:
         return (buffer.str());
     }
 
-private:
+protected:
     const std::vector<AbstractExpression *>& m_args;
+};
+
+/**
+ * User defined functions.  These are almost exactly like GeneralFunctionExpression,
+ * but they have a UserDefinedFunctionExpression.
+ */
+class UserDefinedFunctionExpression : public AbstractExpression {
+public:
+    UserDefinedFunctionExpression(const UserDefinedFunctionDescriptor *descr, const std::vector<AbstractExpression *>& args)
+        : AbstractExpression(EXPRESSION_TYPE_FUNCTION),
+          m_udfDescr(descr), m_args(args) {
+    }
+
+    virtual ~UserDefinedFunctionExpression() {
+        size_t i = m_args.size();
+        while (i--) {
+            delete m_args[i];
+        }
+        delete &m_args;
+    }
+
+    virtual bool hasParameter() const {
+        for (size_t i = 0; i < m_args.size(); i++) {
+            assert(m_args[i]);
+            if (m_args[i]->hasParameter()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // This is almost like GeneralFunctionExpression::eval, but the
+    // call needs to know about the UDFDescriptor.  I suppose we could
+    // make an NValue which holds a UDFDescriptor and add it to the
+    // evaluated parameters.  But that seem slightly crazy.
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        //TODO: Could make this vector a member, if the memory management implications
+        // (of the NValue internal state) were clear -- is there a penalty for longer-lived
+        // NValues that outweighs the current per-eval allocation penalty?
+        std::vector<NValue> nValue(m_args.size());
+        for (int i = 0; i < m_args.size(); ++i) {
+            nValue[i] = m_args[i]->eval(tuple1, tuple2);
+        }
+        return NValue::callUserDefinedFunction(m_udfDescr, nValue);
+    }
+
+    std::string debugInfo(const std::string &spacer) const {
+        std::stringstream buffer;
+        buffer << spacer
+                << "UserDefinedFunctionExpression(fid == "
+                << m_udfDescr->getFid()
+                << ", params = [";
+        std::string sep("");
+        const std::vector<int32_t> &paramtypes = m_udfDescr->getParamTypes();
+        for (std::vector<int32_t>::const_iterator it = paramtypes.cbegin();
+             it != paramtypes.cend();
+             it++) {
+            buffer << sep << *it;
+            sep = ", ";
+        }
+        buffer  << "])"
+                << std::endl;
+        return (buffer.str());
+    }
+
+private:
+    const UserDefinedFunctionDescriptor *m_udfDescr;
+    const std::vector<AbstractExpression *> &m_args;
 };
 
 }
@@ -198,6 +269,11 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     AbstractExpression* ret = 0;
     assert(arguments);
     size_t nArgs = arguments->size();
+    if (IS_USER_DEFINED_ID(functionId)) {
+        const UserDefinedFunctionDescriptor *udfdesc = ExpressionUtil::findUserDefinedFunction(functionId);
+        assert(udfdesc != NULL);
+        return new UserDefinedFunctionExpression(udfdesc, *arguments);
+    }
     if (nArgs == 0) {
         switch(functionId) {
         case FUNC_CURRENT_TIMESTAMP:
@@ -213,8 +289,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     }
     else if (nArgs == 1) {
         switch(functionId) {
-        case FUNC_ABS:
             ret = new UnaryFunctionExpression<FUNC_ABS>((*arguments)[0]);
+        case FUNC_ABS:
             break;
         case FUNC_CEILING:
             ret = new UnaryFunctionExpression<FUNC_CEILING>((*arguments)[0]);

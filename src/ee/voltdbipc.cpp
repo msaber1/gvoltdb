@@ -184,6 +184,8 @@ private:
 
     void sendException( int8_t errorCode);
 
+    double callUserDefinedFunction(int32_t fid, double param);
+
     int8_t activateTableStream(struct ipc_command *cmd);
     void tableStreamSerializeMore(struct ipc_command *cmd);
     void exportAction(struct ipc_command *cmd);
@@ -1066,6 +1068,10 @@ std::string VoltDBIPC::decodeBase64AndDecompress(const std::string& base64Data) 
     writeOrDie(m_fd, message, messageSize);
 
     return readLengthPrefixedBytesToStdString(m_fd);
+}
+
+double VoltDBIPC::callUserDefinedFunction(int32_t fid, double param) {
+    return 0.0;
 }
 
 std::string VoltDBIPC::planForFragmentId(int64_t fragmentId) {

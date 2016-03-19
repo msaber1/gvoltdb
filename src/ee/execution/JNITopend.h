@@ -61,6 +61,8 @@ public:
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
+    double callUserDefinedFunction(int32_t fid, double param);
+
 private:
     JNIEnv *m_jniEnv;
 
@@ -79,6 +81,7 @@ private:
     jmethodID m_pushDRBufferMID;
     jmethodID m_reportDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
+    jmethodID m_callUserDefinedFunctionMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_encoderClass;

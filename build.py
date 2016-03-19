@@ -297,6 +297,7 @@ CTX.INPUT['expressions'] = """
  subqueryexpression.cpp
  tupleaddressexpression.cpp
  vectorexpression.cpp
+ UserDefinedFunctionMap.cpp
 """
 
 CTX.INPUT['plannodes'] = """

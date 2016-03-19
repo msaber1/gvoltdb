@@ -28,8 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
-import junit.framework.TestCase;
-
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -47,6 +45,8 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+
+import junit.framework.TestCase;
 
 /**
  * Tests native execution engine JNI interface.
@@ -160,6 +160,7 @@ public class TestExecutionEngine extends TestCase {
                         new ExecutionEngineJNI(
                                 CLUSTER_ID,
                                 NODE_ID,
+                                null,
                                 0,
                                 0,
                                 "",
@@ -275,6 +276,7 @@ public class TestExecutionEngine extends TestCase {
                         new ExecutionEngineJNI(
                                 CLUSTER_ID,
                                 NODE_ID,
+                                null,
                                 0,
                                 0,
                                 "",
@@ -337,6 +339,7 @@ public class TestExecutionEngine extends TestCase {
                 new ExecutionEngineJNI(
                         CLUSTER_ID,
                         NODE_ID,
+                        null,
                         0,
                         0,
                         "",

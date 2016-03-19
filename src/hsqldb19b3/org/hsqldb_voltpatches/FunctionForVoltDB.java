@@ -369,8 +369,8 @@ public class FunctionForVoltDB extends FunctionSQL {
             return m_typeParameter;
         }
 
-        public static int addUserDefinedFunctionId(String name, Type[] params, Type returnType, short[] syntax) {
-            int newId = getNewUDFId();
+        public static int addUserDefinedFunctionId(String name, Type[] params, Type returnType, short[] syntax, int udfNumber) {
+            int newId = udfNumber + FUNC_VOLT_BEGIN_UDF_ID;
             FunctionId fid = new FunctionId(name, returnType, newId, -1, params, syntax);
             by_LC_name.put(name, fid);
             return newId;
@@ -380,17 +380,6 @@ public class FunctionForVoltDB extends FunctionSQL {
             by_LC_name.remove(fid);
         }
 
-        private static int nextUDFId = FUNC_VOLT_BEGIN_UDF_ID;
-
-        /**
-         * Get the next UDF Id.  We don't actually have to worry about
-         * garbage collecting them, since when one changes we recompile
-         * the entire catalog, causing them all to change.
-         * @return
-         */
-        private static int getNewUDFId() {
-            return nextUDFId++;
-        }
     }
 
     public static final int FUNC_VOLT_ID_FOR_CONTAINS = FunctionId.FUNC_VOLT_CONTAINS;
@@ -742,14 +731,14 @@ public class FunctionForVoltDB extends FunctionSQL {
         return sb.toString();
     }
 
-    public static int registerUserDefinedFunction(String sqlName, Type[] udfParams, Type returnType) {
+    public static int registerUserDefinedFunction(String sqlName, Type[] udfParams, Type returnType, int udfNumber) {
         short [] syntax = new short[udfParams.length + 2];
         syntax[0] = Tokens.OPENBRACKET;
         for (int idx = 1; idx <= udfParams.length; idx += 1) {
             syntax[idx] = Tokens.QUESTION;
         }
-        syntax[udfParams.length + 1] = Tokens.OPENBRACKET;
-        return FunctionId.addUserDefinedFunctionId(sqlName, udfParams, returnType, syntax);
+        syntax[udfParams.length + 1] = Tokens.CLOSEBRACKET;
+        return FunctionId.addUserDefinedFunctionId(sqlName, udfParams, returnType, syntax, udfNumber);
     }
 
 }

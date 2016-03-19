@@ -50,6 +50,8 @@
 #include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressions.h"
+#include "expressions/UserDefinedFunctionDescriptor.h"
+#include "expressions/UserDefinedFunctionMap.h"
 
 #include <cassert>
 #include <sstream>
@@ -729,4 +731,27 @@ AbstractExpression* ExpressionUtil::loadExpressionFromJson(const std::string& js
     return AbstractExpression::buildExpressionTree(domRoot.rootObject());
 }
 
+/**
+ * User Defined Function Registry.
+ */
+namespace {
+UserDefinedFunctionMap udfMap;
 }
+
+void ExpressionUtil::initializeUserDefinedFunctions() {
+	udfMap.clear();
+}
+
+void ExpressionUtil::registerUserDefinedFunction(int32_t funcid, int32_t returnType, const std::vector<int32_t> &paramTypes) {
+    udfMap.addUDF(funcid, returnType, paramTypes);
+}
+
+const UserDefinedFunctionDescriptor *ExpressionUtil::findUserDefinedFunction(int32_t fid) {
+    return udfMap.getUDF(fid);
+}
+
+void ExpressionUtil::dumpUserDefinedFunctions() {
+    udfMap.dump();
+}
+}
+

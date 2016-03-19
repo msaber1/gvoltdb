@@ -415,6 +415,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViewsAndLimitDeletePlans();
+        void initUserDefinedFunctions();
         bool updateCatalogDatabaseReference();
 
         /**

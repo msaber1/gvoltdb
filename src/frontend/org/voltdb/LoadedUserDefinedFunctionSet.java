@@ -66,7 +66,7 @@ public class LoadedUserDefinedFunctionSet {
                 }
                 Method method = findMethod(udfClass, sqlName, sqlNameToMethodCache);
                 assert(method != null);
-                builder.put(fid, new UserDefinedFunctionCaller(method, params, retType));
+                builder.put(fid, new UserDefinedFunctionCaller(method, fid, params, retType));
             }
         }
         return builder;

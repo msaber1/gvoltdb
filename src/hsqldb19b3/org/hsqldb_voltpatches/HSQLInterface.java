@@ -592,6 +592,7 @@ public class HSQLInterface {
         return schemaManager.getTables(schemaName);
     }
 
+    private int m_udfNumber = 0;
     /**
      * Register a user defined function with HSQLDB.  Note that this may
      * throw if the function seems already to be defined.
@@ -600,6 +601,6 @@ public class HSQLInterface {
      * @return
      */
     public int registerUserDefinedFunction(String sqlName, Type[] udfParams, Type returnType) throws HSQLParseException {
-        return FunctionForVoltDB.registerUserDefinedFunction(sqlName, udfParams, returnType);
+        return FunctionForVoltDB.registerUserDefinedFunction(sqlName, udfParams, returnType, m_udfNumber++);
     }
 }

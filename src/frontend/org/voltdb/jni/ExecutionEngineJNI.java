@@ -34,6 +34,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.iv2.Site;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
@@ -113,6 +114,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     public ExecutionEngineJNI(
             final int clusterIndex,
             final long siteId,
+            final Site site,
             final int partitionId,
             final int hostId,
             final String hostname,
@@ -123,7 +125,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final boolean createDrReplicatedStream)
     {
         // base class loads the volt shared library.
-        super(siteId, partitionId);
+        super(siteId, site, partitionId);
 
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex

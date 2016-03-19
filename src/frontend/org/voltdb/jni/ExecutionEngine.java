@@ -18,6 +18,7 @@
 package org.voltdb.jni;
 
 import java.io.UnsupportedEncodingException;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.HashMap;
@@ -37,9 +38,11 @@ import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
+import org.voltdb.UserDefinedFunctionCaller;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.Site;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.types.PlanNodeType;
@@ -87,6 +90,9 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /** Site ID */
     protected final long m_siteId;
+
+    /** The site itself.  This is needed to call user defined functions. */
+    protected final Site m_site;
 
     /** Statistics collector (provided later) */
     private PlannerStatsCollector m_plannerStats = null;
@@ -167,9 +173,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine(long siteId, int partitionId) {
+    public ExecutionEngine(long siteId, Site site, int partitionId) {
         m_partitionId = partitionId;
         m_siteId = siteId;
+        m_site = site;
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
         // In mock test environments there may be no stats agent.
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
@@ -184,6 +191,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         m_partitionId = 0;  // not used
         m_siteId = 0; // not used
         m_plannerStats = null;
+        m_site = null; // not used
     }
 
     /*
@@ -484,6 +492,32 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         return ActivePlanRepository.planForFragmentId(fragmentId);
     }
 
+    /**
+     * This is temporary.  It accepts a function id, a list of objects and
+     * an array of objects.  The return value is returned in the list, which
+     * is truncated before returning.
+     *
+     * The function itself returns null if all went alright, and an exception
+     * if there was a problem.  The exception has the error message.
+     * @param functionid
+     * @param returnValue
+     * @param actuals
+     * @return
+     */
+    public double callUserDefinedFunction(int functionid, double param) {
+        assert(m_site != null);
+        UserDefinedFunctionCaller caller = m_site.getUserDefinedFunction(functionid);
+        assert(caller != null);
+        try {
+            Object answer = caller.call(Double.valueOf(param));
+            if (answer instanceof Double) {
+                return ((Double) answer).doubleValue();
+            }
+        } catch (InvocationTargetException | IllegalAccessException | IllegalArgumentException e) {
+            e.printStackTrace();
+        }
+        return 100.0;
+    }
     /*
      * Interface frontend invokes to communicate to CPP execution engine.
      */

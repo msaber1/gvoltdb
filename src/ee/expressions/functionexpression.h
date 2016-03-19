@@ -279,6 +279,17 @@ static const int FUNC_VOLT_DWITHIN_POINT_POINT         = 21018;     // if two po
 static const int FUNC_VOLT_DWITHIN_POLYGON_POINT       = 21019;     // if a polygon and a point are within certain distance of each other
 static const int FUNC_VOLT_POLYGONFROMVALIDTEXT        = 21020;     // like polygonfromtext, but also validates the result
 
+/*
+ * These are the first and last user defined function indices.
+ * We also need a generic user defined function, to make a
+ * user defined template instance.  The range of ids is
+ * [FUNC_VOLT_BEGIN_UDF_ID, FUNC_VOLT_END_UDF_ID).
+ */
+static const int FUNC_VOLT_BEGIN_UDF_ID                = 1000000;
+static const int FUNC_VOLT_END_UDF_ID                  = 2000000;
+static const int FUNC_VOLT_USER_DEFINED                = FUNC_VOLT_END_UDF_ID;
+#define IS_USER_DEFINED_ID(id) ((FUNC_VOLT_BEGIN_UDF_ID <= (id)) && ((id) < FUNC_VOLT_END_UDF_ID))
+
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;
 static const int SQL_TRIM_TRAILING                    = 284;

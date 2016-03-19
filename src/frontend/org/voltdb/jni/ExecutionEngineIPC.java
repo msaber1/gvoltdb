@@ -41,6 +41,7 @@ import org.voltdb.common.Constants;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.Site;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.Encoder;
@@ -593,6 +594,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     public ExecutionEngineIPC(
             final int clusterIndex,
             final long siteId,
+            final Site site,
             final int partitionId,
             final int hostId,
             final String hostname,
@@ -603,7 +605,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int port,
             final HashinatorConfig hashinatorConfig,
             final boolean createDrReplicatedStream) {
-        super(siteId, partitionId);
+        super(siteId, site, partitionId);
 
         // m_counter = 0;
         m_clusterIndex = clusterIndex;

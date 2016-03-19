@@ -58,6 +58,8 @@
 #include "catalog/planfragment.h"
 #include "catalog/statement.h"
 #include "catalog/table.h"
+#include "catalog/userdefinedfunction.h"
+#include "catalog/udfparameter.h"
 #include "common/ElasticHashinator.h"
 #include "common/executorcontext.hpp"
 #include "common/FailureInjection.h"
@@ -69,6 +71,7 @@
 #include "common/TupleOutputStream.h"
 #include "common/TupleOutputStreamProcessor.h"
 #include "executors/abstractexecutor.h"
+#include "expressions/expressionutil.h"
 #include "indexes/tableindex.h"
 #include "indexes/tableindexfactory.h"
 #include "plannodes/abstractplannode.h"
@@ -567,7 +570,6 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     assert(m_catalog != NULL);
     VOLT_DEBUG("Loading catalog...");
 
-
     m_catalog->execute(catalogPayload);
 
 
@@ -586,6 +588,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
 
     // load up all the tables, adding all tables
     if (processCatalogAdditions(timestamp) == false) {
+        VOLT_DEBUG("processCatalogAdditions seemed to fail");
         return false;
     }
 
@@ -597,8 +600,57 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
     // This must be done after loading all the tables.
     initMaterializedViewsAndLimitDeletePlans();
 
+    initUserDefinedFunctions();
+
     VOLT_DEBUG("Loaded catalog...");
     return true;
+}
+
+/*
+ * Initialize the user defined functions in the catalog.
+ */
+
+void
+VoltDBEngine::initUserDefinedFunctions()
+{
+    VOLT_DEBUG("Loading User Defined Functions...");
+    typedef catalog::CatalogMap<catalog::UserDefinedFunction> udfCM;
+    const udfCM &udfs = m_database->udfs();
+    ExpressionUtil::initializeUserDefinedFunctions();
+    //
+    // udfit is a (smart) pointer to an entry.  This is a pair of a std::string
+    // and a pointer to a UserDefinedFunction.  So, to get the UDF, we need
+    // to dereference udfit and then pick the pair apart.
+    //
+    for (udfCM::field_map_iter udfit = udfs.begin();
+         udfit != udfs.end();
+         udfit++) {
+        const catalog::UserDefinedFunction *udf = udfit->second;
+        VOLT_DEBUG("  sqlcmd: %s, fid: %d, retType: %d, method: %s.%s",
+                   udf->sqlname().c_str(),
+                   udf->funcidx(),
+                   udf->returntype(),
+                   udf->classname().c_str(),
+                   udf->methodname().c_str());
+        typedef catalog::CatalogMap<catalog::UDFParameter> udfprmCM;
+        typedef udfprmCM::field_map_iter udfprmCM_iter;
+        const udfprmCM paramsmap = udf->parameters();
+        int32_t listSize = paramsmap.size();
+        std::vector<int32_t> params(listSize);
+        int32_t fid = udf->funcidx();
+        int32_t type = udf->returntype();
+        //
+        // Again, a paramit is a (smart) pointer to a pair of <string, UDFParam*>.
+        //
+        for (udfprmCM_iter paramit = paramsmap.begin(); paramit != paramsmap.end(); paramit++) {
+            auto param = paramit->second;
+            assert(0 <= param->index() && param->index() < listSize);
+            params[param->index()] = param->type();
+            VOLT_DEBUG("    params[%d] -> %d", param->index(), params[param->index()]);
+        }
+        ExpressionUtil::registerUserDefinedFunction(fid, type, params);
+        // ExpressionUtil::dumpUserDefinedFunctions();
+    }
 }
 
 /*
@@ -607,7 +659,7 @@ bool VoltDBEngine::loadCatalog(const int64_t timestamp, const std::string &catal
  *
  * TODO: This should be extended to find the parent delegate if the
  * deletion isn't a top-level object .. and delegates should have a
- * deleteChildCommand() intrface.
+ * deleteChildCommand() interface.
  *
  * Note, this only deletes tables, indexes are deleted in
  * processCatalogAdditions(..) for dumb reasons.
@@ -1080,6 +1132,8 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
     }
 
     rebuildTableCollections();
+
+    initUserDefinedFunctions();
 
     initMaterializedViewsAndLimitDeletePlans();
 

@@ -111,7 +111,12 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         assert(m_planForFragmentIdMID != 0);
         throw std::exception();
     }
-
+    m_callUserDefinedFunctionMID = m_jniEnv->GetMethodID(jniClass, "callUserDefinedFunction", "(ID)D");
+    if (m_callUserDefinedFunctionMID == NULL) {
+        m_jniEnv->ExceptionDescribe();
+        assert(m_callUserDefinedFunctionMID != 0);
+        throw std::exception();
+    }
     m_crashVoltDBMID =
         m_jniEnv->GetStaticMethodID(
             jniClass,
@@ -325,6 +330,20 @@ std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     return jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
 }
 
+double JNITopend::callUserDefinedFunction(int32_t funcId, double param) {
+    JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 2);
+    if (jni_frame.checkResult() < 0) {
+        VOLT_ERROR("Unable to load dependency: jni frame error.");
+        throw std::exception();
+    }
+    VOLT_DEBUG("Calling function %d", funcId);
+    jdouble result = m_jniEnv->CallDoubleMethod(m_javaExecutionEngine,
+                                                m_callUserDefinedFunctionMID,
+                                                funcId,
+                                                param);
+    VOLT_DEBUG("  answer: %f", result);
+    return result;
+}
 std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 2);
     if (jni_frame.checkResult() < 0) {

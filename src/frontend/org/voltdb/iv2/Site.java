@@ -68,6 +68,7 @@ import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TupleStreamStateInfo;
+import org.voltdb.UserDefinedFunctionCaller;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
@@ -161,10 +162,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Currently available procedure
     volatile LoadedProcedureSet m_loadedProcedures;
-    volatile LoadedUserDefinedFunctionSet m_loadedUserDefinedFunctions;
 
     // Currently available user defined functions.
-    private LoadedUserDefinedFunctionSet m_userDefinedFunctions;
+    volatile LoadedUserDefinedFunctionSet m_loadedUserDefinedFunctions;
 
     // Cache the DR gateway here so that we can pass it to tasks as they are reconstructed from
     // the task log
@@ -471,7 +471,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     /** Update the loaded procedures */
     public void setUserDefinedFunctions(LoadedUserDefinedFunctionSet udfSet) {
-        m_userDefinedFunctions = udfSet;
+        m_loadedUserDefinedFunctions = udfSet;
+    }
+
+    public UserDefinedFunctionCaller getUserDefinedFunction(int fid) {
+        return m_loadedUserDefinedFunctions.getUDFById(fid);
     }
 
     /** Thread specific initialization */
@@ -522,6 +526,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     new ExecutionEngineJNI(
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
+                        this,
                         m_partitionId,
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
@@ -537,6 +542,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 ExecutionEngine internalEE = new ExecutionEngineJNI(
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
+                        this,
                         m_partitionId,
                         CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
@@ -554,6 +560,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                     new ExecutionEngineIPC(
                             m_context.cluster.getRelativeIndex(),
                             m_siteId,
+                            this,
                             m_partitionId,
                             CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
@@ -1255,7 +1262,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_ee.setBatchTimeout(m_context.cluster.getDeployment().get("deployment").
                 getSystemsettings().get("systemsettings").getQuerytimeout());
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
-        m_userDefinedFunctions.loadUserDefinedFunctions(m_context);
+        m_loadedUserDefinedFunctions.loadUserDefinedFunctions(m_context);
 
         if (isMPI) {
             // the rest of the work applies to sites with real EEs

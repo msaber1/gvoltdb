@@ -49,6 +49,7 @@
 #include "GeographyValue.hpp"
 #include "utf8.h"
 #include "murmur3/MurmurHash3.h"
+#include "expressions/UserDefinedFunctionDescriptor.h"
 
 namespace voltdb {
 
@@ -454,6 +455,9 @@ class NValue {
 
     template <int F> // template for SQL functions of multiple NValues
     static NValue call(const std::vector<NValue>& arguments);
+
+    static NValue callUserDefinedFunction(const UserDefinedFunctionDescriptor *udfDescr,
+                                          const std::vector<NValue> &nValues);
 
     /// Iterates over UTF8 strings one character "code point" at a time, being careful not to walk off the end.
     class UTF8Iterator {

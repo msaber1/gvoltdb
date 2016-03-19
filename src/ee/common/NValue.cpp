@@ -19,7 +19,9 @@
 #include "common/StlFriendlyNValue.h"
 #include "common/executorcontext.hpp"
 #include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
+#include "execution/VoltDBEngine.h"
 #include "logging/LogManager.h"
+#include "executorcontext.hpp"
 
 #include <cstdio>
 #include <sstream>
@@ -687,6 +689,14 @@ int64_t NValue::parseTimestampString(const std::string &str)
     }
     result += (micro - 1000000);
     return result;
+}
+
+NValue NValue::callUserDefinedFunction(const UserDefinedFunctionDescriptor *udfDescr,
+                                       const std::vector<NValue> &nValues) {
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    double param = nValues[0].getDouble();
+    double value = engine->getTopend()->callUserDefinedFunction(udfDescr->getFid(), param);
+    return getDoubleValue(value);
 }
 
 

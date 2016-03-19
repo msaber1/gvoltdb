@@ -55,6 +55,8 @@
 
 namespace voltdb {
 
+class UserDefinedFunctionDescriptor;
+
 class ExpressionUtil {
 public:
 /** instantiate a typed expression */
@@ -90,6 +92,11 @@ public:
 
     static AbstractExpression* vectorFactory(ValueType vt, const std::vector<AbstractExpression*>* args);
 
+    // Operations for User Defined Functions.
+    static void initializeUserDefinedFunctions();
+    static void registerUserDefinedFunction(int32_t funcid, int32_t returnType, const std::vector<int32_t> &paramTypes);
+    static const UserDefinedFunctionDescriptor *findUserDefinedFunction(int32_t fid);
+    static void dumpUserDefinedFunctions();
 };
 
 }
