@@ -37,6 +37,12 @@ import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
+import org.voltdb.varia.ProcedureScopeModule;
+
+import com.google.inject.Guice;
+import com.google.inject.Injector;
+import com.google.inject.MembersInjector;
+import com.google.inject.TypeLiteral;
 
 public class CatalogContext {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -84,6 +90,9 @@ public class CatalogContext {
 
     // Some people may be interested in the JAXB rather than the raw deployment bytes.
     private DeploymentType m_memoizedDeployment;
+
+    private final Injector m_injector;
+    private final MembersInjector<ProcedureRunner> m_procedureRunnerInjector;
 
     public CatalogContext(
             long transactionId,
@@ -146,6 +155,32 @@ public class CatalogContext {
                 }
             }
         }
+
+        Class<?> variaClazz = getVariaType();
+        if (variaClazz != null) {
+            m_injector = Guice.createInjector(new ProcedureScopeModule(TypeLiteral.get(variaClazz)));
+        } else {
+            m_injector = Guice.createInjector(new ProcedureScopeModule(TypeLiteral.get(String.class)));
+        }
+        m_procedureRunnerInjector = m_injector.getMembersInjector(ProcedureRunner.class);
+    }
+
+    private Class<?> getVariaType() {
+        for (Procedure p: procedures) {
+            if (p.getPadclassname() != null && !p.getPadclassname().trim().isEmpty()) {
+                try {
+                    return m_jarfile.getLoader().loadClass(p.getPadclassname());
+                } catch (ClassNotFoundException e) {
+                    hostLog.error("failed to load class annotated by @Varia", e);
+                    return null;
+                }
+            }
+        }
+        return null;
+    }
+
+    public MembersInjector<ProcedureRunner> getProcedureRunnerInjector() {
+        return m_procedureRunnerInjector;
     }
 
     public Cluster getCluster() {

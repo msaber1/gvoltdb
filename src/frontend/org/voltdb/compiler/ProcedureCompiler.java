@@ -17,12 +17,15 @@
 
 package org.voltdb.compiler;
 
+import java.lang.annotation.Annotation;
 import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.voltcore.logging.VoltLogger;
@@ -56,7 +59,10 @@ import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.InMemoryJarfile;
+import org.voltdb.varia.ProcedureScoped;
+import org.voltdb.varia.Varia;
 
+import com.google.inject.Inject;
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 import groovy.lang.Closure;
@@ -87,6 +93,53 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
         else {
             compileSingleStmtProcedure(compiler, hsql, estimates, catalog, db, procedureDescriptor);
         }
+    }
+
+    public static Class<?> getVariaFieldType(
+            VoltCompiler compiler,
+            String procName, Class<?> procClass) throws VoltCompilerException
+    {
+        if (procClass.getAnnotation(ProcedureScoped.class) == null) {
+            return null;
+        }
+        Set<Class<?>> found = new HashSet<>();
+        Method[] methods = procClass.getDeclaredMethods();
+        for (Method m: methods) {
+            if (Modifier.isPrivate(m.getModifiers())) {
+                continue;
+            }
+            Inject anno = m.getAnnotation(Inject.class);
+            if (anno == null) {
+                continue;
+            }
+            Class<?> [] pTypes = m.getParameterTypes();
+            if (pTypes.length == 0) {
+                continue;
+            }
+            Annotation[][] pAnnotations = m.getParameterAnnotations();
+            for (int p = 0; p < pTypes.length; ++p) {
+                for (int a = 0; a < pAnnotations[p].length; ++a) {
+                    if (pAnnotations[p][a] instanceof Varia) {
+                        found.add(pTypes[p]);
+                    }
+                }
+            }
+        }
+        if (found.size() > 1) {
+            String msg = "Found multiple method argument types annoted with @Varia in procedure "
+               + procName + ". @Varia may be associated to only one type";
+            if (compiler != null) {
+                throw compiler.new VoltCompilerException(msg);
+            } else {
+                new VoltLogger("HOST").warn(msg);
+            }
+        }
+
+        if (found.size() == 1) {
+            return found.iterator().next();
+        }
+
+        return null;
     }
 
     public static Map<String, SQLStmt> getValidSQLStmts(VoltCompiler compiler,
@@ -305,6 +358,9 @@ public abstract class ProcedureCompiler implements GroovyCodeBlockConstants {
             groupRef.setGroup(group);
         }
         procedure.setClassname(className);
+        if (procedureDescriptor.m_variaType != null) {
+            procedure.setPadclassname(procedureDescriptor.m_variaType.getName());
+        }
         // sysprocs don't use the procedure compiler
         procedure.setSystemproc(false);
         procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);

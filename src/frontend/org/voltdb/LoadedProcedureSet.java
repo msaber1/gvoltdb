@@ -153,6 +153,7 @@ public class LoadedProcedureSet {
 
             assert(procedure != null);
             runner = m_runnerFactory.create(procedure, proc, m_csp);
+            catalogContext.getProcedureRunnerInjector().injectMembers(runner);
             builder.put(proc.getTypeName().intern(), runner);
         }
         return builder;

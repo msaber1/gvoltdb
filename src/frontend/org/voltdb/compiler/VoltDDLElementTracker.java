@@ -166,7 +166,8 @@ public class VoltDDLElementTracker {
                     descriptor.m_class,
                     partitionInfo,
                     descriptor.m_language,
-                    descriptor.m_scriptImpl);
+                    descriptor.m_scriptImpl,
+                    descriptor.m_variaType);
         }
         else {
             descriptor = m_compiler.new ProcedureDescriptor(
@@ -178,7 +179,8 @@ public class VoltDDLElementTracker {
                     false,
                     descriptor.m_language,
                     descriptor.m_scriptImpl,
-                    descriptor.m_class);
+                    descriptor.m_class,
+                    descriptor.m_variaType);
         }
         m_procedureMap.put(procedureName, descriptor);
     }

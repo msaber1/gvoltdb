@@ -619,8 +619,10 @@ public class DDLCompiler {
                 }
             }
 
+            Class<?> variaType = ProcedureCompiler.getVariaFieldType(m_compiler, className, clazz);
+
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), Language.JAVA, null, clazz);
+                    new ArrayList<String>(), Language.JAVA, null, clazz, variaType);
 
             // Parse the ALLOW and PARTITION clauses.
             // Populate descriptor roles and returned partition data as needed.
@@ -679,7 +681,7 @@ public class DDLCompiler {
             }
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), language, codeBlock, scriptClass);
+                    new ArrayList<String>(), language, codeBlock, scriptClass, null);
 
             // Parse the ALLOW and PARTITION clauses.
             // Populate descriptor roles and returned partition data as needed.
@@ -702,7 +704,7 @@ public class DDLCompiler {
             String sqlStatement = statementMatcher.group(3) + ";";
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
-                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null);
+                    new ArrayList<String>(), clazz, sqlStatement, null, null, false, null, null, null,null);
 
             // Parse the ALLOW and PARTITION clauses.
             // Populate descriptor roles and returned partition data as needed.

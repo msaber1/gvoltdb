@@ -107,6 +107,7 @@ end
 
 begin Procedure javaonly    "A stored procedure (transaction) in the system"
   string classname          "The full class name for the Java class for this procedure"
+  string padclassname       "The scratchpad class name"
   UserRef* authUsers        "Users authorized to invoke this procedure"
   GroupRef* authGroups      "Groups authorized to invoke this procedure"
   bool readonly             "Can the stored procedure modify data"

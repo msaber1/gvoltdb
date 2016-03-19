@@ -293,6 +293,7 @@ public class VoltCompiler {
         public final Language m_language;      // Java or Groovy
         public final String m_scriptImpl;      // Procedure code from DDL (if any)
         public final Class<?> m_class;
+        public final Class<?> m_variaType;
 
         ProcedureDescriptor (final ArrayList<String> authGroups, final String className) {
             assert(className != null);
@@ -306,9 +307,10 @@ public class VoltCompiler {
             m_language = null;
             m_scriptImpl = null;
             m_class = null;
+            m_variaType = null;
         }
 
-        public ProcedureDescriptor(final ArrayList<String> authGroups, final Language language, final String scriptImpl, Class<?> clazz) {
+        public ProcedureDescriptor(final ArrayList<String> authGroups, final Language language, final String scriptImpl, Class<?> clazz, Class<?> variazz) {
             assert(clazz != null && language != null);
 
             m_authGroups = authGroups;
@@ -320,9 +322,10 @@ public class VoltCompiler {
             m_language = language;
             m_scriptImpl = scriptImpl;
             m_class = clazz;
+            m_variaType = variazz;
         }
 
-        ProcedureDescriptor(final ArrayList<String> authGroups, final Class<?> clazz, final String partitionString, final Language language, final String scriptImpl) {
+        ProcedureDescriptor(final ArrayList<String> authGroups, final Class<?> clazz, final String partitionString, final Language language, final String scriptImpl, Class<?> variazz) {
             assert(clazz != null);
             assert(partitionString != null);
 
@@ -335,11 +338,13 @@ public class VoltCompiler {
             m_language = language;
             m_scriptImpl = scriptImpl;
             m_class = clazz;
+            m_variaType = variazz;
         }
 
         ProcedureDescriptor (final ArrayList<String> authGroups, final String className,
                 final String singleStmt, final String joinOrder, final String partitionString,
-                boolean builtInStmt, Language language, final String scriptImpl, Class<?> clazz)
+                boolean builtInStmt, Language language, final String scriptImpl, Class<?> clazz,
+                Class<?> variazz)
         {
             assert(className != null);
             assert(singleStmt != null);
@@ -353,6 +358,7 @@ public class VoltCompiler {
             m_language = language;
             m_scriptImpl = scriptImpl;
             m_class = clazz;
+            m_variaType = variazz;
         }
     }
 
@@ -1456,6 +1462,7 @@ public class VoltCompiler {
 
         final List<ProcedureDescriptor> procedures = new ArrayList<>();
         procedures.addAll(allProcs);
+        Set<Class<?>> variaTypes = new HashSet<>();
 
         // Actually parse and handle all the Procedures
         for (final ProcedureDescriptor procedureDescriptor : procedures) {
@@ -1476,6 +1483,15 @@ public class VoltCompiler {
                 m_currentFilename = procedureName;
             }
             ProcedureCompiler.compile(this, hsql, m_estimates, m_catalog, db, procedureDescriptor, jarOutput);
+
+            if (procedureDescriptor.m_variaType != null) {
+                variaTypes.add(procedureDescriptor.m_variaType);
+            }
+        }
+        if (variaTypes.size() > 1) {
+            String msg = "Mutiple procedures were found annotated with @Varia " +
+                    "annotating fields of different types. @Varia supports only one";
+            throw new VoltCompilerException(msg);
         }
         // done handling files
         m_currentFilename = NO_FILENAME;
@@ -1602,7 +1618,8 @@ public class VoltCompiler {
             return new ProcedureDescriptor(groups, classattr,
                                            xmlproc.getSql().getValue(),
                                            xmlproc.getSql().getJoinorder(),
-                                           partattr, false, null, null, null);
+                                           partattr, false, null, null, null,
+                                           null);
         }
         else {
             String partattr = xmlproc.getPartitioninfo();
@@ -1631,7 +1648,7 @@ public class VoltCompiler {
 
             }
 
-            return new ProcedureDescriptor(groups, Language.JAVA, null, clazz);
+            return new ProcedureDescriptor(groups, Language.JAVA, null, clazz, null);
         }
     }
 

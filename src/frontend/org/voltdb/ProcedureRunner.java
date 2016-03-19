@@ -63,8 +63,17 @@ import org.voltdb.sysprocs.AdHocBase;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
+import org.voltdb.varia.Padder;
+import org.voltdb.varia.PadderException;
+import org.voltdb.varia.ProcedureScope;
 
+import com.google.inject.Inject;
+import com.google.inject.Injector;
+import com.google.inject.ProvisionException;
+import com.google.inject.TypeLiteral;
+import com.google.inject.name.Named;
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Supplier;
 
 public class ProcedureRunner {
 
@@ -150,6 +159,12 @@ public class ProcedureRunner {
     protected ByteBuffer m_updatableScratchPad = null;
     protected ByteBuffer m_savedScratchPad = null;
 
+    protected TypeLiteral<?> m_variaType = null;
+    protected ProcedureScope m_scope;
+    protected Injector m_injector = null;
+    protected Padder<?> m_variaPadder = null;
+    protected boolean m_requiresInjection = false;
+
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
     static class StmtProcedure extends VoltProcedure {
@@ -220,7 +235,29 @@ public class ProcedureRunner {
                 site.getCorrespondingSiteId(),
                 m_statsCollector);
 
+        m_requiresInjection = catProc.getPadclassname() != null && !catProc.getPadclassname().trim().isEmpty();
+
         reflect();
+    }
+
+    @Inject
+    public void setProcedureScope(@Named("procedureScope") ProcedureScope scope) {
+        m_scope = scope;
+    }
+
+    @Inject
+    public void setInjector(Injector injector) {
+        m_injector = injector;
+    }
+
+    @Inject
+    void setVariaType(@Named("variaType") Supplier<TypeLiteral<?>> tl) {
+        m_variaType = tl.get();
+    }
+
+    @Inject
+    void setVariaPadder(Padder<?> padder) {
+        m_variaPadder = padder;
     }
 
     public Procedure getCatalogProcedure() {
@@ -251,6 +288,24 @@ public class ProcedureRunner {
         }
         return m_cachedRNG;
     }
+
+    private <T> T seedVaria(TypeLiteral<T> tl) {
+        @SuppressWarnings("unchecked")
+        Padder<T> pdder = (Padder<T>)m_variaPadder;
+        T varia = pdder.itch(viewScratchPad(), m_procedure.initialScratchPadValue());
+        m_scope.seedVaria(tl, varia);
+        return varia;
+    }
+
+    private <T> boolean scratchVaria(TypeLiteral<T> tl, Object value) {
+        @SuppressWarnings("unchecked")
+        Padder<T> pdder = (Padder<T>)m_variaPadder;
+        @SuppressWarnings("unchecked")
+        T varia = (T)value;
+        return pdder.scratch(varia, loadScratchPad());
+    }
+
+    // private <T> void seed
 
     @SuppressWarnings("finally")
     public ClientResponseImpl call(Object... paramListIn) {
@@ -320,6 +375,7 @@ public class ProcedureRunner {
 
             boolean error = false;
             boolean abort = false;
+            Object varia = null;
             // run a regular java class
             if (m_hasJava) {
                 try {
@@ -328,11 +384,24 @@ public class ProcedureRunner {
                             log.trace("invoking... procMethod=" + m_procMethod.getName() + ", class=" + m_procMethod.getDeclaringClass().getName());
                         }
                         try {
+                            if (m_requiresInjection) {
+                                m_scope.enter();
+                                varia = seedVaria(m_variaType);
+                                m_injector.injectMembers(m_procedure);
+                            }
                             Object rawResult = m_procMethod.invoke(m_procedure, paramList);
                             results = getResultsFromRawResults(rawResult);
-                        } catch (IllegalAccessException e) {
+                            if (m_requiresInjection && !m_isReadOnly && scratchVaria(m_variaType, varia)) {
+                                saveScratchPad();
+                            }
+                        } catch (IllegalAccessException|ProvisionException|PadderException e) {
                             // If reflection fails, invoke the same error handling that other exceptions do
                             throw new InvocationTargetException(e);
+                        }
+                        finally {
+                            if (m_requiresInjection) {
+                                m_scope.exit();
+                            }
                         }
                     }
                     else if (m_language == Language.GROOVY) {
