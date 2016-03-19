@@ -739,7 +739,7 @@ UserDefinedFunctionMap udfMap;
 }
 
 void ExpressionUtil::initializeUserDefinedFunctions() {
-	udfMap.clear();
+    udfMap.clear();
 }
 
 void ExpressionUtil::registerUserDefinedFunction(int32_t funcid, int32_t returnType, const std::vector<int32_t> &paramTypes) {
