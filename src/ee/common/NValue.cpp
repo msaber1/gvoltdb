@@ -18,6 +18,7 @@
 #include "common/NValue.hpp"
 #include "common/StlFriendlyNValue.h"
 #include "common/executorcontext.hpp"
+#include "common/valuevector.h"
 #include "expressions/functionexpression.h" // Really for datefunctions and its dependencies.
 #include "execution/VoltDBEngine.h"
 #include "logging/LogManager.h"
@@ -694,9 +695,29 @@ int64_t NValue::parseTimestampString(const std::string &str)
 NValue NValue::callUserDefinedFunction(const UserDefinedFunctionDescriptor *udfDescr,
                                        const std::vector<NValue> &nValues) {
     VoltDBEngine* engine = ExecutorContext::getEngine();
-    double param = nValues[0].getDouble();
-    double value = engine->getTopend()->callUserDefinedFunction(udfDescr->getFid(), param);
-    return getDoubleValue(value);
+    // Check the arguments.
+    std::vector<int32_t> paramTypes = udfDescr->getParamTypes();
+    if (nValues.size() != paramTypes.size()) {
+        char message[128];
+
+        snprintf(message, 128,
+                "User defined function: Too %s arguments passed.",
+                (nValues.size() < paramTypes.size()) ? "many" : "few");
+        throw SQLException(SQLException::
+                           data_exception_most_specific_type_mismatch,
+                           message);
+    }
+    NValueArray convertedValues(nValues.size());
+    for (int idx = 0; idx < nValues.size(); idx += 1) {
+        // If the conversion is impossible, this will throw.
+        // But that's ok.
+        convertedValues[idx] = nValues[idx].castAs((ValueType)paramTypes[idx]);
+    }
+    NValue value = engine->getTopend()
+                         ->callUserDefinedFunction(udfDescr,
+                                                   nValues,
+                                                   getTempStringPool());
+    return value;
 }
 
 

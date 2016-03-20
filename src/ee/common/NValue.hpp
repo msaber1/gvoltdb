@@ -267,6 +267,9 @@ class NValue {
        assume out-of-band tuple storage */
     static uint16_t getTupleStorageSize(const ValueType type);
 
+    /** Calculate the amount of data used to serialize this value. */
+    uint32_t getSerializationSize() const;
+
     /** Deserialize a scalar of the specified type from the tuple
         storage area provided. If this is an Object type, the "isInlined"
         argument indicates whether the value is stored directly inline
@@ -2489,6 +2492,25 @@ inline void NValue::freeObjectsFromTupleStorage(std::vector<char*> const &oldObj
     }
 }
 
+/**
+ * Get the amount of space this object takes when serialized.
+ */
+inline uint32_t NValue::getSerializationSize() const {
+    switch (getValueType()) {
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
+    {
+        int32_t length;
+        (void)getObject_withoutNull(&length);
+        return length;
+    }
+    default:
+        // Defer to getTupleStorageSize for the
+        // fixed size types.
+        return getTupleStorageSize(getValueType());
+    }
+}
 /**
  * Get the amount of storage necessary to store a value of the specified type
  * in a tuple

@@ -20,6 +20,7 @@
 
 #include "common/debuglog.h"
 #include "common/StreamBlock.h"
+#include "common/serializeio.h"
 #include "storage/table.h"
 
 using namespace std;
@@ -330,20 +331,81 @@ std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     return jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
 }
 
-double JNITopend::callUserDefinedFunction(int32_t funcId, double param) {
-    JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 2);
+NValue JNITopend::callUserDefinedFunction(const UserDefinedFunctionDescriptor *udfDescr,
+                                          const std::vector<NValue> &actuals,
+                                          Pool *tempPool) {
+    VOLT_DEBUG("Calling function %d", udfDescr->getFid());
+    /*
+     * Save some local references.  10 is probably too many.
+     */
+    JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 10);
     if (jni_frame.checkResult() < 0) {
         VOLT_ERROR("Unable to load dependency: jni frame error.");
         throw std::exception();
     }
-    VOLT_DEBUG("Calling function %d", funcId);
-    jdouble result = m_jniEnv->CallDoubleMethod(m_javaExecutionEngine,
-                                                m_callUserDefinedFunctionMID,
-                                                funcId,
-                                                param);
-    VOLT_DEBUG("  answer: %f", result);
+    /*
+     * Unpack the udfDescr.
+     */
+    int32_t fid = udfDescr->getFid();
+    const std::vector<int32_t> &paramTypes = udfDescr->getParamTypes();
+    ValueType resultType = (ValueType)udfDescr->getReturnType();
+
+    /*
+     * We send a vector of int16_t types and a vector of
+     * actual values.  This could be a parameter set, but
+     * we don't know how to serialize parameter sets apparently.
+     */
+    uint32_t typeSize = actuals.size()*sizeof(uint16_t);
+    uint32_t paramSize = 0;
+    for (int idx = 0; idx < actuals.size(); idx += 1) {
+        // Only the NValue knows its serialization size.
+        paramSize += actuals[idx].getSerializationSize();
+    }
+
+    // Get a couple of byte arrays to serialize the types
+    // and values.
+    jbyteArray typeArray = m_jniEnv->NewByteArray(typeSize+4);
+    jbyteArray paramsArray = m_jniEnv->NewByteArray(paramSize + 4);
+    // We need some space to copy the data into, and a
+    // couple of serializers.
+    boost::scoped_ptr<int8_t> typeBuff(new int8_t[typeSize + 4]);
+    boost::scoped_ptr<int8_t> paramsBuff(new int8_t[paramSize + 4]);
+    FallbackSerializeOutput typeBB;
+    FallbackSerializeOutput bytesBB;
+    typeBB.initializeWithPosition(typeBuff.get(), typeSize + 4, 0);
+    bytesBB.initializeWithPosition(paramsBuff.get(), paramSize + 4, 0);
+
+    // Write the sizes first.
+    typeBB.writeInt(typeSize);
+    bytesBB.writeInt(paramSize);
+
+    // Serialize the types and actual values.
+    for (int idx = 0; idx < actuals.size(); idx += 1) {
+        actuals[idx].serializeTo(typeBB);
+        typeBB.writeShort(paramTypes[idx]);
+    }
+
+    // Copy the data over into java, maybe.
+    m_jniEnv->SetByteArrayRegion(typeArray, 0, typeBB.position(), typeBuff.get());
+    m_jniEnv->SetByteArrayRegion(paramsArray, 0, bytesBB.position(), paramsBuff.get());
+
+    // The big event.
+    jbyteArray retObj = (jbyteArray)m_jniEnv->CallObjectMethod(m_javaExecutionEngine,
+                                                              m_callUserDefinedFunctionMID,
+                                                              fid,
+                                                              typeArray,
+                                                              paramsArray);
+    // Horse around to get the data out of the returned
+    // byte array.
+    jsize retSize = m_jniEnv->GetArrayLength(retObj);
+    jbyte *resultBuff = m_jniEnv->GetByteArrayElements(retObj, 0);
+    ReferenceSerializeInputBE input(resultBuff, retSize);
+    NValue result;
+    // Deserialize it and return it.
+    result.deserializeFromAllocateForStorage(resultType, input, tempPool);
     return result;
 }
+
 std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, 2);
     if (jni_frame.checkResult() < 0) {
