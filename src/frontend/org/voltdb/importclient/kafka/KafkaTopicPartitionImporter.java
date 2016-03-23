@@ -357,7 +357,7 @@ public class KafkaTopicPartitionImporter extends AbstractImporter
         info(null, "Starting partition fetcher for " + m_topicAndPartition);
         long submitCount = 0;
         AtomicLong cbcnt = new AtomicLong(0);
-        Formatter<String> formatter = (Formatter<String>) m_config.getFormatterFactory().create();
+        Formatter<String> formatter = m_config.getFormatterFactory().create();
         try {
             //Start with the starting leader.
             resetLeader();
