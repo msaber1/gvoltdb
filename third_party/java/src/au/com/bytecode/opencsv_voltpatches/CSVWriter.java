@@ -18,11 +18,14 @@ package au.com.bytecode.opencsv_voltpatches;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.io.InterruptedIOException;
 import java.io.PrintWriter;
 import java.io.Writer;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.List;
+
+import org.voltcore.logging.VoltLogger;
 
 /**
  * A very simple CSV writer released under a commercial-friendly license.
@@ -36,7 +39,36 @@ public class CSVWriter implements Closeable {
 
     private Writer rawWriter;
 
-    private PrintWriter pw;
+    private VoltLogger log = new VoltLogger("ExportClient");
+
+    private TempPrintWriter pw;
+
+    private class TempPrintWriter extends PrintWriter {
+        public TempPrintWriter(Writer out) {
+            super(out);
+        }
+
+        private void ensureOpen() throws IOException {
+            if (out == null)
+                throw new IOException("Stream closed");
+        }
+
+        @Override
+        public void write(String s, int off, int len) {
+            try {
+                synchronized (lock) {
+                    ensureOpen();
+                    out.write(s, off, len);
+                }
+            }
+            catch (InterruptedIOException x) {
+                Thread.currentThread().interrupt();
+            }
+            catch (IOException x) {
+                log.equals("PrintWriter error message: " + x.getMessage());
+            }
+        }
+    }
 
     private char separator;
 
@@ -158,7 +190,7 @@ public class CSVWriter implements Closeable {
      */
     public CSVWriter(Writer writer, char separator, char quotechar, char escapechar, String lineEnd) {
         this.rawWriter = writer;
-        this.pw = new PrintWriter(writer);
+        this.pw = new TempPrintWriter(writer);
         this.separator = separator;
         this.quotechar = quotechar;
         this.escapechar = escapechar;
@@ -333,7 +365,7 @@ public class CSVWriter implements Closeable {
 
     // A VoltDB extension to support reset PrintWriter
     public void resetWriter() {
-        pw = new PrintWriter(rawWriter);
+        pw = new TempPrintWriter(rawWriter);
     }
     // End of VoltDB extension
 }
