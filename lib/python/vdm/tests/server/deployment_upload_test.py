@@ -33,7 +33,7 @@ import io
 import requests
 import socket
 from cStringIO import StringIO
-import xmlrunner
+# import xmlrunner
 from flask import json
 
 __host_name__ = socket.gethostname()
@@ -187,5 +187,9 @@ class UploadConfiguration(Database):
 
 
 if __name__ == '__main__':
-    unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
-    unittest.main()
+    import sys
+    if sys.version_info < (2,7):
+        unittest.main()
+    else:
+        import xmltestrunner
+        unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))

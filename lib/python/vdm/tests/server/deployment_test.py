@@ -29,7 +29,7 @@ OTHER DEALINGS IN THE SOFTWARE.
 
 import unittest
 import requests
-import xmlrunner
+# import xmlrunner
 import socket
 
 __host_name__ = socket.gethostname()
@@ -784,5 +784,9 @@ class UpdateDeployment(Deployment):
 
 
 if __name__ == '__main__':
-    unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
-    unittest.main()
+    import sys
+    if sys.version_info < (2,7):
+        unittest.main()
+    else:
+        import xmltestrunner
+        unittest.main(testRunner=xmlrunner.XMLTestRunner(output='test-reports'))
