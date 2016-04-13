@@ -1,7 +1,7 @@
 Automated Tests of the VMC (VoltDB Management Center), Using GEB
 ================================================================
 
-One more time (or two): this is another fake change, to trigger builds in
+Last time (I think): this is yet another fake change, to trigger builds in
 Jenkins, after this is checked in to an *existing* branch.
 
 This file describes the GEB automated tests of the VMC (VoltDB Management
