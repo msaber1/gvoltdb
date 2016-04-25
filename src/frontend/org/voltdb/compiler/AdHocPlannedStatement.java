@@ -98,7 +98,7 @@ public class AdHocPlannedStatement {
         int size = core.getSerializedSize();
 
         // sql bytes
-        size += 4;
+        size += 2;
         size += sql.length;
 
         // params
@@ -114,7 +114,7 @@ public class AdHocPlannedStatement {
         core.flattenToBuffer(buf);
 
         // sql bytes
-        buf.putInt(sql.length);
+        buf.putShort((short) sql.length);
         buf.put(sql);
 
         // params
@@ -126,10 +126,9 @@ public class AdHocPlannedStatement {
         CorePlan core = CorePlan.fromBuffer(buf);
 
         // sql bytes
-        int sqlLength = buf.getInt();
-        //AS PER ENG-10059, there is a 1MB limit for in List Expression
-        if ((sqlLength < 0) || (sqlLength >= 1024*1024)) {
-            throw new RuntimeException("AdHoc SQL text exceeds the length limitation 1 MB");
+        short sqlLength = buf.getShort();
+        if (sqlLength < 0) {
+            throw new RuntimeException("AdHoc SQL text exceeds the length limitation " + Short.MAX_VALUE);
         }
 
         byte[] sql = new byte[sqlLength];
