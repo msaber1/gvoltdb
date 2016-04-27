@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <commandlog enabled="false" />
+
+    <export>
+        <configuration stream="stream1" enabled="false" type="file">
+            <property name="type">csv</property>
+            <property name="nonce">Stream1</property>
+        </configuration>
+
+
+        <configuration stream="stream2" enabled="true" type="file">
+            <property name="type">csv</property>
+            <property name="nonce">Stream2</property>
+        </configuration>
+    </export>
+</deployment>
