@@ -144,8 +144,8 @@ function async-benchmark() {
     java -classpath $CLIENTCLASSPATH \
         client.kafkaimporter.KafkaImportBenchmark \
         --displayinterval=5 \
-        --duration=180 \
-        --kafkaserverlist=localhost:9092 \
+        --duration=120 \
+        --deleteIntervalCnt=100000 \
         --alltypes=false \
         --useexport=false \
         --expected_rows=6000000 \

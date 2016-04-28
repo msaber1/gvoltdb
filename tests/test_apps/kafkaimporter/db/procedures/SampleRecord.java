@@ -20,7 +20,7 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package kafkaimporter.db.procedures;
+package db.procedures;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -31,52 +31,41 @@ import org.voltdb.types.TimestampType;
 
 public class SampleRecord
 {
-    public final long rowid;
-    public final Object rowid_group;
-    public final Object type_null_tinyint;
-    public final Object type_not_null_tinyint;
-    public final Object type_null_smallint;
-    public final Object type_not_null_smallint;
-    public final Object type_null_integer;
-    public final Object type_not_null_integer;
-    public final Object type_null_bigint;
-    public final Object type_not_null_bigint;
-    public final Object type_null_timestamp;
-    public final Object type_not_null_timestamp;
-    public final Object type_null_float;
-    public final Object type_not_null_float;
-    public final Object type_null_decimal;
-    public final Object type_not_null_decimal;
-    public final Object type_null_varchar25;
-    public final Object type_not_null_varchar25;
-    public final Object type_null_varchar128;
-    public final Object type_not_null_varchar128;
-    public final Object type_null_varchar1024;
-    public final Object type_not_null_varchar1024;
-    public SampleRecord(long rowid, Random rand)
+    public final int event_instance_id;
+    public final Object event_type_id;
+    public final Object event_date;
+    public final Object partner_id;
+    public final Object consumer_id;
+    public final Object address;
+    public final Object sub_domain_1;
+    public final Object sub_domain_2;
+    public final Object sub_domain_3;
+    public final Object event_quantity;
+    public final Object event_value;
+    public final Object transaction_code;
+    public final Object in_message_id;
+    public final Object out_message_id;
+    public final Object event_tracking_id;
+    public final Object tracking_rule_id;
+
+    public SampleRecord(int event_instance_id, Random rand)
     {
-        this.rowid = rowid;
-        this.rowid_group = (byte)((rowid % 255) - 127);
-        this.type_null_tinyint          = nextTinyint(rand, true);
-        this.type_not_null_tinyint      = nextTinyint(rand);
-        this.type_null_smallint         = nextSmallint(rand, true);
-        this.type_not_null_smallint     = nextSmallint(rand);
-        this.type_null_integer          = nextInteger(rand, true);
-        this.type_not_null_integer      = nextInteger(rand);
-        this.type_null_bigint           = nextBigint(rand, true);
-        this.type_not_null_bigint       = nextBigint(rand);
-        this.type_null_timestamp        = nextTimestamp(rand, true);
-        this.type_not_null_timestamp    = nextTimestamp(rand);
-        this.type_null_float            = nextFloat(rand, true);
-        this.type_not_null_float        = nextFloat(rand);
-        this.type_null_decimal          = nextDecimal(rand, true);
-        this.type_not_null_decimal      = nextDecimal(rand);
-        this.type_null_varchar25        = nextVarchar(rand, true, 1, 25);
-        this.type_not_null_varchar25    = nextVarchar(rand, 1, 25);
-        this.type_null_varchar128       = nextVarchar(rand, true, 25, 128);
-        this.type_not_null_varchar128   = nextVarchar(rand, 25, 128);
-        this.type_null_varchar1024      = nextVarchar(rand, true, 128, 1024);
-        this.type_not_null_varchar1024  = nextVarchar(rand, 128, 1024);
+        this.event_instance_id          = event_instance_id;
+        this.event_type_id              = nextInteger(rand);
+        this.event_date                 = nextTimestamp(rand, true);
+        this.partner_id                 = nextInteger(rand);
+        this.consumer_id                = nextBigint(rand);
+        this.address                    = nextVarchar(rand, 1, 25);
+        this.sub_domain_1               = nextVarchar(rand, 1, 25);
+        this.sub_domain_2               = nextVarchar(rand, 1, 25);
+        this.sub_domain_3               = nextVarchar(rand, 1, 25);
+        this.event_quantity             = nextInteger(rand);
+        this.event_value                = nextFloat(rand);
+        this.transaction_code           = nextVarchar(rand, true, 1, 25);
+        this.in_message_id              = nextBigint(rand);
+        this.out_message_id             = nextBigint(rand);
+        this.event_tracking_id          = nextBigint(rand);
+        this.tracking_rule_id           = nextInteger(rand);
     }
 
     private static Object nextTinyint(Random rand)
