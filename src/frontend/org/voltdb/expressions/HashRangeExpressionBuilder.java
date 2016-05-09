@@ -23,38 +23,37 @@ import com.google_voltpatches.common.collect.ImmutableSortedMap;
 import com.google_voltpatches.common.collect.Ordering;
 
 /**
- * Convenience class to generate a HashRangeExpression.
+ * Convenience class to piece together a HashRangeExpression so its
+ * ranges can be immutable post-construction.
+ * Currently used only in org.voltdb.jni.TestExecutionEngine
+ * in voltdb/tests/frontend
+ * TODO: move this class into that package and test directory to
+ * limit its exposure.
  */
 public class HashRangeExpressionBuilder {
+    /** Builder object that produces an immutable map. */
+    private ImmutableSortedMap.Builder<Integer, Integer> m_builder =
+            new ImmutableSortedMap.Builder<Integer, Integer>(Ordering.natural());
+
+    public HashRangeExpressionBuilder() { }
 
     /**
-     * Constructor.
+     * Add a value pair representing a range of hash values.
+     * @param start
+     * @param end
      */
-    public HashRangeExpressionBuilder() {
-    }
-
-    /**
-     * Add a value pair.
-     * @param value1
-     * @param value2
-     */
-    public HashRangeExpressionBuilder put(Integer value1, Integer value2) {
-        m_builder.put(value1, value2);
+    public HashRangeExpressionBuilder put(Integer start, Integer end) {
+        m_builder.put(start, end);
         return this;
     }
 
     /**
-     * Generate a hash range expression.
+     * Generate a hash range expression for elastic partitioning of a table.
+     * @param hashColumnIndex 0-based index of the partition column within its table
      * @return  hash range expression
      */
-    public HashRangeExpression build(Integer hashColumnIndex) {
+    public HashRangeExpression build(int hashColumnIndex) {
         Map<Integer, Integer> ranges = m_builder.build();
-        HashRangeExpression predicate = new HashRangeExpression();
-        predicate.setRanges(ranges);
-        predicate.setHashColumnIndex(hashColumnIndex);
-        return predicate;
+        return new HashRangeExpression(ranges, hashColumnIndex);
     }
-
-    /// Builder object that produces immutable maps.
-    private ImmutableSortedMap.Builder<Integer, Integer> m_builder = new ImmutableSortedMap.Builder<Integer, Integer>(Ordering.natural());
 }

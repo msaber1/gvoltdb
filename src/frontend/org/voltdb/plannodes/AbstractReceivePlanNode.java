@@ -72,6 +72,11 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
 
     @Override
     public boolean reattachFragment(AbstractPlanNode child) {
+        // Paul wants to abolish these trivial SendPlanNodes, but until then,
+        // if we don't find one at the top of each fragment, something has
+        // gone seriously wrong.
+        assert child instanceof SendPlanNode;
+
         addAndLinkChild(child);
         return true;
     }

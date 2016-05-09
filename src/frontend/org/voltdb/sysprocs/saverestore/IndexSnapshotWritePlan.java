@@ -113,13 +113,10 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
      * @param table     The table to build the elastic index on
      * @param ranges    The hash ranges that the index should include
      */
-    public static AbstractExpression createIndexExpressionForTable(Table table, Map<Integer, Integer> ranges)
+    public static AbstractExpression createElasticIndexExpressionForTable(Table table, Map<Integer, Integer> ranges)
     {
-        HashRangeExpression predicate = new HashRangeExpression();
-        predicate.setRanges(ranges);
-        predicate.setHashColumnIndex(table.getPartitioncolumn().getIndex());
-
-        return predicate;
+        int hashColumnIndex = table.getPartitioncolumn().getIndex();
+        return new HashRangeExpression(ranges, hashColumnIndex);
     }
 
     /**
@@ -155,7 +152,7 @@ public class IndexSnapshotWritePlan extends SnapshotWritePlan {
                 final SnapshotTableTask task =
                     new SnapshotTableTask(table,
                                           new SnapshotDataFilter[0],
-                                          createIndexExpressionForTable(table, partitionRange.ranges),
+                                          createElasticIndexExpressionForTable(table, partitionRange.ranges),
                                           false);
                 task.setTarget(dataTarget);
 

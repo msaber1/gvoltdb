@@ -363,14 +363,4 @@ public class FunctionExpression extends AbstractExpression {
         return result;
     }
 
-    @Override
-    public boolean isValueTypeIndexable(StringBuffer msg) {
-        StringBuffer dummyMsg = new StringBuffer();
-        if (!super.isValueTypeIndexable(dummyMsg)) {
-            msg.append("a " + m_valueType.getName() + " valued function '"+ m_name.toUpperCase() + "'");
-            return false;
-        }
-        return true;
-    }
-
 }

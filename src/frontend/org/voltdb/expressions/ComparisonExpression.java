@@ -28,14 +28,14 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.QuantifierType;
 
 /**
- *
+ * ComparisonExpression covers ExpressionTypes COMPARE_EQUAL, COMPARE_NOTEQUAL,
+ * COMPARE_LESSTHAN, etc. as well as COMPARE_LIKE, COMPARE_IN, and
+ * COMPARE_NOTDISTINCT. These are all binary operators with boolean results.
+ * ComparisonExpression can also account for quantified comparisons such as
+ * those modified by ANY and ALL keywords in SQL.
  */
 public class ComparisonExpression extends AbstractExpression {
-
-    public enum Members {
-        QUANTIFIER;
-    }
-
+    private static final String QUANTIFIER_MEMBER_NAME = "QUANTIFIER";
     private QuantifierType m_quantifier = QuantifierType.NONE;
 
     public ComparisonExpression(ExpressionType type) {
@@ -48,10 +48,10 @@ public class ComparisonExpression extends AbstractExpression {
         setValueType(VoltType.BOOLEAN);
     }
 
+    /*
+     * This is needed for serialization
+     */
     public ComparisonExpression() {
-        //
-        // This is needed for serialization
-        //
         super();
     }
 
@@ -63,6 +63,10 @@ public class ComparisonExpression extends AbstractExpression {
         return m_quantifier;
     }
 
+    /**
+     * All comparisons are binary operators.
+     * @return true
+     */
     @Override
     public boolean needsRightExpression() {
         return true;
@@ -91,21 +95,29 @@ public class ComparisonExpression extends AbstractExpression {
     @Override
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
         super.loadFromJSONObject(obj);
-       if (obj.has(Members.QUANTIFIER.name())) {
-           m_quantifier = QuantifierType.get(obj.getInt(Members.QUANTIFIER.name()));
-       } else {
-           m_quantifier = QuantifierType.NONE;
-       }
+        if (obj.has(QUANTIFIER_MEMBER_NAME)) {
+            m_quantifier = QuantifierType.get(obj.getInt(QUANTIFIER_MEMBER_NAME));
+        }
+        else {
+            m_quantifier = QuantifierType.NONE;
+        }
     }
 
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         if (m_quantifier != QuantifierType.NONE) {
-            stringer.key(Members.QUANTIFIER.name()).value(m_quantifier.getValue());
+            stringer.key(QUANTIFIER_MEMBER_NAME).value(m_quantifier.getValue());
         }
     }
 
+    /**
+     * The map of reverse operators for comparison operators that HAVE a reversed form,
+     * like "=" for "=", "<" for ">" etc.
+     * Operators with no reverse syntax like "LIKE" have no entry in this map.
+     * Note that this is simple syntactic reversal of arguments NOT logical negation,
+     * so "=" does NOT map to "!=" and "<" does NOT map to ">=".
+     */
     public static final Map<ExpressionType,ExpressionType> reverses = new HashMap<ExpressionType, ExpressionType>();
     static {
         reverses.put(ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL);
@@ -117,8 +129,15 @@ public class ComparisonExpression extends AbstractExpression {
         reverses.put(ExpressionType.COMPARE_GREATERTHANOREQUALTO, ExpressionType.COMPARE_LESSTHANOREQUALTO);
     }
 
+    /**
+     * Construct an equivalent comparison with its arguments reversed such as
+     * "b < a" for "a > b" or "b = 1" for "1 = b".
+     * @return the equivalent expression
+     */
     public ComparisonExpression reverseOperator() {
         ExpressionType reverseType = reverses.get(this.m_type);
+        // The caller is expected to have checked the map to ensure success.
+        assert reverseType != null;
         // Left and right exprs are reversed on purpose
         ComparisonExpression reversed = new ComparisonExpression(reverseType, m_right, m_left);
         return reversed;
@@ -128,15 +147,6 @@ public class ComparisonExpression extends AbstractExpression {
     public void finalizeValueTypes()
     {
         finalizeChildValueTypes();
-        //
-        // IMPORTANT:
-        // We are not handling the case where one of types is NULL. That is because we
-        // are only dealing with what the *output* type should be, not what the actual
-        // value is at execution time. There will need to be special handling code
-        // over on the ExecutionEngine to handle special cases for conjunctions with NULLs
-        // Therefore, it is safe to assume that the output is always going to be an
-        // integer (for booleans)
-        //
         m_valueType = VoltType.BOOLEAN;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
@@ -192,14 +202,18 @@ public class ComparisonExpression extends AbstractExpression {
         return ender;
     }
 
-    /// Construct the lower bound comparison filter implied by a prefix LIKE comparison.
+    /**
+     * Construct the lower bound comparison filter implied by a prefix LIKE comparison.
+     */
     public ComparisonExpression getGteFilterFromPrefixLike() {
         ExpressionType rangeComparator = ExpressionType.COMPARE_GREATERTHANOREQUALTO;
         String comparand = extractLikePatternPrefix();
         return rangeFilterFromPrefixLike(m_left, rangeComparator, comparand);
     }
 
-    /// Construct the upper bound comparison filter implied by a prefix LIKE comparison.
+    /**
+     * Construct the upper bound comparison filter implied by a prefix LIKE comparison.
+     */
     public ComparisonExpression getLtFilterFromPrefixLike() {
         ExpressionType rangeComparator = ExpressionType.COMPARE_LESSTHAN;
         String comparand = extractAndIncrementLikePatternPrefix();
@@ -214,13 +228,6 @@ public class ComparisonExpression extends AbstractExpression {
             (m_quantifier == QuantifierType.NONE ? "" :
                 (m_quantifier.name() + " ")) +
             m_right.explain(impliedTableName) + ")";
-    }
-
-    @Override
-    public boolean isValueTypeIndexable(StringBuffer msg) {
-        // comparison expression result in boolean result type, which is not indexable
-        msg.append("comparison expression '" + getExpressionType().symbol() +"'");
-        return false;
     }
 
 }

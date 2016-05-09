@@ -20,22 +20,30 @@ package org.voltdb.expressions;
 import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 
+/**
+ * ConjunctionExpression includes ExpressionTypes for
+ * logical AND and OR operators.
+ */
 public class ConjunctionExpression extends AbstractExpression {
     public ConjunctionExpression(ExpressionType type) {
         super(type);
         setValueType(VoltType.BOOLEAN);
     }
+
     public ConjunctionExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
         super(type, left, right);
         setValueType(VoltType.BOOLEAN);
     }
+
+    /**
+     * This constructor is needed for the first step of deserialization.
+     *  Members are deserialized and set post-construction.
+     */
     public ConjunctionExpression() {
-        //
-        // This is needed for serialization
-        //
         super();
     }
 
+    /// Both AND and OR are binary operators.
     @Override
     public boolean needsRightExpression() {
         return true;
@@ -45,15 +53,6 @@ public class ConjunctionExpression extends AbstractExpression {
     public void finalizeValueTypes()
     {
         finalizeChildValueTypes();
-        //
-        // IMPORTANT:
-        // We are not handling the case where one of types is NULL. That is because we
-        // are only dealing with what the *output* type should be, not what the actual
-        // value is at execution time. There will need to be special handling code
-        // over on the ExecutionEngine to handle special cases for conjunctions with NULLs
-        // Therefore, it is safe to assume that the output is always going to be an
-        // integer (for booleans)
-        //
         m_valueType = VoltType.BOOLEAN;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
@@ -65,13 +64,4 @@ public class ConjunctionExpression extends AbstractExpression {
             " " + type.symbol() + " " +
             m_right.explain(impliedTableName) + ")";
     }
-
-    @Override
-    public boolean isValueTypeIndexable(StringBuffer msg) {
-        // Conjunction expression include and and or expression that results in boolean result
-        // boolean result are not indexable
-        msg.append("logical expression: '" + getExpressionType().symbol() + "'");
-        return false;
-    }
-
 }

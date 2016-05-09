@@ -925,7 +925,11 @@ public class TestPlansGroupBy extends PlannerTestCase {
 
         pns = compileToFragments("SELECT sum(PKEY), sum(PKEY) FROM P1 GROUP BY A1");
         checkHasComplexAgg(pns);
-    }
+
+        // Group by a set of boolean predicates.
+        pns = compileToFragments("SELECT sum(PKEY), sum(PKEY) FROM P1 GROUP BY A1 > B1, A1 = B1, A1 > C1, A1 = C1");
+        checkHasComplexAgg(pns);
+}
 
     private void checkGroupbyAliasFeature(String sql1, String sql2, boolean exact) {
         String explainStr1, explainStr2;
