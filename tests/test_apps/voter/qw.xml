@@ -1,0 +1,18 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1"  sitesperhost="8" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <commandlog enabled="false" />
+    <export>
+        <configuration target="default" enabled="true" type="custom" exportconnectorclass="org.voltdb.exportclient.KinesisFirehoseExportClient">
+            <property name="region">us-east-1</property>
+            <property name="stream.name">streamtest3</property>
+            <property name="skipinternals">true</property>
+            <!--<property name="row.length.limit">1000</property>-->
+            <property name="access.key">AKIAJRT25IBW53TQB2PA</property>
+            <property name="secret.key">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</property>
+        </configuration>
+    </export>
+</deployment>

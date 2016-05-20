@@ -1,0 +1,16 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <export>
+        <configuration target="default" enabled="true" type="custom"
+            exportconnectorclass="org.voltdb.exportclient.KinesisFirehoseExportClient">
+            <property name="region">us-east-1</property>
+            <property name="stream.name">streamtest</property>
+            <property name="access.key"></property>
+            <property name="secret.key"></property>
+        </configuration>
+    </export>
+</deployment>

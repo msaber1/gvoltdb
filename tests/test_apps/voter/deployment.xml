@@ -1,0 +1,13 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <security enabled="true"/>
+    <users>
+        <user name="operator" password="mech" roles="ops,administrator" />
+        <user name="developer" password="tech" roles="ops,dbuser" />
+        <user name="clientapp" password="xyzzy" roles="dbuser" />
+    </users>
+</deployment>

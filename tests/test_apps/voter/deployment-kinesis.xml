@@ -1,0 +1,37 @@
+<?xml version="1.0"?>
+<deployment>
+    <cluster hostcount="1" sitesperhost="4" kfactor="0" />
+    <httpd enabled="true">
+        <jsonapi enabled="true" />
+    </httpd>
+    <export>
+        <configuration target="audit_artifact" enabled="true" type="custom"
+            exportconnectorclass="org.voltdb.exportclient.KinesisFirehoseExportClient">
+            <property name="region">us-east-1</property>
+            <property name="stream.name">audit_artifact</property>
+            <property name="access.key">AKIAJJZQVJUIN3TO3U7Q</property>
+            <property name="secret.key">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</property>
+        </configuration>
+        <configuration target="business_artifact" enabled="true" type="custom"
+            exportconnectorclass="org.voltdb.exportclient.KinesisFirehoseExportClient">
+            <property name="region">us-east-1</property>
+            <property name="stream.name">business_artifact</property>
+            <property name="access.key">AKIAJJZQVJUIN3TO3U7Q</property>
+            <property name="secret.key">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</property>
+        </configuration>
+        <configuration target="RT_Metrics_MDP" enabled="true" type="custom"
+            exportconnectorclass="org.voltdb.exportclient.KinesisFirehoseExportClient">
+            <property name="region">us-east-1</property>
+            <property name="stream.name">RT_Metrics_MDP</property>
+            <property name="access.key">AKIAJJZQVJUIN3TO3U7Q</property>
+            <property name="secret.key">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</property>
+        </configuration>
+        <configuration target="RT_Metrics_TTE" enabled="true" type="custom"
+            exportconnectorclass="org.voltdb.exportclient.KinesisFirehoseExportClient">
+            <property name="region">us-east-1</property>
+            <property name="stream.name">RT_Metrics_TTE</property>
+            <property name="access.key">AKIAJJZQVJUIN3TO3U7Q</property>
+            <property name="secret.key">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</property>
+        </configuration>
+    </export>
+</deployment>
