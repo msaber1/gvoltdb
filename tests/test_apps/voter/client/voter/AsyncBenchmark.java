@@ -80,7 +80,7 @@ public class AsyncBenchmark {
     long insertTTECount = 0;
     long insertMDPCount = 0;
     long insertKVCount = 0;
-    
+
     // Timer for periodic stats printing
     Timer timer;
     // Benchmark start time
@@ -286,15 +286,15 @@ public class AsyncBenchmark {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Total Rows Inserted by SP");
         System.out.println(HORIZONTAL_RULE);
-        
+
         System.out.printf("\tInsertAudit:   %10d\n", insertAuditCount);
         System.out.printf("\t  InsertBiz:   %10d\n", insertBizCount);
         System.out.printf("\t  InsertTTE:   %10d\n", insertTTECount);
         System.out.printf("\t  InsertMDP:   %10d\n", insertMDPCount);
         System.out.printf("\t  InsertKV:    %10d\n", insertKVCount);
-        System.out.printf("\t      Total:   %10d\n", 
+        System.out.printf("\t      Total:   %10d\n",
                 insertAuditCount + insertBizCount + insertTTECount + insertMDPCount + insertKVCount);
-        
+
         // 3. Performance statistics
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Client Workload Statistics");
@@ -463,10 +463,10 @@ public class AsyncBenchmark {
 
         AsyncBenchmark benchmark = new AsyncBenchmark(config);
         benchmark.runBenchmark();
-        
+
         TableChangeMonitor tcm = new TableChangeMonitor(benchmark.client, "StreamedTable", "all");
         boolean success = tcm.waitForStreamedAllocatedMemoryZero();// block until all outstanding txns return
-        
+
         benchmark.client.drain();
 
         // print the summary results
