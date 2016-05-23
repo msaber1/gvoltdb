@@ -1,3 +1,6 @@
+LOAD classes voter-procs.jar;
+
+file -inlinebatch END_OF_BATCH
 CREATE STREAM audit_artifact PARTITION ON COLUMN INSTANCE_ID
 EXPORT TO TARGET audit_artifact
 ( 
@@ -38,9 +41,18 @@ EXPORT TO TARGET RT_Metrics_TTE
   TRANS              VARCHAR(52)
 );
 
-LOAD classes voter-procs.jar;
+CREATE STREAM KV_stream PARTITION ON COLUMN SEQ
+EXPORT TO TARGET kv_stream
+( 
+  SEQ                BIGINT not null,
+  EVENT_DATE         TIMESTAMP default now
+);
+
 -- The following CREATE PROCEDURE statements can all be batched.
 CREATE PROCEDURE partition on table RT_Metrics_TTE column INSTANCE_ID FROM CLASS voter.InsertTTE;
 CREATE PROCEDURE partition on table RT_Metrics_MDP column INSTANCE_ID FROM CLASS voter.InsertMDP;
 CREATE PROCEDURE partition on table business_artifact column INSTANCE_ID FROM CLASS voter.InsertBiz;
 CREATE PROCEDURE partition on table audit_artifact column INSTANCE_ID FROM CLASS voter.InsertAudit;
+CREATE PROCEDURE partition on table kv_stream column SEQ FROM CLASS voter.InsertKV;
+
+END_OF_BATCH

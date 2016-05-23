@@ -64,28 +64,23 @@ import com.google_voltpatches.common.util.concurrent.RateLimiter;
 
 public class AsyncBenchmark {
 
-    // Initialize some common constants and variables
-    static final String CONTESTANT_NAMES_CSV =
-            "Edwina Burnam,Tabatha Gehling,Kelly Clauss,Jessie Alloway," +
-            "Alana Bregman,Jessie Eichman,Allie Rogalski,Nita Coster," +
-            "Kurt Walser,Ericka Dieter,Loraine NygrenTania Mattioli";
-
     // handy, rather than typing this out several times
     static final String HORIZONTAL_RULE =
             "----------" + "----------" + "----------" + "----------" +
             "----------" + "----------" + "----------" + "----------" + "\n";
 
-    // potential return codes (synced with Vote procedure)
-    static final long VOTE_SUCCESSFUL = 0;
-    static final long ERR_INVALID_CONTESTANT = 1;
-    static final long ERR_VOTER_OVER_VOTE_LIMIT = 2;
-
     // validated command line configuration
     final VoterConfig config;
     // Reference to the database connection we will use
     final Client client;
-    // Phone number generator
-    PhoneCallGenerator switchboard;
+
+    // counts for the stored proc stream inserts
+    long insertAuditCount = 0;
+    long insertBizCount = 0;
+    long insertTTECount = 0;
+    long insertMDPCount = 0;
+    long insertKVCount = 0;
+    
     // Timer for periodic stats printing
     Timer timer;
     // Benchmark start time
@@ -122,14 +117,17 @@ public class AsyncBenchmark {
         @Option(desc = "Number of contestants in the voting contest (from 1 to 10).")
         int contestants = 6;
 
-        @Option(desc = "Maximum number of votes cast per voter.")
-        int maxvotes = 2;
+        @Option(desc = "Row count for test run.")
+        int maxrows = 0;
 
         @Option(desc = "Maximum TPS rate for benchmark.")
         int ratelimit = Integer.MAX_VALUE;
 
         @Option(desc = "Report latency for async benchmark run.")
         boolean latencyreport = false;
+
+        @Option(desc = "Boolean write only kv pairs to KV stream.")
+        boolean usekv = false;
 
         @Option(desc = "Filename to write raw summary statistics to.")
         String statsfile = "";
@@ -146,7 +144,6 @@ public class AsyncBenchmark {
             if (warmup < 0) exitWithMessageAndUsage("warmup must be >= 0");
             if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
             if (contestants <= 0) exitWithMessageAndUsage("contestants must be > 0");
-            if (maxvotes <= 0) exitWithMessageAndUsage("maxvotes must be > 0");
             if (ratelimit <= 0) exitWithMessageAndUsage("ratelimit must be > 0");
         }
     }
@@ -181,8 +178,6 @@ public class AsyncBenchmark {
 
         periodicStatsContext = client.createStatsContext();
         fullStatsContext = client.createStatsContext();
-
-        switchboard = new PhoneCallGenerator(config.contestants);
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Command Line Configuration");
@@ -287,6 +282,18 @@ public class AsyncBenchmark {
     public synchronized void printResults() throws Exception {
         ClientStats stats = fullStatsContext.fetch().getStats();
 
+        // Stored proc insert countss
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Total Rows Inserted by SP");
+        System.out.println(HORIZONTAL_RULE);
+        
+        System.out.printf("\tInsertAudit:   %10d\n", insertAuditCount);
+        System.out.printf("\t  InsertBiz:   %10d\n", insertBizCount);
+        System.out.printf("\t  InsertTTE:   %10d\n", insertTTECount);
+        System.out.printf("\t  InsertMDP:   %10d\n", insertMDPCount);
+        System.out.printf("\t      Total:   %10d\n", 
+                insertAuditCount + insertBizCount + insertTTECount + insertMDPCount);
+        
         // 3. Performance statistics
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Client Workload Statistics");
@@ -331,6 +338,7 @@ public class AsyncBenchmark {
                 String msg = String.format("TTE Callback callback fault: %s", response.getStatusString());
                 System.out.println(msg);
             }
+            insertTTECount += 1;
         }
     }
     class AuditCallback implements ProcedureCallback {
@@ -340,6 +348,7 @@ public class AsyncBenchmark {
                 String msg = String.format("Audit Callback callback fault: %s", response.getStatusString());
                 System.out.println(msg);
             }
+            insertAuditCount += 1;
         }
     }
     class BizCallback implements ProcedureCallback {
@@ -349,6 +358,7 @@ public class AsyncBenchmark {
                 String msg = String.format("Biz Callback callback fault: %s", response.getStatusString());
                 System.out.println(msg);
             }
+            insertBizCount += 1;
         }
     }
     class MDPCallback implements ProcedureCallback {
@@ -358,6 +368,17 @@ public class AsyncBenchmark {
                 String msg = String.format("MDP Callback callback fault: %s", response.getStatusString());
                 System.out.println(msg);
             }
+            insertMDPCount += 1;
+        }
+    }
+    class KVCallback implements ProcedureCallback {
+        @Override
+        public void clientCallback(ClientResponse response) throws Exception {
+            if (response.getStatus() != ClientResponse.SUCCESS) {
+                String msg = String.format("KV Callback callback fault: %s", response.getStatusString());
+                System.out.println(msg);
+            }
+            insertKVCount += 1;
         }
     }
 
@@ -391,42 +412,40 @@ public class AsyncBenchmark {
         // The throughput may be throttled depending on client configuration
         System.out.println("\nRunning benchmark...");
         final long benchmarkEndTime = System.currentTimeMillis() + (1000l * config.duration);
-        long seq = 0;
         // final RateLimiter rateLimiter30k = RateLimiter.create(30_000);
         final RateLimiter rateLimiter400k = RateLimiter.create(400_000);
         Random rand = new Random();
-        
-        while (benchmarkEndTime > System.currentTimeMillis()) {
+        long seqTTE = 0, seqMDP = 0, seqAudit = 0, seqBiz = 0, seqKV = 0;
+        boolean userowcount = (config.maxrows > 0 ? true : false);
+
+        while ((userowcount && (config.maxrows-- > 0)) || (!userowcount && (benchmarkEndTime > System.currentTimeMillis()))) {
             rateLimiter400k.acquire();
-            
-            // rate for RT_Metrics_TTE is up to 400k TPS
-            client.callProcedure(new TTECallback(),
-                                 "InsertTTE", seq);
-            
-            // rate for the rest is up to 30k TPS so that's about 1 in 13 cycles in this loop
-            if (rand.nextInt(13) == 0)
-                client.callProcedure(new AuditCallback(),
-                        "InsertAudit", seq);
-            if (rand.nextInt(13) == 0)
-                client.callProcedure(new BizCallback(),
-                        "InsertBiz", seq);
-            if (rand.nextInt(13) == 0)
-                client.callProcedure(new MDPCallback(),
-                        "InsertMDP", seq);
-            seq += 1;
+
+            if (config.usekv) {
+                client.callProcedure(new KVCallback(),
+                        "InsertKV", seqKV++);
+            }
+            else {
+                // rate for RT_Metrics_TTE is up to 400k TPS
+                client.callProcedure(new TTECallback(),
+                        "InsertTTE", seqTTE++);
+
+                // rate for the rest is up to 30k TPS so that's about 1 in 13 cycles in this loop
+                int r = rand.nextInt(13);
+                if (r == 0)
+                    client.callProcedure(new AuditCallback(),
+                            "InsertAudit", seqAudit++);
+                if (r == 1)
+                    client.callProcedure(new BizCallback(),
+                            "InsertBiz", seqBiz++);
+                if (r == 2)
+                    client.callProcedure(new MDPCallback(),
+                            "InsertMDP", seqMDP++);
+            }
         }
 
         // cancel periodic stats printing
         timer.cancel();
-
-        // block until all outstanding txns return
-        client.drain();
-
-        // print the summary results
-        printResults();
-
-        // close down the client connections
-        client.close();
     }
 
     /**
@@ -443,5 +462,16 @@ public class AsyncBenchmark {
 
         AsyncBenchmark benchmark = new AsyncBenchmark(config);
         benchmark.runBenchmark();
+        
+        TableChangeMonitor tcm = new TableChangeMonitor(benchmark.client, "StreamedTable", "all");
+        boolean success = tcm.waitForStreamedAllocatedMemoryZero();// block until all outstanding txns return
+        
+        benchmark.client.drain();
+
+        // print the summary results
+        benchmark.printResults();
+
+        // close down the client connections
+        benchmark.client.close();
     }
 }
