@@ -291,8 +291,9 @@ public class AsyncBenchmark {
         System.out.printf("\t  InsertBiz:   %10d\n", insertBizCount);
         System.out.printf("\t  InsertTTE:   %10d\n", insertTTECount);
         System.out.printf("\t  InsertMDP:   %10d\n", insertMDPCount);
+        System.out.printf("\t  InsertKV:    %10d\n", insertKVCount);
         System.out.printf("\t      Total:   %10d\n", 
-                insertAuditCount + insertBizCount + insertTTECount + insertMDPCount);
+                insertAuditCount + insertBizCount + insertTTECount + insertMDPCount + insertKVCount);
         
         // 3. Performance statistics
         System.out.print(HORIZONTAL_RULE);
