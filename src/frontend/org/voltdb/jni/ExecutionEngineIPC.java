@@ -519,8 +519,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
          */
         private void readResultTables(final VoltTable tables[]) throws IOException
         {
-            final ByteBuffer resultTablesBuffer = readMessage();
-            // check if anything was changed
+            int resultTablesLength = readInt();
+            if (resultTablesLength <= 0) {
+                return;
+            }
+            final ByteBuffer resultTablesBuffer = readBytes(resultTablesLength);
+            // check the dirty-ness of the batch
             if (resultTablesBuffer.get() > 0) {
                 m_dirty = true;
             }
@@ -1042,10 +1046,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             // Get the remaining tuple count.
             final long remaining = m_connection.readLong();
 
-            final int[] serialized = new int[count];
+            final int[] serialized;
+
+            if (count > 0) {
+                serialized = new int[count];
+            } else {
+                serialized = new int[]{0};
+            }
             for (int i = 0; i < count; i++) {
                 serialized[i] = m_connection.readInt();
-
                 ByteBuffer view = outputBuffers.get(i).b().duplicate();
                 view.limit(view.position() + serialized[i]);
                 while (view.hasRemaining()) {

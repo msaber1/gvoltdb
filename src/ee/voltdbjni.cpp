@@ -1440,7 +1440,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
         ReferenceSerializeInputBE input(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
         TaskType taskId = static_cast<TaskType>(input.readLong());
-        engine->executeTask(taskId, engine->getParameterBuffer() + sizeof(int64_t));
+        engine->executeTask(taskId, input);
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     }
     catch (const SerializableEEException &e) {
@@ -1455,18 +1455,36 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    getTestDRBuffer
- * Signature: ()[B
+ * Signature: (ZI[I[I)[B
  */
 SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer(
         JNIEnv *env, jclass,
-        jboolean compatible)
+        jboolean compatible,
+        jint partitionId,
+        jintArray partitionKeyValues,
+        jintArray flags)
 {
     VOLT_DEBUG("getTestDRBuffer in C++ called");
     try {
+        jint *partitionKeyValuesJPtr = env->GetIntArrayElements(partitionKeyValues, NULL);
+        int32_t *partitionKeyValuesPtr = reinterpret_cast<int32_t *>(partitionKeyValuesJPtr);
+        std::vector<int32_t> partitionKeyValueList(partitionKeyValuesPtr,
+            partitionKeyValuesPtr + env->GetArrayLength(partitionKeyValues));
+        env->ReleaseIntArrayElements(partitionKeyValues, partitionKeyValuesJPtr, JNI_ABORT);
+
+        jint *flagsJPtr = env->GetIntArrayElements(flags, NULL);
+        int32_t *flagsPtr = reinterpret_cast<int32_t *>(flagsJPtr);
+        std::vector<int32_t> flagList(flagsPtr, flagsPtr + env->GetArrayLength(flags));
+        env->ReleaseIntArrayElements(flags, flagsJPtr, JNI_ABORT);
+
+        assert(partitionKeyValueList.size() == flagList.size());
+
         char *output = new char[1024 * 256];
         int32_t length = (compatible == JNI_TRUE) ?
-                CompatibleDRTupleStream::getTestDRBuffer(output) :
-                DRTupleStream::getTestDRBuffer(output);
+                CompatibleDRTupleStream::getTestDRBuffer(
+                        partitionId, partitionKeyValueList, flagList, output) :
+                DRTupleStream::getTestDRBuffer(
+                        partitionId, partitionKeyValueList, flagList, output);
         jbyteArray array = env->NewByteArray(length);
         jbyte *arrayBytes = env->GetByteArrayElements(array, NULL);
         ::memcpy(arrayBytes, output, length);

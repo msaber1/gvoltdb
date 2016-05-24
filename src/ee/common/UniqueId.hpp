@@ -37,6 +37,10 @@ private:
     const static int32_t MP_INITIATOR_PID = PARTITION_ID_MASK;
 
 public:
+    const static int TIMESTAMP_BITS = 40;
+    const static int COUNTER_BITS = 9;
+    const static int64_t TIMESTAMP_PLUS_COUNTER_MAX_VALUE = (1LL << (TIMESTAMP_BITS + COUNTER_BITS)) - 1LL;
+
     static int64_t makeIdFromComponents(int64_t ts, int64_t seqNo, int64_t partitionId) {
         // compute the time in millis since VOLT_EPOCH
         int64_t uniqueId = ts - VOLT_EPOCH;
@@ -65,6 +69,16 @@ public:
 
     static int64_t timestampAndCounter(int64_t uid) {
         return (uid >> PARTITIONID_BITS) & TIMESTAMP_PLUS_COUNTER_MAX_VALUE;
+
+    static int64_t timestampSinceUnixEpoch(int64_t uid) {
+        return tsCounterSinceUnixEpoch(timestampAndCounter(uid));
+    }
+
+    // Convert this into a microsecond-resolution timestamp based on Unix epoch;
+    // treat the time portion as the time in milliseconds, and the sequence
+    // number as if it is a time in microseconds
+    static int64_t tsCounterSinceUnixEpoch(int64_t tsAndCounter) {
+        return (tsAndCounter >> COUNTER_BITS) * 1000 + VOLT_EPOCH + (tsCounter & COUNTER_MAX_VALUE);
     }
 };
 }

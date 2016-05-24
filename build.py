@@ -259,10 +259,8 @@ CTX.INPUT['execution'] = """
 CTX.INPUT['executors'] = """
  OptimizedProjector.cpp
  abstractexecutor.cpp
- abstractjoinexecutor.cpp
  aggregateexecutor.cpp
  deleteexecutor.cpp
- executorfactory.cpp
  executorutil.cpp
  indexcountexecutor.cpp
  indexscanexecutor.cpp
@@ -318,6 +316,7 @@ CTX.INPUT['plannodes'] = """
  orderbynode.cpp
  plannodefragment.cpp
  plannodeutil.cpp
+ partitionbynode.cpp
  projectionnode.cpp
  receivenode.cpp
  SchemaColumn.cpp
@@ -354,7 +353,6 @@ CTX.INPUT['storage'] = """
  tablefactory.cpp
  TableStats.cpp
  tableutil.cpp
- tabletuplefilter.cpp
  temptable.cpp
  TempTableLimits.cpp
  TupleStreamBase.cpp
@@ -510,6 +508,7 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
+     PartitionByPlanNodeTest
      PlanNodeFragmentTest
     """
 

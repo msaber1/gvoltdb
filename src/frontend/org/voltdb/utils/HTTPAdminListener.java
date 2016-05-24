@@ -30,12 +30,14 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.LinkedBlockingQueue;
 
 import javax.servlet.ServletException;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 import javax.xml.bind.annotation.XmlAttribute;
 
+import org.apache.commons.lang3.StringUtils;
 import org.codehaus.jackson.JsonGenerator;
 import org.codehaus.jackson.annotate.JsonIgnore;
 import org.codehaus.jackson.annotate.JsonProperty;
@@ -45,13 +47,18 @@ import org.codehaus.jackson.map.ObjectMapper;
 import org.codehaus.jackson.schema.JsonSchema;
 import org.eclipse.jetty.continuation.Continuation;
 import org.eclipse.jetty.continuation.ContinuationSupport;
+import org.eclipse.jetty.http.HttpVersion;
 import org.eclipse.jetty.server.Handler;
+import org.eclipse.jetty.server.HttpConfiguration;
+import org.eclipse.jetty.server.HttpConnectionFactory;
 import org.eclipse.jetty.server.Request;
 import org.eclipse.jetty.server.Server;
 import org.eclipse.jetty.server.ServerConnector;
+import org.eclipse.jetty.server.SslConnectionFactory;
 import org.eclipse.jetty.server.handler.AbstractHandler;
 import org.eclipse.jetty.server.handler.ContextHandler;
 import org.eclipse.jetty.server.handler.ContextHandlerCollection;
+import org.eclipse.jetty.util.ssl.SslContextFactory;
 import org.eclipse.jetty.util.thread.QueuedThreadPool;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -62,18 +69,23 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.HTTPClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
-import org.voltdb.client.Client;
+import org.voltdb.client.BatchTimeoutOverrideType;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.compiler.deploymentfile.ExportType;
+import org.voltdb.compiler.deploymentfile.HttpsType;
+import org.voltdb.compiler.deploymentfile.KeyOrTrustStoreType;
 import org.voltdb.compiler.deploymentfile.ServerExportEnum;
 import org.voltdb.compiler.deploymentfile.UsersType;
 import org.voltdb.compiler.deploymentfile.UsersType.User;
 import org.voltdb.compilereport.ReportMaker;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.io.Resources;
+import org.eclipse.jetty.server.SecureRequestCustomizer;
 
 public class HTTPAdminListener {
 
@@ -280,9 +292,11 @@ public class HTTPAdminListener {
             user = u;
             permissions = p;
         }
+        @SuppressWarnings("unused")
         public String getUser() {
             return user;
         }
+        @SuppressWarnings("unused")
         public String[] getPermissions() {
             return permissions;
         }
@@ -326,8 +340,6 @@ public class HTTPAdminListener {
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
-            } finally {
-                httpClientInterface.releaseClient(authResult, false);
             }
         }
     }
@@ -459,19 +471,19 @@ public class HTTPAdminListener {
                     response.getWriter().write(new String(getDeploymentBytes()));
                 } else if (baseRequest.getRequestURI().contains("/users")) {
                     if (request.getMethod().equalsIgnoreCase("POST")) {
-                        handleUpdateUser(jsonp, target, baseRequest, request, response, authResult.m_client);
+                        handleUpdateUser(jsonp, target, baseRequest, request, response, authResult);
                     } else if (request.getMethod().equalsIgnoreCase("PUT")) {
-                        handleCreateUser(jsonp, target, baseRequest, request, response, authResult.m_client);
+                        handleCreateUser(jsonp, target, baseRequest, request, response, authResult);
                     } else if (request.getMethod().equalsIgnoreCase("DELETE")) {
-                        handleRemoveUser(jsonp, target, baseRequest, request, response, authResult.m_client);
+                        handleRemoveUser(jsonp, target, baseRequest, request, response, authResult);
                     } else {
-                        handleGetUsers(jsonp, target, baseRequest, request, response, authResult.m_client);
+                        handleGetUsers(jsonp, target, baseRequest, request, response);
                     }
                 } else if (baseRequest.getRequestURI().contains("/export/type")) {
                     handleGetExportTypes(jsonp, response);
                 } else {
                     if (request.getMethod().equalsIgnoreCase("POST")) {
-                        handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult.m_client);
+                        handleUpdateDeployment(jsonp, target, baseRequest, request, response, authResult);
                     } else {
                         //non POST
                         if (jsonp != null) {
@@ -486,8 +498,6 @@ public class HTTPAdminListener {
                 baseRequest.setHandled(true);
             } catch (Exception ex) {
               logger.info("Not servicing url: " + baseRequest.getRequestURI() + " Details: "+ ex.getMessage(), ex);
-            } finally {
-                httpClientInterface.releaseClient(authResult, false);
             }
         }
 
@@ -495,7 +505,7 @@ public class HTTPAdminListener {
         public void handleUpdateDeployment(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
-                           HttpServletResponse response, Client client)
+                           HttpServletResponse response, AuthenticationResult ar)
                            throws IOException, ServletException {
             String deployment = request.getParameter("deployment");
             if (deployment == null || deployment.length() == 0) {
@@ -520,12 +530,20 @@ public class HTTPAdminListener {
                     return;
                 }
                 Object[] params = new Object[] { null, dep};
-                //Call sync as nothing else can happen when this is going on.
-                client.callProcedure("@UpdateApplicationCatalog", params);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Deployment Updated."));
+                SyncCallback cb = new SyncCallback();
+                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                cb.waitForResponse();
+                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+                if (r.getStatus() == ClientResponse.SUCCESS) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "Deployment Updated."));
+                } else {
+                    response.getWriter().print(HTTPClientInterface.asJsonp(jsonp, r.toJSONString()));
+                }
+                baseRequest.setHandled(true);
             } catch (Exception ex) {
                 logger.error("Failed to update deployment from API", ex);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
+                baseRequest.setHandled(true);
             }
         }
 
@@ -533,7 +551,7 @@ public class HTTPAdminListener {
         public void handleUpdateUser(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
-                           HttpServletResponse response, Client client)
+                           HttpServletResponse response, AuthenticationResult ar)
                            throws IOException, ServletException {
             String update = request.getParameter("user");
             if (update == null || update.trim().length() == 0) {
@@ -573,13 +591,20 @@ public class HTTPAdminListener {
                 }
                 Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
-                client.callProcedure("@UpdateApplicationCatalog", params);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User Updated."));
-                notifyOfCatalogUpdate();
+                SyncCallback cb = new SyncCallback();
+                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                cb.waitForResponse();
+                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+                if (r.getStatus() == ClientResponse.SUCCESS) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User Updated."));
+                } else {
+                    response.getWriter().print(HTTPClientInterface.asJsonp(jsonp, r.toJSONString()));
+                }
+
             } catch (Exception ex) {
                 logger.error("Failed to update user from API", ex);
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
             }
         }
 
@@ -587,7 +612,7 @@ public class HTTPAdminListener {
         public void handleCreateUser(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
-                           HttpServletResponse response, Client client)
+                           HttpServletResponse response, AuthenticationResult ar)
                            throws IOException, ServletException {
             String update = request.getParameter("user");
             if (update == null || update.trim().length() == 0) {
@@ -637,13 +662,19 @@ public class HTTPAdminListener {
                 }
                 Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
-                client.callProcedure("@UpdateApplicationCatalog", params);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, returnString));
-                notifyOfCatalogUpdate();
+                SyncCallback cb = new SyncCallback();
+                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                cb.waitForResponse();
+                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
+                if (r.getStatus() == ClientResponse.SUCCESS) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, returnString));
+                } else {
+                    response.getWriter().print(HTTPClientInterface.asJsonp(jsonp, r.toJSONString()));
+                }
             } catch (Exception ex) {
                 logger.error("Failed to create user from API", ex);
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
             }
         }
 
@@ -651,7 +682,7 @@ public class HTTPAdminListener {
         public void handleRemoveUser(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
-                           HttpServletResponse response, Client client)
+                           HttpServletResponse response, AuthenticationResult ar)
                            throws IOException, ServletException {
             try {
                 DeploymentType newDeployment = CatalogUtil.getDeployment(new ByteArrayInputStream(getDeploymentBytes()));
@@ -679,14 +710,20 @@ public class HTTPAdminListener {
                 }
                 Object[] params = new Object[] { null, dep};
                 //Call sync as nothing else can happen when this is going on.
-                client.callProcedure("@UpdateApplicationCatalog", params);
+                SyncCallback cb = new SyncCallback();
+                httpClientInterface.callProcedure(ar, BatchTimeoutOverrideType.NO_TIMEOUT, cb, "@UpdateApplicationCatalog", params);
+                cb.waitForResponse();
+                ClientResponseImpl r = ClientResponseImpl.class.cast(cb.getResponse());
                 response.setStatus(HttpServletResponse.SC_NO_CONTENT);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User removed"));
-                notifyOfCatalogUpdate();
+                if (r.getStatus() == ClientResponse.SUCCESS) {
+                    response.getWriter().print(buildClientResponse(jsonp, ClientResponse.SUCCESS, "User Removed."));
+                } else {
+                    response.getWriter().print(HTTPClientInterface.asJsonp(jsonp, r.toJSONString()));
+                }
             } catch (Exception ex) {
                 logger.error("Failed to update role from API", ex);
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, ex.toString()));
+                response.getWriter().print(buildClientResponse(jsonp, ClientResponse.UNEXPECTED_FAILURE, Throwables.getStackTraceAsString(ex)));
             }
         }
 
@@ -694,7 +731,7 @@ public class HTTPAdminListener {
         public void handleGetUsers(String jsonp, String target,
                            Request baseRequest,
                            HttpServletRequest request,
-                           HttpServletResponse response, Client client)
+                           HttpServletResponse response)
                            throws IOException, ServletException {
             ObjectMapper mapper = new ObjectMapper();
             User user = null;
@@ -837,16 +874,19 @@ public class HTTPAdminListener {
     }
 
     public HTTPAdminListener(
-            boolean jsonEnabled, String intf, int port, boolean mustListen) throws Exception {
+            boolean jsonEnabled, String intf, int port, HttpsType httpsType, boolean mustListen) throws Exception {
         int poolsize = Integer.getInteger("HTTP_POOL_SIZE", 50);
         int timeout = Integer.getInteger("HTTP_REQUEST_TIMEOUT_SECONDS", 15);
 
         /*
          * Don't force us to look at a huge pile of threads
          */
-        final QueuedThreadPool qtp = new QueuedThreadPool(poolsize);
-        qtp.setIdleTimeout(timeout * 1000);
-        qtp.setMinThreads(1);
+        final QueuedThreadPool qtp = new QueuedThreadPool(
+                poolsize,
+                1, // minimum threads
+                timeout * 1000,
+                new LinkedBlockingQueue<>(poolsize + 16)
+                );
 
         m_server = new Server(qtp);
         m_server.setAttribute(
@@ -868,18 +908,24 @@ public class HTTPAdminListener {
         // NOW START SocketConnector and create Jetty server but dont start.
         ServerConnector connector = null;
         try {
-            // The socket channel connector seems to be faster for our use
-            //SelectChannelConnector connector = new SelectChannelConnector();
-            connector = new ServerConnector(m_server);
+            if (httpsType==null || !httpsType.isEnabled()) { // basic HTTP
+                // The socket channel connector seems to be faster for our use
+                //SelectChannelConnector connector = new SelectChannelConnector();
+                connector = new ServerConnector(m_server);
 
-            if (intf != null && intf.length() > 0) {
-                connector.setHost(intf);
+                if (intf != null && intf.length() > 0) {
+                    connector.setHost(intf);
+                }
+                connector.setPort(port);
+                connector.setName("VoltDB-HTTPD");
+                //open the connector here so we know if port is available and Init work can retry with next port.
+                connector.open();
+                m_server.addConnector(connector);
+            } else { // HTTPS
+                m_server.addConnector(getSSLServerConnector(httpsType, intf, port));
             }
-            connector.setPort(port);
-            connector.setName("VoltDB-HTTPD");
-            //open the connector here so we know if port is available and Init work can retry with next port.
-            connector.open();
-            m_server.addConnector(connector);
+
+            //m_server.setConnectors(new Connector[] { connector, sslConnector });
 
             //"/"
             ContextHandler dbMonitorHandler = new ContextHandler("/");
@@ -932,6 +978,71 @@ public class HTTPAdminListener {
         }
     }
 
+    private String getKeyTrustStoreAttribute(String sysPropName, KeyOrTrustStoreType store, String valueType, boolean throwForNull) {
+        String sysProp = System.getProperty(sysPropName);
+        if (StringUtils.isNotBlank(sysProp)) {
+            return sysProp.trim();
+        } else {
+            String value = null;
+            if (store!=null) {
+                value = "path".equals(valueType) ? store.getPath() : store.getPassword();
+            }
+            if (StringUtils.isBlank(value) && throwForNull) {
+                    throw new IllegalArgumentException(
+                        "To enable HTTPS, keystore must be configured with password in deployment file or using system property. " + sysPropName);
+            } else {
+                return value;
+            }
+        }
+    }
+
+    private ServerConnector getSSLServerConnector(HttpsType httpsType, String intf, int port)
+        throws IOException {
+        SslContextFactory sslContextFactory = new SslContextFactory();
+        String value = getKeyTrustStoreAttribute("javax.net.ssl.keyStore", httpsType.getKeyStore(), "path", true);
+        sslContextFactory.setKeyStorePath(value);
+        sslContextFactory.setKeyStorePassword(getKeyTrustStoreAttribute("javax.net.ssl.keyStorePassword", httpsType.getKeyStore(), "password", true));
+        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStore", httpsType.getTrustStore(), "path", false);
+        if (value!=null) {
+            sslContextFactory.setTrustStorePath(value);
+        }
+        value = getKeyTrustStoreAttribute("javax.net.ssl.trustStorePassword", httpsType.getTrustStore(), "password", false);
+        if (value!=null) {
+            sslContextFactory.setTrustStorePassword(value);
+        }
+        // exclude weak ciphers
+        sslContextFactory.setExcludeCipherSuites("SSL_RSA_WITH_DES_CBC_SHA",
+                "SSL_DHE_RSA_WITH_DES_CBC_SHA", "SSL_DHE_DSS_WITH_DES_CBC_SHA",
+                "SSL_RSA_EXPORT_WITH_RC4_40_MD5",
+                "SSL_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                "SSL_DHE_RSA_EXPORT_WITH_DES40_CBC_SHA",
+                "SSL_DHE_DSS_EXPORT_WITH_DES40_CBC_SHA");
+        /* More configurable things that we are not using for now.
+        sslContextFactory.setKeyManagerPassword("password");
+                */
+
+        // SSL HTTP Configuration
+        HttpConfiguration httpsConfig = new HttpConfiguration();
+        httpsConfig.setSecureScheme("https");
+        httpsConfig.setSecurePort(port);
+        //Add this customizer to indicate we are in https land
+        httpsConfig.addCustomizer(new SecureRequestCustomizer());
+        HttpConnectionFactory factory = new HttpConnectionFactory(httpsConfig);
+
+        // SSL Connector
+        ServerConnector connector = new ServerConnector(m_server,
+            new SslConnectionFactory(sslContextFactory,HttpVersion.HTTP_1_1.asString()),
+            factory);
+        if (intf != null && intf.length() > 0) {
+            connector.setHost(intf);
+        }
+        connector.setPort(port);
+        connector.setName("VoltDB-HTTPS");
+        connector.open();
+
+        return connector;
+    }
+
     public void start() throws Exception {
         try {
             m_server.start();
@@ -958,9 +1069,7 @@ public class HTTPAdminListener {
         m_server = null;
     }
 
-    public void notifyOfCatalogUpdate()
-    {
-        //Notify to clean any cached clients so new security can be enforced.
+    public void notifyOfCatalogUpdate() {
         httpClientInterface.notifyOfCatalogUpdate();
     }
 }

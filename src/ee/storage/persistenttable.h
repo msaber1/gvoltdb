@@ -138,7 +138,6 @@ public:
     void activateSnapshot();
     void printIndex(std::ostream &os, int32_t limit) const;
     ElasticHash generateTupleHash(TableTuple &tuple) const;
-    void DRRollback(size_t drMark, size_t drRowCost);
 
 private:
 
@@ -247,7 +246,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings);
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible = true);
 
     virtual void truncateTable(VoltDBEngine* engine, bool fallible = true);
     // The fallible flag is used to denote a change to a persistent table
@@ -273,11 +272,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // and/or adds a materialized view.
     // Constraint checks are bypassed and the change does not make use of "undo" support.
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool fallible=true,
-                                                bool updateDRTimestamp=true);
+    void updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                        TableTuple &sourceTupleWithNewValues,
+                                        std::vector<TableIndex*> const &indexesToUpdate,
+                                        bool fallible=true,
+                                        bool updateDRTimestamp=true);
 
     virtual void addIndex(TableIndex *index) {
         Table::addIndex(index);
@@ -296,7 +295,7 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     // ------------------------------------------------------------------
     void deleteTupleForSchemaChange(TableTuple &target);
 
-    void insertPersistentTuple(TableTuple &source, bool fallible);
+    void insertPersistentTuple(TableTuple &source, bool fallible, bool ignoreTupleLimit=false);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.
     bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues)
@@ -342,10 +341,11 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
     bool isMaterialized() { return m_isMaterialized; };
 
-    /** inlined here because it can't be inlined in base Table, as it
-     *  uses Tuple.copy.
-     */
-    TableTuple& getTempTupleInlined(TableTuple &source);
+    TableTuple& copyIntoTempTuple(TableTuple &source) {
+        assert (m_tempTuple.m_data);
+        m_tempTuple.copy(source);
+        return m_tempTuple;
+    }
 
     /** Add/drop/list materialized views to this table */
     void addMaterializedView(MaterializedViewMetadata *view);
@@ -511,9 +511,6 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest,
     }
 
     std::pair<const TableIndex*, uint32_t> getUniqueIndexForDR();
-
-  protected:
-    std::vector<uint64_t> getBlockAddresses() const;
 
   private:
 
@@ -887,26 +884,6 @@ PersistentTableSurgeon::getIndexTupleRangeIterator(const ElasticIndexHashRange &
     return boost::shared_ptr<ElasticIndexTupleRangeIterator>(
             new ElasticIndexTupleRangeIterator(*m_index, *m_table.m_schema, range));
 }
-
-inline void
-PersistentTableSurgeon::DRRollback(size_t drMark, size_t drRowCost) {
-    if (!m_table.m_isMaterialized && m_table.m_drEnabled) {
-        if (m_table.m_partitionColumn == -1) {
-            if (ExecutorContext::getExecutorContext()->drReplicatedStream()) {
-                ExecutorContext::getExecutorContext()->drReplicatedStream()->rollbackTo(drMark, drRowCost);
-            }
-        } else {
-            ExecutorContext::getExecutorContext()->drStream()->rollbackTo(drMark, drRowCost);
-        }
-    }
-}
-
-inline TableTuple& PersistentTable::getTempTupleInlined(TableTuple &source) {
-    assert (m_tempTuple.m_data);
-    m_tempTuple.copy(source);
-    return m_tempTuple;
-}
-
 
 inline void PersistentTable::deleteTupleStorage(TableTuple &tuple, TBPtr block)
 {

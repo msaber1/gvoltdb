@@ -225,7 +225,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int64_t* getBatchDepIdsContainer() { return m_batchDepIdsContainer; }
 
         /** check if this value hashes to the local partition */
-        bool isLocalSite(const NValue& value);
+        bool isLocalSite(const NValue& value) const;
+
+        /** return partitionId for the provided hash */
+        int32_t getPartitionForPkHash(const int32_t pkHash) const;
+
+        /** check if this hash is in the local partition */
+        bool isLocalSite(const int32_t pkHash) const;
 
         // -------------------------------------------------
         // Non-transactional work methods
@@ -384,7 +390,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Execute an arbitrary task represented by the task id and serialized parameters.
          * Returns serialized representation of the results
          */
-        void executeTask(TaskType taskType, const char* taskParams);
+        void executeTask(TaskType taskType, ReferenceSerializeInputBE &taskInfo);
 
         void rebuildTableCollections();
 
@@ -400,11 +406,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return m_partitionId;
         }
 
+    protected:
+        void setHashinator(TheHashinator* hashinator);
+
     private:
         /*
          * Tasks dispatched by executeTask
          */
-        void dispatchValidatePartitioningTask(const char *taskParams);
+        void dispatchValidatePartitioningTask(ReferenceSerializeInputBE &taskInfo);
 
         void collectDRTupleStreamStateInfo();
 

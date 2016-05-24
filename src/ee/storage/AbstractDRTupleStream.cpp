@@ -21,9 +21,10 @@
 using namespace std;
 using namespace voltdb;
 
-AbstractDRTupleStream::AbstractDRTupleStream(int defaultBufferSize)
+AbstractDRTupleStream::AbstractDRTupleStream(int partitionId, int defaultBufferSize)
         : TupleStreamBase(defaultBufferSize, MAGIC_DR_TRANSACTION_PADDING),
           m_enabled(true),
+          m_partitionId(partitionId),
           m_secondaryCapacity(SECONDARY_BUFFER_SIZE),
           m_rowTarget(-1),
           m_opened(false),
@@ -74,7 +75,7 @@ void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost) {
 }
 
 void AbstractDRTupleStream::setLastCommittedSequenceNumber(int64_t sequenceNumber) {
-    assert(m_committedSequenceNumber == m_openSequenceNumber);
+    assert(m_committedSequenceNumber <= m_openSequenceNumber);
     m_openSequenceNumber = sequenceNumber;
     m_committedSequenceNumber = sequenceNumber;
 }

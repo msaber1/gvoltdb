@@ -57,6 +57,7 @@ public class VoltDB {
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
     public static final int DEFAULT_HTTP_PORT = 8080;
+    public static final int DEFAULT_HTTPS_PORT = 8443;
     public static final int BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 3000;
     public static final int INITIATOR_SITE_ID = 0;
     public static final int SITES_TO_HOST_DIVISOR = 100;
@@ -232,7 +233,7 @@ public class VoltDB {
         public static boolean m_forceCatalogUpgrade = false;
 
         /** Allow starting voltdb with non-empty managed directories. */
-        public boolean m_newVoltdb = false;
+        public boolean m_forceVoltdbCreate = false;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
@@ -482,8 +483,8 @@ public class VoltDB {
                     m_buildStringOverrideForTest = args[++i].trim();
                 else if (arg.equalsIgnoreCase("placementgroup"))
                     m_placementGroup = args[++i].trim();
-                else if (arg.equalsIgnoreCase("new"))
-                    m_newVoltdb = true;
+                else if (arg.equalsIgnoreCase("force"))
+                    m_forceVoltdbCreate = true;
                 else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     System.out.println("Please refer to VoltDB documentation for command line usage.");
@@ -771,7 +772,7 @@ public class VoltDB {
                     writer.println();
                     writer.println("Platform Properties:");
                     PlatformProperties pp = PlatformProperties.getPlatformProperties();
-                    String[] lines = pp.toLogLines().split("\n");
+                    String[] lines = pp.toLogLines(instance().getVersionString()).split("\n");
                     for (String line : lines) {
                         writer.println(line.trim());
                     }

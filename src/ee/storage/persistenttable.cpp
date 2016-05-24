@@ -78,6 +78,7 @@
 #include "storage/PersistentTableUndoDeleteAction.h"
 #include "storage/PersistentTableUndoTruncateTableAction.h"
 #include "storage/PersistentTableUndoUpdateAction.h"
+#include "storage/DRTupleStreamUndoAction.h"
 #include "storage/ConstraintFailureException.h"
 #include "storage/TupleStreamException.h"
 #include "storage/CopyOnWriteContext.h"
@@ -253,12 +254,31 @@ void PersistentTable::nextFreeTuple(TableTuple *tuple) {
     }
 }
 
-void PersistentTable::deleteAllTuples(bool freeAllocatedStrings) {
+void PersistentTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible) {
+    // Instead of recording each tuple deletion, log it as a table truncation DR.
+    ExecutorContext *ec = ExecutorContext::getExecutorContext();
+    AbstractDRTupleStream *drStream = getDRTupleStream(ec);
+    if (drStream && !m_isMaterialized && m_drEnabled) {
+        const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
+        const int64_t currentSpHandle = ec->currentSpHandle();
+        const int64_t currentUniqueId = ec->currentUniqueId();
+        size_t drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, m_partitionColumn, currentSpHandle, currentUniqueId);
+
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        if (uq && fallible) {
+            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE)));
+        }
+    }
+
+    // Temporarily disable DR binary logging so that it doesn't record the
+    // individual deletions below.
+    DRTupleStreamDisableGuard drGuard(ec, false);
+
     // nothing interesting
     TableIterator ti(this, m_data.begin());
     TableTuple tuple(m_schema);
     while (ti.next(tuple)) {
-        deleteTuple(tuple, true);
+        deleteTuple(tuple, fallible);
     }
 }
 
@@ -347,8 +367,12 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         const double blockLoadFactor = m_data.begin().data()->loadFactor();
         if ((blockLoadFactor <= tableLFCutoffForTrunc) ||
             (m_views.size() > 0 && blockLoadFactor <= tableWithViewsLFCutoffForTrunc)) {
-            return deleteAllTuples(true);
+            return deleteAllTuples(true, fallible);
         }
+    }
+    //For MAT view dont optimize needs more work.
+    if (isMaterialized()) {
+        return deleteAllTuples(true);
     }
 
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
@@ -394,13 +418,17 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
 
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, currentTxnId, currentSpHandle, currentUniqueId);
+        size_t drMark = drStream->truncateTable(lastCommittedSpHandle, m_signature, m_name, m_partitionColumn,
+                                                currentSpHandle, currentUniqueId);
+
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        if (uq && fallible) {
+            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_TRUNCATE_TABLE)));
+        }
     }
 
     UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
@@ -451,10 +479,10 @@ bool PersistentTable::insertTuple(TableTuple &source)
     return true;
 }
 
-void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible)
+void PersistentTable::insertPersistentTuple(TableTuple &source, bool fallible, bool ignoreTupleLimit)
 {
 
-    if (fallible && visibleTupleCount() >= m_tupleLimit) {
+    if (!ignoreTupleLimit && fallible && visibleTupleCount() >= m_tupleLimit) {
         char buffer [256];
         snprintf (buffer, 256, "Table %s exceeds table maximum row count %d",
                 m_name.c_str(), m_tupleLimit);
@@ -503,15 +531,18 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     }
 
     AbstractDRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled && shouldDRStream) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_INSERT, uniqueIndex);
+        size_t drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentSpHandle,
+                                              currentUniqueId, target, DR_RECORD_INSERT);
+
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        if (uq && fallible) {
+            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_INSERT)));
+        }
     }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0) {
@@ -536,8 +567,6 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
     TableTuple conflict(m_schema);
     tryInsertOnAllIndexes(&target, &conflict);
     if (!conflict.isNullTuple()) {
-        // Roll the DR stream back because the undo action is not registered
-        m_surgeon.DRRollback(drMark, rowCostForDRRecord(DR_RECORD_INSERT));
         throw ConstraintFailureException(this, source, conflict, CONSTRAINT_TYPE_UNIQUE);
     }
 
@@ -553,7 +582,7 @@ void PersistentTable::insertTupleCommon(TableTuple &source, TableTuple &target, 
             //* enable for debug */ std::cout << "DEBUG: inserting " << (void*)target.address()
             //* enable for debug */           << " { " << target.debugNoHeader() << " } "
             //* enable for debug */           << " copied to " << (void*)tupleData << std::endl;
-            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon, drMark));
+            uq->registerUndoAction(new (*uq) PersistentTableUndoInsertAction(tupleData, &m_surgeon));
         }
     }
 
@@ -598,7 +627,7 @@ void PersistentTable::insertTupleForUndo(char *tuple)
  * updated strings and creates an UndoAction. Additional optimization
  * for callers that know which indexes to update.
  */
-bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+void PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
                                                      TableTuple &sourceTupleWithNewValues,
                                                      std::vector<TableIndex*> const &indexesToUpdate,
                                                      bool fallible,
@@ -648,15 +677,18 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     }
 
     AbstractDRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         ExecutorContext *ec = ExecutorContext::getExecutorContext();
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues, uniqueIndex);
+        size_t drMark = drStream->appendUpdateRecord(lastCommittedSpHandle, m_signature, m_partitionColumn, currentSpHandle,
+                                                     currentUniqueId, targetTupleToUpdate, sourceTupleWithNewValues);
+
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        if (uq && fallible) {
+            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_UPDATE)));
+        }
     }
 
     if (m_tableStreamer != NULL) {
@@ -732,8 +764,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
         char* newTupleData = uq->allocatePooledCopy(targetTupleToUpdate.address(), tupleLength);
         uq->registerUndoAction(new (*uq) PersistentTableUndoUpdateAction(oldTupleData, newTupleData,
                                                                          oldObjects, newObjects,
-                                                                         &m_surgeon, someIndexGotUpdated,
-                                                                         drMark));
+                                                                         &m_surgeon, someIndexGotUpdated));
     } else {
         // This is normally handled by the Undo Action's release (i.e. when there IS an Undo Action)
         // -- though maybe even that case should delegate memory management back to the PersistentTable
@@ -762,7 +793,6 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUp
     for (int i = 0; i < m_views.size(); i++) {
         m_views[i]->processTupleInsert(targetTupleToUpdate, fallible);
     }
-    return true;
 }
 
 /*
@@ -839,14 +869,17 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
     // be left forgotten in case this throws.
     ExecutorContext *ec = ExecutorContext::getExecutorContext();
     AbstractDRTupleStream *drStream = getDRTupleStream(ec);
-    size_t drMark = INVALID_DR_MARK;
     if (drStream && !m_isMaterialized && m_drEnabled) {
         const int64_t lastCommittedSpHandle = ec->lastCommittedSpHandle();
-        const int64_t currentTxnId = ec->currentTxnId();
         const int64_t currentSpHandle = ec->currentSpHandle();
         const int64_t currentUniqueId = ec->currentUniqueId();
-        std::pair<const TableIndex*, uint32_t> uniqueIndex = getUniqueIndexForDR();
-        drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, currentTxnId, currentSpHandle, currentUniqueId, target, DR_RECORD_DELETE, uniqueIndex);
+        size_t drMark = drStream->appendTuple(lastCommittedSpHandle, m_signature, m_partitionColumn, currentSpHandle,
+                                              currentUniqueId, target, DR_RECORD_DELETE);
+
+        UndoQuantum *uq = ExecutorContext::currentUndoQuantum();
+        if (uq && fallible) {
+            uq->registerUndoAction(new (*uq) DRTupleStreamUndoAction(drStream, drMark, rowCostForDRRecord(DR_RECORD_DELETE)));
+        }
     }
 
     // Just like insert, we want to remove this tuple from all of our indexes
@@ -867,7 +900,7 @@ bool PersistentTable::deleteTuple(TableTuple &target, bool fallible) {
             m_tuplesPinnedByUndo++;
             ++m_invisibleTuplesPendingDeleteCount;
             // Create and register an undo action.
-            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon, drMark), this);
+            uq->registerUndoAction(new (*uq) PersistentTableUndoDeleteAction(target.address(), &m_surgeon), this);
             return true;
         }
     }
@@ -1723,15 +1756,6 @@ void PersistentTable::computeSmallestUniqueIndex() {
                 m_smallestUniqueIndex->getColumnIndices().size() * sizeof(int));
         m_smallestUniqueIndexCrc = vdbcrc::crc32cFinish(m_smallestUniqueIndexCrc);
     }
-}
-
-std::vector<uint64_t> PersistentTable::getBlockAddresses() const {
-    std::vector<uint64_t> blockAddresses;
-    blockAddresses.reserve(m_data.size());
-    for(TBMap::const_iterator i = m_data.begin(); i != m_data.end(); ++i) {
-            blockAddresses.push_back((uint64_t)i->second->address());
-    }
-    return blockAddresses;
 }
 
 } // namespace voltdb

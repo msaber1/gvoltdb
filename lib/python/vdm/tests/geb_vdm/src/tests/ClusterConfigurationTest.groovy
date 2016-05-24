@@ -1,31 +1,19 @@
-/*
-This file is part of VoltDB.
-
-Copyright (C) 2008-2015 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-*/
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2016 VoltDB Inc.
+ *
+ * This program is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU Affero General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU Affero General Public License for more details.
+ *
+ * You should have received a copy of the GNU Affero General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
 
 import java.io.BufferedReader
 import java.io.FileNotFoundException
@@ -1023,7 +1011,6 @@ class ClusterConfigurationTest extends TestBase {
         overview.heartbeatTimeoutField.value("0")
         overview.heartbeatTimeoutField.value("10")
         overview.heartbeatTimeoutText.click()
-        report 'hello'
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Heartbeat Timeout in Advanced has changed'
@@ -1039,7 +1026,6 @@ class ClusterConfigurationTest extends TestBase {
         overview.queryTimeoutField.value("0")
         overview.queryTimeoutField.value("10")
         overview.queryTimeoutText.click()
-        report 'hello'
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Query Timeout in Advanced has changed'
@@ -1055,7 +1041,6 @@ class ClusterConfigurationTest extends TestBase {
         overview.maxTempTableMemoryField.value("0")
         overview.maxTempTableMemoryField.value("10")
         overview.maxTempTableMemoryText.click()
-        report 'hello1'
         and: 'Check Save Message'
         checkSaveMessage()
         then: 'Check if Value in Max Temp Table Memory in Advanced has changed'
@@ -1083,10 +1068,6 @@ class ClusterConfigurationTest extends TestBase {
         }
 
         when: 'Provide Value for Memory Limit in Advanced'
-/*        overview.memoryLimitType.click()
-        report 'old1'
-        overview.memoryLimitOptionGB.click()*/
-
         overview.memoryLimitField.value(Keys.chord(Keys.CONTROL, "A") + Keys.BACK_SPACE)
         overview.memoryLimitField.value("10")
         overview.memoryLimitText.click()
@@ -1515,6 +1496,151 @@ class ClusterConfigurationTest extends TestBase {
         then: 'Delete the database'
         deleteNewDatabase(indexOfNewDatabase, "name_src")
         println()
+    }
+
+    def verifyCreateEditAndDeleteSecurityUsers() {
+        String username     = "usename"
+        String password     = "password"
+        String role         = "role"
+
+        when: 'Expand Security if not already expanded'
+        overview.expandSecurity()
+        then: 'Open the Add User Popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.addSecurityButton.click()
+                waitFor { overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+
+        when: 'Provide Value For User'
+        overview.provideValueForUser(username, password, role)
+        and: 'Save the User'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.saveUserOkButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+        then: 'Check Username text'
+        waitFor { overview.usernameOne.text().equals(username) }
+        waitFor { overview.roleOne.text().equals(role) }
+
+        when: 'Click Edit to open Edit Popup'
+        username    = "username_edited"
+        password    = "password_edited"
+        role        = "user_edited"
+
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.editSecurityOne.click()
+                waitFor { overview.editSecurityOne.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        and: 'Provide value for Edit Popup'
+        overview.provideValueForUser(username, password, role)
+        then:
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.saveUserOkButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+        then: 'Check Username and Role text'
+        waitFor { overview.usernameOne.text().equals(username) }
+        waitFor { overview.roleOne.text().equals(role) }
+
+        when: 'Click Edit to open Edit Popup'
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.editSecurityOne.click()
+                waitFor { overview.editSecurityOne.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            } catch (org.openqa.selenium.StaleElementReferenceException e) {
+                println("Stale Element Exception - Retrying")
+            }
+        }
+        then: "Delete the User"
+        for(count=0; count<numberOfTrials; count++) {
+            try {
+                overview.deleteUserButton.click()
+                waitFor { !overview.saveUserOkButton.isDisplayed() }
+                break
+            } catch(geb.waiting.WaitTimeoutException exception) {
+                println("Unable to find the add security button - Retrying")
+            } catch(org.openqa.selenium.ElementNotVisibleException exception) {
+                try {
+                    waitFor { !overview.saveUserOkButton.isDisplayed() }
+                    break
+                } catch(geb.waiting.WaitTimeoutException e) {
+                    println("Unable to find the add security button - Retrying")
+                }
+            }
+        }
+
+        when: "Check Save Message"
+        checkSaveMessage()
+        try {
+            waitFor { 1==0 }
+        } catch(geb.waiting.WaitTimeoutException exception) {
+
+        }
+        then: "Check No Security Available Text"
+        waitFor { overview.noSecurityAvailable.isDisplayed() }
+        waitFor { overview.noSecurityAvailable.text().equals("No security available.") }
     }
 
     def cleanup() { // called after each test

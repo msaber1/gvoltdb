@@ -59,13 +59,29 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         VALIDATE_PARTITIONING(0),
         GET_DR_TUPLESTREAM_STATE(1),
         SET_DR_SEQUENCE_NUMBERS(2),
-        SET_DR_PROTOCOL_VERSION(3);
+        SET_DR_PROTOCOL_VERSION(3),
+        SP_JAVA_GET_DRID_TRACKER(4),
+        SET_DRID_TRACKER(5),
+        GENERATE_DR_EVENT(6);
 
         private TaskType(int taskId) {
             this.taskId = taskId;
         }
 
         public final int taskId;
+    }
+
+    // keep sync with DREventType in ee/src/common/types.h
+    public static enum EventType {
+        NOT_A_EVENT(0),
+        POISON_PILL(1),
+        CATALOG_UPDATE(2);
+
+        private EventType(int typeId) {
+            this.typeId = typeId;
+        }
+
+        public final int typeId;
     }
 
     // is the execution site dirty
@@ -996,7 +1012,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      */
     public native static long nativeGetRSS();
 
-    public native static byte[] getTestDRBuffer(boolean compatible);
+    /**
+     * Request a DR buffer payload with specified content, partition key value list and flag list should have the same length
+     * @param compatible request test DR buffer of compatible version if it's set to true
+     * @param partitionId producer partition ID
+     * @param partitionKeyValues list of partition key value that specifies the desired partition key value of each txn
+     * @param flags list of DRTxnPartitionHashFlags that specifies the desired type of each txn
+     * @return payload bytes (only txns with no InvocationBuffer header)
+     */
+    public native static byte[] getTestDRBuffer(boolean compatible, int partitionId, int partitionKeyValues[], int flags[]);
 
     /**
      * Start collecting statistics (starts timer).

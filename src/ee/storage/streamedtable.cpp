@@ -181,7 +181,7 @@ TableIterator* StreamedTable::makeIterator() {
     throw UnexpectedEEException("May not iterate a streamed table.");
 }
 
-void StreamedTable::deleteAllTuples(bool freeAllocatedStrings)
+void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible)
 {
     throw UnexpectedEEException("May not delete all tuples of a streamed table.");
 }
@@ -223,12 +223,6 @@ bool StreamedTable::insertTuple(TableTuple &source)
             m_views[i]->processTupleInsert(source, true);
         }
     }
-    return true;
-}
-
-bool StreamedTable::updateTupleWithSpecificIndexes(TableTuple &, TableTuple &, std::vector<TableIndex*> const&, bool)
-{
-    throwFatalException("May not update a streamed table.");
     return true;
 }
 

@@ -275,7 +275,7 @@ public abstract class SubPlanAssembler {
             assert(false);
             return false;
         }
-        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombinePredicate(indexPredicate);
+        List<AbstractExpression> exprsToCover = ExpressionUtil.uncombine(indexPredicate);
 
         for (AbstractExpression coveringExpr : coveringExprs) {
             if (exprsToCover.isEmpty()) {
@@ -1452,11 +1452,11 @@ public abstract class SubPlanAssembler {
      * assess the data from the table according to the path.
      *
      * @param table The table to get data from.
-     * @param path The access path to access the data in the table (index/scan/etc).
      * @return The root of a plan graph to get the data.
      */
     protected static AbstractPlanNode getAccessPlanForTable(JoinNode tableNode) {
         StmtTableScan tableScan = tableNode.getTableScan();
+        // Access path to access the data in the table (index/scan/etc).
         AccessPath path = tableNode.m_currentAccessPath;
         assert(path != null);
 
@@ -1539,11 +1539,11 @@ public abstract class SubPlanAssembler {
         // create the IndexScanNode with all its metadata
         scanNode.setLookupType(path.lookupType);
         scanNode.setBindings(path.bindings);
-        scanNode.setEndExpression(ExpressionUtil.combinePredicates(path.endExprs));
+        scanNode.setEndExpression(ExpressionUtil.combine(path.endExprs));
         scanNode.setPredicate(path.otherExprs);
         // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
         // iteration after it had to initially settle for starting at "greater than a prefix key".
-        scanNode.setInitialExpression(ExpressionUtil.combinePredicates(path.initialExpr));
+        scanNode.setInitialExpression(ExpressionUtil.combine(path.initialExpr));
         scanNode.setSkipNullPredicate();
         scanNode.setEliminatedPostFilters(path.eliminatedPostExprs);
         return resultNode;

@@ -80,7 +80,6 @@ const size_t COLUMN_DESCRIPTOR_SIZE = 1 + 4 + 4; // type, name offset, name leng
 class Table {
     friend class TableFactory;
     friend class TableIterator;
-    friend class TableTupleFilter;
     friend class CopyOnWriteContext;
     friend class ExecutionEngine;
     friend class TableStats;
@@ -126,7 +125,7 @@ class Table {
     // ------------------------------------------------------------------
     // OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool fallible=true) = 0;
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
@@ -380,9 +379,6 @@ protected:
     virtual void freeLastScannedBlock(std::vector<TBPtr>::iterator nextBlockIterator) {
         throw UnexpectedEEException("May not use freeLastScannedBlock with streamed tables or persistent tables.");
     }
-
-    // Return tuple blocks addresses
-    virtual std::vector<uint64_t> getBlockAddresses() const = 0;
 
     Table(int tableAllocationTargetSize);
     void resetTable();

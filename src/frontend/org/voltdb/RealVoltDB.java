@@ -178,9 +178,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     // CatalogContext is immutable, just make sure that accessors see a consistent version
     volatile CatalogContext m_catalogContext;
     private String m_buildString;
-    static final String m_defaultVersionString = "6.2";
+    static final String m_defaultVersionString = "6.3";
     // by default set the version to only be compatible with itself
-    static final String m_defaultHotfixableRegexPattern = "^\\Q6.2\\E\\z";
+    static final String m_defaultHotfixableRegexPattern = "^\\Q6.3\\E\\z";
     // these next two are non-static because they can be overrriden on the CLI for test
     private String m_versionString = m_defaultVersionString;
     private String m_hotfixableRegexPattern = m_defaultHotfixableRegexPattern;
@@ -244,7 +244,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     volatile boolean m_joining = false;
 
     long m_clusterCreateTime;
-    boolean m_replicationActive = false;
+    AtomicBoolean m_replicationActive = new AtomicBoolean(false);
     private ProducerDRGateway m_producerDRGateway = null;
     private ConsumerDRGateway m_consumerDRGateway = null;
 
@@ -382,7 +382,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     new StringBuilder("Files from a previous database session exist in the managed directories:");
             for (String nonEmptyPath : nonEmptyPaths)
                 crashMessage.append("\n  - " + nonEmptyPath);
-            crashMessage.append("\nUse the recover command to restore the previous database or use create --new" +
+            crashMessage.append("\nUse the recover command to restore the previous database or use create --force" +
                 " to start a new database session overwriting existing files.");
             VoltDB.crashLocalVoltDB(crashMessage.toString());
         }
@@ -416,7 +416,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_mode = OperationMode.INITIALIZING;
             m_config = config;
             m_startMode = null;
-            m_consumerDRGateway = new ConsumerDRGateway.DummyConsumerDRGateway();
 
             // set a bunch of things to null/empty/new for tests
             // which reusue the process
@@ -439,7 +438,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             m_recoveryStartTime = System.currentTimeMillis();
             m_hostIdWithStartupCatalog = 0;
             m_pathToStartupCatalog = m_config.m_pathToCatalog;
-            m_replicationActive = false;
+            m_replicationActive = new AtomicBoolean(false);
             m_configLogger = null;
             ActivePlanRepository.clear();
 
@@ -518,8 +517,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             Map<Integer, String> hostGroups = null;
 
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
-            if (!config.m_newVoltdb && config.m_isEnterprise && config.m_startAction == StartAction.CREATE)
-                managedPathsEmptyCheck();
+            if (config.m_isEnterprise && config.m_startAction == StartAction.CREATE && !config.m_forceVoltdbCreate) {
+                    managedPathsEmptyCheck();
+            }
 
             if (!isRejoin && !m_joining) {
                 hostGroups = m_messenger.waitForGroupJoin(numberOfNodes);
@@ -825,7 +825,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     Constructor<?> ndrgwConstructor = ndrgwClass.getConstructor(File.class, File.class, boolean.class, int.class, int.class);
                     m_producerDRGateway = (ProducerDRGateway) ndrgwConstructor.newInstance(new File(m_catalogContext.cluster.getDroverflow()),
                                                                                    getSnapshotPath(m_catalogContext),
-                                                                                   m_replicationActive,
+                                                                                   m_replicationActive.get(),
                                                                                    m_configuredNumberOfPartitions,
                                                                                    m_catalogContext.getDeployment().getCluster().getHostcount());
                     m_producerDRGateway.start();
@@ -833,6 +833,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Unable to load DR system", true, e);
                 }
+            }
+            else {
+                // set up empty stats for the DR Producer
+                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERNODE, 0,
+                        new DRProducerStatsBase.DRProducerNodeStatsBase());
+                getStatsAgent().registerStatsSource(StatsSelector.DRPRODUCERPARTITION, 0,
+                        new DRProducerStatsBase.DRProducerPartitionStatsBase());
             }
             createDRConsumerIfNeeded();
 
@@ -855,7 +862,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                             m_memoryStats,
                             m_commandLog,
                             m_producerDRGateway,
-                            m_consumerDRGateway,
                             iv2init != m_MPI && createMpDRGateway, // first SPI gets it
                             m_config.m_executionCoreBindings.poll());
 
@@ -866,10 +872,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
                 // LeaderAppointer startup blocks if the initiators are not initialized.
                 // So create the LeaderAppointer after the initiators.
-                // arogers: The leader appointer should
-                // expect a sync snapshot. This needs to change when the replica supports different
-                // start actions
-                boolean expectSyncSnapshot = m_config.m_replicationRole == ReplicationRole.REPLICA;
+                boolean expectSyncSnapshot = m_config.m_replicationRole == ReplicationRole.REPLICA && config.m_startAction == StartAction.CREATE;
                 m_leaderAppointer = new LeaderAppointer(
                         m_messenger,
                         m_configuredNumberOfPartitions,
@@ -1806,7 +1809,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
         // print out a bunch of useful system info
         PlatformProperties pp = PlatformProperties.getPlatformProperties();
-        String[] lines = pp.toLogLines().split("\n");
+        String[] lines = pp.toLogLines(getVersionString()).split("\n");
         for (String line : lines) {
             hostLog.info(line.trim());
         }
@@ -2078,6 +2081,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                     } catch (InterruptedException e) {
                         hostLog.warn("Interrupted shutting down invocation buffer server", e);
                     }
+                    finally {
+                        m_producerDRGateway = null;
+                    }
                 }
 
                 shutdownReplicationConsumerRole();
@@ -2300,10 +2306,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             // Perform any actions that would have been taken during the ordinary
             // initialization path
             if (createDRConsumerIfNeeded()) {
-                for (Initiator iv2init : m_iv2Initiators.values()) {
-                    iv2init.setConsumerDRGateway(m_consumerDRGateway);
+                for (int pid : m_cartographer.getPartitions()) {
+                    // Notify the consumer of leaders because it was disabled before
+                    ClientInterfaceRepairCallback callback = (ClientInterfaceRepairCallback) m_consumerDRGateway;
+                    callback.repairCompleted(pid, m_cartographer.getHSIdForMaster(pid));
                 }
-                m_consumerDRGateway.initialize(false);
+                // If this is @UAC cl replay, don't initialize DR consumer until
+                // cluster recover finished.
+                if (m_mode != OperationMode.INITIALIZING) {
+                    m_consumerDRGateway.initialize(false);
+                }
             }
             // 6.2. If we are a DR replica, we may care about a
             // deployment update
@@ -2574,7 +2586,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     {
         if (role == ReplicationRole.NONE && m_config.m_replicationRole == ReplicationRole.REPLICA) {
             consoleLog.info("Promoting replication role from replica to master.");
+            hostLog.info("Promoting replication role from replica to master.");
             shutdownReplicationConsumerRole();
+            getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
+            getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
+            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
+                    new DRConsumerStatsBase.DRConsumerNodeStatsBase());
+            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
+                    new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
         }
         m_config.m_replicationRole = role;
         if (m_clientInterface != null) {
@@ -2588,6 +2607,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 m_consumerDRGateway.shutdown(true);
             } catch (InterruptedException e) {
                 hostLog.warn("Interrupted shutting down dr replication", e);
+            }
+            finally {
+                m_consumerDRGateway = null;
             }
         }
     }
@@ -2701,6 +2723,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
         if (m_rejoining) {
             if (m_rejoinTruncationReqId.compareTo(requestId) <= 0) {
                 String actionName = m_joining ? "join" : "rejoin";
+                // remove the rejoin blocker
+                final String node = VoltZK.rejoinNodesBlockerHost+String.valueOf(m_myHostId);
+                VoltZK.removeRejoinNodeIndicator(m_messenger.getZK(),node);
                 consoleLog.info(String.format("Node %s completed", actionName));
                 m_rejoinTruncationReqId = null;
                 m_rejoining = false;
@@ -2759,7 +2784,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                         VoltDB.getDefaultReplicationInterface());
             }
             if (m_consumerDRGateway != null) {
-                m_consumerDRGateway.initialize(m_config.m_startAction.doesRecover());
+                m_consumerDRGateway.initialize(m_config.m_startAction != StartAction.CREATE);
             }
         } catch (Exception ex) {
             MiscUtils.printPortsInUse(hostLog);
@@ -2769,8 +2794,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
 
     private boolean createDRConsumerIfNeeded() {
         if (!m_config.m_isEnterprise
-                || !(m_consumerDRGateway instanceof ConsumerDRGateway.DummyConsumerDRGateway)
+                || (m_consumerDRGateway != null)
                 || !m_catalogContext.cluster.getDrconsumerenabled()) {
+            if (!m_config.m_isEnterprise || !m_catalogContext.cluster.getDrconsumerenabled()) {
+                // This is called multiple times but the new value will be ignored if a StatSource has been assigned
+                getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
+                        new DRConsumerStatsBase.DRConsumerNodeStatsBase());
+                getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
+                        new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
+            }
             return false;
         }
         if (m_config.m_replicationRole == ReplicationRole.REPLICA ||
@@ -2782,6 +2814,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
                 VoltDB.crashLocalVoltDB("Cannot start as DR consumer without an enabled DR data connection.");
             }
             try {
+                getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERNODE, 0);
+                getStatsAgent().deregisterStatsSourcesFor(StatsSelector.DRCONSUMERPARTITION, 0);
                 Class<?> rdrgwClass = Class.forName("org.voltdb.dr2.ConsumerDRGatewayImpl");
                 Constructor<?> rdrgwConstructor = rdrgwClass.getConstructor(
                         int.class,
@@ -2799,21 +2833,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
             }
             return true;
         }
+        else {
+            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERNODE, 0,
+                    new DRConsumerStatsBase.DRConsumerNodeStatsBase());
+            getStatsAgent().registerStatsSource(StatsSelector.DRCONSUMERPARTITION, 0,
+                    new DRConsumerStatsBase.DRConsumerPartitionStatsBase());
+        }
         return false;
     }
 
+    // Thread safe
     @Override
     public void setReplicationActive(boolean active)
     {
-        if (m_replicationActive != active) {
-            m_replicationActive = active;
+        if (m_replicationActive.compareAndSet(!active, active)) {
 
             try {
                 JSONStringer js = new JSONStringer();
                 js.object();
                 // Replication role should the be same across the cluster
                 js.key("role").value(getReplicationRole().ordinal());
-                js.key("active").value(m_replicationActive);
+                js.key("active").value(m_replicationActive.get());
                 js.endObject();
 
                 getHostMessenger().getZK().setData(VoltZK.replicationconfig,
@@ -2834,7 +2874,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback {
     @Override
     public boolean getReplicationActive()
     {
-        return m_replicationActive;
+        return m_replicationActive.get();
     }
 
     @Override

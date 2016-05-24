@@ -113,7 +113,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     private int m_purpose = FOR_SCANNING_PERFORMANCE_OR_ORDERING;
 
     // Post-filters that got eliminated by exactly matched partial index filters
-    private List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<AbstractExpression>();
+    private final List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<AbstractExpression>();
 
     public IndexScanPlanNode() {
         super();
@@ -153,7 +153,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         int nextKeyIndex;
         if (m_endExpression != null &&
-                searchKeySize < ExpressionUtil.uncombinePredicate(m_endExpression).size()) {
+                searchKeySize < ExpressionUtil.uncombine(m_endExpression).size()) {
             nextKeyIndex = searchKeySize;
         } else if (searchKeySize == 0) {
             m_skip_null_predicate = null;
@@ -233,7 +233,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
             exprs.add(expr);
 
-            skipNullPredicate = ExpressionUtil.combinePredicates(exprs);
+            skipNullPredicate = ExpressionUtil.combine(exprs);
             skipNullPredicate.finalizeValueTypes();
         }
         return skipNullPredicate;
@@ -445,9 +445,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     {
         if (newExpr != null)
         {
-            List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombinePredicate(m_endExpression);
+            List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombine(m_endExpression);
             newEndExpressions.add((AbstractExpression)newExpr.clone());
-            m_endExpression = ExpressionUtil.combinePredicates(newEndExpressions);
+            m_endExpression = ExpressionUtil.combine(newEndExpressions);
         }
     }
 
@@ -540,12 +540,31 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super.resolveColumnIndexes();
     }
 
+    private double getSearchExpressionKeyWidth(final double colCount) {
+        double keyWidth = m_searchkeyExpressions.size();
+        assert(keyWidth <= colCount);
+        // count a range scan as a half covered column
+        if (keyWidth > 0.0 &&
+            m_lookupType != IndexLookupType.EQ &&
+            m_lookupType != IndexLookupType.GEO_CONTAINS) {
+            keyWidth -= 0.5;
+        }
+        else if (keyWidth == 0.0 && m_endExpression != null) {
+            // When there is no start key, count an end-key as a single-column range scan key.
+
+            // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
+            // might give a result that is more in line with multi-component start-key-only scans.
+            keyWidth = 0.5;
+        }
+        return keyWidth;
+    }
+
     @Override
     public void computeCostEstimates(long unusedChildOutputTupleCountEstimate,
-            Cluster unusedCluster,
-            Database unusedDb,
-            DatabaseEstimates estimates,
-            ScalarValueHints[] unusedParamHints) {
+                                     Cluster unusedCluster,
+                                     Database unusedDb,
+                                     DatabaseEstimates estimates,
+                                     ScalarValueHints[] unusedParamHints) {
 
         // HOW WE COST INDEXES
         // unique, covering index always wins
@@ -558,25 +577,10 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(m_targetTableName);
 
-        // get the width of the index and number of columns used
+        // get the width of the index - number of columns or expression included in the index
         // need doubles for math
-        double colCount = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
-        double keyWidth = m_searchkeyExpressions.size();
-        assert(keyWidth <= colCount);
-
-        // count a range scan as a half covered column
-        if (keyWidth > 0.0 &&
-                m_lookupType != IndexLookupType.EQ &&
-                m_lookupType != IndexLookupType.GEO_CONTAINS) {
-            keyWidth -= 0.5;
-        }
-        // When there is no start key, count an end-key as a single-column range scan key.
-        else if (keyWidth == 0.0 && m_endExpression != null) {
-            // TODO: ( (double) ExpressionUtil.uncombineAny(m_endExpression).size() ) - 0.5
-            // might give a result that is more in line with multi-component start-key-only scans.
-            keyWidth = 0.5;
-        }
-
+        final double colCount = CatalogUtil.getCatalogIndexSize(m_catalogIndex);
+        final double keyWidth = getSearchExpressionKeyWidth(colCount);
 
         // Estimate the cost of the scan (AND each projection and sort thereafter).
         // This "tuplesToRead" is not strictly speaking an expected count of tuples.
@@ -955,7 +959,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // added for reverse scan purpose only
     public boolean isPredicatesOptimizableForAggregate() {
         // for reverse scan, need to examine "added" predicates
-        List<AbstractExpression> predicates = ExpressionUtil.uncombinePredicate(m_predicate);
+        List<AbstractExpression> predicates = ExpressionUtil.uncombine(m_predicate);
         // if the size of predicates doesn't equal 1, can't be our added artifact predicates
         if (predicates.size() != 1) {
             return false;

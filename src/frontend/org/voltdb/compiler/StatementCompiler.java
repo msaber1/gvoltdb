@@ -35,6 +35,7 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
@@ -311,9 +312,18 @@ public abstract class StatementCompiler {
      */
     static byte[] writePlanBytes(VoltCompiler compiler, PlanFragment fragment, AbstractPlanNode planGraph)
     throws VoltCompilerException {
+        String json = null;
         // get the plan bytes
-        PlanNodeList node_list = new PlanNodeList(planGraph);
-        String json = node_list.toJSONString();
+        try {
+            PlanNodeList node_list = new PlanNodeList(planGraph);
+            json = node_list.toJSONString();
+        }
+        catch (StackOverflowError error) {
+            //
+            String msg = "Encountered stack overflow error. "
+                       + "Try reducing the number of predicate expressions in the query.";
+            throw compiler.new VoltCompilerException(msg);
+        }
         compiler.captureDiagnosticJsonFragment(json);
         // Place serialized version of PlanNodeTree into a PlanFragment
         byte[] jsonBytes = json.getBytes(Charsets.UTF_8);
@@ -414,9 +424,10 @@ public abstract class StatementCompiler {
         // We will need to update the system catalogs with this new information
         for (int i = 0; i < plan.parameters.length; ++i) {
             StmtParameter catalogParam = stmt.getParameters().add(String.valueOf(i));
-            catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
-            catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
             catalogParam.setIndex(i);
+            ParameterValueExpression pve = plan.parameters[i];
+            catalogParam.setJavatype(pve.getValueType().getValue());
+            catalogParam.setIsarray(pve.getParamIsVector());
         }
 
         PlanFragment frag = stmt.getFragments().add("0");
