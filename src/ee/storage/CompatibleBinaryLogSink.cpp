@@ -370,21 +370,21 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                                   drTable, pool, newTuple, NOT_CONFLICT_ON_PK, actionType, insertConflict, NEW_ROW);
     }
 
-    int retval = ExecutorContext::getExecutorContext()->getTopend()->reportDRConflict(static_cast<int32_t>(UniqueId::pid(uniqueId)),
-                                                                                      remoteClusterId,
-                                                                                      UniqueId::timestampSinceUnixEpoch(uniqueId),
-                                                                                      drTable->name(),
-                                                                                      actionType,
-                                                                                      deleteConflict,
-                                                                                      existingMetaTableForDelete.get(),
-                                                                                      existingTupleTableForDelete.get(),
-                                                                                      expectedMetaTableForDelete.get(),
-                                                                                      expectedTupleTableForDelete.get(),
-                                                                                      insertConflict,
-                                                                                      existingMetaTableForInsert.get(),
-                                                                                      existingTupleTableForInsert.get(),
-                                                                                      newMetaTableForInsert.get(),
-                                                                                      newTupleTableForInsert.get());
+    int retval = ExecutorContext::reportDRConflict(UniqueId::pid(uniqueId),
+                                                   remoteClusterId,
+                                                   UniqueId::timestampSinceUnixEpoch(uniqueId),
+                                                   drTable->name(),
+                                                   actionType,
+                                                   deleteConflict,
+                                                   existingMetaTableForDelete.get(),
+                                                   existingTupleTableForDelete.get(),
+                                                   expectedMetaTableForDelete.get(),
+                                                   expectedTupleTableForDelete.get(),
+                                                   insertConflict,
+                                                   existingMetaTableForInsert.get(),
+                                                   existingTupleTableForInsert.get(),
+                                                   newMetaTableForInsert.get(),
+                                                   newTupleTableForInsert.get());
     bool applyRemoteChange = isApplyNewRow(retval);
     bool resolved = isResolved(retval);
     // if conflict is not resolved, don't delete any existing rows.
@@ -428,29 +428,29 @@ bool handleConflict(VoltDBEngine *engine, PersistentTable *drTable, Pool *pool, 
                 newMetaTableForInsert.get(), newTupleTableForInsert.get());
     }
 
-    if (existingMetaTableForDelete.get()) {
-        existingMetaTableForDelete.get()->deleteAllTuples(true, false);
+    if (existingMetaTableForDelete) {
+        existingMetaTableForDelete->deleteAllTuplesNonVirtual(true);
     }
-    if (existingTupleTableForDelete.get()) {
-        existingTupleTableForDelete.get()->deleteAllTuples(true, false);
+    if (existingTupleTableForDelete) {
+        existingTupleTableForDelete->deleteAllTuplesNonVirtual(true);
     }
-    if (expectedMetaTableForDelete.get()) {
-        expectedMetaTableForDelete.get()->deleteAllTuples(true, false);
+    if (expectedMetaTableForDelete) {
+        expectedMetaTableForDelete->deleteAllTuplesNonVirtual(true);
     }
-    if (expectedTupleTableForDelete.get()) {
-        expectedTupleTableForDelete.get()->deleteAllTuples(true, false);
+    if (expectedTupleTableForDelete) {
+        expectedTupleTableForDelete->deleteAllTuplesNonVirtual(true);
     }
-    if (existingMetaTableForInsert.get()) {
-        existingMetaTableForInsert.get()->deleteAllTuples(true, false);
+    if (existingMetaTableForInsert) {
+        existingMetaTableForInsert->deleteAllTuplesNonVirtual(true);
     }
-    if (existingTupleTableForInsert.get()) {
-        existingTupleTableForInsert.get()->deleteAllTuples(true, false);
+    if (existingTupleTableForInsert) {
+        existingTupleTableForInsert->deleteAllTuplesNonVirtual(true);
     }
-    if (newMetaTableForInsert.get()) {
-        newMetaTableForInsert.get()->deleteAllTuples(true, false);
+    if (newMetaTableForInsert) {
+        newMetaTableForInsert->deleteAllTuplesNonVirtual(true);
     }
-    if (newTupleTableForInsert.get()) {
-        newTupleTableForInsert.get()->deleteAllTuples(true, false);
+    if (newTupleTableForInsert) {
+        newTupleTableForInsert->deleteAllTuplesNonVirtual(true);
     }
 
     return true;

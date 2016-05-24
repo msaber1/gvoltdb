@@ -306,9 +306,7 @@ public:
     }
 
     void endTxn(MockVoltDBEngine *engine, bool success) {
-        if (!success) {
-            m_undoLog.undo(m_undoToken);
-        } else {
+        if (success) {
             m_undoLog.release(m_undoToken++);
             if (engine->getExecutorContext()->drStream() != NULL) {
                 engine->getExecutorContext()->drStream()->endTransaction(m_currTxnUniqueId);
@@ -316,6 +314,9 @@ public:
             if (engine->getExecutorContext()->drReplicatedStream() != NULL) {
                 engine->getExecutorContext()->drReplicatedStream()->endTransaction(m_currTxnUniqueId);
             }
+        }
+        else {
+            m_undoLog.undo(m_undoToken);
         }
     }
 
@@ -998,9 +999,11 @@ TEST_F(DRBinaryLogTest, CantFindTable) {
     // should not throw fatal exception.
     try {
         flushAndApply(99, false);
-    } catch (SerializableEEException &e) {
+    }
+    catch (const SerializableEEException& e) {
         endTxn(m_engine, false);
-    } catch (...) {
+    }
+    catch (...) {
         ASSERT_TRUE(false);
     }
 }
@@ -1888,7 +1891,7 @@ TEST_F(DRBinaryLogTest, InsertOverBufferLimit) {
         for (int i = 1; i <= total; i++) {
             insertTuple(m_table, prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
         }
-    } catch (SerializableEEException e) {
+    } catch (const SerializableEEException& e) {
         endTxn(m_engine, false);
         spHandle++;
 
@@ -1936,7 +1939,8 @@ TEST_F(DRBinaryLogTest, UpdateOverBufferLimit) {
             newTuple.setNValue(1, ValueFactory::getBigIntValue(i));
             updateTuple(m_table, oldTuple, newTuple);
         }
-    } catch (SerializableEEException e) {
+    }
+    catch (const SerializableEEException& e) {
         endTxn(m_engine, false);
 
         // Make sure all changes rolled back
@@ -1974,7 +1978,8 @@ TEST_F(DRBinaryLogTest, DeleteOverBufferLimit) {
             TableTuple tuple = m_table->lookupTupleByValues(prepareTempTuple(m_table, 42, i, "349508345.34583", "a thing", "a totally different thing altogether", i));
             deleteTuple(m_table, tuple);
         }
-    } catch (SerializableEEException e) {
+    }
+    catch (const SerializableEEException& e) {
         endTxn(m_engine, false);
         spHandle++;
 

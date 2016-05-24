@@ -80,6 +80,7 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Deployment;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.common.Constants;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
@@ -100,7 +101,6 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
-import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
 
 import vanilla.java.affinity.impl.PosixJNAAffinity;
@@ -1412,8 +1412,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         boolean DRCatalogChange = false;
-        CatalogMap<Table> tables = m_context.catalog.getClusters().get("cluster").getDatabases().get("database").getTables();
-        for (Table t : tables) {
+        for (Table t : m_context.tables) {
             if (t.getIsdred()) {
                 DRCatalogChange |= diffCmds.contains("tables#" + t.getTypeName());
                 if (DRCatalogChange) {
@@ -1444,7 +1443,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (DRCatalogChange) {
             final Pair<Long, String> catalogCommands = DRCatalogDiffEngine.serializeCatalogCommandsForDr(m_context.catalog);
             generateDREvent( EventType.CATALOG_UPDATE, uniqueId, m_lastCommittedSpHandle,
-                    spHandle, catalogCommands.getSecond().getBytes(Charsets.UTF_8));
+                    spHandle, catalogCommands.getSecond().getBytes(Constants.UTF8ENCODING));
         }
 
         return true;
@@ -1539,8 +1538,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ByteBuffer paramBuffer = m_ee.getParamBufferForExecuteTask(4 + log.length);
         paramBuffer.putInt(log.length);
         paramBuffer.put(log);
-        return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle, m_lastCommittedSpHandle, uniqueId,
-                            remoteClusterId, getNextUndoToken(m_currentTxnId));
+        return m_ee.applyBinaryLog(paramBuffer, txnId, spHandle,
+                m_lastCommittedSpHandle, uniqueId,
+                remoteClusterId, getNextUndoToken(m_currentTxnId));
     }
 
     @Override

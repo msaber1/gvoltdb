@@ -18,7 +18,6 @@
 #ifndef TOPEND_H_
 #define TOPEND_H_
 #include "common/ids.h"
-#include "common/FatalException.hpp"
 #include "common/types.h"
 
 #include <string>
@@ -28,9 +27,10 @@
 #include <boost/shared_array.hpp>
 
 namespace voltdb {
-class Table;
+class FatalException;
 class Pool;
 class StreamBlock;
+class Table;
 
 /*
  * Topend abstracts the EE's calling interface to Java to
@@ -38,7 +38,7 @@ class StreamBlock;
  * the IPC communication paths.
  */
 class Topend {
-  public:
+public:
     virtual int loadNextDependency(
         int32_t dependencyId, voltdb::Pool *pool, Table* destination) = 0;
 
@@ -55,9 +55,10 @@ class Topend {
 
     virtual std::string planForFragmentId(int64_t fragmentId) = 0;
 
-    virtual void crashVoltDB(voltdb::FatalException e) = 0;
+    virtual void crashVoltDB(const voltdb::FatalException& e) = 0;
 
     virtual int64_t getQueuedExportBytes(int32_t partitionId, std::string signature) = 0;
+
     virtual void pushExportBuffer(
             int64_t exportGeneration,
             int32_t partitionId,
@@ -68,10 +69,13 @@ class Topend {
 
     virtual int64_t pushDRBuffer(int32_t partitionId, StreamBlock *block) = 0;
 
-    virtual int reportDRConflict(int32_t partitionId, int32_t remoteClusterId, int64_t remoteTimestamp, std::string tableName, DRRecordType action,
-            DRConflictType deleteConflict, Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
+    virtual int reportDRConflict(int32_t partitionId, int32_t remoteClusterId,
+            int64_t remoteTimestamp, std::string tableName, DRRecordType action,
+            DRConflictType deleteConflict,
+            Table *existingMetaTableForDelete, Table *existingTupleTableForDelete,
             Table *expectedMetaTableForDelete, Table *expectedTupleTableForDelete,
-            DRConflictType insertConflict, Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
+            DRConflictType insertConflict,
+            Table *existingMetaTableForInsert, Table *existingTupleTableForInsert,
             Table *newMetaTableForInsert, Table *newTupleTableForInsert) = 0;
 
     virtual void fallbackToEEAllocatedBuffer(char *buffer, size_t length) = 0;
@@ -100,7 +104,7 @@ public:
 
     std::string planForFragmentId(int64_t fragmentId);
 
-    void crashVoltDB(voltdb::FatalException e);
+    void crashVoltDB(const voltdb::FatalException& e);
 
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
 

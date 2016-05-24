@@ -73,14 +73,24 @@ class AbstractExecutor {
     bool init(VoltDBEngine*, TempTableLimits* limits);
 
     /** Invoke a plannode's associated executor */
-    bool execute(const NValueArray& params);
+    void execute(const NValueArray& params)
+    {
+        assert(m_abstractNode);
+        VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
+
+        // run the executor
+        if (!p_execute(params)) {
+            throw UnexpectedEEException("Unspecified execution error detected");
+        }
+    }
+
 
     /**
      * Returns the plannode that generated this executor.
      */
-    inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
+    AbstractPlanNode* getPlanNode() { return m_abstractNode; }
 
-    inline void cleanupTempOutputTable()
+    void cleanupTempOutputTable()
     {
         if (m_tmpOutputTable) {
             VOLT_TRACE("Clearing output table...");
@@ -88,7 +98,7 @@ class AbstractExecutor {
         }
     }
 
-    inline void cleanupInputTempTable(Table * input_table) {
+    void cleanupInputTempTable(Table * input_table) {
         TempTable* tmp_input_table = dynamic_cast<TempTable*>(input_table);
         if (tmp_input_table) {
             // No need of its input temp table
@@ -100,7 +110,7 @@ class AbstractExecutor {
         // LEAVE as blank on purpose
     }
 
-    inline bool outputTempTableIsEmpty() const {
+    bool outputTempTableIsEmpty() const {
         if (m_tmpOutputTable != NULL) {
             return m_tmpOutputTable->activeTupleCount() == 0;
         }
@@ -157,16 +167,5 @@ class AbstractExecutor {
 
 };
 
-
-inline bool AbstractExecutor::execute(const NValueArray& params)
-{
-    assert(m_abstractNode);
-    VOLT_TRACE("Starting execution of plannode(id=%d)...",  m_abstractNode->getPlanNodeId());
-
-    // run the executor
-    return p_execute(params);
-}
-
-}
-
+} // namespace voltdb
 #endif

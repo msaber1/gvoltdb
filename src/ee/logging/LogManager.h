@@ -43,7 +43,7 @@ public:
      * Retrieve a logger by ID
      * @parameter loggerId ID of the logger to retrieve
      */
-    inline const Logger* getLogger(LoggerId id) const {
+    const Logger* getLogger(LoggerId id) const {
         switch (id) {
         case LOGGERID_SQL:
             return &m_sqlLogger;
@@ -58,7 +58,7 @@ public:
      * Update the log levels of the loggers.
      * @param logLevels Integer contaning the log levels for the various loggers
      */
-    inline void setLogLevels(int64_t logLevels) {
+    void setLogLevels(int64_t logLevels) {
         m_sqlLogger.m_level = static_cast<LogLevel>((7 & logLevels));
         m_hostLogger.m_level = static_cast<LogLevel>(((7 << 3) & logLevels) >> 3);
     }
@@ -67,7 +67,7 @@ public:
      * Retrieve the log proxy used by this LogManager and its Loggers
      * @return LogProxy Pointer to the LogProxy in use by this LogManager and its Loggers
      */
-    inline const LogProxy* getLogProxy() {
+    LogProxy* getLogProxy() const {
         return m_proxy;
     }
 
@@ -83,7 +83,7 @@ public:
      * Retrieve a logger by ID from the LogManager associated with this thread.
      * @parameter loggerId ID of the logger to retrieve
      */
-    inline static const Logger* getThreadLogger(LoggerId id) {
+    static const Logger* getThreadLogger(LoggerId id) {
         return getThreadLogManager()->getLogger(id);
     }
 
@@ -94,7 +94,7 @@ private:
     /**
      * The log proxy in use by this LogManager and its Loggers
      */
-    const LogProxy *m_proxy;
+    LogProxy* const m_proxy;
     Logger m_sqlLogger;
     Logger m_hostLogger;
 };

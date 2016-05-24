@@ -53,7 +53,12 @@ import org.voltdb.utils.VoltTableUtil;
  */
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
 
-    static VoltLogger log = new VoltLogger("HOST");
+    /** The logger is essentially a "static final" constant, except that it is
+        convenient in some tests to substititute a "mocked" logger via
+        setVoltLoggerForTest. */
+    protected static VoltLogger LOG = new VoltLogger("HOST");
+
+    protected static final boolean HOST_TRACE_ENABLED = LOG.isTraceEnabled();
 
     public static enum TaskType {
         VALIDATE_PARTITIONING(0),
@@ -91,8 +96,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     // These two definitions must match the definitions in voltdbipc.cpp
     protected static final int ERRORCODE_SUCCESS = 0;
     protected static final int ERRORCODE_ERROR = 1; // just error or not so far.
-
-    protected static final int ERRORCODE_WRONG_SERIALIZED_BYTES = 101;
 
     /** For now sync this value with the value in the EE C++ code to get good stats. */
     public static final int EE_PLAN_CACHE_SIZE = 1000;
@@ -146,9 +149,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         return m_dirty;
     }
 
-    @Override
-    public void deserializedBytes(final int numBytes) {
+    public void setBatchTimeout(int batchTimeout) {
+        m_batchTimeout = batchTimeout;
     }
+
+    public int getBatchTimeout() {
+        return m_batchTimeout;
+    }
+
+    private boolean shouldTimeOut(long latency) {
+        if (m_readOnly &&
+                m_batchTimeout > NO_BATCH_TIMEOUT_VALUE &&
+                m_batchTimeout < latency) {
+            return true;
+        }
+        return false;
+    }
+
+    @Override
+    public void deserializedBytes(int numBytes) { }
 
     /** Create an ee and load the volt shared library */
     public ExecutionEngine(long siteId, int partitionId) {
@@ -182,7 +201,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Does not copy the table data - references WorkUnit's tables.
      * @param dependencies
      */
-    public void stashWorkUnitDependencies(final Map<Integer, List<VoltTable>> dependencies) {
+    public void stashWorkUnitDependencies(Map<Integer, List<VoltTable>> dependencies) {
         m_dependencyTracker.trackNewWorkUnit(dependencies);
     }
 
@@ -191,23 +210,23 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param depId
      * @param vt
      */
-    public void stashDependency(final int depId, final VoltTable vt) {
+    public void stashDependencyForTest(int depId, VoltTable vt)
+    {
         m_dependencyTracker.addDependency(depId, vt);
     }
 
 
-    private class DependencyTracker {
+    private static class DependencyTracker {
         private final HashMap<Integer, ArrayDeque<VoltTable>> m_depsById =
-            new HashMap<Integer, ArrayDeque<VoltTable>>();
-
-        private final VoltLogger hostLog = new VoltLogger("HOST");
+            new HashMap<>();
 
         /**
          * Add a single dependency. Exists only for test cases.
          * @param depId
          * @param vt
          */
-        void addDependency(final int depId, final VoltTable vt) {
+        void addDependency(int depId, VoltTable vt)
+        {
             ArrayDeque<VoltTable> deque = m_depsById.get(depId);
             if (deque == null) {
                 deque = new ArrayDeque<VoltTable>();
@@ -220,14 +239,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
          * Store dependency tables for later retrieval by the EE.
          * @param workunit
          */
-        void trackNewWorkUnit(final Map<Integer, List<VoltTable>> dependencies) {
-            for (final Entry<Integer, List<VoltTable>> e : dependencies.entrySet()) {
+        void trackNewWorkUnit(Map<Integer, List<VoltTable>> dependencies)
+        {
+            for (Entry<Integer, List<VoltTable>> e : dependencies.entrySet()) {
                 // could do this optionally - debug only.
                 verifyDependencySanity(e.getKey(), e.getValue());
                 // create a new list of references to the workunit's table
                 // to avoid any changes to the WorkUnit's list. But do not
                 // copy the table data.
-                final ArrayDeque<VoltTable> deque = new ArrayDeque<VoltTable>();
+                ArrayDeque<VoltTable> deque = new ArrayDeque<VoltTable>();
                 for (VoltTable depTable : e.getValue()) {
                     // A joining node will respond with a table that has this status code
                     if (depTable.getStatusCode() != VoltTableUtil.NULL_DEPENDENCY_STATUS) {
@@ -240,23 +260,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             }
         }
 
-        public VoltTable nextDependency(final int dependencyId) {
+        public VoltTable nextDependency(int dependencyId)
+        {
             // this formulation retains an arraydeque in the tracker that is
             // overwritten by the next transaction using this dependency id. If
             // the EE requests all dependencies (as is expected), the deque
             // will not retain any references to VoltTables (which is the goal).
             final ArrayDeque<VoltTable> vtstack = m_depsById.get(dependencyId);
-            if (vtstack != null && vtstack.size() > 0) {
-                // java doc. says this amortized constant time.
-                return vtstack.pop();
-            }
-            else if (vtstack == null) {
+            if (vtstack == null) {
                 assert(false) : "receive without associated tracked dependency.";
                 return null;
             }
-            else {
+            if (vtstack.isEmpty()) {
                 return null;
             }
+            // java doc. says this amortized constant time.
+            return vtstack.pop();
         }
 
         /**
@@ -264,30 +283,30 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
          * @param dependencyId
          * @param dependencies
          */
-        void verifyDependencySanity(final Integer dependencyId, final List<VoltTable> dependencies) {
+        void verifyDependencySanity(Integer dependencyId, List<VoltTable> dependencies)
+        {
             if (dependencies == null) {
-                hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotFound.name(),
-                               new Object[] { dependencyId }, null);
+                LOG.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotFound.name(),
+                        new Object[] { dependencyId }, null);
                 VoltDB.crashLocalVoltDB("No additional info.", false, null);
                 // Prevent warnings.
                 return;
             }
-            for (final Object dependency : dependencies) {
+            for (Object dependency : dependencies) {
                 if (dependency == null) {
-                    hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyContainedNull.name(),
-                                   new Object[] { dependencyId },
-                            null);
+                    LOG.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyContainedNull.name(),
+                            new Object[] { dependencyId }, null);
                     VoltDB.crashLocalVoltDB("No additional info.", false, null);
                     // Prevent warnings.
                     return;
                 }
-                if (hostLog.isTraceEnabled()) {
-                    hostLog.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
-                               new Object[] { dependencyId, dependency.getClass().getName(), dependency.toString() },
-                               null);
+                if (HOST_TRACE_ENABLED) {
+                    LOG.l7dlog(Level.TRACE, LogKeys.org_voltdb_ExecutionSite_ImportingDependency.name(),
+                            new Object[] { dependencyId, dependency.getClass().getName(), dependency.toString() },
+                            null);
                 }
                 if (!(dependency instanceof VoltTable)) {
-                    hostLog.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotVoltTable.name(),
+                    LOG.l7dlog(Level.FATAL, LogKeys.host_ExecutionSite_DependencyNotVoltTable.name(),
                                    new Object[] { dependencyId }, null);
                     VoltDB.crashLocalVoltDB("No additional info.", false, null);
                 }
@@ -298,24 +317,21 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
 
-
     /*
      * Interface backend invokes to communicate to Java frontend
      */
-
 
     /**
      * Call VoltDB.crashVoltDB on behalf of the EE
      * @param reason Reason the EE crashed
      */
     public static void crashVoltDB(String reason, String traces[], String filename, int lineno) {
-        VoltLogger hostLog = new VoltLogger("HOST");
         String fn = (filename == null) ? "unknown" : filename;
         String re = (reason == null) ? "Fatal EE error." : reason;
-        hostLog.fatal(re + " In " + fn + ":" + lineno);
+        LOG.fatal(re + " In " + fn + ":" + lineno);
         if (traces != null) {
             for ( String trace : traces) {
-                hostLog.fatal(trace);
+                LOG.fatal(trace);
             }
         }
         VoltDB.crashLocalVoltDB(re + " In " + fn + ":" + lineno, true, null);
@@ -324,19 +340,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Called from the ExecutionEngine to request serialized dependencies.
      */
-    public byte[] nextDependencyAsBytes(final int dependencyId) {
-        final VoltTable vt =  m_dependencyTracker.nextDependency(dependencyId);
-        if (vt != null) {
-            final ByteBuffer buf2 = PrivateVoltTableFactory.getTableDataReference(vt);
-            int pos = buf2.position();
-            byte[] bytes = new byte[buf2.limit() - pos];
-            buf2.get(bytes);
-            buf2.position(pos);
-            return bytes;
-        }
-        else {
+    public byte[] nextDependencyAsBytes(int dependencyId)
+    {
+        VoltTable vt =  m_dependencyTracker.nextDependency(dependencyId);
+        if (vt == null) {
             return null;
         }
+        ByteBuffer buf2 = PrivateVoltTableFactory.getTableDataReference(vt);
+        int pos = buf2.position();
+        byte[] bytes = new byte[buf2.limit() - pos];
+        buf2.get(bytes);
+        buf2.position(pos);
+        return bytes;
     }
 
     public long fragmentProgressUpdate(int indexFromFragmentTask,
@@ -357,10 +372,10 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
         long latency = currentTime - m_startTime;
 
-        if (shouldTimedOut(latency)) {
+        if (shouldTimeOut(latency)) {
 
             String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, true);
-            log.info(msg);
+            LOG.info(msg);
 
             // timing out the long running queries
             return -1 * latency;
@@ -385,7 +400,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             return LONG_OP_THRESHOLD;
         }
         String msg = getLongRunningQueriesMessage(indexFromFragmentTask, latency, planNodeTypeAsInt, false);
-        log.info(msg);
+        LOG.info(msg);
 
         m_logDuration = (m_logDuration < 30000) ? (2 * m_logDuration) : 30000;
         m_lastMsgTime = currentTime;
@@ -396,7 +411,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     private String getLongRunningQueriesMessage(int indexFromFragmentTask,
-            long latency, int planNodeTypeAsInt, boolean timeout) {
+            long latency, int planNodeTypeAsInt, boolean timeout)
+    {
         String status = timeout ? "timed out at" : "taking a long time to execute -- at least";
         String msg = String.format(
                 "Procedure %s is %s " +
@@ -449,7 +465,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
             msg += sb.toString();
         }
-
         return msg;
     }
 
@@ -457,7 +472,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Called from the execution engine to fetch a plan for a given hash.
      * Also update cache stats.
      */
-    public byte[] planForFragmentId(long fragmentId) {
+    protected byte[] planForFragmentId(long fragmentId)
+    {
         // track cache misses
         m_cacheMisses++;
         // estimate the cache size by the number of misses
@@ -472,7 +488,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Interface frontend invokes to communicate to CPP execution engine.
      */
 
-    public abstract boolean activateTableStream(final int tableId,
+    public abstract boolean activateTableStream(int tableId,
                                                 TableStreamType type,
                                                 long undoQuantumToken,
                                                 byte[] predicates);
@@ -489,34 +505,39 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public abstract Pair<Long, int[]> tableStreamSerializeMore(int tableId, TableStreamType type,
                                                                List<DBBPool.BBContainer> outputBuffers);
 
-    public abstract void processRecoveryMessage( ByteBuffer buffer, long pointer);
+    public abstract boolean processRecoveryMessage( ByteBuffer buffer, long pointer);
 
     /** Releases the Engine object. */
-    public abstract void release() throws EEException, InterruptedException;
+    public abstract boolean release() throws EEException, InterruptedException;
 
     public static byte[] getStringBytes(String string) {
         try {
             return string.getBytes("UTF-8");
-        } catch (UnsupportedEncodingException e) {
+        }
+        catch (UnsupportedEncodingException e) {
             throw new AssertionError(e);
         }
     }
 
-    public void loadCatalog(long timestamp, String serializedCatalog) {
+    public void loadCatalog(long timestamp, String serializedCatalog)
+    {
+        // Purposely discarding dummy return.
         loadCatalog(timestamp, getStringBytes(serializedCatalog));
     }
 
     /** Pass the catalog to the engine */
-    protected abstract void loadCatalog(final long timestamp, final byte[] catalogBytes) throws EEException;
+    protected abstract boolean loadCatalog(long timestamp, byte[] catalogBytes) throws EEException;
 
     /** Pass diffs to apply to the EE's catalog to update it */
-    public abstract void updateCatalog(final long timestamp, final String diffCommands) throws EEException;
+    public abstract boolean updateCatalog(long timestamp, String diffCommands) throws EEException;
 
-    public void setBatch(int batchIndex) {
+    public void setBatch(int batchIndex)
+    {
         m_currentBatchIndex = batchIndex;
     }
 
-    public void setProcedureName(String procedureName) {
+    public void setProcedureName(String procedureName)
+    {
         m_currentProcedureName = procedureName;
     }
 
@@ -532,6 +553,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long uniqueId,
                                             long undoQuantumToken) throws EEException
     {
+        if (numFragmentIds == 0) {
+            return new VoltTable[0];
+        }
+        // plan frag zero is invalid
+        assert(planFragmentIds[0] != 0);
+
+        if (HOST_TRACE_ENABLED) {
+            for (int i = 0; i < numFragmentIds; ++i) {
+                LOG.trace("Batch Executing planfragment:" + planFragmentIds[i] + ", params=" + parameterSets[i].toString());
+            }
+        }
+
         try {
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
             m_readOnly = (undoQuantumToken == Long.MAX_VALUE) ? true : false;
@@ -540,19 +573,22 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_startTime = 0;
             m_logDuration = INITIAL_LOG_DURATION;
             m_sqlTexts = sqlTexts;
+            m_cacheMisses = 0;
 
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
                     parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+            // Don't count any cache hits or misses when there's an exception.
+            // This is not cmpletely accurate, especially considering that the count of misses
+            // is used to estimate the cache size. But exceptions can leave some batched fragments
+            // untried, so they should not be counted as a miss OR as a hit.
+            // Rather than miscategorize some fragments, leave all fragments out of the accounting
+            // if any one in the batch threw an exception.
+
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
                     m_cacheMisses, m_partitionId);
             return results;
         }
         finally {
-            // don't count any cache misses when there's an exception. This is a lie and they
-            // will still be used to estimate the cache size, but it's hard to count cache hits
-            // during an exception, so we don't count cache misses either to get the right ratio.
-            m_cacheMisses = 0;
-
             m_sqlTexts = null;
         }
     }
@@ -582,7 +618,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param logLevels Levels to set
      * @throws EEException
      */
-    public abstract void setLogLevels(long logLevels) throws EEException;
+    public abstract boolean setLogLevels(long logLevels) throws EEException;
 
     /**
      * This method should be called roughly every second. It allows the EE
@@ -590,13 +626,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param time The current time in milliseconds since the epoch. See
      * System.currentTimeMillis();
      */
-    public abstract void tick(long time, long lastCommittedSpHandle);
+    public abstract boolean tick(long time, long lastCommittedSpHandle);
 
     /**
      * Instruct EE to come to an idle state. Flush Export buffers, finish
      * any in-progress checkpoint, etc.
      */
-    public abstract void quiesce(long lastCommittedSpHandle);
+    public abstract boolean quiesce(long lastCommittedSpHandle);
 
     /**
      * Retrieve a set of statistics using the specified selector from the StatisticsSelector enum.
@@ -615,24 +651,24 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Instruct the EE to start/stop its profiler.
      */
-    public abstract void toggleProfiler(int toggle);
+    public abstract boolean toggleProfiler(int toggle);
 
     /**
      * Release all undo actions up to and including the specified undo token
      * @param undoToken The undo token.
      */
-    public abstract void releaseUndoToken(long undoToken);
+    public abstract boolean releaseUndoToken(long undoToken);
 
     /**
      * Undo all undo actions back to and including the specified undo token
      * @param undoToken The undo token.
      */
-    public abstract void undoUndoToken(long undoToken);
+    public abstract boolean undoUndoToken(long undoToken);
 
     /**
      * Execute an Export action against the execution engine.
      */
-    public abstract void exportAction( boolean syncAction,
+    public abstract boolean exportAction( boolean syncAction,
             long ackOffset, long seqNo, int partitionId, String tableSignature);
 
     /**
@@ -656,16 +692,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      *
      * THIS METHOD IS CURRENTLY ONLY USED FOR TESTING
      */
-    public abstract int hashinate(
-            Object value,
-            HashinatorConfig config);
+    public abstract int hashinate(Object value, HashinatorConfig config);
 
     /**
      * Updates the hashinator with new config
      * @param type hashinator type
      * @param config new hashinator config
      */
-    public abstract void updateHashinator(HashinatorConfig config);
+    public abstract boolean updateHashinator(HashinatorConfig config);
 
     /**
      * Apply binary log data. To be able to advance the DR sequence number and
@@ -679,7 +713,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken                For undo
      * @throws EEException
      */
-    public abstract void applyBinaryLog(ByteBuffer log,
+    public abstract long applyBinaryLog(ByteBuffer log,
                                         long txnId,
                                         long spHandle,
                                         long lastCommittedSpHandle,
@@ -1008,7 +1042,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /**
      * Start collecting statistics (starts timer).
      */
-    protected void startStatsCollection() {
+    protected void startStatsCollection()
+    {
         if (m_plannerStats != null) {
             m_plannerStats.startStatsCollection();
         }
@@ -1020,7 +1055,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param cacheSize  size of cache
      * @param cacheUse   where the plan came from
      */
-    protected void endStatsCollection(long cacheSize, CacheUse cacheUse) {
+    protected void endStatsCollection(long cacheSize, CacheUse cacheUse)
+    {
         if (m_plannerStats != null) {
             m_plannerStats.endStatsCollection(cacheSize, 0, cacheUse, m_partitionId);
         }
@@ -1033,9 +1069,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param vl  The new logger to install
      */
     @Deprecated
-    public static void setVoltLoggerForTest(VoltLogger vl) {
-        log = vl;
-    }
+    public static void setVoltLoggerForTest(VoltLogger vl) { LOG = vl; }
 
     /**
      * Useful in unit tests.  Sets the starting frequency with which
@@ -1044,7 +1078,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param newDuration  The duration in milliseconds before the first message is logged
      */
     @Deprecated
-    public void setInitialLogDurationForTest(long newDuration) {
+    public void setInitialLogDurationForTest(long newDuration)
+    {
         INITIAL_LOG_DURATION = newDuration;
     }
 
@@ -1053,7 +1088,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * the long-running query info message will be logged.
      */
     @Deprecated
-    public long getInitialLogDurationForTest() {
+    public long getInitialLogDurationForTest()
+    {
         return INITIAL_LOG_DURATION;
     }
 }

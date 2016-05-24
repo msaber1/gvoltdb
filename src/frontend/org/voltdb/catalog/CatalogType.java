@@ -15,14 +15,11 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* WARNING: THIS FILE IS AUTO-GENERATED
-            DO NOT MODIFY THIS SOURCE
-            ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
-
 package org.voltdb.catalog;
 
 import java.lang.reflect.Field;
 
+// THIS FILE IS NOT AUTO-GENERATED. MODIFY IT AS NEEDED.
 
 /**
  * The base class for all objects in the Catalog. CatalogType instances all

@@ -39,7 +39,7 @@ import org.voltdb.utils.SerializationHelper;
  * the FastSerializable interface.
  *
  */
-public class FastSerializer {//implements DataOutput {
+public class FastSerializer {
     /** callbacked when the internal buffer was grown. */
     public interface BufferGrowCallback {
         void onBufferGrow(FastSerializer obj);
@@ -54,7 +54,7 @@ public class FastSerializer {//implements DataOutput {
      * Create a <code>FastSerializer</code> that is BigEndian and uses a HeapByteBuffer
      */
     public FastSerializer() {
-        this(true, false);
+        this(true, false, null, INITIAL_ALLOCATION);
     }
 
     /**
@@ -90,7 +90,8 @@ public class FastSerializer {//implements DataOutput {
      * is absolutely necessary for the serialized result then use isDirect and a null pool
      */
     /** constructor that sets callback object. */
-    public FastSerializer(boolean bigEndian, boolean isDirect, BufferGrowCallback callback, int initialAllocation) {
+    public FastSerializer(boolean bigEndian, boolean isDirect,
+            BufferGrowCallback callback, int initialAllocation) {
         assert(initialAllocation > 0);
         this.isDirect = isDirect;
         if (isDirect) {
@@ -464,11 +465,9 @@ public class FastSerializer {//implements DataOutput {
         }
     }
 
-
     public void write(int b) throws IOException {
         writeByte((byte) b);
     }
-
 
     public void write(byte[] b) throws IOException {
         growIfNeeded(b.length);
@@ -480,69 +479,57 @@ public class FastSerializer {//implements DataOutput {
         buffer.b().put(b);
     }
 
-
     public void write(byte[] b, int off, int len) throws IOException {
         growIfNeeded(len);
         buffer.b().put(b, off, len);
     }
 
-
     public void writeBoolean(boolean v) throws IOException {
         writeByte((byte) (v ? 1 : 0));
     }
-
 
     public void writeByte(int v) throws IOException {
         growIfNeeded(Byte.SIZE/8);
         buffer.b().put((byte) v);
     }
 
-
     public void writeBytes(String s) throws IOException {
         throw new UnsupportedOperationException("FastSerializer.writeBytes() not supported.");
     }
-
 
     public void writeChar(int v) throws IOException {
         growIfNeeded(Character.SIZE/8);
         buffer.b().putChar((char) v);
     }
 
-
     public void writeChars(String s) throws IOException {
         throw new UnsupportedOperationException("FastSerializer.writeChars() not supported.");
     }
-
 
     public void writeDouble(double v) throws IOException {
         growIfNeeded(Double.SIZE/8);
         buffer.b().putDouble(v);
     }
 
-
     public void writeFloat(float v) throws IOException {
         growIfNeeded(Float.SIZE/8);
         buffer.b().putFloat(v);
     }
-
 
     public void writeInt(int v) throws IOException {
         growIfNeeded(Integer.SIZE/8);
         buffer.b().putInt(v);
     }
 
-
     public void writeLong(long v) throws IOException {
         growIfNeeded(Long.SIZE/8);
         buffer.b().putLong(v);
     }
 
-
     public void writeShort(int v) throws IOException {
         growIfNeeded(Short.SIZE/8);
         buffer.b().putShort((short) v);
     }
-
 
     public void writeUTF(String str) throws IOException {
         throw new UnsupportedOperationException("FastSerializer.writeChars() not supported.");

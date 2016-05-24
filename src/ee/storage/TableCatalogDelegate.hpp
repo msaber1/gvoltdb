@@ -64,8 +64,8 @@ class TableCatalogDelegate {
 
     void deleteCommand();
 
-    int init(catalog::Database const &catalogDatabase,
-             catalog::Table const &catalogTable);
+    void init(catalog::Database const &catalogDatabase,
+              catalog::Table const &catalogTable);
     bool evaluateExport(catalog::Database const &catalogDatabase,
              catalog::Table const &catalogTable);
 
@@ -76,7 +76,7 @@ class TableCatalogDelegate {
     static TupleSchema *createTupleSchema(catalog::Database const &catalogDatabase,
                                           catalog::Table const &catalogTable);
 
-    static bool getIndexScheme(catalog::Table const &catalogTable,
+    static void getIndexScheme(catalog::Table const &catalogTable,
                                catalog::Index const &catalogIndex,
                                const TupleSchema *schema,
                                TableIndexScheme *scheme);

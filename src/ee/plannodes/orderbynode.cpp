@@ -85,9 +85,8 @@ void OrderByPlanNode::loadFromJSONObject(PlannerDomValue obj)
         }
 
         if (!(hasExpression && hasDirection)) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "OrderByPlanNode::loadFromJSONObject:"
-                                          " Does not have expression and direction.");
+            throw UnexpectedEEException("OrderByPlanNode::loadFromJSONObject:"
+                                        " Does not have expression and direction.");
         }
     }
 }

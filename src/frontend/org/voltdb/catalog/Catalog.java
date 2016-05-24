@@ -15,10 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* WARNING: THIS FILE IS AUTO-GENERATED
-            DO NOT MODIFY THIS SOURCE
-            ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
-
 package org.voltdb.catalog;
 
 import java.io.IOException;
@@ -27,6 +23,8 @@ import java.io.StringReader;
 import com.google_voltpatches.common.cache.Cache;
 import com.google_voltpatches.common.cache.CacheBuilder;
 import com.google_voltpatches.common.io.LineReader;
+
+// THIS FILE IS NOT AUTO-GENERATED. MODIFY IT AS NEEDED.
 
 /**
  * The root class in the Catalog hierarchy, which is essentially a tree of

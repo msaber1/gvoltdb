@@ -43,11 +43,11 @@
 #ifndef TESTS_EE_TEST_UTILS_LOADTABLEFROM_HPP_
 #define TESTS_EE_TEST_UTILS_LOADTABLEFROM_HPP_
 
-#include "storage/table.h"
+#include "storage/temptable.h"
 #include "storage/tablefactory.h"
 #include "common/TupleSchemaBuilder.h"
 
-#include "test_utils/ScopedTupleSchema.hpp"
+//#include "test_utils/ScopedTupleSchema.hpp"
 
 namespace voltdb {
 /**
@@ -91,7 +91,6 @@ TempTable *loadTableFrom(const char *buffer,
     /*
      * Read the schema information.
      */
-    std::vector<string> columnNames;
     voltdb::TupleSchemaBuilder builder(column_count);
     for (int idx = 0; idx < column_count; idx += 1) {
         ValueType colType = static_cast<ValueType>(result.readByte());
@@ -104,6 +103,8 @@ TempTable *loadTableFrom(const char *buffer,
         builder.setColumnAtIndex(idx, colType);
     }
     TupleSchema *schema = builder.build();
+
+    std::vector<string> columnNames;
     for (int idx = 0; idx < column_count; idx += 1) {
         columnNames.push_back(result.readTextString());
         if (debug_print) {
@@ -112,8 +113,7 @@ TempTable *loadTableFrom(const char *buffer,
                    columnNames[idx].c_str());
         }
     }
-    TempTable *table;
-    table = TableFactory::getTempTable(0,
+    TempTable *table = TableFactory::getTempTable(0,
                                        "result",
                                        schema, // Transfers ownership to the table.
                                        columnNames,

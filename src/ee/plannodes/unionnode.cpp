@@ -66,23 +66,29 @@ void UnionPlanNode::loadFromJSONObject(PlannerDomValue obj)
     std::string unionTypeStr = obj.valueForKey("UNION_TYPE").asStr();
     if (unionTypeStr == "UNION") {
         m_unionType = UNION_TYPE_UNION;
-    } else if (unionTypeStr == "UNION_ALL") {
+    }
+    else if (unionTypeStr == "UNION_ALL") {
         m_unionType = UNION_TYPE_UNION_ALL;
-    } else if (unionTypeStr == "INTERSECT") {
+    }
+    else if (unionTypeStr == "INTERSECT") {
         m_unionType = UNION_TYPE_INTERSECT;
-    } else if (unionTypeStr == "INTERSECT_ALL") {
+    }
+    else if (unionTypeStr == "INTERSECT_ALL") {
         m_unionType = UNION_TYPE_INTERSECT_ALL;
-    } else if (unionTypeStr == "EXCEPT") {
+    }
+    else if (unionTypeStr == "EXCEPT") {
         m_unionType = UNION_TYPE_EXCEPT;
-    } else if (unionTypeStr == "EXCEPT_ALL") {
+    }
+    else if (unionTypeStr == "EXCEPT_ALL") {
         m_unionType = UNION_TYPE_EXCEPT_ALL;
-    } else if (unionTypeStr == "NOUNION") {
+    }
+    else if (unionTypeStr == "NOUNION") {
         m_unionType = UNION_TYPE_NOUNION;
-    } else {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "UnionPlanNode::loadFromJSONObject:"
-                                      " Unsupported UNION_TYPE value " +
-                                      unionTypeStr);
+    }
+    else {
+        throw UnexpectedEEException("UnionPlanNode::loadFromJSONObject:"
+                                    " Unsupported UNION_TYPE value " +
+                                    unionTypeStr);
     }
 }
 

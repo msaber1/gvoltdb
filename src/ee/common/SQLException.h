@@ -62,7 +62,7 @@ public:
     int getInternalFlags() const { return m_internalFlags; }
 
 protected:
-    void p_serialize(ReferenceSerializeOutput *output) const;
+    void p_serialize(ReferenceSerializeOutput& output) const;
 private:
     std::string m_sqlState;
 

@@ -174,31 +174,25 @@ StreamedTable::~StreamedTable()
 }
 
 TableIterator& StreamedTable::iterator() {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not iterate a streamed table.");
+    throw UnexpectedEEException("May not iterate a streamed table.");
 }
 
 TableIterator* StreamedTable::makeIterator() {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not iterate a streamed table.");
+    throw UnexpectedEEException("May not iterate a streamed table.");
 }
 
 void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible)
 {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not delete all tuples of a streamed"
-                                  " table.");
+    throw UnexpectedEEException("May not delete all tuples of a streamed table.");
 }
 
 TBPtr StreamedTable::allocateNextBlock() {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not use block alloc interface with "
-                                  "streamed tables.");
+    throw UnexpectedEEException("May not use block alloc interface with "
+                                "streamed tables.");
 }
 
 void StreamedTable::nextFreeTuple(TableTuple *) {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not use nextFreeTuple with streamed tables.");
+    throw UnexpectedEEException("May not use nextFreeTuple with streamed tables.");
 }
 
 bool StreamedTable::insertTuple(TableTuple &source)
@@ -261,8 +255,7 @@ bool StreamedTable::deleteTuple(TableTuple &tuple, bool fallible)
 
 void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*)
 {
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not update a streamed table.");
+    throw UnexpectedEEException("May not update a streamed table.");
 }
 
 void StreamedTable::flushOldTuples(int64_t timeInMillis)

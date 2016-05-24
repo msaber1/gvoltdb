@@ -58,8 +58,7 @@ namespace voltdb {
         return "";
     }
 
-    void DummyTopend::crashVoltDB(voltdb::FatalException e) {
-    }
+    void DummyTopend::crashVoltDB(const voltdb::FatalException& e) { }
 
     int64_t DummyTopend::getQueuedExportBytes(int32_t partitionId, std::string signature) {
         int64_t bytes = 0;

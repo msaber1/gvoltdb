@@ -19,6 +19,7 @@
 #include <iostream>
 
 #include "common/debuglog.h"
+#include "common/FatalException.hpp"
 #include "common/StreamBlock.h"
 #include "storage/table.h"
 
@@ -344,7 +345,7 @@ std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {
     return jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
 }
 
-void JNITopend::crashVoltDB(FatalException e) {
+void JNITopend::crashVoltDB(const FatalException& e) {
     //Enough references for the reason string, traces array, and traces strings
     JNILocalFrameBarrier jni_frame =
             JNILocalFrameBarrier(

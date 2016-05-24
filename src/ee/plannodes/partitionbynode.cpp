@@ -24,7 +24,6 @@
 namespace voltdb {
 PartitionByPlanNode::~PartitionByPlanNode()
 {
-
 }
 
 PlanNodeType PartitionByPlanNode::getPlanNodeType() const
@@ -43,18 +42,18 @@ void PartitionByPlanNode::loadFromJSONObject(PlannerDomValue obj)
         if (sortColumnValue.hasNonNullKey("SORT_EXPRESSION")) {
             PlannerDomValue exprDom = sortColumnValue.valueForKey("SORT_EXPRESSION");
             m_sortExpressions.push_back(AbstractExpression::buildExpressionTree(exprDom));
-        } else {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                       "PartitionByPlanNode::loadFromJSONObject:"
-                                                       " Missing sort expression.");
+        }
+        else {
+            throw UnexpectedEEException("PartitionByPlanNode::loadFromJSONObject:"
+                                        " Missing sort expression.");
         }
         if (sortColumnValue.hasNonNullKey("SORT_DIRECTION")) {
             std::string dirStr = sortColumnValue.valueForKey("SORT_DIRECTION").asStr();
             m_sortDirections.push_back(stringToSortDirection(dirStr));
-        } else {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                                       "PartitionByPlanNode::loadFromJSONObject:"
-                                                       " Missing sort direction.");
+        }
+        else {
+            throw UnexpectedEEException("PartitionByPlanNode::loadFromJSONObject:"
+                                        " Missing sort direction.");
         }
     }
 }
@@ -67,6 +66,7 @@ std::string PartitionByPlanNode::debugInfo(const std::string &spacer) const
     for (int idx = 0; idx < m_sortExpressions.size(); idx += 1) {
         buffer << m_sortExpressions[idx]->debug(spacer);
     }
-        return buffer.str();
+    return buffer.str();
 }
-}
+
+} // namespace voltdb

@@ -111,7 +111,7 @@ TEST_F(LoggingTest, TestLoggerUsesProxyLevels) {
             m_logManager.setLogLevels(logLevelsToSet);
             for (int ii = 1; ii < numLogLevels - 1; ii++) { //Should never log to ALL or OFF
                 for (int zz = 0; zz < numLoggers; zz++) {
-                    TestProxy *proxy = dynamic_cast<TestProxy*>(const_cast<voltdb::LogProxy*>(m_logManager.getLogProxy()));
+                    TestProxy *proxy = dynamic_cast<TestProxy*>(m_logManager.getLogProxy());
                     proxy->lastLoggerId = voltdb::LOGGERID_INVALID;
                     if (zz == loggerIndex) {
                         if (ii >= levelIndex) {

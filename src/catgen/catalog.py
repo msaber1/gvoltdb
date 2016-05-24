@@ -63,8 +63,11 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     # SETUP
     ##########
     pkgdir = package.replace('.', '/')
-    os.system( interp( "rm -rf $postpath/*", locals() ) )
+    os.system( interp( '''
+find $postpath -type f | xargs fgrep --files-with-matches "WARNING: THIS FILE IS AUTO-GENERATED" | xargs rm -f
+''', locals() ) )
     os.system( interp( "mkdir -p $postpath/", locals() ) )
+    """
     os.system( interp( "cp $prepath/Catalog.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/CatalogType.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/CatalogMap.java $postpath", locals() ) )
@@ -74,7 +77,7 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
     os.system( interp( "cp $prepath/FilteredCatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/DRCatalogDiffEngine.java $postpath", locals() ) )
     os.system( interp( "cp $prepath/DatabaseConfiguration.java $postpath", locals() ) )
-
+    """
     ##########
     # WRITE THE SOURCE FILES
     ##########
@@ -88,8 +91,9 @@ def genjava( classes, javaOnlyClasses, prepath, postpath, package ):
             raise OSError("Can't create file %s for writing" % javapath)
         write = writer( f )
         write (gpl_header)
-        write (auto_gen_warning)
         write('package', package + ';\n')
+
+        write (auto_gen_warning)
 
         if cls.has_comment():
             write('/**\n *', cls.comment)
@@ -294,14 +298,18 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
     ##########
     # SETUP
     ##########
-    os.system( interp( "rm -rf $postpath/*", locals() ) )
+    os.system( interp( '''
+find $postpath -type f | xargs fgrep --files-with-matches "WARNING: THIS FILE IS AUTO-GENERATED" | xargs rm -f
+''', locals() ) )
     os.system( interp( "mkdir -p $postpath/", locals() ) )
+    """
+    os.system( interp( "rm -rf $postpath/*", locals() ) )
     os.system( interp( "cp $prepath/catalog.h $postpath", locals() ) )
     os.system( interp( "cp $prepath/catalogtype.h $postpath", locals() ) )
     os.system( interp( "cp $prepath/catalogmap.h $postpath", locals() ) )
     os.system( interp( "cp $prepath/catalog.cpp $postpath", locals() ) )
     os.system( interp( "cp $prepath/catalogtype.cpp $postpath", locals() ) )
-
+    """
     ##########
     # WRITE THE SOURCE FILES
     ##########
@@ -345,7 +353,6 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
 
         write('#include <string>')
         write('#include "catalogtype.h"')
-        write('#include "catalogmap.h"\n')
         write('namespace catalog {\n')
 
         for classType in referencedClasses:
@@ -356,7 +363,6 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
             write(' */')
 
         write( interp( 'class $clsname : public CatalogType {', locals() ) )
-        write( '    friend class Catalog;' )
         write( interp( '    friend class CatalogMap<$clsname>;', locals() ) )
 
         # protected section
@@ -424,7 +430,7 @@ def gencpp( classes, javaOnlyClasses, prepath, postpath ):
         filename = clsname.lower()
         write ( '#include <cassert>' )
         write ( interp( '#include "$filename.h"', locals() ) )
-        write ( '#include "catalog.h"' )
+        ####write ( '#include "catalog.h"' )
         otherhdrs = ['#include "%s.h"' % field.type[:-1].lower() for field in actualFields if field.type[-1] in ['*', '?'] ]
         uniques = {}
         for hdr in otherhdrs:

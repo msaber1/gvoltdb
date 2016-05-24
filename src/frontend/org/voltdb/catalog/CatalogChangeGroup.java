@@ -15,10 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* WARNING: THIS FILE IS AUTO-GENERATED
-            DO NOT MODIFY THIS SOURCE
-            ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
-
 package org.voltdb.catalog;
 
 import java.util.ArrayList;
@@ -29,6 +25,8 @@ import java.util.Set;
 import java.util.TreeMap;
 
 import org.voltdb.catalog.CatalogDiffEngine.DiffClass;
+
+// THIS FILE IS NOT AUTO-GENERATED. MODIFY IT AS NEEDED.
 
 /**
  * Describes the set of changes to a subtree of the catalog. For example, a {@link ChangeGroup}

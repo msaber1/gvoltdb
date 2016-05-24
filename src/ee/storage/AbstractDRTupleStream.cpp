@@ -36,17 +36,18 @@ AbstractDRTupleStream::AbstractDRTupleStream(int partitionId, int defaultBufferS
 void AbstractDRTupleStream::setSecondaryCapacity(size_t capacity) {
     assert (capacity > 0);
     if (m_uso != 0 || m_openSpHandle != 0 ||
-        m_openTransactionUso != 0 || m_committedSpHandle != 0)
-    {
+        m_openTransactionUso != 0 || m_committedSpHandle != 0) {
         throwFatalException("setSecondaryCapacity only callable before "
                             "TupleStreamBase is used");
     }
     m_secondaryCapacity = capacity;
 }
 
-void AbstractDRTupleStream::pushExportBuffer(StreamBlock *block, bool sync, bool endOfStream) {
-    if (sync) return;
-    int64_t rowTarget = ExecutorContext::getExecutorContext()->getTopend()->pushDRBuffer(m_partitionId, block);
+void AbstractDRTupleStream::pushExportBufXXXfer(StreamBlock *block, bool sync, bool endOfStream) {
+    if (sync) {
+        return;
+    }
+    int64_t rowTarget = ExecutorContext::pushDRBuffer(m_partitionId, block);
     if (rowTarget >= 0) {
         m_rowTarget = rowTarget;
     }
@@ -60,7 +61,8 @@ void AbstractDRTupleStream::rollbackTo(size_t mark, size_t drRowCost) {
     }
     if (drRowCost <= m_txnRowCount) {
         m_txnRowCount -= drRowCost;
-    } else {
+    }
+    else {
         // convenience to let us just throw away everything at once
         assert(drRowCost == SIZE_MAX);
         m_txnRowCount = 0;

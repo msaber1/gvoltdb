@@ -44,15 +44,15 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     protected VoltTable[] coreExecutePlanFragments(
-            final int numFragmentIds,
-            final long[] planFragmentIds,
-            final long[] inputDepIds,
-            final Object[] parameterSets,
-            final long txnId,
-            final long spHandle,
-            final long lastCommittedSpHandle,
-            final long uniqueId,
-            final long undoToken) throws EEException
+            int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            Object[] parameterSets,
+            long txnId,
+            long spHandle,
+            long lastCommittedSpHandle,
+            long uniqueId,
+            long undoToken) throws EEException
     {
         if (numFragmentIds != 1) {
             return null;
@@ -119,52 +119,58 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable[] getStats(final StatsSelector selector, final int[] locators, boolean interval, Long now) {
-        return null;
-    }
-
-    @Override
-    public void loadCatalog(final long txnId, final byte[] catalogBytes) throws EEException {
-    }
-
-    @Override
-    public void updateCatalog(final long txnId, final String catalogDiffs) throws EEException {
-    }
-
-    @Override
-    public byte[] loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long spHandle, final long lastCommittedTxnId, long uniqueId,
-        boolean returnUniqueViolations, boolean shouldDRStream, long undoToken)
-    throws EEException
+    public VoltTable[] getStats(StatsSelector selector, int[] locators,
+            boolean interval, Long now)
     {
         return null;
     }
 
     @Override
-    public void release() throws EEException { }
+    public boolean loadCatalog(long txnId, byte[] catalogBytes) throws EEException
+    {
+        return false;
+    }
 
     @Override
-    public void releaseUndoToken(final long undoToken) { }
+    public boolean updateCatalog(long txnId, String catalogDiffs) throws EEException {
+         return false;
+    }
 
     @Override
-    public VoltTable serializeTable(final int tableId) throws EEException {
+    public byte[] loadTable(int tableId, VoltTable table, long txnId,
+        long spHandle, long lastCommittedTxnId, long uniqueId,
+        boolean returnUniqueViolations, boolean shouldDRStream,
+        long undoToken) throws EEException
+    {
         return null;
     }
 
     @Override
-    public void tick(long time, long lastCommittedTxnId) { }
+    public boolean release() throws EEException { return false; }
 
     @Override
-    public void toggleProfiler(int toggle) { }
+    public VoltTable serializeTable(int tableId) throws EEException
+    {
+        return null;
+    }
 
     @Override
-    public void undoUndoToken(long undoToken) { }
+    public boolean tick(long time, long lastCommittedTxnId) { return false; }
 
     @Override
-    public void setLogLevels(long logLevels) throws EEException { }
+    public boolean toggleProfiler(int toggle) { return false; }
 
     @Override
-    public void quiesce(long lastCommittedTxnId) { }
+    public boolean releaseUndoToken(long undoToken) { return false; }
+
+    @Override
+    public boolean undoUndoToken(long undoToken) { return false; }
+
+    @Override
+    public boolean setLogLevels(long logLevels) throws EEException { return false; }
+
+    @Override
+    public boolean quiesce(long lastCommittedTxnId) { return false; }
 
     @Override
     public boolean activateTableStream(int tableId, TableStreamType type, long undoQuantumToken, byte[] predicates) {
@@ -178,8 +184,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void exportAction(boolean syncAction,
+    public boolean exportAction(boolean syncAction,
             long ackOffset, long seqNo, int partitionId, String mTableSignature) {
+        return false;
     }
 
     @Override
@@ -188,7 +195,8 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void processRecoveryMessage( java.nio.ByteBuffer buffer, long pointer) {
+    public boolean processRecoveryMessage( java.nio.ByteBuffer buffer, long pointer) {
+        return false;
     }
 
     @Override
@@ -202,20 +210,18 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void updateHashinator(TheHashinator.HashinatorConfig config) {
+    public boolean updateHashinator(TheHashinator.HashinatorConfig config) {
+        return false;
     }
 
     @Override
     public long applyBinaryLog(ByteBuffer log, long txnId, long spHandle, long lastCommittedSpHandle, long uniqueId,
-                               int remoteClusterId, long undoToken) throws EEException
-    {
+                               int remoteClusterId, long undoToken) throws EEException {
         throw new UnsupportedOperationException();
     }
 
     @Override
-    public long getThreadLocalPoolAllocations() {
-        return 0L;
-    }
+    public long getThreadLocalPoolAllocations() { return 0L; }
 
     @Override
     public byte[] executeTask(TaskType taskType, ByteBuffer task) {

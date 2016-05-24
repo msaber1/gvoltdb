@@ -72,7 +72,7 @@ public:
 
 TEST_F(TempTableLimitsTest, CheckLogLatch)
 {
-    TestProxy* proxy = dynamic_cast<TestProxy*>(const_cast<LogProxy*>(m_logManager.getLogProxy()));
+    TestProxy* proxy = dynamic_cast<TestProxy*>(m_logManager.getLogProxy());
     proxy->reset();
 
     TempTableLimits dut(1024 * 10, 1024 * 5); // Set 10K hard limit, 5K warn level
@@ -96,7 +96,7 @@ TEST_F(TempTableLimitsTest, CheckLogLatch)
 
 TEST_F(TempTableLimitsTest, CheckLimitException)
 {
-    TestProxy* proxy = dynamic_cast<TestProxy*>(const_cast<LogProxy*>(m_logManager.getLogProxy()));
+    TestProxy* proxy = dynamic_cast<TestProxy*>(m_logManager.getLogProxy());
     proxy->reset();
 
     TempTableLimits dut(1024 * 10); // Set 10K hard limit, but no warn level.

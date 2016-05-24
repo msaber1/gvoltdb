@@ -15,9 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* WARNING: THIS FILE IS AUTO-GENERATED
-            DO NOT MODIFY THIS SOURCE
-            ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
+// THIS FILE IS NOT AUTO-GENERATED. MODIFY IT AS NEEDED.
 
 #include <cstdlib>
 #include <cassert>
@@ -69,12 +67,11 @@ void Catalog::cleanupExecutionBookkeeping() {
 void Catalog::purgeDeletions() {
     for (std::vector<std::string>::iterator i = m_deletions.begin();
          i != m_deletions.end();
-         i++)
-    {
+         i++) {
         boost::unordered_map<std::string, CatalogType*>::iterator object = m_allCatalogObjects.find(*i);
         if (object == m_allCatalogObjects.end()) {
             std::string errmsg = "Catalog reference for " + (*i) + " not found.";
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, errmsg);
+            throw UnexpectedEEException(errmsg);
         }
         delete object->second;
     }
@@ -90,8 +87,7 @@ void Catalog::execute(const string &stmts) {
     }
 
     if (m_unresolved.size() > 0) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "failed to execute catalog");
+        throw UnexpectedEEException("failed to execute catalog");
     }
 }
 
@@ -193,8 +189,7 @@ void Catalog::executeOne(const string &stmt) {
         }
     }
     else {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "Invalid catalog command.");
+        throw UnexpectedEEException("Invalid catalog command.");
     }
 }
 
@@ -309,8 +304,7 @@ Catalog::addChild(const string &collectionName, const string &childName) {
     if (collectionName.compare("clusters") == 0) {
         CatalogType *exists = m_clusters.get(childName);
         if (exists) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "trying to add a duplicate value.");
+            throw UnexpectedEEException("trying to add a duplicate value.");
         }
         return m_clusters.add(childName);
     }

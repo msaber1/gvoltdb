@@ -49,30 +49,32 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <cstdlib>
-#include <ctime>
-#include <unistd.h>
-#include <boost/shared_ptr.hpp>
 #include "harness.h"
+
+#include "test_utils/LoadTableFrom.hpp"
+
+#include "catalog/catalog.h"
+#include "catalog/cluster.h"
+#include "catalog/table.h"
+#include "catalog/database.h"
 #include "common/common.h"
-#include "expressions/abstractexpression.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "execution/VoltDBEngine.h"
-#include "plannodes/abstractplannode.h"
+#include "expressions/abstractexpression.h"
 #include "indexes/tableindex.h"
+#include "plannodes/abstractplannode.h"
 #include "storage/table.h"
 #include "storage/tablefactory.h"
 #include "storage/tableiterator.h"
 #include "storage/temptable.h"
 #include "storage/tableutil.h"
-#include "catalog/catalog.h"
-#include "catalog/cluster.h"
-#include "catalog/table.h"
-#include "catalog/database.h"
-#include "catalog/constraint.h"
 
-#include "test_utils/LoadTableFrom.hpp"
+#include <boost/shared_ptr.hpp>
+
+#include <cstdlib>
+#include <ctime>
+#include <unistd.h>
 
 using namespace std;
 using namespace voltdb;
@@ -87,11 +89,11 @@ using namespace voltdb;
 // configurations without having to dig down into the code
 //
 ValueType COLUMN_TYPES[NUM_OF_COLUMNS]  = { VALUE_TYPE_INTEGER,
-                                                    VALUE_TYPE_VARCHAR,
-                                                    VALUE_TYPE_VARCHAR,
-                                                    VALUE_TYPE_INTEGER };
-int COLUMN_SIZES[NUM_OF_COLUMNS]                = { 4, 8, 8, 4};
-bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS]         = { false, true, true, false };
+                                            VALUE_TYPE_VARCHAR,
+                                            VALUE_TYPE_VARCHAR,
+                                            VALUE_TYPE_INTEGER };
+int COLUMN_SIZES[NUM_OF_COLUMNS]        = { 4, 8, 8, 4 };
+bool COLUMN_ALLOW_NULLS[NUM_OF_COLUMNS] = { false, true, true, false };
 
 typedef int64_t fragmentId_t;
 
@@ -124,9 +126,8 @@ public:
      * just for this test.  But that is not easily done.
      */
     ExecutionEngineTest(uint32_t random_seed = (unsigned int)time(NULL))
-            : m_cluster_id(1),
-              m_site_id(1),
-              m_constraint(NULL)
+        : m_topend()
+        , m_engine(&m_topend)
     {
         srand(random_seed);
         /*
@@ -140,7 +141,7 @@ public:
          * and surround each line with unescaped double quotes.  But you
          * knew that already.
          */
-        m_catalog_string =
+        string catalog_string =
             "add / clusters cluster\n"
             "set /clusters#cluster localepoch 1199145600\n"
             "set $PREV securityEnabled false\n"
@@ -408,33 +409,32 @@ public:
          * resetReusedResultOutputBuffer causes the engine to
          * use them.
          */
-        m_topend.reset(new EngineTestTopend());
-        m_engine.reset(new VoltDBEngine(m_topend.get()));
         m_parameter_buffer.reset(new char [4 * 1024]);
         m_result_buffer.reset(new char [1024 * 1024 * 2]);
         m_exception_buffer.reset(new char [4 * 1024]);
-        m_engine->setBuffers(m_parameter_buffer.get(), 4 * 1024,
+        m_engine.setBuffers(m_parameter_buffer.get(), 4 * 1024,
                              m_result_buffer.get(), 1024 * 1024 * 2,
-                             m_exception_buffer.get(), 4096);
-        m_engine->resetReusedResultOutputBuffer();
+                             m_exception_buffer.get(), 4 * 1024);
+        m_engine.resetReusedResultOutputBuffer();
         int partitionCount = 3;
-        ASSERT_TRUE(m_engine->initialize(this->m_cluster_id, this->m_site_id, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false));
-        m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
-        ASSERT_TRUE(m_engine->loadCatalog( -2, m_catalog_string));
+        m_engine.initialize(0, 0, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
+        m_engine.updateHashinator(HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
+        m_engine.loadCatalog(-2, catalog_string);
 
         /*
          * Get a link to the catalog and pull out information about it
          */
-        m_catalog = m_engine->getCatalog();
-        m_cluster = m_catalog->clusters().get("cluster");
-        m_database = m_cluster->databases().get("database");
-        m_database_id = m_database->relativeIndex();
-        catalog::Table *partitioned_catalog_table_customer = m_database->tables().get("D_CUSTOMER");
-        m_partitioned_customer_table_id = partitioned_catalog_table_customer->relativeIndex();
-        m_partitioned_customer_table = m_engine->getTable(m_partitioned_customer_table_id);
-        catalog::Table *replicated_catalog_table_customer = m_database->tables().get("R_CUSTOMER");
-        m_replicated_customer_table_id = replicated_catalog_table_customer->relativeIndex();
-        m_replicated_customer_table = m_engine->getTable(m_replicated_customer_table_id);
+        // This is not the real catalog that the VoltDBEngine uses.
+        // It is a duplicate made locally to get GUIDs
+        catalog::Catalog* catalog = m_engine.getCatalog();
+        catalog::Cluster* cluster = catalog->clusters().get("cluster");
+        catalog::Database* database = cluster->databases().get("database");
+        catalog::Table *partitioned_catalog_table_customer = database->tables().get("D_CUSTOMER");
+        int partitioned_customer_table_id = partitioned_catalog_table_customer->relativeIndex();
+        m_partitioned_customer_table = m_engine.getTable(partitioned_customer_table_id);
+        catalog::Table* replicated_catalog_table_customer = database->tables().get("R_CUSTOMER");
+        int replicated_customer_table_id = replicated_catalog_table_customer->relativeIndex();
+        m_replicated_customer_table = m_engine.getTable(replicated_customer_table_id);
 
         //
         // Fill in tuples.  The IndexOrder test does not use
@@ -451,42 +451,35 @@ public:
         ASSERT_TRUE(tableutil::addRandomTuples(m_replicated_customer_table, NUM_OF_TUPLES));
     }
     ~ExecutionEngineTest() {
-            //
-            // When we delete the VoltDBEngine
-            // it will cleanup all the tables for us.
-            //
-        }
+        // When we delete the VoltDBEngine
+        // it will cleanup all the tables for us.
+    }
 
-    protected:
-        CatalogId m_cluster_id;
-        CatalogId m_database_id;
-        CatalogId m_site_id;
-        string m_catalog_string;
-        catalog::Catalog *m_catalog; //This is not the real catalog that the VoltDBEngine uses. It is a duplicate made locally to get GUIDs
-        catalog::Cluster *m_cluster;
-        catalog::Database *m_database;
-        catalog::Constraint *m_constraint;
-        boost::scoped_ptr<VoltDBEngine>     m_engine;
-        boost::scoped_ptr<EngineTestTopend> m_topend;
-        Table* m_partitioned_customer_table;
-        int m_partitioned_customer_table_id;
-
-        Table* m_replicated_customer_table;
-        int m_replicated_customer_table_id;
+protected:
+        EngineTestTopend m_topend;
+        VoltDBEngine m_engine;
         void compareTables(Table *first, Table* second);
-        boost::shared_array<char>m_result_buffer;
-        boost::shared_array<char>m_exception_buffer;
-        boost::shared_array<char>m_parameter_buffer;
+        boost::shared_array<char> m_result_buffer;
+        boost::shared_array<char> m_exception_buffer;
+        boost::shared_array<char> m_parameter_buffer;
+        Table* m_partitioned_customer_table;
+        Table* m_replicated_customer_table;
 };
 
 /* Check the order of index vector
  * Index vector should follow the order of primary key first, all unique indices afterwards, and all the non-unique indices at the end.
  */
 TEST_F(ExecutionEngineTest, IndexOrder) {
-    ASSERT_TRUE(m_partitioned_customer_table->primaryKeyIndex() == m_partitioned_customer_table->allIndexes()[0]);
+    ASSERT_TRUE(m_partitioned_customer_table->primaryKeyIndex() ==
+            m_partitioned_customer_table->allIndexes()[0]);
     ASSERT_TRUE(m_partitioned_customer_table->allIndexes()[1]->isUniqueIndex());
     ASSERT_FALSE(m_partitioned_customer_table->allIndexes()[2]->isUniqueIndex());
     ASSERT_FALSE(m_partitioned_customer_table->allIndexes()[3]->isUniqueIndex());
+    ASSERT_TRUE(m_replicated_customer_table->primaryKeyIndex() ==
+            m_replicated_customer_table->allIndexes()[0]);
+    ASSERT_TRUE(m_replicated_customer_table->allIndexes()[1]->isUniqueIndex());
+    ASSERT_FALSE(m_replicated_customer_table->allIndexes()[2]->isUniqueIndex());
+    ASSERT_FALSE(m_replicated_customer_table->allIndexes()[3]->isUniqueIndex());
 }
 
 // ------------------------------------------------------------------
@@ -610,7 +603,7 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     // Load the plan in the top end.  We'll use fragmentId as
     // a length one array below.
     //
-    m_topend->addPlan(100, plan);
+    m_topend.addPlan(100, plan);
     fragmentId_t fragmentId = 100;
 
     // Make sure the parameter buffer is filled
@@ -623,13 +616,13 @@ TEST_F(ExecutionEngineTest, Execute_PlanFragmentInfo) {
     // Execute the plan.  You'd think this would be more
     // impressive.
     //
-    m_engine->executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
+    m_engine.executePlanFragments(1, &fragmentId, NULL, emptyParams, 1000, 1000, 1000, 1000, 1);
 
     // Fetch the results.  We have forced them to be written
     // to our own buffer in the local engine.  But we don't
     // know how much of the buffer is actually used.  So we
     // need to query the engine.
-    size_t result_size = m_engine->getResultsSize();
+    size_t result_size = m_engine.getResultsSize();
     if (debug_dump) {
         dumpResultTable(m_result_buffer.get(), result_size);
     }

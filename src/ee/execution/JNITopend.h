@@ -19,12 +19,12 @@
 #define JNITOPEND_H_
 #include "boost/shared_array.hpp"
 #include "common/Topend.h"
-#include "common/FatalException.hpp"
-#include "common/Pool.hpp"
 #include <jni.h>
 
 namespace voltdb {
-
+class FatalException;
+class Pool;
+ 
 class JNITopend : public Topend {
 public:
     JNITopend(JNIEnv *env, jobject caller);
@@ -39,7 +39,7 @@ public:
                 int64_t currMemoryInBytes,
                 int64_t peakMemoryInBytes);
     std::string planForFragmentId(int64_t fragmentId);
-    void crashVoltDB(FatalException e);
+    void crashVoltDB(const FatalException& e);
     int64_t getQueuedExportBytes(int32_t partitionId, std::string signature);
     void pushExportBuffer(
             int64_t exportGeneration,

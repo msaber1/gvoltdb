@@ -2549,8 +2549,7 @@ inline uint16_t NValue::getTupleStorageSize(const ValueType type) {
           char message[128];
           snprintf(message, 128, "NValue::getTupleStorageSize() unsupported type '%s'",
                    getTypeName(type).c_str());
-          throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                        message);
+          throw UnexpectedEEException(message);
     }
 }
 
@@ -2952,8 +2951,7 @@ template <TupleSerializationFormat F, Endianess E> inline void NValue::deseriali
     char message[128];
     snprintf(message, 128, "NValue::deserializeFrom() unrecognized type '%s'",
              getTypeName(type).c_str());
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  message);
+    throw UnexpectedEEException(message);
 }
 
 /**
@@ -3187,13 +3185,11 @@ inline void NValue::serializeToExport_withoutNull(ExportSerializeOutput &io) con
         char message[128];
         snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s",
                  getTypeName(getValueType()).c_str());
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        throw UnexpectedEEException(message);
     }
     default:
-        break;
+        throw UnexpectedEEException("Invalid type in serializeToExport");
     }
-    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "Invalid type in serializeToExport");
 }
 
 /** Reformat an object-typed value from its inlined form to its

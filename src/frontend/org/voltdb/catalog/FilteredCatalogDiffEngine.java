@@ -15,11 +15,9 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-/* WARNING: THIS FILE IS AUTO-GENERATED
-            DO NOT MODIFY THIS SOURCE
-            ALL CHANGES MUST BE MADE IN THE CATALOG GENERATOR */
-
 package org.voltdb.catalog;
+
+// THIS FILE IS NOT AUTO-GENERATED. MODIFY IT AS NEEDED.
 
 /*
  * This class provides additional filtering to the CatalogDiffEngine. This class

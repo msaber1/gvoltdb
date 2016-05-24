@@ -377,12 +377,10 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
 
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);
-
     catalog::Table *catalogTable = engine->getCatalogTable(m_name);
-    if (tcd->init(*engine->getDatabase(), *catalogTable) != 0) {
-        VOLT_ERROR("Failed to initialize table '%s' from catalog",m_name.c_str());
-        return ;
-    }
+    assert(catalogTable);
+
+    tcd->init(*engine->getDatabase(), *catalogTable);
 
     assert(!tcd->exportEnabled());
     PersistentTable * emptyTable = tcd->getPersistentTable();
@@ -398,12 +396,12 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     BOOST_FOREACH(MaterializedViewMetadata * originalView, m_views) {
         PersistentTable * targetTable = originalView->targetTable();
         TableCatalogDelegate * targetTcd =  engine->getTableDelegate(targetTable->name());
+        assert(targetTcd);
         catalog::Table *catalogViewTable = engine->getCatalogTable(targetTable->name());
+        assert(catalogViewTable);
 
-        if (targetTcd->init(*engine->getDatabase(), *catalogViewTable) != 0) {
-            VOLT_ERROR("Failed to initialize table '%s' from catalog",targetTable->name().c_str());
-            return ;
-        }
+        targetTcd->init(*engine->getDatabase(), *catalogViewTable);
+
         PersistentTable * targetEmptyTable = targetTcd->getPersistentTable();
         assert(targetEmptyTable);
         new MaterializedViewMetadata(emptyTable, targetEmptyTable, originalView->getMaterializedViewInfo());
@@ -444,7 +442,8 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         emptyTable->m_invisibleTuplesPendingDeleteCount = emptyTable->m_tupleCount;
         // Create and register an undo action.
         uq->registerUndoAction(new (*uq) PersistentTableUndoTruncateTableAction(engine, tcd, this, emptyTable));
-    } else {
+    }
+    else {
         if (fallible) {
             throwFatalException("Attempted to truncate table %s when there was no "
                                 "active undo quantum even though one was expected", m_name.c_str());

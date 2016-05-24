@@ -15,10 +15,6 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 #include "common/InterruptException.h"
-#include "common/SerializableEEException.h"
-#include "common/serializeio.h"
-#include <iostream>
-#include <cassert>
 
 using namespace voltdb;
 
@@ -26,5 +22,4 @@ InterruptException::InterruptException(std::string message) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_INTERRUPT, message) {
 }
 
-void InterruptException::p_serialize(ReferenceSerializeOutput *output) const {
-}
+void InterruptException::p_serialize(ReferenceSerializeOutput& output) const { }

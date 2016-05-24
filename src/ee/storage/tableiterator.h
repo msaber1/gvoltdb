@@ -264,7 +264,7 @@ inline bool TableIterator::tempNext(TableTuple &out) {
         {
             // delete the last block of tuples in this temp table when they will never be used
             if (m_tempTableDeleteAsGo) {
-                m_table->freeLastScanedBlock(m_tempBlockIterator);
+                m_table->freeLastScannedBlock(m_tempBlockIterator);
             }
 
             m_currentBlock = *m_tempBlockIterator;

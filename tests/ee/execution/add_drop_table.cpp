@@ -43,17 +43,13 @@ class AddDropTableTest : public Test {
         : m_clusterId(0), m_databaseId(0), m_siteId(0), m_partitionId(0),
           m_hostId(101), m_hostName("host101"), m_drClusterId(0)
     {
-        m_engine = new VoltDBEngine();
-
-        m_resultBuffer = new char[1024 * 1024 * 2];
-        m_exceptionBuffer = new char[4096];
-        m_engine->setBuffers(NULL, 0,
+        m_engine.setBuffers(NULL, 0,
                              m_resultBuffer, 1024 * 1024 * 2,
                              m_exceptionBuffer, 4096);
 
-        m_engine->resetReusedResultOutputBuffer();
+        m_engine.resetReusedResultOutputBuffer();
         int partitionCount = 3;
-        m_engine->initialize(m_clusterId,
+        m_engine.initialize(m_clusterId,
                              m_siteId,
                              m_partitionId,
                              m_hostId,
@@ -62,7 +58,7 @@ class AddDropTableTest : public Test {
                              1024,
                              DEFAULT_TEMP_TABLE_MEMORY,
                              false);
-        m_engine->updateHashinator( HASHINATOR_LEGACY,
+        m_engine.updateHashinator(HASHINATOR_LEGACY,
                                    (char*)&partitionCount,
                                     NULL,
                                     0);
@@ -73,17 +69,8 @@ class AddDropTableTest : public Test {
           "set /clusters#cluster/databases#database isActiveActiveDRed false\n"
           "add /clusters#cluster/databases#database programs program\n";
 
-        bool loadResult = m_engine->loadCatalog( -2, initialCatalog);
-        ASSERT_TRUE(loadResult);
+        m_engine.loadCatalog(-2, initialCatalog);
     }
-
-    ~AddDropTableTest()
-    {
-        delete m_engine;
-        delete[] m_resultBuffer;
-        delete[] m_exceptionBuffer;
-    }
-
 
     std::string tableACmds()
     {
@@ -136,9 +123,9 @@ class AddDropTableTest : public Test {
     CatalogId m_hostId;
     std::string m_hostName;
     CatalogId m_drClusterId;
-    VoltDBEngine *m_engine;
-    char *m_resultBuffer;
-    char *m_exceptionBuffer;
+    char m_resultBuffer[1024 * 1024 * 2];
+    char m_exceptionBuffer[4096];
+    VoltDBEngine m_engine;
 };
 
 /*
@@ -148,7 +135,7 @@ class AddDropTableTest : public Test {
 TEST_F(AddDropTableTest, DetectNewTable)
 {
     // add a table to voltdbengine's catalog
-    catalog::Catalog *catalog = m_engine->getCatalog();
+    catalog::Catalog *catalog = m_engine.getCatalog();
     catalog->execute(tableACmds());
 
     bool found = false;
@@ -180,7 +167,7 @@ TEST_F(AddDropTableTest, DetectNewTable)
  */
 TEST_F(AddDropTableTest, DetectDeletedTable)
 {
-    catalog::Catalog *catalog = m_engine->getCatalog();
+    catalog::Catalog *catalog = m_engine.getCatalog();
     catalog->execute(tableACmds());
 
     bool found = false;
@@ -231,7 +218,7 @@ TEST_F(AddDropTableTest, DetectDeletedTable)
  */
 TEST_F(AddDropTableTest, WasAddedFlagCleared)
 {
-    catalog::Catalog *catalog = m_engine->getCatalog();
+    catalog::Catalog *catalog = m_engine.getCatalog();
     catalog->execute(tableACmds());
     catalog->execute(tableBCmds());
 
@@ -260,7 +247,7 @@ TEST_F(AddDropTableTest, DeletionsSetCleared)
     vector<std::string> deletions;
     vector<std::string>::iterator delIter;
 
-    catalog::Catalog *catalog = m_engine->getCatalog();
+    catalog::Catalog *catalog = m_engine.getCatalog();
     catalog::Cluster *cluster = catalog->clusters().get("cluster");
     catalog::Database *db = cluster->databases().get("database");
 
@@ -279,7 +266,6 @@ TEST_F(AddDropTableTest, DeletionsSetCleared)
         ++delIter;
     }
     catalog->purgeDeletions();
-
     // delete a second table. verify deletion bookkeeping
     catalog->execute(tableBDeleteCmd());
     ASSERT_EQ(0, db->tables().size());
@@ -301,14 +287,13 @@ TEST_F(AddDropTableTest, DeletionsSetCleared)
  */
 TEST_F(AddDropTableTest, AddTable)
 {
-    bool changeResult = m_engine->updateCatalog( 0, tableACmds());
-    ASSERT_TRUE(changeResult);
+    m_engine.updateCatalog(0, tableACmds());
 
     Table *table1, *table2;
-    table1 = m_engine->getTable("tableA");
+    table1 = m_engine.getTable("tableA");
     ASSERT_TRUE(table1 != NULL);
 
-    table2 = m_engine->getTable(1); // catalogId
+    table2 = m_engine.getTable(1); // catalogId
     ASSERT_TRUE(table2 != NULL);
     ASSERT_TRUE(table1 == table2);
 }
@@ -321,30 +306,29 @@ TEST_F(AddDropTableTest, AddTwoTablesDropTwoTables)
 {
     Table *table1, *table2;
 
-    catalog::Catalog *catalog = m_engine->getCatalog();
+    catalog::Catalog *catalog = m_engine.getCatalog();
     catalog::Cluster *cluster = catalog->clusters().get("cluster");
     catalog::Database *db = cluster->databases().get("database");
     ASSERT_EQ(0, db->tables().size());
 
     // add tableA, tableB
     std::string a_and_b = tableACmds() + "\n" + tableBCmds();
-    bool changeResult = m_engine->updateCatalog( 0, a_and_b);
-    ASSERT_TRUE(changeResult);
+    m_engine.updateCatalog(0, a_and_b);
     ASSERT_EQ(2, db->tables().size());
 
     // verify first table
-    table1 = m_engine->getTable("tableA");
+    table1 = m_engine.getTable("tableA");
     ASSERT_TRUE(table1 != NULL);
 
-    table2 = m_engine->getTable(1); // catalogId
+    table2 = m_engine.getTable(1); // catalogId
     ASSERT_TRUE(table2 != NULL);
     ASSERT_TRUE(table1 == table2);
 
     // verify second table
-    table1 = m_engine->getTable("tableB");
+    table1 = m_engine.getTable("tableB");
     ASSERT_TRUE(table1 != NULL);
 
-    table2 = m_engine->getTable(2); // catalogId
+    table2 = m_engine.getTable(2); // catalogId
     ASSERT_TRUE(table2 != NULL);
     ASSERT_TRUE(table1 == table2);
 
@@ -353,13 +337,12 @@ TEST_F(AddDropTableTest, AddTwoTablesDropTwoTables)
     table2->incrementRefcount();
 
     std::string drop = tableADeleteCmd() + "\n" + tableBDeleteCmd();
-    changeResult = m_engine->updateCatalog( 1,drop);
-    ASSERT_TRUE(changeResult);
+    m_engine.updateCatalog(1, drop);
     ASSERT_EQ(0, db->tables().size());
-    ASSERT_EQ(NULL, m_engine->getTable(1)); // catalogId
-    ASSERT_EQ(NULL, m_engine->getTable("tableA"));
-    ASSERT_EQ(NULL, m_engine->getTable(2)); // catalogId
-    ASSERT_EQ(NULL, m_engine->getTable("tableB"));
+    ASSERT_EQ(NULL, m_engine.getTable(1)); // catalogId
+    ASSERT_EQ(NULL, m_engine.getTable("tableA"));
+    ASSERT_EQ(NULL, m_engine.getTable(2)); // catalogId
+    ASSERT_EQ(NULL, m_engine.getTable("tableB"));
 
     table1->decrementRefcount();
     table2->decrementRefcount();
@@ -372,26 +355,24 @@ TEST_F(AddDropTableTest, AddTwoTablesDropTwoTables)
 TEST_F(AddDropTableTest, DropTable)
 {
     // add. verified by AddTable test.
-    bool result = m_engine->updateCatalog( 0, tableACmds());
-    ASSERT_TRUE(result);
+    m_engine.updateCatalog(0, tableACmds());
 
     Table *table1, *table2;
 
     // grab the table. need some data from it to complete the
     // test. hold a reference to keep it safe.
-    table1 = m_engine->getTable("tableA");
+    table1 = m_engine.getTable("tableA");
     table1->incrementRefcount();
 
     ASSERT_TRUE(table1 != NULL);
 
     // and delete
-    result = m_engine->updateCatalog( 1, tableADeleteCmd());
-    ASSERT_TRUE(result);
+    m_engine.updateCatalog(1, tableADeleteCmd());
 
-    table2 = m_engine->getTable("tableA");
+    table2 = m_engine.getTable("tableA");
     ASSERT_TRUE(table2 == NULL);
 
-    table2 = m_engine->getTable(0);
+    table2 = m_engine.getTable(0);
     ASSERT_TRUE(table2 == NULL);
 
     // release the last reference.
@@ -403,31 +384,23 @@ TEST_F(AddDropTableTest, DropTable)
  */
 TEST_F(AddDropTableTest, AddDropAdd)
 {
-    bool result;
-
     // std::string addboth = tableACmds() + "\n" + tableBCmds();
     // std::string dropboth = tableADeleteCmd() + "\n" + tableBDeleteCmd();
 
-    // result = m_engine->updateCatalog(addboth, ++m_catVersion);
-    // ASSERT_TRUE(result);
+    // m_engine.updateCatalog(addboth, ++m_catVersion);
 
-    result = m_engine->updateCatalog( -1, tableACmds());
-    ASSERT_TRUE(result);
+    m_engine.updateCatalog(-1, tableACmds());
 
     for (int ii=0; ii < 20; ii++) {
-        // result = m_engine->updateCatalog(tableBDeleteCmd(), ++m_catVersion);
-        // ASSERT_TRUE(result);
+        // m_engine.updateCatalog(tableBDeleteCmd(), ++m_catVersion);
 
         // A-only to B-only
-        result = m_engine->updateCatalog( (ii * 2), tableADeleteCmd() + "\n" + tableBCmds());
-        ASSERT_TRUE(result);
+        m_engine.updateCatalog((ii * 2), tableADeleteCmd() + "\n" + tableBCmds());
 
         // B-only to A-only
-        result = m_engine->updateCatalog( (ii * 2) + 1, tableBDeleteCmd() + "\n" + tableACmds());
-        ASSERT_TRUE(result);
+        m_engine.updateCatalog((ii * 2) + 1, tableBDeleteCmd() + "\n" + tableACmds());
 
-        // result = m_engine->updateCatalog(tableBCmds(), ++m_catVersion);
-        // ASSERT_TRUE(result);
+        // m_engine.updateCatalog(tableBCmds(), ++m_catVersion);
     }
 }
 
@@ -438,31 +411,26 @@ TEST_F(AddDropTableTest, AddDropAdd)
  */
 TEST_F(AddDropTableTest, StatsWithDropTable)
 {
-    bool result = m_engine->updateCatalog( 0, tableACmds());
-    ASSERT_TRUE(result);
-
-    result = m_engine->updateCatalog( 1, tableBCmds());
-    ASSERT_TRUE(result);
+    m_engine.updateCatalog(0, tableACmds());
+    m_engine.updateCatalog(1, tableBCmds());
 
     // get stats - relying on valgrind for most verification here
     int locators12[] = {1, 2};
-    int statresult = m_engine->getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators12, 2, false, 1L);
+    int statresult = m_engine.getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators12, 2, false, 1L);
     ASSERT_TRUE(statresult == 1);
 
     // delete A.
-    result = m_engine->updateCatalog( 2, tableADeleteCmd());
-    ASSERT_TRUE(result);
+    m_engine.updateCatalog(2, tableADeleteCmd());
 
     // get stats for the remaining table by relative offset
     int locators1[] = {1};
-    statresult = m_engine->getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators1, 1, false, 1L);
+    statresult = m_engine.getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators1, 1, false, 1L);
     ASSERT_TRUE(statresult == 1);
 
-    result = m_engine->updateCatalog( 3, tableACmds());
-    ASSERT_TRUE(result);
+    m_engine.updateCatalog(3, tableACmds());
 
     // get stats for the tables by relative offset
-    statresult = m_engine->getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators12, 2, false, 1L);
+    statresult = m_engine.getStats(STATISTICS_SELECTOR_TYPE_TABLE, locators12, 2, false, 1L);
     ASSERT_TRUE(statresult == 1);
 }
 

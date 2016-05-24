@@ -17,14 +17,11 @@
 
 #include "storage/DRTupleStream.h"
 
+#include "common/ExportSerializeIo.h"
+#include "common/NValue.hpp"
+#include "common/tabletuple.h"
 #include "common/TupleSchema.h"
 #include "common/types.h"
-#include "common/NValue.hpp"
-#include "common/ValuePeeker.hpp"
-#include "common/ValueFactory.hpp"
-#include "common/tabletuple.h"
-#include "common/ExportSerializeIo.h"
-#include "common/executorcontext.hpp"
 #include "common/UniqueId.hpp"
 #include "crc/crc32c.h"
 #include "indexes/tableindex.h"

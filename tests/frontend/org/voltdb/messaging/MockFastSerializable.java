@@ -58,15 +58,19 @@ public class MockFastSerializable implements FastSerializable {
     public static class Other implements FastSerializable {
         @Override
         public void readExternal(FastDeserializer in) { read(in, VALUE); }
+
         @Override
         public void writeExternal(FastSerializer out) { write(out, VALUE); }
+
         private static byte VALUE = 99;
     }
 
     @Override
     public void readExternal(FastDeserializer in) { read(in, VALUE); }
+
     @Override
     public void writeExternal(FastSerializer out) { write(out, VALUE); }
+
     private static byte VALUE = 42;
 
     private static void read(FastDeserializer in, byte value) {

@@ -76,15 +76,13 @@ import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientAuthScheme;
-import org.voltdb.catalog.Statement;
-import org.voltdb.catalog.Table;
-import org.voltdb.client.ClientAuthHashScheme;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.common.Constants;
 import org.voltdb.dtxn.InitiatorStats.InvocationInfo;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2EndOfLogMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -100,7 +98,6 @@ import com.google_voltpatches.common.base.Predicate;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
-import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -613,7 +610,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             final String service = ByteBufferUtil.readArbitraryString(message);
             final String username = ByteBufferUtil.readArbitraryString(message);
-            final int digestLen = ClientAuthHashScheme.getDigestLength(hashScheme);
+            final int digestLen = ClientAuthScheme.getDigestLength(hashScheme);
             final byte password[] = new byte[digestLen];
             //We should be left with SHA bytes only which varies based on scheme.
             if (message.remaining() != digestLen) {

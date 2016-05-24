@@ -44,72 +44,62 @@ namespace voltdb {
 
         int32_t asInt() const {
             if (m_value.IsNull()) {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              "PlannerDomValue: int value is null");
+                throw UnexpectedEEException("PlannerDomValue: int value is null");
             }
-            else if (m_value.IsInt()) {
+            if (m_value.IsInt()) {
                 return m_value.GetInt();
             }
-            else if (m_value.IsString()) {
+            if (m_value.IsString()) {
                 return (int32_t) strtoimax(m_value.GetString(), NULL, 10);
             }
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "PlannerDomValue: int value is not an integer");
+            throw UnexpectedEEException("PlannerDomValue: int value is not an integer");
         }
 
         int64_t asInt64() const {
             if (m_value.IsNull()) {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              "PlannerDomValue: int64 value is null");
+                throw UnexpectedEEException("PlannerDomValue: int64 value is null");
             }
-            else if (m_value.IsInt64()) {
+            if (m_value.IsInt64()) {
                 return m_value.GetInt64();
             }
-            else if (m_value.IsInt()) {
+            if (m_value.IsInt()) {
                 return m_value.GetInt();
             }
-            else if (m_value.IsString()) {
+            if (m_value.IsString()) {
                 return (int64_t) strtoimax(m_value.GetString(), NULL, 10);
             }
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "PlannerDomValue: int64 value is non-integral");
+            throw UnexpectedEEException("PlannerDomValue: int64 value is non-integral");
         }
 
         double asDouble() const {
             if (m_value.IsNull()) {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                              "PlannerDomValue: double value is null");
+                throw UnexpectedEEException("PlannerDomValue: double value is null");
             }
-            else if (m_value.IsDouble()) {
+            if (m_value.IsDouble()) {
                 return m_value.GetDouble();
             }
-            else if (m_value.IsInt()) {
+            if (m_value.IsInt()) {
                 return m_value.GetInt();
             }
-            else if (m_value.IsInt64()) {
+            if (m_value.IsInt64()) {
                 return (double) m_value.GetInt64();
             }
-            else if (m_value.IsString()) {
+            if (m_value.IsString()) {
                 return std::strtod(m_value.GetString(), NULL);
             }
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "PlannerDomValue: double value is not a number");
+            throw UnexpectedEEException("PlannerDomValue: double value is not a number");
         }
 
         bool asBool() const {
-            if (m_value.IsNull() || (m_value.IsBool() == false)) {
-                char msg[1024];
-                snprintf(msg, 1024, "PlannerDomValue: value is null or not a bool");
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+            if (m_value.IsNull() || !m_value.IsBool()) {
+                throw UnexpectedEEException("PlannerDomValue: value is null or not a bool");
             }
             return m_value.GetBool();
         }
 
         std::string asStr() const {
-            if (m_value.IsNull() || (m_value.IsString() == false)) {
-                char msg[1024];
-                snprintf(msg, 1024, "PlannerDomValue: value is null or not a string");
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+            if (m_value.IsNull() || !m_value.IsString()) {
+                throw UnexpectedEEException("PlannerDomValue: value is null or not a string");
             }
             return m_value.GetString();
 
@@ -132,25 +122,21 @@ namespace voltdb {
             if (value.IsNull()) {
                 char msg[1024];
                 snprintf(msg, 1024, "PlannerDomValue: %s key is null or missing", key);
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+                throw UnexpectedEEException(msg);
             }
             return PlannerDomValue(value);
         }
 
         int arrayLen() const {
-            if (m_value.IsArray() == false) {
-                char msg[1024];
-                snprintf(msg, 1024, "PlannerDomValue: value is not an array");
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+            if (!m_value.IsArray()) {
+                throw UnexpectedEEException("PlannerDomValue: value is not an array");
             }
             return m_value.Size();
         }
 
         PlannerDomValue valueAtIndex(int index) const {
-            if (m_value.IsArray() == false) {
-                char msg[1024];
-                snprintf(msg, 1024, "PlannerDomValue: value is not an array");
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, msg);
+            if (!m_value.IsArray()) {
+                throw UnexpectedEEException("PlannerDomValue: value is not an array");
             }
             return m_value[index];
         }

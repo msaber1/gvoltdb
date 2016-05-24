@@ -27,8 +27,6 @@ import java.io.File;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
-import junit.framework.TestCase;
-
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.TheHashinator.HashinatorType;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -48,6 +46,8 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.regressionsuites.multipartitionprocs.MultiSiteSelect;
+
+import junit.framework.TestCase;
 
 public class TestTwoSitePlans extends TestCase {
 
@@ -255,8 +255,8 @@ public class TestTwoSitePlans extends TestCase {
         }
         assertTrue(dependency2 != null);
 
-        ee1.stashDependency(outDepId, dependency1);
-        ee1.stashDependency(outDepId, dependency2);
+        ee1.stashDependencyForTest(outDepId, dependency1);
+        ee1.stashDependencyForTest(outDepId, dependency2);
 
         dependency1 = ee1.executePlanFragments(
                 1,

@@ -147,13 +147,11 @@ Table* ExecutorContext::executeExecutors(const std::vector<AbstractExecutor*>& e
             assert(executor);
             // Call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
-            if (!executor->execute(*m_staticParams)) {
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                    "Unspecified execution error detected");
-            }
+            executor->execute(*m_staticParams);
             ++ctr;
         }
-    } catch (const SerializableEEException &e) {
+    }
+    catch (const SerializableEEException &e) {
         // Clean up any tempTables when the plan finishes abnormally.
         // This needs to be the caller's responsibility for normal returns because
         // the caller may want to first examine the final output table.
