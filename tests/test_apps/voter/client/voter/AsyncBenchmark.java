@@ -445,6 +445,8 @@ public class AsyncBenchmark {
             }
         }
 
+        System.out.println("Benchmark loop time: " + (System.currentTimeMillis()-benchmarkStartTS) + " millseconds.");
+
         // cancel periodic stats printing
         timer.cancel();
     }
@@ -465,6 +467,19 @@ public class AsyncBenchmark {
         benchmark.runBenchmark();
 
         TableChangeMonitor tcm = new TableChangeMonitor(benchmark.client, "StreamedTable", "all");
+
+        System.out.println(HORIZONTAL_RULE);
+        System.out.println("Total rows inserted -- prior to export drain");
+        System.out.printf("\tInsertAudit:   %10d\n", benchmark.insertAuditCount);
+        System.out.printf("\t  InsertBiz:   %10d\n", benchmark.insertBizCount);
+        System.out.printf("\t  InsertTTE:   %10d\n", benchmark.insertTTECount);
+        System.out.printf("\t  InsertMDP:   %10d\n", benchmark.insertMDPCount);
+        System.out.printf("\t  InsertKV:    %10d\n", benchmark.insertKVCount);
+        System.out.printf("\t      Total:   %10d\n",
+                benchmark.insertAuditCount + benchmark.insertBizCount +
+                benchmark.insertTTECount + benchmark.insertMDPCount + benchmark.insertKVCount);
+        System.out.print(HORIZONTAL_RULE);
+
         boolean success = tcm.waitForStreamedAllocatedMemoryZero();// block until all outstanding txns return
 
         benchmark.client.drain();

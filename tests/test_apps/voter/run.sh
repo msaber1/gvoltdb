@@ -86,9 +86,9 @@ function async-benchmark() {
     java -classpath voter-client.jar:$CLIENTCLASSPATH voter.AsyncBenchmark \
         --displayinterval=5 \
         --warmup=5 \
-        --duration=30 \
+        --duration=600 \
+        --ratelimit=1000 \
         --servers=volt3h \
-        --maxrows=2000 \
         --usekv=true \
         --contestants=6
 }
