@@ -29,7 +29,6 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.InstanceId;
-import org.voltdb.CatalogContext;
 import org.voltdb.DefaultSnapshotDataTarget;
 import org.voltdb.ExtensibleSnapshotDigestData;
 import org.voltdb.SnapshotDataFilter;
@@ -231,7 +230,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 SnapshotDataTarget target = m_createdTargets.get(task.m_table.getRelativeIndex());
                 if (target == null) {
                     target = createDataTargetForTable(file_path, file_nonce, task.m_table, txnId,
-                            context.getHostId(), context.getCatalogContext().cluster.getTypeName(),
+                            context.getHostId(), context.getCluster().getTypeName(),
                             context.getDatabase().getTypeName(), context.getNumberOfPartitions(),
                             context.getDatabase().getIsactiveactivedred(),
                             tracker, timestamp, numTables, snapshotRecord);
@@ -310,10 +309,9 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
             Table[] tables) throws IOException
     {
         InstanceId instId = VoltDB.instance().getHostMessenger().getInstanceId();
-        CatalogContext catContext = context.getCatalogContext();
         Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                 txnId,
-                catContext.getCatalogCRC(),
+                context.getCatalogCRC(),
                 file_path,
                 file_nonce,
                 Arrays.asList(tables),
@@ -323,7 +321,7 @@ public class NativeSnapshotWritePlan extends SnapshotWritePlan
                 instId,
                 timestamp,
                 newPartitionCount,
-                catContext.cluster.getDrclusterid());
+                context.getClusterId());
         if (completionTask != null) {
             SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
         }

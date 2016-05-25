@@ -47,6 +47,7 @@ import org.voltdb.TupleStreamStateInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
+import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
@@ -114,6 +115,11 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public Cluster getCluster() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
         public long getSpHandleForSnapshotDigest() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
@@ -130,6 +136,12 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public int getClusterId()
+        {
+            return getCorrespondingClusterId();
+        }
+
+        @Override
         public int getHostId() {
             throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
         }
@@ -140,10 +152,26 @@ public class MpRoSite implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public CatalogContext getCatalogContext() {
+        public long getCatalogCRC() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        @Override
+        public byte[] getCatalogHash() {
             // AdHoc invocations need to be able to check the hash of the current catalog
             // against the hash of the catalog they were planned against.
-            return m_context;
+            return m_context.getCatalogHash();
+        }
+
+        @Override
+        public byte[] getDeploymentHash() {
+            throw new RuntimeException("Not needed for RO MP Site, shouldn't be here.");
+        }
+
+        // Needed for Adhoc queries
+        @Override
+        public int getCatalogVersion() {
+            return m_context.catalogVersion;
         }
 
         @Override

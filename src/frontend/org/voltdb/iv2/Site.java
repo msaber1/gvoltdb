@@ -271,6 +271,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public Cluster getCluster() {
+            return m_context.cluster;
+        }
+
+        @Override
         public long getSpHandleForSnapshotDigest() {
             return m_spHandleForSnapshotDigest;
         }
@@ -287,13 +292,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public boolean isLowestSiteId()
         {
-            if (m_isLowestSiteId == null) {
+            if (m_isLowestSiteId != null) {
+                return m_isLowestSiteId;
+            } else {
                 // FUTURE: should pass this status in at construction.
                 long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
                 m_isLowestSiteId = m_siteId == lowestSiteId;
+                return m_isLowestSiteId;
             }
-            return m_isLowestSiteId;
         }
+
+        @Override
+        public int getClusterId() {
+            return getCorrespondingClusterId();
+        }
+
 
         @Override
         public int getHostId() {
@@ -306,10 +319,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public CatalogContext getCatalogContext() {
-            // AdHoc invocations need to be able to check the hash of the current catalog
-            // against the hash of the catalog they were planned against.
-            return m_context;
+        public long getCatalogCRC() {
+            return m_context.getCatalogCRC();
+        }
+
+        @Override
+        public int getCatalogVersion() {
+            return m_context.catalogVersion;
+        }
+
+        @Override
+        public byte[] getCatalogHash() {
+            return m_context.getCatalogHash();
+        }
+
+        @Override
+        public byte[] getDeploymentHash() {
+            return m_context.deploymentHash;
         }
 
         @Override
@@ -517,7 +543,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             ProcedureRunner runner = Site.this.m_loadedProcedures.getProcByName(procName);
             return runner.getCatalogProcedure();
         }
-
     };
 
     /** Create a new execution site and the corresponding EE */

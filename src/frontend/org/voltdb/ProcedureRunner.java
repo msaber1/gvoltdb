@@ -232,12 +232,13 @@ public class ProcedureRunner {
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
      */
-    public long getTransactionId() {
+    long getTransactionId() {
         StoredProcedureInvocation invocation = m_txnState.getInvocation();
         if (invocation != null && ProcedureInvocationType.isDeprecatedInternalDRType(invocation.getType())) {
             return invocation.getOriginalTxnId();
+        } else {
+            return m_txnState.txnId;
         }
-        return m_txnState.txnId;
     }
 
     Random getSeededRandomNumberGenerator() {
@@ -892,16 +893,14 @@ public class ProcedureRunner {
             // beyond string.
         }
 
-        String argClassName = argClass.getSimpleName();
+        String argTypeName = argClass.getSimpleName();
         String preferredType = expectedType.getMostCompatibleJavaTypeName();
 
         throw new VoltTypeException("Procedure " + m_procedureName +
-                ": Incompatible parameter type: can not convert type '" +
-                argClassName + "' to '" + expectedType.getName() + "' for arg " + argInd +
-                " for SQL stmt: " + stmt.getText() + ". " +
-                stmt.paramTypesExplained() +
-                " Try explicitly using a " + expectedType.getName() +
-                " compatible argument type such as " + preferredType + ".");
+                ": Incompatible parameter type: can not convert type '"+ argTypeName +
+                "' to '"+ expectedType.getName() + "' for arg " + argInd +
+                " for SQL stmt: " + stmt.getText() + "." +
+                " Try explicitly using a " + preferredType + " parameter.");
     }
 
     private final ParameterSet getCleanParams(SQLStmt stmt, boolean verifyTypeConv, Object... inArgs) {
