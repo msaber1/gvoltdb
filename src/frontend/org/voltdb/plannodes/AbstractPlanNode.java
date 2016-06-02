@@ -1123,15 +1123,28 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
-    public boolean reattachFragment( SendPlanNode child ) {
-        for( AbstractPlanNode pn : m_inlineNodes.values() ) {
-            if( pn.reattachFragment( child) )
+    public boolean reattachFragment(AbstractPlanNode child) {
+        for (AbstractPlanNode pn : m_children) {
+            if (pn.reattachFragment(child)) {
                 return true;
-        }
-        for( AbstractPlanNode pn : m_children ) {
-            if( pn.reattachFragment( child) )
-                return true;
+            }
         }
         return false;
+    }
+
+    /**
+     * When a project node is added to the top of the plan, we need to adjust
+     * the differentiator field of TVEs to reflect differences in the scan
+     * schema vs the storage schema of a table, so that fields with duplicate names
+     * produced by expanding "SELECT *" can resolve correctly.
+     *
+     * We recurse until we find either a join node or a scan node.
+     *
+     * @param  existing differentiator field of a TVE
+     * @return new differentiator value
+     */
+    public int adjustDifferentiatorField(int differentiator) {
+        assert (m_children.size() == 1);
+        return m_children.get(0).adjustDifferentiatorField(differentiator);
     }
 }

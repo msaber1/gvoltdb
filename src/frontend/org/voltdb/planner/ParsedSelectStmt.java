@@ -466,7 +466,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (hasComplexAgg()) {
                 expr = col.expression.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
             }
-            SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, expr);
+            SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, expr, col.differentiator);
             m_projectSchema.addColumn(schema_col);
         }
 
@@ -689,12 +689,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
+        int index = 0;
         for (VoltXMLElement child : columnsNode.children) {
-            parseDisplayColumn(child, isDistributed);
+            parseDisplayColumn(index, child, isDistributed);
+            ++index;
         }
     }
 
-    private void parseDisplayColumn(VoltXMLElement child, boolean isDistributed) {
+    private void parseDisplayColumn(int index, VoltXMLElement child, boolean isDistributed) {
         ParsedColInfo col = new ParsedColInfo();
         m_aggregationList.clear();
         AbstractExpression colExpr = parseExpressionTree(child);
@@ -709,6 +711,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         ExpressionUtil.finalizeValueTypes(colExpr);
 
+        if (colExpr.getValueType() == VoltType.BOOLEAN) {
+            throw new PlanningErrorException(
+                    "A SELECT clause does not allow a BOOLEAN expression. " +
+                    "consider using CASE WHEN to decode the BOOLEAN expression " +
+                    "into a value of some other type.");
+        }
         // ENG-6291: If parent is UNION, voltdb wants to make inline varchar to be outlined
         if(isParentUnionClause() && AbstractExpression.hasInlineVarType(colExpr)) {
             AbstractExpression expr = new OperatorExpression();;
@@ -763,7 +771,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         // materialized views (which use the parsed select statement but
         // don't go through the planner pass that does more involved
         // column index resolution).
-        col.index = m_displayColumns.size();
+        col.index = index;
 
         insertAggExpressionsToAggResultColumns(m_aggregationList, col);
         if (m_aggregationList.size() >= 1) {
@@ -779,6 +787,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
         }
 
+        // The differentiator is used when ParsedColInfo is converted to
+        // a SchemaColumn object, to differentiate between columns that have the
+        // same name within a table (which can happen for subqueries or joins).
+        col.differentiator = index;
         m_displayColumns.add(col);
     }
 
@@ -982,8 +994,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             m_distinctGroupByColumns.add(pcol);
 
             // ParsedColInfo, TVE, SchemaColumn, NodeSchema ??? Could it be more complicated ???
-            SchemaColumn schema_col = new SchemaColumn(
-                    col.tableName, col.tableAlias, col.columnName, col.alias, tve);
+            SchemaColumn schema_col = new SchemaColumn(col.tableName, col.tableAlias, col.columnName, col.alias, tve, col.differentiator);
             m_distinctProjectSchema.addColumn(schema_col);
         }
 
@@ -1926,25 +1937,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             throw new PlanningErrorException(
                     "Mismatched plan output cols to parsed display columns");
         }
-    }
-
-    @Override
-    public List<AbstractExpression> findAllSubexpressionsOfType(ExpressionType exprType) {
-        List<AbstractExpression> exprs = super.findAllSubexpressionsOfType(exprType);
-        if (m_having != null) {
-            exprs.addAll(m_having.findAllSubexpressionsOfType(exprType));
-        }
-        if (m_groupByExpressions != null) {
-            for (AbstractExpression groupByExpr : m_groupByExpressions.values()) {
-                exprs.addAll(groupByExpr.findAllSubexpressionsOfType(exprType));
-            }
-        }
-        for(ParsedColInfo col : m_displayColumns) {
-            if (col.expression != null) {
-                exprs.addAll(col.expression.findAllSubexpressionsOfType(exprType));
-            }
-        }
-        return exprs;
     }
 
     /**
