@@ -22,7 +22,6 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.iv2.UniqueIdGenerator;
 
 /**
  * Message from a client interface to an initiator, instructing the
@@ -30,28 +29,19 @@ import org.voltdb.iv2.UniqueIdGenerator;
  * execution sites if needed.
  *
  */
-public class Iv2LogFaultMessage extends VoltMessage
+public class Iv2LogFaultAckMessage extends VoltMessage
 {
     private long m_spHandle;
-    private long m_spUniqueId;
-    private boolean m_synchronous;
 
     /** Empty constructor for de-serialization */
-    Iv2LogFaultMessage() {
+    Iv2LogFaultAckMessage() {
         super();
     }
 
-    public Iv2LogFaultMessage(boolean synchronous, long spHandle, long spUniqueId)
+    public Iv2LogFaultAckMessage(long spHandle)
     {
         super();
         m_spHandle = spHandle;
-        m_spUniqueId = spUniqueId;
-        m_synchronous = synchronous;
-    }
-
-    public boolean isSynchronous()
-    {
-        return m_synchronous;
     }
 
     public long getSpHandle()
@@ -59,27 +49,19 @@ public class Iv2LogFaultMessage extends VoltMessage
         return m_spHandle;
     }
 
-    public long getSpUniqueId() {
-        return m_spUniqueId;
-    }
-
     @Override
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 8  // spHandle
-                 + 8  // spUniqueId
-                 + 1; // synchronous
+        msgsize += 8;  // spHandle
         return msgsize;
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-        buf.put(VoltDbMessageFactory.IV2_LOG_FAULT_ID);
+        buf.put(VoltDbMessageFactory.IV2_LOG_FAULT_ACK_ID);
         buf.putLong(m_spHandle);
-        buf.putLong(m_spUniqueId);
-        buf.put((byte) (m_synchronous ? 1 : 0));
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -88,22 +70,16 @@ public class Iv2LogFaultMessage extends VoltMessage
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException {
         m_spHandle = buf.getLong();
-        m_spUniqueId = buf.getLong();
-        m_synchronous = buf.get() == 0 ? false : true;
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
-        sb.append("IV2 LOG_FAULT (FROM ");
+        sb.append("IV2 LOG_FAULT_ACK (FROM ");
         sb.append(CoreUtils.hsIdToString(m_sourceHSId));
         sb.append(" SPHANDLE: ");
         sb.append(m_spHandle);
-        sb.append(" SPUNIQUEID: ");
-        sb.append(UniqueIdGenerator.toShortString(m_spUniqueId));
-        sb.append(" SYNCHRONOUS: ");
-        sb.append(m_synchronous);
         return sb.toString();
     }
 }

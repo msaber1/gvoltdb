@@ -160,6 +160,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 try {
                     RepairResult res = repair.start().get();
                     txnid = res.m_txnId;
+                    ((SpScheduler)m_scheduler).verifyFaultLogWriteCompletion().get();
                     success = true;
                 } catch (CancellationException e) {
                     success = false;

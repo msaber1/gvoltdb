@@ -20,6 +20,7 @@ package org.voltdb;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.iv2.SpScheduler;
 import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -55,7 +56,7 @@ public class DummyCommandLog implements CommandLog {
     }
 
     @Override
-    public void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+    public void logIv2Fault(SpScheduler requestingSpSched, long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle) {
     }
 

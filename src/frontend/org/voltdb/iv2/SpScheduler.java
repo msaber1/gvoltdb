@@ -27,7 +27,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Queue;
+import java.util.Set;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -55,12 +57,14 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.Iv2LogFaultAckMessage;
 import org.voltdb.messaging.Iv2LogFaultMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 import com.google_voltpatches.common.primitives.Ints;
 import com.google_voltpatches.common.primitives.Longs;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
+import com.google_voltpatches.common.util.concurrent.SettableFuture;
 
 public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 {
@@ -139,6 +143,12 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     List<Long> m_replicaHSIds = new ArrayList<Long>();
     long m_sendToHSIds[] = new long[0];
 
+    private Set<Long> m_faultLogIOCompletionSet = new HashSet<Long>();
+    private long m_pendingFaultLogSpHandle = 0;
+    private long m_faultLogSourceHSId = 0;
+    private SettableFuture<Boolean> m_faultLogWriteCompleteResult = null;
+
+
     private final TransactionTaskQueue m_pendingTasks;
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
@@ -192,7 +202,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void setMaxSeenTxnId(long maxSeenTxnId)
     {
         super.setMaxSeenTxnId(maxSeenTxnId);
-        writeIv2ViableReplayEntry();
+        writeIv2ViableReplayEntry(false);
     }
 
     @Override
@@ -225,6 +235,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     @Override
     public void updateReplicas(List<Long> replicas, Map<Integer, Long> partitionMasters)
     {
+        synchronized(m_lock) {
+            if (m_faultLogWriteCompleteResult != null) {
+                m_faultLogWriteCompleteResult.cancel(false);
+            }
+        }
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
         // Update the list of remote replicas that we'll need to send to
@@ -262,7 +277,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                         "had no responses.  This should be impossible?");
             }
         }
-        writeIv2ViableReplayEntry();
+        writeIv2ViableReplayEntry(true);
     }
 
     /**
@@ -394,6 +409,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         }
         else if (message instanceof Iv2LogFaultMessage) {
             handleIv2LogFaultMessage((Iv2LogFaultMessage)message);
+        }
+        else if (message instanceof Iv2LogFaultAckMessage) {
+            handleSyncIv2LogFaultAckMessage((Iv2LogFaultAckMessage)message);
         }
         else if (message instanceof DumpMessage) {
             handleDumpMessage();
@@ -994,6 +1012,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         // Should only receive these messages at replicas, call the internal log write with
         // the provided SP handle
+        if (message.isSynchronous()) {
+            synchronized(m_lock) {
+                m_pendingFaultLogSpHandle = message.getSpHandle();
+                m_faultLogSourceHSId = message.m_sourceHSId;
+                m_faultLogIOCompletionSet.clear();
+            }
+        }
+
         writeIv2ViableReplayEntryInternal(message.getSpHandle());
         setMaxSeenTxnId(message.getSpHandle());
 
@@ -1001,6 +1027,42 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         // the value sent by the master
         m_uniqueIdGenerator.updateMostRecentlyGeneratedUniqueId(message.getSpUniqueId());
         m_cl.initializeLastDurableUniqueId(m_durabilityListener, m_uniqueIdGenerator.getLastUniqueId());
+    }
+
+    void processFaultLogDurabilityForHSId(long durableHSId)
+    {
+        m_faultLogIOCompletionSet.remove(durableHSId);
+        if (m_faultLogIOCompletionSet.isEmpty()) {
+            m_pendingFaultLogSpHandle = 0;
+            m_faultLogSourceHSId = 0;
+            if (m_faultLogWriteCompleteResult != null) {
+                // All fault logs have been written on all replicas
+                m_faultLogWriteCompleteResult.set(new Boolean(true));
+            }
+        }
+    }
+
+    public Future<Boolean> verifyFaultLogWriteCompletion()
+    {
+        synchronized(m_lock) {
+            if (m_pendingFaultLogSpHandle != 0 && m_faultLogWriteCompleteResult != null) {
+                return m_faultLogWriteCompleteResult;
+            }
+            else {
+                SettableFuture<Boolean> missingFaultLogReq = SettableFuture.create();
+                missingFaultLogReq.set(new Boolean(false));
+                return missingFaultLogReq;
+            }
+        }
+    }
+
+    public void handleSyncIv2LogFaultAckMessage(Iv2LogFaultAckMessage message)
+    {
+        synchronized(m_lock) {
+            if (m_pendingFaultLogSpHandle == message.getSpHandle()) {
+                processFaultLogDurabilityForHSId(message.m_sourceHSId);
+            }
+        }
     }
 
     public void handleDumpMessage()
@@ -1038,24 +1100,32 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     public void enableWritingIv2FaultLog()
     {
         m_replayComplete = true;
-        writeIv2ViableReplayEntry();
+        writeIv2ViableReplayEntry(false);
     }
 
     /**
      * If appropriate, cause the initiator to write the viable replay set to the command log
      * Use when it's unclear whether the caller is the leader or a replica; the right thing will happen.
      */
-    void writeIv2ViableReplayEntry()
+    void writeIv2ViableReplayEntry(boolean synchronous)
     {
         if (m_replayComplete) {
             if (m_isLeader) {
                 // write the viable set locally
                 long faultSpHandle = advanceTxnEgo().getTxnId();
+                if (synchronous) {
+                    synchronized(m_lock) {
+                        m_pendingFaultLogSpHandle = faultSpHandle;
+                        m_faultLogWriteCompleteResult = SettableFuture.create();
+                        m_faultLogSourceHSId = m_mailbox.getHSId();
+                        m_faultLogIOCompletionSet.addAll(m_replicaHSIds);
+                    }
+                }
                 writeIv2ViableReplayEntryInternal(faultSpHandle);
                 // Generate Iv2LogFault message and send it to replicas
-                Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(faultSpHandle, m_uniqueIdGenerator.getLastUniqueId());
-                m_mailbox.send(m_sendToHSIds,
-                        faultMsg);
+                Iv2LogFaultMessage faultMsg = new Iv2LogFaultMessage(synchronous,
+                        faultSpHandle, m_uniqueIdGenerator.getLastUniqueId());
+                m_mailbox.send(m_sendToHSIds, faultMsg);
             }
         }
     }
@@ -1066,8 +1136,27 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     void writeIv2ViableReplayEntryInternal(long spHandle)
     {
         if (m_replayComplete) {
-            m_cl.logIv2Fault(m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
+            m_cl.logIv2Fault(this, m_mailbox.getHSId(), new HashSet<Long>(m_replicaHSIds), m_partitionId,
                     spHandle);
+        }
+    }
+
+    public void faultLogDurable(long spHandle)
+    {
+        synchronized(m_lock) {
+            if (m_pendingFaultLogSpHandle == spHandle) {
+                // If the spHandle matches it means it is synchronous
+                if (m_faultLogSourceHSId != m_mailbox.getHSId()) {
+                    // We are a replica and the leader is waiting for an acknowledgement
+                    Iv2LogFaultAckMessage faultAckMsg = new Iv2LogFaultAckMessage(m_pendingFaultLogSpHandle);
+                    m_mailbox.send(m_faultLogSourceHSId, faultAckMsg);
+                    m_pendingFaultLogSpHandle = 0;
+                    m_faultLogSourceHSId = 0;
+                }
+                else {
+                    processFaultLogDurabilityForHSId(m_mailbox.getHSId());
+                }
+            }
         }
     }
 
@@ -1076,7 +1165,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         if (event.truncationSnapshot && event.didSucceed) {
             synchronized(m_lock) {
-                writeIv2ViableReplayEntry();
+                writeIv2ViableReplayEntry(false);
             }
         }
         return new CountDownLatch(0);

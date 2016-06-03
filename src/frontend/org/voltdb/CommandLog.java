@@ -19,6 +19,7 @@ package org.voltdb;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.iv2.SpScheduler;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 import org.voltdb.iv2.TransactionTask;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -74,7 +75,7 @@ public interface CommandLog {
     /**
      * IV2-only method.  Write this Iv2FaultLogEntry to the fault log portion of the command log
      */
-    public abstract void logIv2Fault(long writerHSId, Set<Long> survivorHSId,
+    public abstract void logIv2Fault(SpScheduler requestingSpSched, long writerHSId, Set<Long> survivorHSId,
             int partitionId, long spHandle);
 
     /**
