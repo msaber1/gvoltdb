@@ -1,6 +1,6 @@
 <?xml version="1.0"?>
 <deployment>
-    <cluster hostcount="3" sitesperhost="8" kfactor="1" />
+    <cluster hostcount="1" sitesperhost="8" kfactor="0" />
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
@@ -33,10 +33,10 @@
             <property name="access.key">AKIAJJZQVJUIN3TO3U7Q</property>
             <property name="secret.key">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</property>
         </configuration>
-        <configuration target="kv_stream" enabled="true" type="custom"
+        <configuration target="streamrs1" enabled="true" type="custom"
             exportconnectorclass="org.voltdb.exportclient.KinesisFirehoseExportClient">
             <property name="region">us-east-1</property>
-            <property name="stream.name">kv1</property>
+            <property name="stream.name">kvstream</property>
             <property name="access.key">AKIAJJZQVJUIN3TO3U7Q</property>
             <property name="secret.key">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</property>
         </configuration>

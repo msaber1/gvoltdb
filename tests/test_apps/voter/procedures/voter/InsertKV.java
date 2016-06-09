@@ -34,6 +34,8 @@ import voter.SampleRecord;
 public class InsertKV extends VoltProcedure {
     public final SQLStmt export = new SQLStmt("INSERT INTO kv_stream (seq, event_date) " +
             "VALUES (?, ?)");
+    public final SQLStmt mirror_export = new SQLStmt("INSERT INTO kv_stream_mirror (seq, event_date) " +
+            "VALUES (?, ?)");
 
     public long run(long seq)
     {
@@ -48,6 +50,11 @@ public class InsertKV extends VoltProcedure {
 
         voltQueueSQL(
                 export
+                , seq
+                , record.event_date
+        );
+        voltQueueSQL(
+                mirror_export
                 , seq
                 , record.event_date
         );

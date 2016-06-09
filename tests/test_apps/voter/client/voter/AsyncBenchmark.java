@@ -424,7 +424,7 @@ public class AsyncBenchmark {
 
             if (config.usekv) {
                 client.callProcedure(new KVCallback(),
-                        "InsertKV", seqKV++);
+                        "InsertRS", seqKV++);
             }
             else {
                 // rate for RT_Metrics_TTE is up to 400k TPS
@@ -446,7 +446,6 @@ public class AsyncBenchmark {
         }
 
         System.out.println("Benchmark loop time: " + (System.currentTimeMillis()-benchmarkStartTS) + " millseconds.");
-
         // cancel periodic stats printing
         timer.cancel();
     }

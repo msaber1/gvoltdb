@@ -38,9 +38,9 @@ public class SampleRecord
     public final Object trans;
     public SampleRecord(long seq, int len, Random rand)
     {
-        this.instance_id    = nextInteger(rand, true);
+        this.instance_id    = nextInteger(rand);
         this.event_type_id  = nextInteger(rand);
-        this.event_date     = nextTimestamp(rand, true);
+        this.event_date     = nextTimestamp(rand);
         this.trans          = nextVarchar(rand, len, len);
     }
 

@@ -1,6 +1,6 @@
-IMPORT CLASS exportbenchmark.procedures.SampleRecord;
+LOAD CLASSES exportbenchmark.jar;
 
-CREATE TABLE ALL_VALUES (
+create stream ALL_VALUES partition on column rowid export to target ABC (
   txnid                     BIGINT        NOT NULL
 , rowid                     BIGINT        NOT NULL
 , rowid_group               TINYINT       NOT NULL
@@ -25,8 +25,8 @@ CREATE TABLE ALL_VALUES (
 , type_null_varchar1024     VARCHAR(1024)
 , type_not_null_varchar1024 VARCHAR(1024) NOT NULL
 );
-PARTITION TABLE ALL_VALUES ON COLUMN rowid;
 
-EXPORT TABLE ALL_VALUES;
+-- PARTITION TABLE ALL_VALUES ON COLUMN rowid;
+-- EXPORT TABLE ALL_VALUES;
 
 CREATE PROCEDURE FROM CLASS exportbenchmark.procedures.InsertExport;

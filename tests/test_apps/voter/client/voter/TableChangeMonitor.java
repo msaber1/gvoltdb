@@ -57,8 +57,8 @@ public class TableChangeMonitor {
         long mem_left = 0;
         long st = System.currentTimeMillis();
         long startwait = System.currentTimeMillis();
-        //Wait 60 mins only
-        long end = st + (60 * 60 * 1000);
+        //Wait 20 mins only
+        long end = st + (20 * 60 * 1000);
         while (true) {
             stats = client.callProcedure("@Statistics", "table", 0).getResults()[0];
             boolean passedThisTime = true;
