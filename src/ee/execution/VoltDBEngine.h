@@ -178,6 +178,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // Dependency Transfer Functions
         // -------------------------------------------------
         bool send(Table* dependency);
+        bool writeToDisk(Table* dependency);
         int loadNextDependency(Table* destination);
 
         // -------------------------------------------------
@@ -542,6 +543,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         char* m_reusedResultBuffer;
         /** size of reused_result_buffer. */
         int m_reusedResultCapacity;
+
+        /** name of output file for large result sets */
+        string m_outputFileName;
 
         // arrays to hold fragment ids and dep ids from java
         // n.b. these are 8k each, should be boost shared arrays?

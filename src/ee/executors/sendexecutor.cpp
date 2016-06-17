@@ -66,8 +66,10 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
                           TempTableLimits* limits)
 {
     VOLT_TRACE("init Send Executor");
-    assert(dynamic_cast<SendPlanNode*>(m_abstractNode));
+    SendPlanNode* sendNode = dynamic_cast<SendPlanNode*>(m_abstractNode);
+    assert(sendNode);
     assert(m_abstractNode->getInputTableCount() == 1);
+    m_highVolume = sendNode->isHighVolume();
     return true;
 }
 
@@ -78,10 +80,19 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     assert(inputTable);
     //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
     // Just blast the input table on through VoltDBEngine!
-    if (!m_engine->send(inputTable)) {
-        VOLT_ERROR("Failed to send table '%s'", inputTable->name().c_str());
-        return false;
+    if (m_highVolume) {
+        // For large result sets serialize input table to a file on disk
+        if (!m_engine->writeToDisk(inputTable)) {
+            VOLT_ERROR("Failed to write table '%s'", inputTable->name().c_str());
+            return false;
+        }
+    } else {
+        if (!m_engine->send(inputTable)) {
+                VOLT_ERROR("Failed to send table '%s'", inputTable->name().c_str());
+                return false;
+        }
     }
+
     VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
 
     return true;

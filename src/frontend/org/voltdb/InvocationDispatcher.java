@@ -366,6 +366,9 @@ public final class InvocationDispatcher {
             else if ("@AdHocSpForTest".equals(task.procName)) {
                 return dispatchAdHocSpForTest(task, handler, ccxn, false, user);
             }
+            else if ("@ReadOnlySlow".equals(task.procName)) {
+                return dispatchReadOnlySlow(task, handler, ccxn, false, user);
+            }
             else if ("@LoadMultipartitionTable".equals(task.procName)) {
                 /*
                  * For IV2 DR: This will generate a sentinel for each partition,
@@ -511,7 +514,9 @@ public final class InvocationDispatcher {
 
         // If we got here, instance is paused and handler is not admin.
         if (procedure.getSystemproc() &&
-                ("@AdHoc".equals(invocation.procName) || "@AdHocSpForTest".equals(invocation.procName))) {
+                ("@AdHoc".equals(invocation.procName) ||
+                        "@AdHocSpForTest".equals(invocation.procName) ||
+                        "@ReadOnlySlow".equals(invocation.procName))) {
             // AdHoc is handled after it is planned and we figure out if it is read-only or not.
             return true;
         } else {
@@ -738,6 +743,20 @@ public final class InvocationDispatcher {
     }
 
     private final ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, InvocationClientHandler handler,
+            Connection ccxn, boolean isExplain, AuthSystem.AuthUser user) {
+        ParameterSet params = task.getParams();
+        Object[] paramArray = params.toArray();
+        String sql = (String) paramArray[0];
+        Object[] userParams = null;
+        if (params.size() > 1) {
+            userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
+        }
+        ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
+        dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, null, user);
+        return null;
+    }
+
+    private final ClientResponseImpl dispatchReadOnlySlow(StoredProcedureInvocation task, InvocationClientHandler handler,
             Connection ccxn, boolean isExplain, AuthSystem.AuthUser user) {
         ParameterSet params = task.getParams();
         Object[] paramArray = params.toArray();

@@ -96,6 +96,7 @@
 #include <boost/multi_index/mem_fun.hpp>
 #include <boost/multi_index/sequenced_index.hpp>
 
+#include <iostream>
 #include <sstream>
 #include <locale>
 #include <typeinfo>
@@ -431,10 +432,16 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
 
+    // 255 is typical system limit on file name size
+    char outputFileName[255];
+    //snprintf(outputFileName,255,"hvout_%ld.tbl",uniqueId);
+    snprintf(outputFileName,255,"hvout.tbl");
+    m_outputFileName.assign(outputFileName);
+
     /*
      * Reserve space in the result output buffer for the number of
      * result dependencies and for the dirty byte. Necessary for a
-     * plan fragment because the number of produced depenencies may
+     * plan fragment because the number of produced dependencies may
      * not be known in advance.
      */
     if (first) {
@@ -555,6 +562,34 @@ bool VoltDBEngine::send(Table* dependency) {
     if (!dependency->serializeTo(m_resultOutput))
         return false;
     m_numResultDependencies++;
+    return true;
+}
+
+bool VoltDBEngine::writeToDisk(Table* dependency) {
+    VOLT_DEBUG("Writing Dependency from C++");
+    // TODO write directly to output file instead of copying to temporary buffer (which may not be large enough for results)
+
+    /*
+    m_resultOutput.writeInt(-1); // legacy placeholder for old output id
+    int pos = m_resultOutput.size();
+    if (!dependency->serializeTo(m_resultOutput))
+        return false;
+    m_numResultDependencies++;
+
+    const char * bufferStart = m_resultOutput.data()+pos;
+    size_t bufferSize = m_resultOutput.size();
+    std::ofstream outputFile(m_outputFileName,std::ofstream::binary);
+    outputFile.write(bufferStart,bufferSize);
+    */
+
+    SerializeOutputFile serialize_iof;
+    serialize_iof.initialize(m_outputFileName);
+    if (!dependency->serializeToFile(serialize_iof))
+            return false;
+    serialize_iof.close();
+
+    // TODO send back a table with the file name as row of data?
+
     return true;
 }
 
@@ -1251,7 +1286,6 @@ void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
         PlanSet::iterator iter = plans.get<0>().begin();
         plans.erase(iter);
     }
-
     m_currExecutorVec = ev_guard.get();
     assert(m_currExecutorVec);
     // update the context
