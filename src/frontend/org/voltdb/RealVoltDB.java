@@ -164,10 +164,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
         "                Changes to this file will be overwritten. Copy it elsewhere if you",
         "                want to use it as a starting point for a custom configuration. -->",
         "<deployment>",
-        "   <cluster hostcount=\"1\" />",
-        "   <httpd enabled=\"true\">",
-        "      <jsonapi enabled=\"true\" />",
-        "   </httpd>",
+        "    <cluster hostcount=\"1\" />",
+        "    <httpd enabled=\"true\">",
+        "        <jsonapi enabled=\"true\" />",
+        "    </httpd>",
         "</deployment>"
     };
 
@@ -1082,7 +1082,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     // generated below.
                     Set<Integer> hostsOnRing = new HashSet<Integer>();
                     if (!m_leaderAppointer.isClusterKSafe(hostsOnRing)) {
-                        VoltDB.crashGlobalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
+                        VoltDB.crashLocalVoltDB("Some partitions have no replicas.  Cluster has become unviable.",
                                 false, null);
                     }
                     // Cleanup the rejoin blocker in case the rejoining node failed.
