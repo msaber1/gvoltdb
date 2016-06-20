@@ -209,7 +209,7 @@ public class TestReadOnlySlowQueries extends ReadOnlySlowQueryTester {
         //System.out.println("@ReadOnlySlow:");
         result = m_client.callProcedure("@ReadOnlySlow", query).getResults()[0];
 
-        VoltTable lrrResult = LRRHelper.getTableFromFile("hvout.tbl");
+        VoltTable lrrResult = LRRHelper.getTableFromFileTable(result);
         //System.out.println(lrrResult.toString());
         assertEquals("Result sizes don't match: expected " + expected + ", read "+ lrrResult.getRowCount(),expected, lrrResult.getRowCount());
         int spResult = lrrResult.getRowCount();

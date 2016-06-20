@@ -433,9 +433,9 @@ public class RegressionSuite extends TestCase {
     static protected void validateTableOfScalarLongsRO(Client client, String sql, long[] expected)
             throws NoConnectionsException, IOException, ProcCallException {
         assertNotNull(expected);
-        client.callProcedure("@ReadOnlySlow", sql);
-        VoltTable vt = LRRHelper.getTableFromFile("hvout.tbl");
-        validateTableOfScalarLongs(vt, expected);
+        VoltTable vt = client.callProcedure("@ReadOnlySlow", sql).getResults()[0];
+        VoltTable vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, expected);
     }
 
     static protected void validateTableOfScalarDecimals(Client client, String sql, BigDecimal[] expected)

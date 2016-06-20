@@ -180,6 +180,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t defaultDrBufferSize,
                          int64_t tempTableMemoryLimit,
                          bool createDrReplicatedStream,
+						 std::string pathName,
                          int32_t compactionThreshold)
 {
     m_clusterIndex = clusterIndex;
@@ -242,7 +243,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             hostId,
                                             m_drStream,
                                             m_drReplicatedStream,
-                                            drClusterId);
+                                            drClusterId,
+											pathName);
     return true;
 }
 
@@ -432,11 +434,6 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
 
-    // 255 is typical system limit on file name size
-    char outputFileName[255];
-    //snprintf(outputFileName,255,"hvout_%ld.tbl",uniqueId);
-    snprintf(outputFileName,255,"hvout.tbl");
-    m_outputFileName.assign(outputFileName);
 
     /*
      * Reserve space in the result output buffer for the number of
@@ -567,7 +564,6 @@ bool VoltDBEngine::send(Table* dependency) {
 
 bool VoltDBEngine::writeToDisk(Table* dependency) {
     VOLT_DEBUG("Writing Dependency from C++");
-    // TODO write directly to output file instead of copying to temporary buffer (which may not be large enough for results)
 
     /*
     m_resultOutput.writeInt(-1); // legacy placeholder for old output id
@@ -583,12 +579,12 @@ bool VoltDBEngine::writeToDisk(Table* dependency) {
     */
 
     SerializeOutputFile serialize_iof;
-    serialize_iof.initialize(m_outputFileName);
+    string outFileName = m_executorContext->nextOutFileName();
+
+    serialize_iof.initialize(outFileName);
     if (!dependency->serializeToFile(serialize_iof))
             return false;
     serialize_iof.close();
-
-    // TODO send back a table with the file name as row of data?
 
     return true;
 }

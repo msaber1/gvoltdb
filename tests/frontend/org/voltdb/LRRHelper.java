@@ -32,10 +32,15 @@ import java.nio.file.Paths;
 
 
 public class LRRHelper {
+    public static VoltTable getTableFromFileTable (VoltTable fileTable) {
+    	//System.out.println(fileTable.toString());
+        String fileName = fileTable.fetchRow(0).getString("filenames");
+        return getTableFromFile(fileName);
+    }
     public static VoltTable getTableFromFile (String fileName) {
         byte[] bytes = null;
         try {
-            bytes = Files.readAllBytes(Paths.get("hvout.tbl"));
+            bytes = Files.readAllBytes(Paths.get(fileName));
         } catch (IOException e) {
             e.printStackTrace();
         }
@@ -43,13 +48,7 @@ public class LRRHelper {
             return null;
         }
         ByteBuffer buf = ByteBuffer.wrap(bytes);
-        /*
-        System.out.println("Buffer:\n"+buf.toString());
-        while(buf.hasRemaining()) {
-            System.out.println(buf.get());
-        }
-        buf.flip();
-        */
+
         VoltTable vt = new VoltTable();
         vt.initFromBuffer(buf);
         //System.out.println(vt.toString());
