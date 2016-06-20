@@ -180,7 +180,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          int32_t defaultDrBufferSize,
                          int64_t tempTableMemoryLimit,
                          bool createDrReplicatedStream,
-						 std::string pathName,
+                         std::string pathName,
                          int32_t compactionThreshold)
 {
     m_clusterIndex = clusterIndex;
@@ -244,7 +244,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_drStream,
                                             m_drReplicatedStream,
                                             drClusterId,
-											pathName);
+                                            pathName);
     return true;
 }
 

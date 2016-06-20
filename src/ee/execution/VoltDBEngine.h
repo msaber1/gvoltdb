@@ -117,7 +117,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t defaultDrBufferSize,
                         int64_t tempTableMemoryLimit,
                         bool createDrReplicatedStream,
-						std::string pathName = "",
+                        std::string pathName = "",
                         int32_t compactionThreshold = 95);
         virtual ~VoltDBEngine();
 
@@ -409,7 +409,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         }
 
         std::string getLastOutFileName() {
-        	return m_executorContext->lastOutFileName();
+            return m_executorContext->lastOutFileName();
         }
 
     protected:

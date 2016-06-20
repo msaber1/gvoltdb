@@ -269,7 +269,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint defaultDrBufferSize,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
-	jbyteArray pathName,
+    jbyteArray pathName,
     jint compactionThreshold)
 {
     VOLT_DEBUG("nativeInitialize() start");
@@ -301,7 +301,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    defaultDrBufferSize,
                                    tempTableMemory,
                                    createDrReplicatedStream,
-								   pathString,
+                                   pathString,
                                    static_cast<int32_t>(compactionThreshold));
         if (success) {
             VOLT_DEBUG("initialize succeeded");

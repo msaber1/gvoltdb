@@ -907,17 +907,17 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         //
         sql = "SELECT ID FROM R1 sub1 WHERE ID > ? ORDER BY ID;";
         vt = client.callProcedure("@ReadOnlySlow", sql, 1).getResults()[0];
-        vt2 = LRRHelper.getTableFromFileTable(vt);        
+        vt2 = LRRHelper.getTableFromFileTable(vt);
         validateTableOfScalarLongs(vt2, new long[]{2, 3});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ReadOnlySlow", sql, 2).getResults()[0];
-        vt2 = LRRHelper.getTableFromFileTable(vt);        
+        vt2 = LRRHelper.getTableFromFileTable(vt);
         validateTableOfScalarLongs(vt2, new long[]{3});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ReadOnlySlow", sql, 3).getResults()[0];
-        vt2 = LRRHelper.getTableFromFileTable(vt);        
+        vt2 = LRRHelper.getTableFromFileTable(vt);
         validateTableOfScalarLongs(vt2, new long[]{});
         checkPlannerCache(client, CACHE_SKIPPED);
 
@@ -926,36 +926,36 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         //
         sql = "SELECT ID FROM R1 sub1 WHERE num = 0 and ID > ? order by ID;";
         vt = client.callProcedure("@ReadOnlySlow", sql, 0).getResults()[0];
-        vt2 = LRRHelper.getTableFromFileTable(vt);        
+        vt2 = LRRHelper.getTableFromFileTable(vt);
         validateTableOfScalarLongs(vt2, new long[]{1, 2});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ReadOnlySlow", sql, 1).getResults()[0];
-        vt2 = LRRHelper.getTableFromFileTable(vt);        
+        vt2 = LRRHelper.getTableFromFileTable(vt);
         validateTableOfScalarLongs(vt2, new long[]{2});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ReadOnlySlow", sql, 3).getResults()[0];
-        vt2 = LRRHelper.getTableFromFileTable(vt);        
+        vt2 = LRRHelper.getTableFromFileTable(vt);
         validateTableOfScalarLongs(vt2, new long[]{});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         // adjust the constant
         sql = "SELECT ID FROM R1 sub1 WHERE num = 1 and ID > ? order by ID;";
         vt = client.callProcedure("@ReadOnlySlow", sql, 0).getResults()[0];
-        vt2 = LRRHelper.getTableFromFileTable(vt);        
+        vt2 = LRRHelper.getTableFromFileTable(vt);
                 validateTableOfScalarLongs(vt2, new long[]{3});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ReadOnlySlow", sql, 3).getResults()[0];
-        vt2 = LRRHelper.getTableFromFileTable(vt);        
+        vt2 = LRRHelper.getTableFromFileTable(vt);
         validateTableOfScalarLongs(vt2, new long[]{});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         // replace constants with parameter
         sql = "SELECT ID FROM R1 sub1 WHERE num = ? and ID > ? order by ID;";
         vt = client.callProcedure("@ReadOnlySlow", sql, 0, 0).getResults()[0];
-        vt2 = LRRHelper.getTableFromFileTable(vt);        
+        vt2 = LRRHelper.getTableFromFileTable(vt);
         validateTableOfScalarLongs(vt2, new long[]{1, 2});
         checkPlannerCache(client, CACHE_SKIPPED);
 
@@ -963,7 +963,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         vt2 = LRRHelper.getTableFromFileTable(vt);
         validateTableOfScalarLongs(vt2, new long[]{3});
         checkPlannerCache(client, CACHE_SKIPPED);
-        
+
     }
 
     //

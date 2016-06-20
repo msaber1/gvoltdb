@@ -33,7 +33,7 @@ import java.nio.file.Paths;
 
 public class LRRHelper {
     public static VoltTable getTableFromFileTable (VoltTable fileTable) {
-    	//System.out.println(fileTable.toString());
+        //System.out.println(fileTable.toString());
         String fileName = fileTable.fetchRow(0).getString("filenames");
         return getTableFromFile(fileName);
     }

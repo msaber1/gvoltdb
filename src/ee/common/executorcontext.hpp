@@ -61,7 +61,7 @@ class ExecutorContext {
                     AbstractDRTupleStream *drTupleStream,
                     AbstractDRTupleStream *drReplicatedStream,
                     CatalogId drClusterId,
-					std::string pathName);
+                    std::string pathName);
 
     ~ExecutorContext();
 
@@ -152,7 +152,7 @@ class ExecutorContext {
     }
 
     std::string getPathName() {
-    	return m_pathName;
+        return m_pathName;
     }
 
     std::string nextOutFileName() {
@@ -171,11 +171,11 @@ class ExecutorContext {
     }
 
     int getOutFileCount() {
-    	return m_outFileCount;
+        return m_outFileCount;
     }
 
     void incrOutFileCount() {
-    	++m_outFileCount;
+        ++m_outFileCount;
     }
 
     /** Current or most recent sp handle */

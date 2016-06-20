@@ -1677,7 +1677,7 @@ public abstract class CatalogUtil {
         if (schedule != null) {
             schedule.setPath(snapshotPath.getPath());
         }
-        
+
         //Set high volume directory
         cluster.setHighvolumeoutput(highVolumeOutputPath.getPath());
 
@@ -1722,7 +1722,7 @@ public abstract class CatalogUtil {
 
         return voltDbRoot;
     }
-    
+
     public static File getHighVolumeOutput(PathsType.Highvolumeoutput paths, File voltDbRoot) {
         File highVolumeOutputPath;
         highVolumeOutputPath = new File(paths.getPath());;
@@ -1737,7 +1737,7 @@ public abstract class CatalogUtil {
             if (!highVolumeOutputPath.mkdirs()) {
                 hostLog.fatal("Failed to create high volume output path directory \"" +
                               highVolumeOutputPath + "\"");
-                
+
             }
         }
         validateDirectory("high volume output path", highVolumeOutputPath);
@@ -1745,7 +1745,7 @@ public abstract class CatalogUtil {
         return highVolumeOutputPath;
 
     }
-    
+
     public static File getSnapshot(PathsType.Snapshots paths, File voltDbRoot) {
         File snapshotPath;
         snapshotPath = new File(paths.getPath());

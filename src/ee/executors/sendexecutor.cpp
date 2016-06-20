@@ -71,7 +71,7 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(m_abstractNode->getInputTableCount() == 1);
     m_highVolume = sendNode->isHighVolume();
     if (m_highVolume) {
-    	// Create output table for file names
+        // Create output table for file names
         setHighVolumeOutputTable(limits);
     }
     return true;
