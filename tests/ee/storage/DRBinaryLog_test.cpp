@@ -105,7 +105,7 @@ public:
     MockVoltDBEngine(bool isActiveActiveEnabled, int clusterId, Topend* topend, Pool* pool, DRTupleStream* drStream, DRTupleStream* drReplicatedStream) {
         m_isActiveActiveEnabled = isActiveActiveEnabled;
         m_context.reset(new ExecutorContext(1, 1, NULL, topend, pool,
-                                            NULL, this, "localhost", 2, drStream, drReplicatedStream, clusterId));
+                                            NULL, this, "localhost", 2, drStream, drReplicatedStream, clusterId, ""));
 
         std::vector<ValueType> exportColumnType;
         std::vector<int32_t> exportColumnLength;

@@ -93,7 +93,7 @@ class TableAndIndexTest : public Test {
               drReplicatedStream(16383, 64*1024) {
             NValueArray* noParams = NULL;
             mockEngine = new MockVoltDBEngine(false);
-            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0);
+            engine = new ExecutorContext(0, 0, NULL, &topend, &pool, noParams, mockEngine, "", 0, &drStream, &drReplicatedStream, 0, "");
             mem = 0;
             *reinterpret_cast<int64_t*>(signature) = 42;
 
