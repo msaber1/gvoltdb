@@ -87,7 +87,7 @@
   
   <!-- <consistency> -->
   <xs:complexType name="consistencyType">
-    <xs:attribute name="readlevel" type="readlevelType" default="safe"/>
+    <xs:attribute name="readlevel" type="readlevelType" default="fast"/>
   </xs:complexType>
 
   <!-- <paths> -->

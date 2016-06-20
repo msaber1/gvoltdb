@@ -142,7 +142,7 @@ public class VoltDB {
         public String m_adminInterface = "";
 
         /** consistency level for reads */
-        public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.SAFE;
+        public Consistency.ReadLevel m_consistencyReadLevel = Consistency.ReadLevel.FAST;
 
         /** port number to use to build intra-cluster mesh */
         public int m_internalPort = DEFAULT_INTERNAL_PORT;
