@@ -533,8 +533,8 @@ int main(int argc, char* argv[]) {
                                                     0,              // hostId
                                                     NULL,           // drTupleStream
                                                     NULL,           // drReplicatedStream
-                                                    0,	            // drClusterId
-													""));			// pathName
+                                                    0,              // drClusterId
+                                                    ""));           // pathName
 
     return TestSuite::globalInstance()->runAll();
 }

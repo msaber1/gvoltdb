@@ -76,7 +76,7 @@ public:
                                                             NULL,             // drTupleStream
                                                             NULL,             // drReplicatedStream
                                                             0,                // drClusterId
-															""));			  // pathName
+                                                            ""));             // pathName
     }
 
 protected:

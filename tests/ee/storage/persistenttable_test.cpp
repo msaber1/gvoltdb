@@ -69,7 +69,7 @@ public:
                              1024,  // defaultDrBufferSize
                              voltdb::DEFAULT_TEMP_TABLE_MEMORY,
                              false, // don't create DR replicated stream
-							 "", 	// pathName
+                             "",    // pathName
                              95);   // compaction threshold
         m_engine->setUndoToken(m_undoToken);
     }
