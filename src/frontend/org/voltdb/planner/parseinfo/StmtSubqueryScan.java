@@ -265,8 +265,12 @@ public class StmtSubqueryScan extends StmtTableScan {
         return m_outputColumnList.get(columnIndex).getColumnName();
     }
 
-    public Integer getColumnIndex(String columnAlias) {
-        return m_outputColumnIndexMap.get(columnAlias);
+    public SchemaColumn getSchemaColumn(int columnIndex) {
+        return m_outputColumnList.get(columnIndex);
+    }
+
+    public Integer getColumnIndex(String columnAlias, int differentiator) {
+        return m_outputColumnIndexMap.get(Pair.of(columnAlias, differentiator));
     }
 
     @Override

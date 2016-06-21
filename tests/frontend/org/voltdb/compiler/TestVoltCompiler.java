@@ -2486,9 +2486,10 @@ public class TestVoltCompiler extends TestCase {
                   "SELECT T1a.a, count(*), sum(T1a.b) FROM T1 T1a JOIN T1 T1b ON T1a.a=T1b.a GROUP BY T1a.a;";
         checkDDLErrorMessage(tableDDL+viewDDL, "Table T1 appeared in the table list more than once: " +
                                                "materialized view does not support self-join.");
-        // 3. Test table join subquery.
+        // 3. Test table join subquery. The subquery "LIMIT 10" is there to prevent an optimization
+        // which replaces the subquery with an original table.
         viewDDL = "CREATE VIEW V (aint, cnt, sumint) AS \n" +
-                  "SELECT T1.a, count(*), sum(T1.b) FROM T1 JOIN (SELECT * FROM T2) T2 ON T1.a=T2.a GROUP BY T1.a;";
+                  "SELECT T1.a, count(*), sum(T1.b) FROM T1 JOIN (SELECT * FROM T2 LIMIT 10) T2 ON T1.a=T2.a GROUP BY T1.a;";
         checkDDLErrorMessage(tableDDL+viewDDL, "Materialized view \"V\" with subquery sources is not supported.");
     }
 
