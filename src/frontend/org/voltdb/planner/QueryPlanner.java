@@ -444,6 +444,7 @@ public class QueryPlanner {
             fragmentize(bestPlan, recvNode);
         }
 
+        System.out.println(bestPlan.toString());
         return bestPlan;
     }
 

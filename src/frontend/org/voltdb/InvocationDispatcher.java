@@ -1546,22 +1546,22 @@ public final class InvocationDispatcher {
         assert(plannedStmtBatch.isReadOnly());
         task.procName = "@ReadOnlySlow";
 
-            int type = VoltType.NULL.getValue();
-            // replicated table read is single-part without a partitioning param
-            // I copied this from below, but I'm not convinced that the above statement is correct
-            // or that the null behavior here either (a) ever actually happens or (b) has the
-            // desired intent.
-            Object partitionParam = plannedStmtBatch.partitionParam();
-            byte[] param = null;
-            if (partitionParam != null) {
-                type = VoltType.typeFromClass(partitionParam.getClass()).getValue();
-                param = VoltType.valueToBytes(partitionParam);
-            }
-            partition = TheHashinator.getPartitionForParameter(type, partitionParam);
+        int type = VoltType.NULL.getValue();
+        // replicated table read is single-part without a partitioning param
+        // I copied this from below, but I'm not convinced that the above statement is correct
+        // or that the null behavior here either (a) ever actually happens or (b) has the
+        // desired intent.
+        Object partitionParam = plannedStmtBatch.partitionParam();
+        byte[] param = null;
+        if (partitionParam != null) {
+            type = VoltType.typeFromClass(partitionParam.getClass()).getValue();
+            param = VoltType.valueToBytes(partitionParam);
+        }
+        partition = TheHashinator.getPartitionForParameter(type, partitionParam);
 
-            // Send the partitioning parameter and its type along so that the site can check if
-            // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
-            task.setParams(param, (byte)type, buf.array());
+        // Send the partitioning parameter and its type along so that the site can check if
+        // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
+        task.setParams(param, (byte)type, buf.array());
 
         task.clientHandle = plannedStmtBatch.clientHandle;
 
