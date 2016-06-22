@@ -373,6 +373,19 @@ public class AsyncCompilerAgent {
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e);
             }
+            // Catch even the Error classes that are not usually caught because any
+            // throw from this function will hang a client waiting for a response.
+            catch (Throwable e) {
+                // Errors can be pretty serious, so log them before moving on.
+                // Messages for Errors probably don't contain sql statement info
+                // and it MIGHT not be relevant to some kind of environmental
+                // error. On the other hand, it doesn't hurt to include it.
+                hostLog.error("An unexpected error aborted ad hoc planning for statement \"" +
+                        sqlStatement + "\" ",
+                        e);
+                errorMsgs.add("An unexpected error aborted ad hoc planning for statement \"" +
+                        sqlStatement + "\" " + e);
+            }
         }
         String errorSummary = null;
         if (!errorMsgs.isEmpty()) {
