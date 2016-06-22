@@ -66,6 +66,7 @@ import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTypeUtil;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Preconditions;
 
 public class ProcedureRunner {
 
@@ -642,6 +643,11 @@ public class ProcedureRunner {
             if (plannedStatement.core.collectorFragment != null) {
                 collectorFragId = ActivePlanRepository.loadOrAddRefPlanFragment(
                         plannedStatement.core.collectorHash, plannedStatement.core.collectorFragment, sql);
+            }
+
+            // extra checking for PG
+            for (VoltType vt : plannedStatement.core.parameterTypes) {
+                Preconditions.checkState(vt != VoltType.INVALID, "ProcedureRunner voltQueueSQL (experimental) invalid param.");
             }
 
             queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(

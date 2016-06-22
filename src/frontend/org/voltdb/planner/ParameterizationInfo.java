@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ParameterConverter;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
@@ -41,6 +42,8 @@ import org.voltdb.utils.VoltTypeUtil;
  *
  */
 class ParameterizationInfo {
+
+    private static final VoltLogger m_log = new VoltLogger("COMPILER");
 
     final VoltXMLElement originalXmlSQL;
     final VoltXMLElement parameterizedXmlSQL;
@@ -184,6 +187,12 @@ class ParameterizationInfo {
                 // handle parameter value type
                 String typeStr = node.attributes.get("valuetype");
                 VoltType vt = VoltType.typeFromString(typeStr);
+
+                // extra checking for PG
+                if (vt == VoltType.INVALID) {
+                    m_log.error("ParameterizationInfo.parameterizeRecursively has paramter of type INVALID" +
+                            "\nVoltXML node content:\n" + node.toString());
+                }
 
                 String value = null;
                 if (vt != VoltType.NULL) {

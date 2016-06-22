@@ -29,11 +29,14 @@ import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.Encoder;
+
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Base class for @AdHoc... system procedures.
@@ -100,6 +103,11 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                         Encoder.hexEncode(catalogHash).substring(0, 10) +
                         "). Statement: " + new String(statement.sql, Constants.UTF8ENCODING);
                 throw new VoltAbortException(msg);
+            }
+
+            // extra checking for PG
+            for (VoltType vt : statement.core.parameterTypes) {
+                Preconditions.checkState(vt != VoltType.INVALID, "CorePlan in SQLStmt at has invalid param.");
             }
 
             // Don't cache the statement text, since ad hoc statements

@@ -29,6 +29,7 @@ import java.util.TreeMap;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.json_voltpatches.JSONException;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -62,7 +63,11 @@ import org.voltdb.types.ExpressionType;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.QuantifierType;
 
+import com.google_voltpatches.common.base.Preconditions;
+
 public abstract class AbstractParsedStmt {
+
+    private static final VoltLogger m_log = new VoltLogger("COMPILER");
 
     protected String m_contentDeterminismMessage = null;
 
@@ -1129,6 +1134,21 @@ public abstract class AbstractParsedStmt {
                 String typeName = node.attributes.get("valuetype");
                 String isVectorParam = node.attributes.get("isvector");
                 VoltType type = VoltType.typeFromString(typeName);
+
+                // extra checking for PG
+                if (type == VoltType.INVALID) {
+                    String schema = "UNKNOWN";
+                    if (m_db != null) {
+                        schema = m_db.getSchema();
+                    }
+
+                    m_log.error("*** VoltXMLElement has paramter of type INVALID at index" + String.valueOf(index) +
+                            "\nVoltXML content:\n" + root.toString() +
+                            "\nSQL Statement:\n" + m_sql +
+                            "\nSchema:\n" + schema +
+                            "\n***\n");
+                }
+
                 ParameterValueExpression pve = new ParameterValueExpression();
                 pve.setParameterIndex(index);
                 pve.setValueType(type);
@@ -1293,11 +1313,19 @@ public abstract class AbstractParsedStmt {
     public ParameterValueExpression[] getParameters() {
         // If a statement contains subqueries the parameters will be associated with
         // the parent statement
+        ParameterValueExpression[] retval;
         if (m_parentStmt != null) {
-            return m_parentStmt.getParameters();
+            retval = m_parentStmt.getParameters();
         } else {
-            return m_paramsByIndex.values().toArray(new ParameterValueExpression[m_paramsByIndex.size()]);
+            retval = m_paramsByIndex.values().toArray(new ParameterValueExpression[m_paramsByIndex.size()]);
         }
+
+        // extra checking for PG
+        for (ParameterValueExpression pve : retval) {
+            Preconditions.checkState(pve.getValueType() != VoltType.INVALID, "PlanAssembler getParameters has invalid param.");
+        }
+
+        return retval;
     }
 
     public void setParentAsUnionClause() {

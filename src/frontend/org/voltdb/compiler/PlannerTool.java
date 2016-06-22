@@ -28,6 +28,7 @@ import org.voltdb.PlannerStatsCollector.CacheUse;
 import org.voltdb.StatsAgent;
 import org.voltdb.StatsSelector;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.common.Constants;
@@ -41,13 +42,15 @@ import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.utils.Encoder;
 
+import com.google_voltpatches.common.base.Preconditions;
+
 /**
  * Planner tool accepts an already compiled VoltDB catalog and then
  * interactively accept SQL and outputs plans on standard out.
  */
 public class PlannerTool {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private static final VoltLogger compileLog = new VoltLogger("COMPILE");
+    private static final VoltLogger compileLog = new VoltLogger("COMPILER");
 
     private final Database m_database;
     private final Cluster m_cluster;
@@ -241,6 +244,12 @@ public class PlannerTool {
                             CorePlan core = matched.m_core;
                             ParameterSet params = null;
                             if (planner.compiledAsParameterizedPlan()) {
+
+                                // extra checking for PG
+                                for (VoltType vt : core.parameterTypes) {
+                                    Preconditions.checkState(vt != VoltType.INVALID, "PlannerTool planSQL invalid param.");
+                                }
+
                                 params = planner.extractedParamValues(core.parameterTypes);
                             } else if (hasUserQuestionMark) {
                                 params = ParameterSet.fromArrayNoCopy(userParams);

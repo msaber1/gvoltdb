@@ -37,6 +37,8 @@ import org.voltdb.planner.CorePlan;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
 
+import com.google_voltpatches.common.base.Preconditions;
+
 /**
  * Holds a batch of planned SQL statements.
  *
@@ -260,6 +262,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             int ii = 0;
             for (AdHocPlannedStatement cs : plannedStatements) {
                 for (VoltType paramType : cs.core.parameterTypes) {
+                    Preconditions.checkState(paramType != VoltType.INVALID, "AdHocPlannedStmtBatch flattenPlanArray invalid param.");
+
                     if (ii >= typedUserParams.length) {
                         String errorMsg =
                             "Too few actual arguments were passed for the parameters in the sql statement(s): (" +

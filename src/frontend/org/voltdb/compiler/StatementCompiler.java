@@ -52,6 +52,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.base.Charsets;
+import com.google_voltpatches.common.base.Preconditions;
 
 /**
  * Compiles individual SQL statements and updates the given catalog.
@@ -225,7 +226,12 @@ public abstract class StatementCompiler {
         // We will need to update the system catalogs with this new information
         for (int i = 0; i < plan.parameters.length; ++i) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
-            catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
+
+            // extra checking for PG
+            VoltType vt = plan.parameters[i].getValueType();
+            Preconditions.checkState(vt != VoltType.INVALID, "StatementCompiler compileStatementAndUpdateCatalog has invalid param.");
+            catalogParam.setJavatype(vt.getValue());
+
             catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
             catalogParam.setIndex(i);
         }
@@ -414,7 +420,12 @@ public abstract class StatementCompiler {
         // We will need to update the system catalogs with this new information
         for (int i = 0; i < plan.parameters.length; ++i) {
             StmtParameter catalogParam = stmt.getParameters().add(String.valueOf(i));
-            catalogParam.setJavatype(plan.parameters[i].getValueType().getValue());
+
+            // extra checking for PG
+            VoltType vt = plan.parameters[i].getValueType();
+            Preconditions.checkState(vt != VoltType.INVALID, "StatementCompiler compileStatementAndUpdateCatalog has invalid param.");
+            catalogParam.setJavatype(vt.getValue());
+
             catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
             catalogParam.setIndex(i);
         }

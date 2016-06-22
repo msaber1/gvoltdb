@@ -28,6 +28,8 @@ import org.voltdb.common.Constants;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.utils.Encoder;
 
+import com.google_voltpatches.common.base.Preconditions;
+
 /**
  * CorePlan is an immutable representation of a SQL execution plan.
  * It refers to a parameterized statement, and so it could apply to
@@ -102,6 +104,11 @@ public class CorePlan {
         this.catalogHash = catalogHash;
         parameterTypes = plan.parameterTypes();
         readOnly = plan.isReadOnly();
+
+        // extra checking for PG
+        for (VoltType vt : parameterTypes) {
+            Preconditions.checkArgument(vt != VoltType.INVALID, "CorePlan constructor from CompiledPlan has invalid param.");
+        }
     }
 
     /***
@@ -131,6 +138,11 @@ public class CorePlan {
         this.readOnly = isReadOnly;
         this.parameterTypes = paramTypes;
         this.catalogHash = catalogHash;
+
+        // extra checking for PG
+        for (VoltType vt : paramTypes) {
+            Preconditions.checkArgument(vt != VoltType.INVALID, "CorePlan copy constructor has invalid param.");
+        }
     }
 
     @Override
@@ -188,6 +200,7 @@ public class CorePlan {
         // param types
         buf.putShort((short) parameterTypes.length);
         for (VoltType type : parameterTypes) {
+            Preconditions.checkState(type != VoltType.INVALID, "CorePlan param type is invalid at serialization time.");
             buf.put(type.getValue());
         }
     }

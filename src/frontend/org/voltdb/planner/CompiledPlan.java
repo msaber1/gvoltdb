@@ -32,6 +32,8 @@ import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.PlanNodeType;
 
+import com.google_voltpatches.common.base.Preconditions;
+
 /**
  * A triple-tuple to hold a complete plan graph along with its
  * input (parameters) and output (result columns). This class just
@@ -302,8 +304,12 @@ public class CompiledPlan {
             int ii = 0;
             for (ParameterValueExpression param : parameters) {
                 m_parameterTypes[ii++] = param.getValueType();
+
+                // extra checking for PG
+                Preconditions.checkState(param.getValueType() != VoltType.INVALID, "CompiledPlan parameterTypes invalid param.");
             }
         }
+
         return m_parameterTypes;
     }
 
