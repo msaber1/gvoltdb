@@ -1454,7 +1454,6 @@ public final class InvocationDispatcher {
                 param = VoltType.valueToBytes(partitionParam);
             }
             partition = TheHashinator.getPartitionForParameter(type, partitionParam);
-
             // Send the partitioning parameter and its type along so that the site can check if
             // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
             task.setParams(param, (byte)type, buf.array());
@@ -1558,7 +1557,6 @@ public final class InvocationDispatcher {
             param = VoltType.valueToBytes(partitionParam);
         }
         partition = TheHashinator.getPartitionForParameter(type, partitionParam);
-
         // Send the partitioning parameter and its type along so that the site can check if
         // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
         task.setParams(param, (byte)type, buf.array());

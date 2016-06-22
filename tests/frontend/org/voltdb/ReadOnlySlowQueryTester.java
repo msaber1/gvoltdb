@@ -38,9 +38,8 @@ import org.voltdb.utils.MiscUtils;
 public abstract class ReadOnlySlowQueryTester extends TestCase {
 
     // TODO: make an enum
-    protected final int NOT_VALIDATING_SP_RESULT = 0;
-    protected final int VALIDATING_SP_RESULT = 1;
-    protected final int VALIDATING_TOTAL_SP_RESULT = 2;
+    protected final boolean NOT_VALIDATING_SP_RESULT = false;
+    protected final boolean VALIDATING_SP_RESULT = true;
 
     public static void setUpSchema(VoltProjectBuilder builder,
                                    String pathToCatalog,
@@ -118,7 +117,7 @@ public abstract class ReadOnlySlowQueryTester extends TestCase {
         return config;
     }
 
-    public abstract int runQueryTest(String query, int hash, int spPartialSoFar, int expected, int validatingSPresult)
+    public abstract void runQueryTest(String query, int hash, int spPartialSoFar, int expected, boolean validateResult)
             throws IOException, NoConnectionsException, ProcCallException;
 
     /**
@@ -127,19 +126,21 @@ public abstract class ReadOnlySlowQueryTester extends TestCase {
      * @throws NoConnectionsException
      */
     protected void runAllAdHocSPtests(int hashableA, int hashableB, int hashableC, int hashableD) throws NoConnectionsException, IOException, ProcCallException {
+        runQueryTest(String.format("SELECT * FROM PARTED1 WHERE PARTVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM PARTED1 WHERE PARTVAL = %d;", hashableB), hashableB, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1;", hashableA, 0, 2, VALIDATING_SP_RESULT);
         runQueryTest(String.format("SELECT * FROM REPPED1 WHERE REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM V_REPPED1;", hashableA, 0, 2, VALIDATING_SP_RESULT);
         runQueryTest(String.format("SELECT * FROM V_REPPED1 WHERE REPPEDVAL = %d;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-       runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and B.PARTVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = %d and B.REPPEDVAL = %d;", hashableA, hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-       runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and A.REPPEDVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and A.REPPEDVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = %d and A.REPPEDVAL = B.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
-      runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and B.PARTVAL = A.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
-       runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = %d and B.REPPEDVAL = A.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = %d and B.PARTVAL = A.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = %d and B.REPPEDVAL = A.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
 
         runQueryTest(String.format("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = %d and A.REPPEDVAL = B.PARTVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest(String.format("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = %d and A.REPPEDVAL = B.REPPEDVAL;", hashableA), hashableA, 0, 1, VALIDATING_SP_RESULT);
@@ -162,16 +163,5 @@ public abstract class ReadOnlySlowQueryTester extends TestCase {
 
     }
 
-    protected static String getQueryForLongQueryTable(int numberOfPredicates) {
-        StringBuilder string = new StringBuilder("SELECT count(*) FROM long_query_table ");
-        if (numberOfPredicates > 0) {
-            string.append("WHERE ID = 123 ");
-            for (int i = 1; i < numberOfPredicates; i++) {
-                string.append("AND ID > 100 ");
-            }
-        }
-        string.append(";");
-        return string.toString();
-    }
 
 }

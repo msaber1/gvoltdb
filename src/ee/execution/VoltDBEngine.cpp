@@ -565,19 +565,6 @@ bool VoltDBEngine::send(Table* dependency) {
 bool VoltDBEngine::writeToDisk(Table* dependency) {
     VOLT_DEBUG("Writing Dependency from C++");
 
-    /*
-    m_resultOutput.writeInt(-1); // legacy placeholder for old output id
-    int pos = m_resultOutput.size();
-    if (!dependency->serializeTo(m_resultOutput))
-        return false;
-    m_numResultDependencies++;
-
-    const char * bufferStart = m_resultOutput.data()+pos;
-    size_t bufferSize = m_resultOutput.size();
-    std::ofstream outputFile(m_outputFileName,std::ofstream::binary);
-    outputFile.write(bufferStart,bufferSize);
-    */
-
     SerializeOutputFile serialize_iof;
     string outFileName = m_executorContext->nextOutFileName();
 

@@ -601,7 +601,7 @@ public:
 
     /** Set the buffer to buffer with capacity. Note this does not change the position. */
     void initialize(std::string outputFileName) {
-        ofile.open(outputFileName.c_str(),std::ofstream::binary);
+        ofile.open(outputFileName.c_str(),std::ofstream::binary | std::ofstream::trunc);
     }
 
     void close() {
@@ -663,7 +663,6 @@ public:
 
         // do a network order conversion
         int32_t networkOrderLen = htonl(stringLength);
-
         ofile.write((char*)&networkOrderLen, sizeof(networkOrderLen));
         ofile.write((char*)&value,length);
     }
