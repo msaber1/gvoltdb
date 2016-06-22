@@ -164,24 +164,23 @@ public class TestReadOnlySlowQueries extends ReadOnlySlowQueryTester {
     public void runQueryTest(String query, int hashable, int spPartialSoFar, int expected, boolean validateResult)
             throws IOException, NoConnectionsException, ProcCallException {
 
-        System.out.println("@ReadOnlySlow:");
+        //System.out.println("@ReadOnlySlow:");
         VoltTable result2 = m_client.callProcedure("@ReadOnlySlow", query).getResults()[0];
 
         VoltTable lrrResult = LRRHelper.getTableFromFileTable(result2);
-        System.out.println(lrrResult.toString());
+        //System.out.println(lrrResult.toString());
+        assertEquals("Result sizes don't match: expected " + expected + ", read "+ lrrResult.getRowCount(),expected, lrrResult.getRowCount());
 
 
         if (validateResult) {
             // Compare to @AdHoc results
-            System.out.println("@AdHoc:");
+            //System.out.println("@AdHoc:");
             VoltTable result = m_client.callProcedure("@AdHoc", query).getResults()[0];
-            System.out.println(result.toString());
+            //System.out.println(result.toString());
             assertEquals(expected, result.getRowCount());
 
             assert(result.equals(lrrResult));
         }
-
-        assertEquals("Result sizes don't match: expected " + expected + ", read "+ lrrResult.getRowCount(),expected, lrrResult.getRowCount());
 
     }
 
