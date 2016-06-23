@@ -597,7 +597,7 @@ private:
 /** Class for writing to disk. */
 class SerializeOutputFile {
 public:
-    SerializeOutputFile() : ofile(NULL){}
+    SerializeOutputFile() : ofile(){}
 
     /** Set the buffer to buffer with capacity. Note this does not change the position. */
     void initialize(std::string outputFileName) {

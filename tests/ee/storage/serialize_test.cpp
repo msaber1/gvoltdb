@@ -66,6 +66,7 @@
 
 using namespace std;
 using namespace voltdb;
+using stupidunit::ChTempDir;
 
 #define NUM_OF_COLUMNS 6
 ValueType col_types[NUM_OF_COLUMNS] = { VALUE_TYPE_TINYINT, VALUE_TYPE_BIGINT, VALUE_TYPE_BIGINT, VALUE_TYPE_BIGINT, VALUE_TYPE_VARCHAR, VALUE_TYPE_DOUBLE };
@@ -159,7 +160,8 @@ TEST_F(TableSerializeTest, RoundTrip) {
 
 TEST_F(TableSerializeTest, FileRoundTrip) {
     // Serialize the table
-    std::string filename("/tmp/test");
+	ChTempDir tempdir;
+    std::string filename = tempdir.name() + "/test";
     SerializeOutputFile serialize_outf;
     serialize_outf.initialize(filename);
     table_->serializeToFile(serialize_outf);
@@ -170,11 +172,12 @@ TEST_F(TableSerializeTest, FileRoundTrip) {
     serialize_stream.seekg(0,serialize_stream.end);
     int size = serialize_stream.tellg();
     serialize_stream.seekg(0,serialize_stream.beg);
-    printf("Serialize size: %d\n",size);
 
+    assert(size >= 0);
     char * buffer = new char [size];
     serialize_stream.read(buffer,size);
     serialize_stream.close();
+    printf("Serialize size %d\n",size);
 
     // Deserialize the table: verify that it matches the existing table
     CopySerializeInputBE serialize_in(buffer + sizeof(int32_t), size - sizeof(int32_t));
@@ -189,7 +192,8 @@ TEST_F(TableSerializeTest, FileRoundTrip) {
     }
 
     // Serialize the table a second time, verify that it
-    std::string filename2("/tmp/test2");
+
+    std::string filename2 = tempdir.name() + "/test2";
     SerializeOutputFile serialize_outf2;
     serialize_outf2.initialize(filename2);
     deserialized->serializeToFile(serialize_outf2);
@@ -201,6 +205,7 @@ TEST_F(TableSerializeTest, FileRoundTrip) {
     int size2 = serialize_stream2.tellg();
     serialize_stream2.seekg(0,serialize_stream2.beg);
 
+    assert(size2 >= 0);
     char * buffer2 = new char [size2];
     serialize_stream2.read(buffer2,size2);
     serialize_stream2.close();
@@ -211,6 +216,8 @@ TEST_F(TableSerializeTest, FileRoundTrip) {
     EXPECT_EQ(0, ::memcmp(data1, data2, size));
     deserialized->deleteAllTuples(true);
     delete deserialized;
+    delete[] buffer;
+    delete[] buffer2;
 }
 
 TEST_F(TableSerializeTest, NullStrings) {
@@ -283,7 +290,8 @@ TEST_F(TableSerializeTest, NullStringsFile) {
     table_->insertTuple(tuple);
 
     // Serialize the table
-    std::string filename("/tmp/test3");
+	ChTempDir tempdir;
+    std::string filename = tempdir.name() + "/test";
     SerializeOutputFile serialize_outf;
     serialize_outf.initialize(filename);
     table_->serializeToFile(serialize_outf);
@@ -295,6 +303,7 @@ TEST_F(TableSerializeTest, NullStringsFile) {
     int size = serialize_stream.tellg();
     serialize_stream.seekg(0,serialize_stream.beg);
 
+    assert(size >= 0);
     char * buffer = new char [size];
     serialize_stream.read(buffer,size);
     serialize_stream.close();
@@ -332,6 +341,7 @@ TEST_F(TableSerializeTest, NullStringsFile) {
     }
     EXPECT_EQ(1, count);
     delete deserialized;
+    delete[] buffer;
 }
 
 int main() {
