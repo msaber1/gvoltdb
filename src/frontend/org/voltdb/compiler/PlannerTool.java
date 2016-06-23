@@ -121,7 +121,7 @@ public class PlannerTool {
         DatabaseEstimates estimates = new DatabaseEstimates();
         QueryPlanner planner = new QueryPlanner(
             sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-            partitioning, m_hsql, estimates, true, false,
+            partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE, false
             AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
         CompiledPlan plan = null;
@@ -198,7 +198,11 @@ public class PlannerTool {
             DatabaseEstimates estimates = new DatabaseEstimates();
             QueryPlanner planner = new QueryPlanner(
                     sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
+<<<<<<< HEAD
                     partitioning, m_hsql, estimates, true, isHighVolume,
+=======
+                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
+>>>>>>> master
                     AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
             CompiledPlan plan = null;
