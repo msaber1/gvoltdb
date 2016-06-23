@@ -1142,7 +1142,7 @@ public abstract class AbstractParsedStmt {
                         schema = m_db.getSchema();
                     }
 
-                    m_log.error("*** VoltXMLElement has paramter of type INVALID at index" + String.valueOf(index) +
+                    m_log.error("*** VoltXMLElement has parameter of type INVALID at index" + String.valueOf(index) +
                             "\nVoltXML content:\n" + root.toString() +
                             "\nSQL Statement:\n" + m_sql +
                             "\nSchema:\n" + schema +

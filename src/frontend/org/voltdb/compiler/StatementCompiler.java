@@ -423,7 +423,7 @@ public abstract class StatementCompiler {
 
             // extra checking for PG
             VoltType vt = plan.parameters[i].getValueType();
-            Preconditions.checkState(vt != VoltType.INVALID, "StatementCompiler compileStatementAndUpdateCatalog has invalid param.");
+            Preconditions.checkState(vt != VoltType.INVALID, "StatementCompiler compileDefaultProcedure has invalid param.");
             catalogParam.setJavatype(vt.getValue());
 
             catalogParam.setIsarray(plan.parameters[i].getParamIsVector());
