@@ -436,6 +436,7 @@ public class QueryPlanner {
             SendPlanNode sendNode = new SendPlanNode();
             // If this plan came from an @ReadOnlySlow, this sendNode should write to disk
             if (m_isHighVolume) {
+                bestPlan.setHighVolume(true);
                 sendNode.setHighVolume(true);
             }
             // connect the nodes to build the graph
@@ -466,6 +467,11 @@ public class QueryPlanner {
             // Have too many receive node for two fragment plan limit
             m_recentErrorMsg = "This join of multiple partitioned tables is too complex. "
                     + "Consider simplifying its subqueries: " + getOriginalSql();
+            return null;
+        }
+
+        if (m_isHighVolume && (!bestPlan.isReadOnly() || receives.size() == 1)) {
+            m_recentErrorMsg = "High volume queries do not support writes or multi-partition transactions. " + getOriginalSql();
             return null;
         }
 

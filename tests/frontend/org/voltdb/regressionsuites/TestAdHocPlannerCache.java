@@ -25,8 +25,11 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.file.Files;
+import java.nio.file.Paths;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.LRRHelper;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
@@ -861,6 +864,7 @@ public class TestAdHocPlannerCache extends RegressionSuite {
     public void subtestReadOnlySlow(Client client) throws IOException, ProcCallException {
         System.out.println("subtestReadOnlySlow...");
         VoltTable vt;
+        VoltTable vt2;
         String sql;
         checkPlannerCache(client, CACHE_SKIPPED);
 
@@ -897,21 +901,24 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         validateTableOfScalarLongsRO(client, sql, new long[]{3});
         checkPlannerCache(client, CACHE_SKIPPED);
 
-/*
+
         //
         // User question mark AdHoc queries
         //
         sql = "SELECT ID FROM R1 sub1 WHERE ID > ? ORDER BY ID;";
         vt = client.callProcedure("@ReadOnlySlow", sql, 1).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{2, 3});
+        vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, new long[]{2, 3});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ReadOnlySlow", sql, 2).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{3});
+        vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, new long[]{3});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ReadOnlySlow", sql, 3).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{});
+        vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, new long[]{});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         //
@@ -919,37 +926,44 @@ public class TestAdHocPlannerCache extends RegressionSuite {
         //
         sql = "SELECT ID FROM R1 sub1 WHERE num = 0 and ID > ? order by ID;";
         vt = client.callProcedure("@ReadOnlySlow", sql, 0).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{1, 2});
+        vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, new long[]{1, 2});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ReadOnlySlow", sql, 1).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{2});
+        vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, new long[]{2});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ReadOnlySlow", sql, 3).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{});
+        vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, new long[]{});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         // adjust the constant
         sql = "SELECT ID FROM R1 sub1 WHERE num = 1 and ID > ? order by ID;";
         vt = client.callProcedure("@ReadOnlySlow", sql, 0).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{3});
+        vt2 = LRRHelper.getTableFromFileTable(vt);
+                validateTableOfScalarLongs(vt2, new long[]{3});
         checkPlannerCache(client, CACHE_SKIPPED);
 
-        vt = client.callProcedure("@AdHoc", sql, 3).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{});
+        vt = client.callProcedure("@ReadOnlySlow", sql, 3).getResults()[0];
+        vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, new long[]{});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         // replace constants with parameter
         sql = "SELECT ID FROM R1 sub1 WHERE num = ? and ID > ? order by ID;";
         vt = client.callProcedure("@ReadOnlySlow", sql, 0, 0).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{1, 2});
+        vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, new long[]{1, 2});
         checkPlannerCache(client, CACHE_SKIPPED);
 
         vt = client.callProcedure("@ReadOnlySlow", sql, 1, 2).getResults()[0];
-        validateTableOfScalarLongs(vt, new long[]{3});
+        vt2 = LRRHelper.getTableFromFileTable(vt);
+        validateTableOfScalarLongs(vt2, new long[]{3});
         checkPlannerCache(client, CACHE_SKIPPED);
-        */
+
     }
 
     //

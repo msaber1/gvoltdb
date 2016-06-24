@@ -87,13 +87,15 @@ struct FunctionTest : public Test {
                                   0,
                                   (AbstractDRTupleStream *)0,
                                   (AbstractDRTupleStream *)0,
-                                  0) {}
+                                  0,
+                                  "") {}
 
         /**
          * A template for calling nullary function call expressions.
          */
         template <typename OUTPUT_TYPE>
         int testNullary(int operation, OUTPUT_TYPE, bool expect_null = false);
+
         /**
          * A template for calling unary function call expressions.  For any C++
          * type T, define the function "NValue getSomeValue(T val)" to

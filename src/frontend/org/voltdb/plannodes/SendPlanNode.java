@@ -110,7 +110,11 @@ public class SendPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
-        m_highVolume = jobj.getBoolean( Members.HIGH_VOLUME.name() );
+        if (jobj.has(Members.HIGH_VOLUME.name())) {
+            m_highVolume = jobj.getBoolean( Members.HIGH_VOLUME.name() );
+        } else {
+            m_highVolume = false;
+        }
     }
 
     @Override

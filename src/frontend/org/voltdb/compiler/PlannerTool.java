@@ -121,7 +121,7 @@ public class PlannerTool {
         DatabaseEstimates estimates = new DatabaseEstimates();
         QueryPlanner planner = new QueryPlanner(
             sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-            partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE, false
+            partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE, false,
             AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
         CompiledPlan plan = null;
@@ -198,11 +198,7 @@ public class PlannerTool {
             DatabaseEstimates estimates = new DatabaseEstimates();
             QueryPlanner planner = new QueryPlanner(
                     sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
-<<<<<<< HEAD
-                    partitioning, m_hsql, estimates, true, isHighVolume,
-=======
-                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE,
->>>>>>> master
+                    partitioning, m_hsql, estimates, !VoltCompiler.DEBUG_MODE, isHighVolume,
                     AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null, DeterminismMode.FASTER);
 
             CompiledPlan plan = null;
@@ -299,7 +295,7 @@ public class PlannerTool {
             AdHocPlannedStatement ahps = new AdHocPlannedStatement(plan, core);
 
             // do not put wrong parameter explain query into cache
-            if (!wrongNumberParameters && partitioning.isInferred() && !isHighVolume) {
+            if (!wrongNumberParameters && partitioning.isInferred()) {
 
                 // Note either the parameter index (per force to a user-provided parameter) or
                 // the actual constant value of the partitioning key inferred from the plan.
@@ -310,8 +306,10 @@ public class PlannerTool {
 
 
                 assert(parsedToken != null);
-                // Again, plans with inferred partitioning are the only ones supported in the cache.
-                m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planner.wasBadPameterized());
+                if (!isHighVolume) {
+                    // Again, plans with inferred partitioning are the only ones supported in the cache.
+                    m_cache.put(sqlIn, parsedToken, ahps, extractedLiterals, hasUserQuestionMark, planner.wasBadPameterized());
+                }
             }
             return ahps;
         }

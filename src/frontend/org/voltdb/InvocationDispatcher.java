@@ -761,7 +761,24 @@ public final class InvocationDispatcher {
             userParams = Arrays.copyOfRange(paramArray, 1, paramArray.length);
         }
         ExplainMode explainMode = isExplain ? ExplainMode.EXPLAIN_ADHOC : ExplainMode.NONE;
-        dispatchAdHocCommon(task, handler, ccxn, explainMode, sql, userParams, null, user);
+
+        List<String> sqlStatements = SQLLexer.splitStatements(sql);
+        String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
+
+        AdHocPlannerWork ahpw = new AdHocPlannerWork(
+                m_siteId,
+                task.clientHandle, handler.connectionId(),
+                handler.isAdmin(), ccxn,
+                sql, stmtsArray, userParams, null, explainMode,
+                true, null,
+                task.procName, task.type, task.originalTxnId, task.originalUniqueId,
+                task.getBatchTimeout(),
+                VoltDB.instance().getReplicationRole() == ReplicationRole.REPLICA,
+                VoltDB.instance().getCatalogContext().cluster.getUseddlschema(),
+                m_adhocCompletionHandler, user);
+        LocalObjectMessage work = new LocalObjectMessage( ahpw );
+
+        m_mailbox.send(m_plannerSiteId, work);
         return null;
     }
 
@@ -1178,7 +1195,11 @@ public final class InvocationDispatcher {
                         }
                         else {
                             try {
-                                createAdHocTransaction(plannedStmtBatch, c);
+                                if (plannedStmtBatch.isHighVolume()) {
+                                    createReadOnlySlowTransaction(plannedStmtBatch, c);
+                                } else {
+                                    createAdHocTransaction(plannedStmtBatch, c);
+                                }
                             }
                             catch (VoltTypeException vte) {
                                 String msg = "Unable to execute adhoc sql statement(s): " + vte.getMessage();
@@ -1428,7 +1449,6 @@ public final class InvocationDispatcher {
                 param = VoltType.valueToBytes(partitionParam);
             }
             partition = TheHashinator.getPartitionForParameter(type, partitionParam);
-
             // Send the partitioning parameter and its type along so that the site can check if
             // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
             task.setParams(param, (byte)type, buf.array());
@@ -1442,6 +1462,100 @@ public final class InvocationDispatcher {
             }
             task.setParams(buf.array());
         }
+        task.clientHandle = plannedStmtBatch.clientHandle;
+
+        ClientResponseImpl error = null;
+        if (VoltDB.instance().getMode() == OperationMode.PAUSED &&
+                !plannedStmtBatch.isReadOnly() && !plannedStmtBatch.adminConnection) {
+            error = new ClientResponseImpl(
+                    ClientResponseImpl.SERVER_UNAVAILABLE,
+                    new VoltTable[0],
+                    "Server is paused and is available in read-only mode - please try again later",
+                    plannedStmtBatch.clientHandle);
+            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
+            buffer.putInt(buffer.capacity() - 4);
+            error.flattenToBuffer(buffer).flip();
+            c.writeStream().enqueue(buffer);
+        }
+        else
+        if ((error = m_permissionValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
+                SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
+            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
+            buffer.putInt(buffer.capacity() - 4);
+            error.flattenToBuffer(buffer).flip();
+            c.writeStream().enqueue(buffer);
+        }
+        else
+        if ((error = m_invocationValidator.shouldAccept(task.procName, plannedStmtBatch.work.user, task,
+                SystemProcedureCatalog.listing.get(task.procName).asCatalogProcedure())) != null) {
+            ByteBuffer buffer = ByteBuffer.allocate(error.getSerializedSize() + 4);
+            buffer.putInt(buffer.capacity() - 4);
+            error.flattenToBuffer(buffer).flip();
+            c.writeStream().enqueue(buffer);
+        }
+        else {
+            /*
+             * Round trip the invocation to initialize it for command logging
+             */
+            try {
+                task = MiscUtils.roundTripForCL(task);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+
+            // initiate the transaction
+            createTransaction(plannedStmtBatch.connectionId, task,
+                    plannedStmtBatch.isReadOnly(), isSinglePartition, false,
+                    partition,
+                    task.getSerializedSize(), System.nanoTime());
+        }
+    }
+
+    private final void createReadOnlySlowTransaction(final AdHocPlannedStmtBatch plannedStmtBatch, Connection c)
+            throws VoltTypeException
+    {
+        ByteBuffer buf = null;
+        try {
+            buf = plannedStmtBatch.flattenPlanArrayToBuffer();
+        }
+        catch (IOException e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
+        assert(buf.hasArray());
+
+        // create the execution site task
+        StoredProcedureInvocation task = new StoredProcedureInvocation();
+        // DR stuff
+        task.type = plannedStmtBatch.work.invocationType;
+        task.originalTxnId = plannedStmtBatch.work.originalTxnId;
+        task.originalUniqueId = plannedStmtBatch.work.originalUniqueId;
+        task.batchTimeout = plannedStmtBatch.work.m_batchTimeout;
+        // pick the sysproc based on the presence of partition info
+        // HSQL (or PostgreSQL) does not specifically implement AdHoc SP
+        // -- instead, use its always-SP implementation of AdHoc
+        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForNonVoltDBBackend;
+        int partition = -1;
+
+        assert(isSinglePartition);
+        assert(plannedStmtBatch.isReadOnly());
+        task.procName = "@ReadOnlySlow";
+
+        int type = VoltType.NULL.getValue();
+        // replicated table read is single-part without a partitioning param
+        // I copied this from below, but I'm not convinced that the above statement is correct
+        // or that the null behavior here either (a) ever actually happens or (b) has the
+        // desired intent.
+        Object partitionParam = plannedStmtBatch.partitionParam();
+        byte[] param = null;
+        if (partitionParam != null) {
+            type = VoltType.typeFromClass(partitionParam.getClass()).getValue();
+            param = VoltType.valueToBytes(partitionParam);
+        }
+        partition = TheHashinator.getPartitionForParameter(type, partitionParam);
+        // Send the partitioning parameter and its type along so that the site can check if
+        // it's mis-partitioned. Type is needed to re-hashinate for command log re-init.
+        task.setParams(param, (byte)type, buf.array());
+
         task.clientHandle = plannedStmtBatch.clientHandle;
 
         ClientResponseImpl error = null;

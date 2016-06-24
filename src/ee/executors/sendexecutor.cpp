@@ -70,12 +70,15 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(sendNode);
     assert(m_abstractNode->getInputTableCount() == 1);
     m_highVolume = sendNode->isHighVolume();
+    if (m_highVolume) {
+        // Create output table for file names
+        setHighVolumeOutputTable(limits);
+    }
     return true;
 }
 
 bool SendExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("started SEND");
-
     Table* inputTable = m_abstractNode->getInputTable();
     assert(inputTable);
     //inputTable->setDependencyId(m_dependencyId);//Multiple send executors sharing the same input table apparently.
@@ -86,13 +89,22 @@ bool SendExecutor::p_execute(const NValueArray &params) {
             VOLT_ERROR("Failed to write table '%s'", inputTable->name().c_str());
             return false;
         }
+        // Place file name in output table
+        Table * outputTable = m_abstractNode->getOutputTable();
+        TableTuple& filename_tuple = outputTable->tempTuple();
+        filename_tuple.setNValue(0,ValueFactory::getStringValue(m_engine->getLastOutFileName().c_str()));
+        // put the tuple into the output table
+        outputTable->insertTuple(filename_tuple);
+        if (!m_engine->send(outputTable)) {
+                VOLT_ERROR("Failed to send table '%s'", outputTable->name().c_str());
+                return false;
+        }
     } else {
         if (!m_engine->send(inputTable)) {
                 VOLT_ERROR("Failed to send table '%s'", inputTable->name().c_str());
                 return false;
         }
     }
-
     VOLT_DEBUG("SEND TABLE: %s", inputTable->debug().c_str());
 
     return true;
