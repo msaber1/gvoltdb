@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,19 +25,28 @@ import java.util.concurrent.ExecutionException;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
 /**
- * Stub class that provides a gateway to the InvocationBufferServer when
+ * Stub class that provides a gateway to the DRProducer when
  * DR is enabled. If no DR, then it acts as a noop stub.
  *
  */
 public class PartitionDRGateway implements DurableUniqueIdListener {
 
     public enum DRRecordType {
-        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX;
+        INSERT, DELETE, UPDATE, BEGIN_TXN, END_TXN, TRUNCATE_TABLE, DELETE_BY_INDEX, UPDATE_BY_INDEX, HASH_DELIMITER;
+    }
+
+    public enum DRTxnPartitionHashFlag {
+        PLACEHOLDER,
+        REPLICATED,
+        SINGLE,
+        MULTI,
+        SPECIAL
     }
 
     public static enum DRRowType {
@@ -129,7 +138,7 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
                                    StoredProcedureInvocation spi,
                                    ClientResponseImpl response) {}
     public long onBinaryDR(int partitionId, long startSequenceNumber, long lastSequenceNumber,
-            long lastSpUniqueId, long lastMpUniqueId, ByteBuffer buf) {
+            long lastSpUniqueId, long lastMpUniqueId, EventType eventType, ByteBuffer buf) {
         final BBContainer cont = DBBPool.wrapBB(buf);
         DBBPool.registerUnsafeMemory(cont.address());
         cont.discard();
@@ -153,12 +162,14 @@ public class PartitionDRGateway implements DurableUniqueIdListener {
             long lastSequenceNumber,
             long lastSpUniqueId,
             long lastMpUniqueId,
+            int eventType,
             ByteBuffer buf) {
         final PartitionDRGateway pdrg = m_partitionDRGateways.get(partitionId);
         if (pdrg == null) {
             VoltDB.crashLocalVoltDB("No PRDG when there should be", true, null);
         }
-        return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber, lastSpUniqueId, lastMpUniqueId, buf);
+        return pdrg.onBinaryDR(partitionId, startSequenceNumber, lastSequenceNumber,
+                lastSpUniqueId, lastMpUniqueId, EventType.values()[eventType], buf);
     }
 
     public void forceAllDRNodeBuffersToDisk(final boolean nofsync) {}

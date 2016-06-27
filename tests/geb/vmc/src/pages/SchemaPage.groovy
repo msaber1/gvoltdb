@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -41,7 +41,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
         sizeLink    (to: SchemaPageSizeWorksheetTab){ sizeTab.find('a') }
         ddlLink     (to: SchemaPageDdlSourceTab)    { ddlTab.find('a') }
         voltDbDocumentationLink { $('a#iconDoc') }
-        refreshbutton 		{ $(class:"refreshBtn schm", text:"Refresh") }
+        refreshbutton       { $(class:"refreshBtn schm", text:"Refresh") }
     }
 
 
@@ -73,7 +73,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
                     return false
                 }
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
+
             }
         }
     }
@@ -95,7 +95,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
                     return false
                 }
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
+
             }
         }
     }
@@ -118,7 +118,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
                     return false
                 }
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
+
             }
         }
     }
@@ -141,7 +141,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
                     return false
                 }
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
+
             }
         }
     }
@@ -164,7 +164,7 @@ class SchemaPage extends VoltDBManagementCenterPage {
                     return false
                 }
             } catch(org.openqa.selenium.StaleElementReferenceException e) {
-                
+
             }
         }
     }

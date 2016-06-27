@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -131,8 +131,8 @@ public class TestSystemCatalogSuite extends RegressionSuite {
     {
         Client client = getClient();
         VoltTable[] results = client.callProcedure("@SystemCatalog", "TYPEINFO").getResults();
-        assertEquals(10, results[0].getRowCount()); // Will break if we add a type, hopefully gets
-                                                   // type-adder to double-check they've got things right
+        assertEquals(14, results[0].getRowCount()); // Will break if we add a type, hopefully gets
+                                                    // type-adder to double-check they've got things right
         assertEquals(18, results[0].getColumnCount());
         System.out.println(results[0]);
     }

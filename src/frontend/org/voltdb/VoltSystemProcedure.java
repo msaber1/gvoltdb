@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -174,12 +174,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         if (mapResults != null) {
             List<VoltTable> matchingTablesForId = mapResults.get(aggregatorOutputDependencyId);
             if (matchingTablesForId == null) {
-                if (mapResults.size() != 0 && log.isDebugEnabled()) {
-                    log.debug("Sysproc received a stale fragment response message from before the " +
-                              "transaction restart. This is possible for sysprocs because the dependency " +
-                              "IDs are always the same for a given sysproc. The result of this cannot be " +
-                              "trusted.");
-                }
+                log.error("Sysproc received a stale fragment response message from before the " +
+                          "transaction restart.");
+                throw new MpTransactionState.FragmentFailureException();
             } else {
                 results.add(matchingTablesForId.get(0));
             }

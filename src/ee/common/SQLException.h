@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -56,8 +56,9 @@ public:
     const std::string& getSqlState() const { return m_sqlState; }
 
     // internal flags that are not serialized to java
-    static const int TYPE_UNDERFLOW = 1;
-    static const int TYPE_OVERFLOW = 2;
+    static const int TYPE_UNDERFLOW             = 1;
+    static const int TYPE_OVERFLOW              = 2;
+    static const int TYPE_VAR_LENGTH_MISMATCH   = 4;
     int getInternalFlags() const { return m_internalFlags; }
 
 protected:

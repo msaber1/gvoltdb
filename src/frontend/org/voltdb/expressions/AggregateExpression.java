@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -69,6 +69,7 @@ public class AggregateExpression extends AbstractExpression {
         case AGGREGATE_COUNT_STAR:
         case AGGREGATE_APPROX_COUNT_DISTINCT:
         case AGGREGATE_HYPERLOGLOGS_TO_CARD:
+        case AGGREGATE_WINDOWED_RANK:
             //
             // Always an integer
             //

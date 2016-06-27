@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -115,13 +115,13 @@ TEST_F(TableTupleTest, HiddenColumns)
     EXPECT_EQ(0, tuple.getHiddenNValue(0).compare(nvalHiddenBigint));
     EXPECT_EQ(0, tuple.getHiddenNValue(1).compare(nvalHiddenString));
 
-    EXPECT_EQ(8 + (4 + 6) + 8 + (4 + 8), tuple.maxDRSerializationSize(NULL));
+    EXPECT_EQ(8 + (4 + 6) + 8 + (4 + 8), tuple.maxDRSerializationSize());
 
     tuple.setHiddenNValue(1, ValueFactory::getNullStringValue());
     nvalHiddenString.free();
 
     // The hidden string is null, takes 0 serialized byte
-    EXPECT_EQ(8 + (4 + 6) + 8, tuple.maxDRSerializationSize(NULL));
+    EXPECT_EQ(8 + (4 + 6) + 8, tuple.maxDRSerializationSize());
 
     nvalVisibleString.free();
 }

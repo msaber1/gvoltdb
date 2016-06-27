@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,11 +23,11 @@ import org.voltdb.types.ExpressionType;
 public class ConjunctionExpression extends AbstractExpression {
     public ConjunctionExpression(ExpressionType type) {
         super(type);
-        setValueType(VoltType.BIGINT);
+        setValueType(VoltType.BOOLEAN);
     }
     public ConjunctionExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
         super(type, left, right);
-        setValueType(VoltType.BIGINT);
+        setValueType(VoltType.BOOLEAN);
     }
     public ConjunctionExpression() {
         //
@@ -54,7 +54,7 @@ public class ConjunctionExpression extends AbstractExpression {
         // Therefore, it is safe to assume that the output is always going to be an
         // integer (for booleans)
         //
-        m_valueType = VoltType.BIGINT;
+        m_valueType = VoltType.BOOLEAN;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
 
@@ -64,6 +64,14 @@ public class ConjunctionExpression extends AbstractExpression {
         return "(" + m_left.explain(impliedTableName) +
             " " + type.symbol() + " " +
             m_right.explain(impliedTableName) + ")";
+    }
+
+    @Override
+    public boolean isValueTypeIndexable(StringBuffer msg) {
+        // Conjunction expression include and and or expression that results in boolean result
+        // boolean result are not indexable
+        msg.append("logical expression: '" + getExpressionType().symbol() + "'");
+        return false;
     }
 
 }

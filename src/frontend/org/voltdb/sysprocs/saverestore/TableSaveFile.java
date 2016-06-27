@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -324,7 +324,7 @@ public class TableSaveFile
         } catch (JSONException e) {
             throw new IOException(e);
         }
-            }
+    }
 
     public int[] getVersionNumber()
     {
@@ -579,6 +579,7 @@ public class TableSaveFile
                 try {
                     m_chunkReads.acquire();
                 } catch (InterruptedException e) {
+                    fileInputBufferC.discard();
                     return;
                 }
                 boolean expectedAnotherChunk = false;

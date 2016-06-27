@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -48,6 +48,7 @@ public interface VoltDBInterface
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
+     * @param config Configuration from command line.
      */
     public void initialize(VoltDB.Configuration config);
 

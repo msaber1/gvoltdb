@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,7 +29,6 @@
 #include <sys/time.h>
 #include "harness.h"
 #include "structures/CompactingMap.h"
-#include "structures/CompactingSet.h"
 #include "common/FixUnusedAssertHack.h"
 
 using namespace voltdb;
@@ -190,20 +189,34 @@ TEST_F(CompactingMapTest, Benchmark) {
 
     voltdb::CompactingMap<NormalKeyValuePair<std::string, std::string>, StringComparator>::iterator iter;
 
+    // We don't have a cached last buffer yet.
+    ASSERT_FALSE(volt.hasCachedLastBuffer());
+    ASSERT_TRUE(volt.size() == 0);
     for (int i = 0; i < ITERATIONS; i++) {
         volt.insert(std::pair<std::string,std::string>(keyFromInt(i),keyFromInt(i)));
+        // Still don't have a cached last buffer, because we never
+        // had a last buffer.
+        ASSERT_FALSE(volt.hasCachedLastBuffer());
         //ASSERT_TRUE(volt.size() == i + 1);
 
         iter = volt.find(keyFromInt(i / 2));
         ASSERT_TRUE(!iter.isEnd());
         ASSERT_TRUE(iter.value().compare(keyFromInt(i / 2)) == 0);
     }
-
+    ASSERT_EQ(ITERATIONS, volt.size());
     for (int i = 0; i < ITERATIONS; i += 2) {
+        ASSERT_EQ(ITERATIONS-i/2, volt.size());
         volt.erase(keyFromInt(i));
+        ASSERT_EQ(ITERATIONS-i/2-1, volt.size());
+        ASSERT_FALSE(volt.hasCachedLastBuffer());
         iter = volt.find(keyFromInt(i));
         ASSERT_TRUE(iter.isEnd());
     }
+
+    // Insert another and test, because why not?
+    volt.insert(std::pair<std::string,std::string>(keyFromInt(0),keyFromInt(0)));
+    ASSERT_FALSE(volt.hasCachedLastBuffer());
+    volt.erase(keyFromInt(0));
 
     iter = volt.begin();
     for (int i = 1; i < ITERATIONS; i += 2, iter.moveNext()) {
@@ -228,6 +241,7 @@ TEST_F(CompactingMapTest, Benchmark) {
         ASSERT_TRUE(success);
     }
     ASSERT_TRUE(volt.size() == 0);
+    ASSERT_TRUE(volt.hasCachedLastBuffer());
 }
 
 TEST_F(CompactingMapTest, BenchmarkDel) {
@@ -754,68 +768,6 @@ TEST_F(CompactingMapTest, RandomMulti) {
     // std::cout << "Sizes: " << countSizes << " greatest size: " << size_greatest << std::endl;
     // std::cout << "LowerBounds: " << lowerBounds << " lb greatest chain: " << lb_greatestChain << std::endl;
     // std::cout << "UpperBounds: " << upperBounds << " ub greatest chain: " << ub_greatestChain << std::endl;
-}
-
-TEST_F(CompactingMapTest, Traversal) {
-    CompactingSet<int> s;
-    for (int i = 0; i < 10; i++) {
-        ASSERT_TRUE(s.insert(i));
-    }
-
-    CompactingSet<int>::const_iterator fi = s.begin();
-    ASSERT_EQ(0, *fi); fi++;
-    ASSERT_EQ(1, *fi); fi++;
-    ASSERT_EQ(2, *fi); fi++;
-    ASSERT_EQ(3, *fi); fi++;
-    ASSERT_EQ(4, *fi); fi++;
-    ASSERT_EQ(5, *fi); fi++;
-    ASSERT_EQ(6, *fi); fi++;
-    ASSERT_EQ(7, *fi); fi++;
-    ASSERT_EQ(8, *fi); fi++;
-    ASSERT_EQ(9, *fi); fi++;
-    ASSERT_EQ(fi, s.end());
-
-    CompactingSet<int>::const_iterator ei = s.end();
-    ASSERT_EQ(ei, s.end()); ei--;
-    ASSERT_EQ(9, *ei); ei--;
-    ASSERT_EQ(8, *ei); ei--;
-    ASSERT_EQ(7, *ei); ei--;
-    ASSERT_EQ(6, *ei); ei--;
-    ASSERT_EQ(5, *ei); ei--;
-    ASSERT_EQ(4, *ei); ei--;
-    ASSERT_EQ(3, *ei); ei--;
-    ASSERT_EQ(2, *ei); ei--;
-    ASSERT_EQ(1, *ei); ei--;
-    ASSERT_EQ(0, *ei); ei--;
-
-    s.clear();
-    ASSERT_TRUE(s.empty());
-}
-
-TEST_F(CompactingMapTest, CopyMap) {
-    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> a(true, IntComparator());
-    for (int i = 0; i < 10001; i++) {
-        a.insert(std::pair<int, int>(i, i + 1));
-    }
-
-    // Make a deep copy of map a
-    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator> b(a);
-    ASSERT_EQ(a, b);
-
-    // Clearing map a shouldn't affect map b
-    a.clear();
-
-    voltdb::CompactingMap<NormalKeyValuePair<int, int>, IntComparator>::iterator i = b.begin();
-    int expected = 0;
-    while (i != b.end()) {
-        ASSERT_EQ(expected, i.key());
-        ASSERT_EQ(expected + 1, i.value());
-        expected++; i++;
-    }
-    ASSERT_EQ(10001, expected);
-
-    b.clear();
-    ASSERT_TRUE(b.empty());
 }
 
 // ENG-1057

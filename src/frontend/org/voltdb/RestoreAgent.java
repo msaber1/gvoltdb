@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -183,6 +183,7 @@ SnapshotCompletionInterest, Promotable
                         JSONObject jsObj = new JSONObject();
                         jsObj.put(SnapshotUtil.JSON_PATH, m_snapshotToRestore.path);
                         jsObj.put(SnapshotUtil.JSON_NONCE, m_snapshotToRestore.nonce);
+                        jsObj.put(SnapshotUtil.JSON_IS_RECOVER, true);
                         if (m_action == StartAction.SAFE_RECOVER) {
                             jsObj.put(SnapshotUtil.JSON_DUPLICATES_PATH, m_voltdbrootPath);
                         }
@@ -190,9 +191,6 @@ SnapshotCompletionInterest, Promotable
                             TheHashinator.getConfiguredHashinatorType() == TheHashinator.HashinatorType.ELASTIC) {
                             // Restore the hashinator if there's command log to replay and we're running elastic
                             jsObj.put(SnapshotUtil.JSON_HASHINATOR, true);
-                        }
-                        if (m_action == StartAction.RECOVER) {
-                            jsObj.put(SnapshotUtil.JSON_CHECK_CLUSTER_ID, true);
                         }
                         Object[] params = new Object[] { jsObj.toString() };
                         initSnapshotWork(params);
@@ -693,7 +691,8 @@ SnapshotCompletionInterest, Promotable
                 // The expected partition count could be determined by the new partition count recorded
                 // in the truncation snapshot. Truncation snapshot taken at the end of the join process
                 // actually records the new partition count in the digest.
-                m_replayAgent.generateReplayPlan(infoWithMinHostId.newPartitionCount, m_isLeader);
+                m_replayAgent.generateReplayPlan(infoWithMinHostId.instanceId.getTimestamp(),
+                        infoWithMinHostId.txnId, infoWithMinHostId.newPartitionCount, m_isLeader);
             }
         }
 
@@ -705,17 +704,17 @@ SnapshotCompletionInterest, Promotable
     {
         int partitionCount = -1;
         for (TableFiles tf : s.m_tableFiles.values()) {
-            if (tf.m_isReplicated) {
-                continue;
+            // Check if the snapshot is complete
+            if (tf.m_completed.stream().anyMatch(b->!b)) {
+                m_snapshotErrLogStr.append("\nRejected snapshot ")
+                                   .append(s.getNonce())
+                                   .append(" because it was not completed.");
+                return null;
             }
 
-            for (boolean completed : tf.m_completed) {
-                if (!completed) {
-                    m_snapshotErrLogStr.append("\nRejected snapshot ")
-                                    .append(s.getNonce())
-                                    .append(" because it was not completed.");
-                    return null;
-                }
+            // Replicated table doesn't check partition count
+            if (tf.m_isReplicated) {
+                continue;
             }
 
             // Everyone has to agree on the total partition count
@@ -1164,9 +1163,9 @@ SnapshotCompletionInterest, Promotable
                 }
                 int remoteRecover = json.getInt("action");
                 if (remoteRecover != recover) {
-                    String msg = "Database actions are not consistent, please enter " +
-                        "the same database action on the command-line.";
-                    throw new RuntimeException(msg);
+                    String msg = "Database actions are not consistent. Remote node action is not 'recover'. " +
+                                 "Please enter the same database action on the command-line.";
+                    VoltDB.crashLocalVoltDB(msg, false, null);
                 }
 
                 JSONArray snapInfos = json.getJSONArray("snapInfos");

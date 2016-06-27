@@ -61,6 +61,9 @@ if CTX.compilerName() == 'gcc':
         elif (CTX.compilerMinorVersion() == 8):
 	    CTX.CPPFLAGS += " -Wno-conversion -Wno-unused-but-set-variable -Wno-unused-local-typedefs"
 
+    if (CTX.compilerMajorVersion() == 5):
+        CTX.CPPFLAGS += " -Wno-unused-local-typedefs"
+
 if (CTX.compilerName() == 'clang') and (CTX.compilerMajorVersion() == 3 and CTX.compilerMinorVersion() >= 4):
     CTX.CPPFLAGS += " -Wno-varargs"
 
@@ -73,6 +76,27 @@ if (CTX.compilerName() != 'gcc') or (CTX.compilerMajorVersion() == 4 and CTX.com
 
 if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
+
+# Set the compiler version and C++ standard flag.
+# GCC before 4.3 is too old.
+# GCC 4.4 up to but not including 4.7 use -std=c++0x
+# GCC 4.7 and later use -std=c++11
+# Clang uses -std=c++11
+# This should match the calculation in CMakeLists.txt
+if CTX.compilerName() == 'gcc':
+    if (CTX.compilerMajorVersion() < 4) or (CTX.compilerMajorVersion() == 4) and (CTX.compilerMinorVersion() < 4):
+	print("GCC Version %d.%d.%d is too old\n"
+	       % (CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()));
+	sys.exit(-1);
+    if 4 <= CTX.compilerMinorVersion() <= 6:
+	CTX.CXX_VERSION_FLAG = "--std=c++0x"
+	print("Building with C++ 0x\n")
+    else:
+	CTX.CXX_VERSION_FLAG ="--std=c++11"
+	print("Building with C++11")
+elif CTX.compilerName() == 'clang':
+    CTX.CXX_VERSION_FLAG="--std=c++11"
+CTX.CPPFLAGS += " " + CTX.CXX_VERSION_FLAG
 
 if CTX.COVERAGE:
     CTX.LDFLAGS += " -ftest-coverage -fprofile-arcs"
@@ -153,13 +177,13 @@ if CTX.PLATFORM == "Darwin":
     CTX.CPPFLAGS += " -DMACOSX -arch x86_64"
     CTX.JNIEXT = "jnilib"
     CTX.JNILIBFLAGS = " -bundle"
-    CTX.JNIBINFLAGS = " -framework JavaVM,1.7"
+    CTX.JNIBINFLAGS = " -framework JavaVM,1.8"
     CTX.SOFLAGS += "-dynamiclib -undefined dynamic_lookup -single_module"
     CTX.SOEXT = "dylib"
-    CTX.JNIFLAGS = "-framework JavaVM,1.7"
+    CTX.JNIFLAGS = "-framework JavaVM,1.8"
 
 if CTX.PLATFORM == "Linux":
-    CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic"
+    CTX.CPPFLAGS += " -Wno-attributes -Wcast-align -DLINUX -fpic"
     CTX.NMFLAGS += " --demangle"
 
 ###############################################################################
@@ -188,10 +212,12 @@ CTX.INPUT['catalog'] = """
  database.cpp
  index.cpp
  indexref.cpp
+ materializedviewhandler.cpp
  materializedviewinfo.cpp
  planfragment.cpp
  statement.cpp
  table.cpp
+ viewtrigger.cpp
 """
 
 CTX.INPUT['structures'] = """
@@ -261,13 +287,14 @@ CTX.INPUT['executors'] = """
 CTX.INPUT['expressions'] = """
  abstractexpression.cpp
  expressionutil.cpp
- vectorexpression.cpp
  functionexpression.cpp
- tupleaddressexpression.cpp
+ geofunctions.cpp
  operatorexpression.cpp
  parametervalueexpression.cpp
- subqueryexpression.cpp
  scalarvalueexpression.cpp
+ subqueryexpression.cpp
+ tupleaddressexpression.cpp
+ vectorexpression.cpp
 """
 
 CTX.INPUT['plannodes'] = """
@@ -291,6 +318,7 @@ CTX.INPUT['plannodes'] = """
  orderbynode.cpp
  plannodefragment.cpp
  plannodeutil.cpp
+ partitionbynode.cpp
  projectionnode.cpp
  receivenode.cpp
  SchemaColumn.cpp
@@ -302,40 +330,46 @@ CTX.INPUT['plannodes'] = """
 """
 
 CTX.INPUT['indexes'] = """
+ CoveringCellIndex.cpp
+ IndexStats.cpp
  tableindex.cpp
  tableindexfactory.cpp
- IndexStats.cpp
 """
 
 CTX.INPUT['storage'] = """
+ AbstractDRTupleStream.cpp
+ BinaryLogSink.cpp
+ BinaryLogSinkWrapper.cpp
+ CompatibleBinaryLogSink.cpp
+ CompatibleDRTupleStream.cpp
+ ConstraintFailureException.cpp
  constraintutil.cpp
  CopyOnWriteContext.cpp
- ElasticContext.cpp
  CopyOnWriteIterator.cpp
- ConstraintFailureException.cpp
- TableStreamer.cpp
+ DRTupleStream.cpp
+ ElasticContext.cpp
+ ElasticIndex.cpp
+ ElasticIndexReadContext.cpp
  ElasticScanner.cpp
- MaterializedViewMetadata.cpp
+ ExportTupleStream.cpp
+ MaterializedViewTriggerForInsert.cpp
+ MaterializedViewTriggerForWrite.cpp
  persistenttable.cpp
  PersistentTableStats.cpp
- StreamedTableStats.cpp
+ RecoveryContext.cpp
  streamedtable.cpp
+ StreamedTableStats.cpp
  table.cpp
  TableCatalogDelegate.cpp
  tablefactory.cpp
  TableStats.cpp
+ TableStreamer.cpp
+ TableStreamerContext.cpp
  tableutil.cpp
  temptable.cpp
  TempTableLimits.cpp
- TupleStreamBase.cpp
- ExportTupleStream.cpp
- DRTupleStream.cpp
- BinaryLogSink.cpp
- RecoveryContext.cpp
  TupleBlock.cpp
- TableStreamerContext.cpp
- ElasticIndex.cpp
- ElasticIndexReadContext.cpp
+ TupleStreamBase.cpp
 """
 
 CTX.INPUT['stats'] = """
@@ -367,6 +401,16 @@ CTX.THIRD_PARTY_INPUT['sha1'] = """
  sha1.cpp
 """
 
+###############################################################################
+# Some special handling for S2.
+###############################################################################
+CTX.S2GEO_LIBS += "-ls2geo -lcrypto"
+CTX.LASTLDFLAGS += CTX.S2GEO_LIBS
+
+###############################################################################
+# Some special handling for OpenSSL
+###############################################################################
+CTX.OPENSSL_VERSION="1.0.2d"
 
 ###############################################################################
 # SPECIFY THE TESTS
@@ -400,9 +444,11 @@ if whichtests in ("${eetestsuite}", "common"):
      pool_test
      serializeio_test
      tabletuple_test
+     ThreadLocalPoolTest
      tupleschema_test
      undolog_test
      valuearray_test
+     uniqueid_test
     """
 
 if whichtests in ("${eetestsuite}", "execution"):
@@ -429,8 +475,9 @@ if whichtests in ("${eetestsuite}", "indexes"):
      index_key_test
      index_scripted_test
      index_test
-     compacting_hash_index
+     CompactingHashIndexTest
      CompactingTreeMultiIndexTest
+     CoveringCellIndexTest
     """
 
 if whichtests in ("${eetestsuite}", "storage"):
@@ -464,6 +511,7 @@ if whichtests in ("${eetestsuite}", "structures"):
 
 if whichtests in ("${eetestsuite}", "plannodes"):
     CTX.TESTS['plannodes'] = """
+     PartitionByPlanNodeTest
      PlanNodeFragmentTest
     """
 
@@ -473,6 +521,7 @@ if whichtests in ("${eetestsuite}", "plannodes"):
 #
 ###############################################################################
 print("Compiler: %s %d.%d.%d" % (CTX.compilerName(), CTX.compilerMajorVersion(), CTX.compilerMinorVersion(), CTX.compilerPatchLevel()))
+print("OpenSSL: version %s, config %s\n" % (CTX.getOpenSSLVersion(), CTX.getOpenSSLToken()))
 
 ###############################################################################
 # BUILD THE MAKEFILE

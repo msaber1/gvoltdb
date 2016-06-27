@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -283,22 +283,6 @@ public abstract class VoltTypeUtil {
                 LOG.severe("ERROR: Unable to get object from string for invalid ValueType '" + type + "'");
         }
         return (ret);
-    }
-
-    public static long getHashableLongFromObject(Object obj) {
-        if (obj == null || VoltType.isNullVoltType(obj)) {
-            return 0;
-        } else if (obj instanceof Long) {
-            return ((Long) obj).longValue();
-        } else if (obj instanceof Integer) {
-            return ((Integer)obj).intValue();
-        } else if (obj instanceof Short) {
-            return ((Short)obj).shortValue();
-        } else if (obj instanceof Byte) {
-            return ((Byte)obj).byteValue();
-        } else {
-            throw new RuntimeException(obj + " cannot be casted to a long");
-        }
     }
 
     public static java.sql.Timestamp getSqlTimestampFromMicrosSinceEpoch(long timestamp) {

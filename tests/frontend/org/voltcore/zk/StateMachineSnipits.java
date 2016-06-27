@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -102,6 +102,11 @@ public class StateMachineSnipits extends ZKTestBase {
         }
 
         @Override
+        protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
+            return ByteBuffer.allocate(0);
+        }
+
+        @Override
         protected void setInitialState(ByteBuffer currentAgreedState)
         {
         }
@@ -198,6 +203,11 @@ public class StateMachineSnipits extends ZKTestBase {
         }
 
         @Override
+        protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
+            return ByteBuffer.allocate(0);
+        }
+
+        @Override
         protected void setInitialState(ByteBuffer currentAgreedState)
         {
             m_cb.membersAdded(getCurrentMembers());
@@ -245,6 +255,11 @@ public class StateMachineSnipits extends ZKTestBase {
 
         protected StateMachine(SynchronizedStatesManager ssm, String instanceName) {
             ssm.super(instanceName, log);
+        }
+
+        @Override
+        protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
+            return m_startingState;
         }
 
         @Override
@@ -345,6 +360,11 @@ public class StateMachineSnipits extends ZKTestBase {
 
         public Task(SynchronizedStatesManager ssm, String instanceName) {
             ssm.super(instanceName, log);
+        }
+
+        @Override
+        protected ByteBuffer notifyOfStateMachineReset(boolean isDirectVictim) {
+            return ByteBuffer.allocate(0);
         }
 
         @Override

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,10 +25,12 @@ import java.util.Map;
  *
  */
 public enum IndexType {
-    INVALID         (0),
-    BALANCED_TREE   (1),
-    HASH_TABLE      (2),
-    BTREE           (3);
+    INVALID             (0),
+    BALANCED_TREE       (1),
+    HASH_TABLE          (2),
+    BTREE               (3),
+    COVERING_CELL_INDEX (4),
+    ;
 
     IndexType(int val) {
         assert (this.ordinal() == val) :
@@ -87,7 +89,9 @@ public enum IndexType {
             return "_TREE";
         case BTREE:
         case HASH_TABLE:
+        case COVERING_CELL_INDEX:
             return "";
+        case INVALID:
         }
         return null;
     }

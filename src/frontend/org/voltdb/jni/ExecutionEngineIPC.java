@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -448,6 +448,24 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             resultTablesLengthBytes.flip();
 
             final int resultTablesLength = resultTablesLengthBytes.getInt();
+
+            // check the dirty-ness of the batch
+            final ByteBuffer dirtyBytes = ByteBuffer.allocate(1);
+            while (dirtyBytes.hasRemaining()) {
+                int read = m_socketChannel.read(dirtyBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            dirtyBytes.flip();
+            // check if anything was changed
+            final boolean dirty  = dirtyBytes.get() > 0;
+            if (dirty)
+                m_dirty = true;
+
+            if (resultTablesLength <= 0)
+                return;
+
             final ByteBuffer resultTablesBuffer = ByteBuffer
                     .allocate(resultTablesLength);
             //resultTablesBuffer.order(ByteOrder.LITTLE_ENDIAN);
@@ -458,11 +476,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
             }
             resultTablesBuffer.flip();
-
-            // check if anything was changed
-            final boolean dirty = resultTablesBuffer.get() > 0;
-            if (dirty)
-                m_dirty = true;
 
             for (int ii = 0; ii < tables.length; ii++) {
                 final int dependencyCount = resultTablesBuffer.getInt(); // ignore the table count
@@ -597,6 +610,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int drClusterId,
+            final int defaultDrBufferSize,
             final int tempTableMemory,
             final BackendTarget target,
             final int port,
@@ -627,6 +641,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_hostId,
                 m_hostname,
                 drClusterId,
+                defaultDrBufferSize,
                 1024 * 1024 * tempTableMemory,
                 hashinatorConfig,
                 createDrReplicatedStream);
@@ -662,6 +677,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int drClusterId,
+            final int defaultDrBufferSize,
             final long tempTableMemory,
             final HashinatorConfig hashinatorConfig,
             final boolean createDrReplicatedStream)
@@ -677,6 +693,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(partitionId);
         m_data.putInt(hostId);
         m_data.putInt(drClusterId);
+        m_data.putInt(defaultDrBufferSize);
         m_data.putLong(EELoggers.getLogLevels());
         m_data.putLong(tempTableMemory);
         m_data.putInt(createDrReplicatedStream ? 1 : 0);
@@ -938,7 +955,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     throws EEException
     {
         if (returnUniqueViolations) {
-            throw new UnsupportedOperationException("Haven't added IPC support for returning unique violatiosn");
+            throw new UnsupportedOperationException("Haven't added IPC support for returning unique violations");
         }
         m_data.clear();
         m_data.putInt(Commands.LoadTable.m_id);
@@ -982,15 +999,20 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
             throw new EEException(result);
         }
-
-        ByteBuffer responseBuffer = null;
+        /*//
+        // This code will hang expecting input that never arrives
+        // until voltdbipc is extended to respond with information
+        // negative or positive about "unique violations".
         try {
-            responseBuffer = readMessage();
-        } catch (IOException e) {
+            ByteBuffer responseBuffer = readMessage();
+            if (responseBuffer != null) {
+                return responseBuffer.array();
+            }
+        }
+        catch (IOException e) {
             Throwables.propagate(e);
         }
-
-        if (responseBuffer != null) return responseBuffer.array();
+        //*/
         return null;
     }
 
@@ -1259,7 +1281,13 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             remainingBuffer.flip();
             final long remaining = remainingBuffer.getLong();
 
-            final int[] serialized = new int[count];
+            final int[] serialized;
+
+            if (count > 0) {
+                serialized = new int[count];
+            } else {
+                serialized = new int[]{0};
+            }
             for (int i = 0; i < count; i++) {
                 ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
                 while (lengthBuffer.hasRemaining()) {
@@ -1270,17 +1298,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
                 lengthBuffer.flip();
                 serialized[i] = lengthBuffer.getInt();
-
                 ByteBuffer view = outputBuffers.get(i).b().duplicate();
                 view.limit(view.position() + serialized[i]);
                 while (view.hasRemaining()) {
                     m_connection.m_socketChannel.read(view);
                 }
             }
-
             return Pair.of(remaining, serialized);
         } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
     }
@@ -1346,7 +1371,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new RuntimeException(e);
         }
 
-        return null;
+        return retval;
     }
 
     @Override

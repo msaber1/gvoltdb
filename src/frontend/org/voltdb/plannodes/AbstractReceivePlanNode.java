@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -71,8 +71,8 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
     public String nondeterminismDetail() { return m_nondeterminismDetail; }
 
     @Override
-    public boolean reattachFragment( SendPlanNode child  ) {
-        this.addAndLinkChild(child);
+    public boolean reattachFragment(AbstractPlanNode child) {
+        addAndLinkChild(child);
         return true;
     }
 
@@ -91,7 +91,7 @@ public abstract class AbstractReceivePlanNode extends AbstractPlanNode {
             int index = tve.resolveColumnIndexesUsingSchema(input_schema);
             tve.setColumnIndex(index);
         }
-        outputSchema.sortByTveIndex();
+        // output schema for ReceivePlanNode should never be re-sorted
     }
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -34,6 +34,7 @@ import java.util.concurrent.ExecutorService;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -480,6 +481,12 @@ public class Cartographer extends StatsSource
                         //Dont die in k=0 cluster or 2node k1 (with partition detection on)
                         return false;
                     }
+                    // check if any node still in rejoin status
+                    try {
+                        if (m_zk.exists(VoltZK.rejoinNodeBlocker, false) != null) {
+                            return false;
+                        }
+                    } catch (KeeperException.NoNodeException ignore) {} // shouldn't happen
                     //Otherwise we do check replicas for host
                     return doPartitionsHaveReplicas(hid);
                 }

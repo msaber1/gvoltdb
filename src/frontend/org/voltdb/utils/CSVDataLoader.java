@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,10 +17,11 @@
 
 package org.voltdb.utils;
 
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+
 import org.voltdb.VoltType;
 import org.voltdb.client.NoConnectionsException;
-
-import java.util.concurrent.ExecutionException;
 
 /**
  * The interface CSVLoader uses to insert rows into the database.
@@ -64,4 +65,6 @@ public interface CSVDataLoader {
      * Flush use this only when you think you are done and want to push everything before close/quit.
      */
     public void flush() throws ExecutionException, InterruptedException;
+
+    public Map<Integer, String> getColumnNames();
 }

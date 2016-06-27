@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -17,13 +17,14 @@
 
 package org.voltdb.utils;
 
+import java.util.Map;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.atomic.AtomicLong;
+
 import org.voltdb.client.ClientImpl;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.VoltBulkLoader.BulkLoaderFailureCallBack;
 import org.voltdb.client.VoltBulkLoader.VoltBulkLoader;
-
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicLong;
 
 /**
  * A CSVDataLoader implementation that uses the bulk loader to insert batched rows.
@@ -88,5 +89,11 @@ public class CSVBulkDataLoader implements CSVDataLoader {
     public long getFailedRows()
     {
         return m_failedInsertCount.get();
+    }
+
+    @Override
+    public Map<Integer, String> getColumnNames()
+    {
+        return m_loader.getColumnNames();
     }
 }

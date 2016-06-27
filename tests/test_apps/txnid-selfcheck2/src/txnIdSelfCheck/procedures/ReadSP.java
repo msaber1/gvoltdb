@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,7 +31,7 @@ public class ReadSP extends VoltProcedure {
 
     // join partitioned tbl to replicated tbl. This enables detection of some replica faults.
     public final SQLStmt p_getCIDData = new SQLStmt(
-            "SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY cid, rid desc;");
+            "SELECT * FROM partitioned p INNER JOIN dimension d ON p.cid=d.cid WHERE p.cid = ? ORDER BY p.cid, p.rid desc;");
 
     public VoltTable[] run(byte cid) {
         voltQueueSQL(p_getCIDData, cid);

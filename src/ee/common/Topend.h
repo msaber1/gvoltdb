@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -121,13 +121,15 @@ public:
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;
     std::deque<boost::shared_ptr<StreamBlock> > blocks;
-    std::vector<boost::shared_array<char> > data;
+    std::deque<boost::shared_array<char> > data;
     bool receivedDRBuffer;
     bool receivedExportBuffer;
     int64_t pushDRBufferRetval;
     DRRecordType actionType;
     DRConflictType deleteConflictType;
     DRConflictType insertConflictType;
+    int32_t remoteClusterId;
+    int64_t remoteTimestamp;
     boost::shared_ptr<Table> existingMetaRowsForDelete;
     boost::shared_ptr<Table> existingTupleRowsForDelete;
     boost::shared_ptr<Table> expectedMetaRowsForDelete;

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -173,7 +173,7 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    boost::scoped_ptr<char> cleaner(
+    boost::scoped_array<char> cleaner(
         addPartitionData(values, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
@@ -205,7 +205,7 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionLimitOffsetTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    boost::scoped_ptr<char> cleaner(
+    boost::scoped_array<char> cleaner(
         addPartitionData(values, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
@@ -237,7 +237,7 @@ TEST_F(MergeReceiveExecutorTest, singlePartitionBigOffsetTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    boost::scoped_ptr<char> cleaner(
+    boost::scoped_array<char> cleaner(
         addPartitionData(values, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
@@ -274,9 +274,9 @@ TEST_F(MergeReceiveExecutorTest, twoNonOverlapPartitionsTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    boost::scoped_ptr<char> cleaner1(
+    boost::scoped_array<char> cleaner1(
         addPartitionData(values1, tuples, partitionTupleCounts));
-    boost::scoped_ptr<char> cleaner2(
+    boost::scoped_array<char> cleaner2(
         addPartitionData(values2, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);
@@ -327,11 +327,11 @@ TEST_F(MergeReceiveExecutorTest, multipleOverlapPartitionsTest)
     std::vector<TableTuple> tuples;
     std::vector<int64_t> partitionTupleCounts;
 
-    boost::scoped_ptr<char> cleaner1(
+    boost::scoped_array<char> cleaner1(
         addPartitionData(values1, tuples, partitionTupleCounts));
-    boost::scoped_ptr<char> cleaner2(
+    boost::scoped_array<char> cleaner2(
         addPartitionData(values2, tuples, partitionTupleCounts));
-    boost::scoped_ptr<char> cleaner3(
+    boost::scoped_array<char> cleaner3(
         addPartitionData(values3, tuples, partitionTupleCounts));
 
     std::vector<SortDirectionType> dirs(1, SORT_DIRECTION_TYPE_ASC);

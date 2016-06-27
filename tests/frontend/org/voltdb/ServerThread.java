@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -51,6 +51,7 @@ public class ServerThread extends Thread {
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
+        m_config.m_forceVoltdbCreate = true;
 
         setName("ServerThread");
     }
@@ -68,6 +69,7 @@ public class ServerThread extends Thread {
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
+        m_config.m_forceVoltdbCreate = true;
 
         setName("ServerThread");
     }
@@ -86,6 +88,7 @@ public class ServerThread extends Thread {
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
+        m_config.m_forceVoltdbCreate = true;
 
         if (!m_config.validate()) {
             System.exit(-1);
@@ -123,6 +126,7 @@ public class ServerThread extends Thread {
 
         // Disable loading the EE if running against HSQL.
         m_config.m_noLoadLibVOLTDB = m_config.m_backend == BackendTarget.HSQLDB_BACKEND;
+        m_config.m_forceVoltdbCreate = true;
 
         if (!m_config.validate()) {
             System.exit(-1);

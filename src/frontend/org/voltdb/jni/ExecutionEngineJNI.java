@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -117,6 +117,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int hostId,
             final String hostname,
             final int drClusterId,
+            final int defaultDrBufferSize,
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
             final boolean createDrReplicatedStream)
@@ -144,6 +145,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     hostId,
                     getStringBytes(hostname),
                     drClusterId,
+                    defaultDrBufferSize,
                     tempTableMemory * 1024 * 1024,
                     createDrReplicatedStream,
                     EE_COMPACTION_THRESHOLD);

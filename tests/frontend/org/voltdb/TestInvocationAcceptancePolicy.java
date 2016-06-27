@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -62,7 +62,7 @@ public class TestInvocationAcceptancePolicy {
         InvocationPermissionPolicy policy = new InvocationSysprocPermissionPolicy();
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.ALLOW);
 
-        // A user that doesn't have sysproc permission
+        // A user that doesn't have admin permission
         user = createUser(false, false, false, null, true, false, false);
         assertEquals(policy.shouldAccept(user, invocation, proc), PolicyResult.DENY);
     }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -25,13 +25,13 @@
 #include "boost/scoped_array.hpp"
 #include "boost/shared_ptr.hpp"
 #include "boost/unordered_set.hpp"
+#include "stx/btree_map.h"
+#include "stx/btree_set.h"
 #include <math.h>
 #include <iostream>
 #include "boost_ext/FastAllocator.hpp"
 #include "common/ThreadLocalPool.h"
 #include "common/tabletuple.h"
-#include "structures/CompactingMap.h"
-#include "structures/CompactingSet.h"
 #include <deque>
 
 namespace voltdb {
@@ -77,9 +77,9 @@ private:
 //typedef boost::shared_ptr<TupleBlock> TBPtr;
 typedef boost::intrusive_ptr<TupleBlock> TBPtr;
 //typedef TupleBlock* TBPtr;
-typedef CompactingMap<NormalKeyValuePair<char*, TBPtr>, comp<char*>, false> TBMap;
+typedef stx::btree_map< char*, TBPtr > TBMap;
 typedef TBMap::iterator TBMapI;
-typedef CompactingSet<TBPtr> TBBucket;
+typedef stx::btree_set<TBPtr> TBBucket;
 typedef TBBucket::iterator TBBucketI;
 typedef boost::shared_ptr<TBBucket> TBBucketPtr;
 typedef std::vector<TBBucketPtr> TBBucketPtrVector;

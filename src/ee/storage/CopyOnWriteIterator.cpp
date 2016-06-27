@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -28,13 +28,24 @@ CopyOnWriteIterator::CopyOnWriteIterator(
         m_location(NULL),
         m_blockOffset(0),
         m_currentBlock(NULL),
+        m_tableEmpty(false),
         m_skippedDirtyRows(0),
         m_skippedInactiveRows(0) {
+
+    if ((m_blocks.size() == 1) && m_blockIterator.data()->isEmpty()) {
+        // Empty persistent table - no tuples in table and table only
+        // has empty tuple storage block associated with it. So no need
+        // to set it up for snapshot
+        m_blockIterator = m_end;
+        m_tableEmpty = true;
+        return;
+    }
+
     //Prime the pump
     if (m_blockIterator != m_end) {
-        m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.value());
+        m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
         m_location = m_blockIterator.key();
-        m_currentBlock = m_blockIterator.value();
+        m_currentBlock = m_blockIterator.data();
         m_blockIterator++;
     }
     m_blockOffset = 0;
@@ -48,6 +59,12 @@ CopyOnWriteIterator::CopyOnWriteIterator(
  * it skiped a dirty tuple and didn't end up with the right found tuple count upon reaching the end.
  */
 bool CopyOnWriteIterator::needToDirtyTuple(char *tupleAddress) {
+    if (m_tableEmpty) {
+        // snapshot was activated when the table was empty.
+        // Tuple is not in  snapshot region, don't care about this tuple
+        assert(m_currentBlock == NULL);
+        return false;
+    }
     /**
      * Find out which block the address is contained in. Lower bound returns the first entry
      * in the index >= the address. Unless the address happens to be equal then the block
@@ -59,6 +76,8 @@ bool CopyOnWriteIterator::needToDirtyTuple(char *tupleAddress) {
         // tuple not in snapshot region, don't care about this tuple
         return false;
     }
+
+    assert(m_currentBlock != NULL);
 
     /**
      * Now check where this is relative to the COWIterator.
@@ -90,12 +109,12 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
                 m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, TBPtr());
                 break;
             }
-            m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.value());
+            m_surgeon->snapshotFinishedScanningBlock(m_currentBlock, m_blockIterator.data());
 
             char *finishedBlock = m_currentBlock->address();
 
             m_location = m_blockIterator.key();
-            m_currentBlock = m_blockIterator.value();
+            m_currentBlock = m_blockIterator.data();
             assert(m_currentBlock->address() == m_location);
             m_blockOffset = 0;
 
@@ -104,9 +123,9 @@ bool CopyOnWriteIterator::next(TableTuple &out) {
             //
             // This invalidates the iterators, so we have to get new iterators
             // using the current block's start address. m_blockIterator has to
-            // point to the next block, hence the upperBound() call.
+            // point to the next block, hence the upper_bound() call.
             m_blocks.erase(finishedBlock);
-            m_blockIterator = m_blocks.upperBound(m_currentBlock->address());
+            m_blockIterator = m_blocks.upper_bound(m_currentBlock->address());
             m_end = m_blocks.end();
         }
         assert(m_location < m_currentBlock.get()->address() + m_table->getTableAllocationSize());
@@ -150,7 +169,7 @@ int64_t CopyOnWriteIterator::countRemaining() const {
                 break;
             }
             location = blockIterator.key();
-            currentBlock = blockIterator.value();
+            currentBlock = blockIterator.data();
             assert(currentBlock->address() == location);
             blockOffset = 0;
             blockIterator++;

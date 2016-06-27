@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -35,7 +35,6 @@ import kafka.message.MessageAndMetadata;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
-import org.voltdb.CLIConfig.Option;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -91,6 +90,9 @@ public class KafkaLoader {
     public void processKafkaMessages() throws Exception {
         // Split server list
         final String[] serverlist = m_config.servers.split(",");
+
+        // If we need to prompt the user for a VoltDB password, do so.
+        m_config.password = m_config.readPasswordIfNeeded(m_config.user, m_config.password, "Enter password: ");
 
         // Create connection
         final ClientConfig c_config = new ClientConfig(m_config.user, m_config.password);

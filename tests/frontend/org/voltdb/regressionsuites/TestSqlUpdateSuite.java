@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -199,6 +199,13 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         // NAME is inlined varchar, DESC is not.
         String update = "update STRINGPART set desc = name, num = -1 where val1 = 1";
         executeAndTestUpdate("STRINGPART", update, 1);
+    }
+
+    public void testInvalidUpdate() throws Exception
+    {
+        Client client = getClient();
+        verifyStmtFails(client, "UPDATE P1_VIEW SET NUM_SUM = 5",
+                "Illegal to modify a materialized view.");
     }
 
     //

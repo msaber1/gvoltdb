@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -79,8 +79,8 @@ public class TestZK extends ZKTestBase {
         m_siteIdToZKPort.put(site, clientPort);
         config.networkThreads = 1;
         config.coordinatorIp = new InetSocketAddress( recoverPort );
-        HostMessenger hm = new HostMessenger(config);
-        hm.start();
+        HostMessenger hm = new HostMessenger(config, null, null);
+        hm.start(null);
         m_messengers.set(site, hm);
     }
 

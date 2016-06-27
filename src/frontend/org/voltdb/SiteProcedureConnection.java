@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -171,7 +171,9 @@ public interface SiteProcedureConnection {
             JoinProducerBase.JoinCompletionAction action,
             Map<String, Map<Integer, Pair<Long, Long>>> exportSequenceNumbers,
             Map<Integer, Long> drSequenceNumbers,
-            boolean requireExistingSequenceNumbers);
+            Map<Integer, Map<Integer, Map<Integer, DRConsumerDrIdTracker>>> allConsumerSiteTrackers,
+            boolean requireExistingSequenceNumbers,
+            long clusterCreateTime);
 
     public long[] getUSOForExportTable(String signature);
 
@@ -203,4 +205,5 @@ public interface SiteProcedureConnection {
     public long[] validatePartitioning(long tableIds[], int hashinatorType, byte hashinatorConfig[]);
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle);
     public long applyBinaryLog(long txnId, long spHandle, long uniqueId, int remoteClusterId, byte logData[]);
+    public void setDRProtocolVersion(int drVersion);
 }

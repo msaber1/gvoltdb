@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -67,6 +67,8 @@ public class Promote extends VoltSystemProcedure {
                     -1);
             VoltDB.instance().setReplicationRole(ReplicationRole.NONE);
         }
+        // clear out trackers on all sites when DR consumer be promoted
+        ctx.resetDrAppliedTracker();
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);

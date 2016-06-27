@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -37,7 +37,9 @@ public class ScalarValueExpression extends AbstractValueExpression {
     @Override
     public boolean equals(Object obj) {
         assert(m_left != null);
-        if (obj instanceof ScalarValueExpression == false) return false;
+        if (obj instanceof ScalarValueExpression == false) {
+            return false;
+        }
         ScalarValueExpression expr = (ScalarValueExpression) obj;
         return m_left.equals(expr.getLeft());
     }

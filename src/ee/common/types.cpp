@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -38,6 +38,8 @@ bool isNumeric(ValueType type) {
       case (VALUE_TYPE_VARCHAR):
       case (VALUE_TYPE_VARBINARY):
       case (VALUE_TYPE_TIMESTAMP):
+      case (VALUE_TYPE_POINT):
+      case (VALUE_TYPE_GEOGRAPHY):
       case (VALUE_TYPE_NULL):
       case (VALUE_TYPE_INVALID):
       case (VALUE_TYPE_ARRAY):
@@ -61,6 +63,8 @@ bool isIntegralType(ValueType type) {
       case (VALUE_TYPE_VARCHAR):
       case (VALUE_TYPE_VARBINARY):
       case (VALUE_TYPE_TIMESTAMP):
+      case (VALUE_TYPE_POINT):
+      case (VALUE_TYPE_GEOGRAPHY):
       case (VALUE_TYPE_NULL):
       case (VALUE_TYPE_DECIMAL):
       case (VALUE_TYPE_ARRAY):
@@ -70,6 +74,18 @@ bool isIntegralType(ValueType type) {
     }
     throw exception();
 }
+
+bool isVariableLengthType(ValueType type) {
+    switch (type) {
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_GEOGRAPHY:
+        return true;
+    default:
+        return false;
+    }
+}
+
 
 NValue getRandomValue(ValueType type, uint32_t maxLength) {
     switch (type) {
@@ -160,6 +176,12 @@ string getTypeName(ValueType type) {
         case (VALUE_TYPE_BOOLEAN):
             ret = "boolean";
             break;
+        case (VALUE_TYPE_POINT):
+            ret = "point";
+            break;
+        case (VALUE_TYPE_GEOGRAPHY):
+            ret = "geography";
+            break;
         case (VALUE_TYPE_ADDRESS):
             ret = "address";
             break;
@@ -213,49 +235,42 @@ std::string tableStreamTypeToString(TableStreamType type) {
 string valueToString(ValueType type)
 {
     switch (type) {
-      case VALUE_TYPE_INVALID: {
-          return "INVALID";
-      }
-      case VALUE_TYPE_NULL: {
-          return "NULL";
-      }
-      case VALUE_TYPE_TINYINT: {
-          return "TINYINT";
-      }
-      case VALUE_TYPE_SMALLINT: {
-          return "SMALLINT";
-          break;
-      }
-      case VALUE_TYPE_INTEGER: {
-          return "INTEGER";
-      }
-      case VALUE_TYPE_BIGINT: {
-          return "BIGINT";
-      }
-      case VALUE_TYPE_DOUBLE: {
-          return "FLOAT";
-      }
-      case VALUE_TYPE_VARCHAR: {
-          return "VARCHAR";
-      }
-      case VALUE_TYPE_VARBINARY: {
-          return "VARBINARY";
-      }
-      case VALUE_TYPE_TIMESTAMP: {
-          return "TIMESTAMP";
-      }
-      case VALUE_TYPE_DECIMAL: {
-          return "DECIMAL";
-      }
-      case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC: {
-          return "NUMERIC";
-      }
-      case VALUE_TYPE_ARRAY: {
-          return "ARRAY";
-      }
-      default:
-          return "INVALID";
+    case VALUE_TYPE_INVALID:
+        return "INVALID";
+    case VALUE_TYPE_NULL:
+        return "NULL";
+    case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
+        return "NUMERIC";
+    case VALUE_TYPE_TINYINT:
+        return "TINYINT";
+    case VALUE_TYPE_SMALLINT:
+        return "SMALLINT";
+    case VALUE_TYPE_INTEGER:
+        return "INTEGER";
+    case VALUE_TYPE_BIGINT:
+        return "BIGINT";
+    case VALUE_TYPE_DOUBLE:
+        return "FLOAT";
+    case VALUE_TYPE_VARCHAR:
+        return "VARCHAR";
+    case VALUE_TYPE_TIMESTAMP:
+        return "TIMESTAMP";
+    case VALUE_TYPE_DECIMAL:
+        return "DECIMAL";
+    case VALUE_TYPE_BOOLEAN:
+        return "BOOLEAN";
+    case VALUE_TYPE_ADDRESS:
+        return "ADDRESS";
+    case VALUE_TYPE_VARBINARY:
+        return "VARBINARY";
+    case VALUE_TYPE_POINT:
+        return "POINT";
+    case VALUE_TYPE_GEOGRAPHY:
+        return "GEOGRAPHY";
+    case VALUE_TYPE_ARRAY:
+        return "ARRAY";
     }
+    return "UNDEFINED";
 }
 
 ValueType stringToValue(string str )
@@ -264,6 +279,8 @@ ValueType stringToValue(string str )
         return VALUE_TYPE_INVALID;
     } else if (str == "NULL") {
         return VALUE_TYPE_NULL;
+    } else if (str == "NUMERIC") {
+        return VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC;
     } else if (str == "TINYINT") {
         return VALUE_TYPE_TINYINT;
     } else if (str == "SMALLINT") {
@@ -274,14 +291,22 @@ ValueType stringToValue(string str )
         return VALUE_TYPE_BIGINT;
     } else if (str == "FLOAT") {
         return VALUE_TYPE_DOUBLE;
-    } else if (str == "STRING") {
+    } else if (str == "VARCHAR") {
         return VALUE_TYPE_VARCHAR;
-    } else if (str == "VARBINARY") {
-        return VALUE_TYPE_VARBINARY;
     } else if (str == "TIMESTAMP") {
         return VALUE_TYPE_TIMESTAMP;
     } else if (str == "DECIMAL") {
         return VALUE_TYPE_DECIMAL;
+    } else if (str == "BOOLEAN") {
+        return VALUE_TYPE_BOOLEAN;
+    } else if (str == "ADDRESS") {
+        return VALUE_TYPE_ADDRESS;
+    } else if (str == "VARBINARY") {
+        return VALUE_TYPE_VARBINARY;
+    } else if (str == "POINT") {
+        return VALUE_TYPE_POINT;
+    } else if (str == "GEOGRAPHY") {
+        return VALUE_TYPE_GEOGRAPHY;
     } else if (str == "ARRAY") {
         return VALUE_TYPE_ARRAY;
     }
@@ -429,6 +454,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_TUPLESCAN: {
         return "TUPLESCAN";
     }
+    case PLAN_NODE_TYPE_PARTITIONBY: {
+        return "PARTITIONBY";
+    }
     } // END OF SWITCH
     return "UNDEFINED";
 }
@@ -481,6 +509,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_MATERIALIZEDSCAN;
     } else if (str == "TUPLESCAN") {
         return PLAN_NODE_TYPE_TUPLESCAN;
+    } else if (str == "PARTITIONBY") {
+        return PLAN_NODE_TYPE_PARTITIONBY;
     }
     return PLAN_NODE_TYPE_INVALID;
 }
@@ -749,62 +779,46 @@ QuantifierType stringToQuantifier(string str )
 string indexLookupToString(IndexLookupType type)
 {
     switch (type) {
-    case INDEX_LOOKUP_TYPE_INVALID: {
+    case INDEX_LOOKUP_TYPE_INVALID:
         return "INVALID";
-    }
-    case INDEX_LOOKUP_TYPE_EQ: {
+    case INDEX_LOOKUP_TYPE_EQ:
         return "EQ";
-    }
-    case INDEX_LOOKUP_TYPE_GT: {
+    case INDEX_LOOKUP_TYPE_GT:
         return "GT";
-    }
-    case INDEX_LOOKUP_TYPE_GTE: {
+    case INDEX_LOOKUP_TYPE_GTE:
         return "GTE";
-    }
-    case INDEX_LOOKUP_TYPE_LT: {
+    case INDEX_LOOKUP_TYPE_LT:
         return "LT";
-    }
-    case INDEX_LOOKUP_TYPE_LTE: {
+    case INDEX_LOOKUP_TYPE_LTE:
         return "LTE";
-    }
-    case INDEX_LOOKUP_TYPE_GT_LT: {
-        return "GT_LT";
-    }
-    case INDEX_LOOKUP_TYPE_GTE_LT: {
-        return "GTE_LT";
-    }
-    case INDEX_LOOKUP_TYPE_GTL_TE: {
-        return "GTL_TE";
-    }
-    case INDEX_LOOKUP_TYPE_GTE_LTE: {
-        return "GTE_LTE";
-    }
+    case INDEX_LOOKUP_TYPE_GEO_CONTAINS:
+        return "GEO_CONTAINS";
     }
     return "INVALID";
 }
 
-IndexLookupType stringToIndexLookup(string str )
+IndexLookupType stringToIndexLookup(string str)
 {
     if (str == "INVALID") {
         return INDEX_LOOKUP_TYPE_INVALID;
-    } else if (str == "EQ") {
+    }
+    if (str == "EQ") {
         return INDEX_LOOKUP_TYPE_EQ;
-    } else if (str == "GT") {
+    }
+    if (str == "GT") {
         return INDEX_LOOKUP_TYPE_GT;
-    }  else if (str == "GTE") {
+    }
+    if (str == "GTE") {
         return INDEX_LOOKUP_TYPE_GTE;
-    }  else if (str == "LT") {
+    }
+    if (str == "LT") {
         return INDEX_LOOKUP_TYPE_LT;
-    }  else if (str == "LTE") {
+    }
+    if (str == "LTE") {
         return INDEX_LOOKUP_TYPE_LTE;
-    } else if (str == "GT_LT") {
-        return INDEX_LOOKUP_TYPE_GT_LT;
-    }  else if (str == "GTE_LT") {
-        return INDEX_LOOKUP_TYPE_GTE_LT;
-    }  else if (str == "GTL_TE") {
-        return INDEX_LOOKUP_TYPE_GTL_TE;
-    }  else if (str == "GTE_LTE") {
-        return INDEX_LOOKUP_TYPE_GTE_LTE;
+    }
+    if (str == "GEO_CONTAINS") {
+        return INDEX_LOOKUP_TYPE_GEO_CONTAINS;
     }
     return INDEX_LOOKUP_TYPE_INVALID;
 }

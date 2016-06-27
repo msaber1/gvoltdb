@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -29,16 +29,16 @@ import org.voltdb.VoltProcedure;
 public class InsertBase extends VoltProcedure {
 
     protected final SQLStmt i_no_nulls = new SQLStmt
-    ("INSERT INTO NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    ("INSERT INTO NO_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     protected final SQLStmt i_no_nulls_grp = new SQLStmt
-    ("INSERT INTO NO_NULLS_GRP VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    ("INSERT INTO NO_NULLS_GRP VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
 
     protected final SQLStmt i_allow_nulls = new SQLStmt
-    ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO ALLOW_NULLS VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     protected final SQLStmt i_allow_nulls_grp = new SQLStmt
-    ("INSERT INTO ALLOW_NULLS_GRP VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+    ("INSERT INTO ALLOW_NULLS_GRP VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
 
     public final SQLStmt i_with_defaults = new SQLStmt
     ("INSERT INTO WITH_DEFAULTS (PKEY) VALUES (?)");

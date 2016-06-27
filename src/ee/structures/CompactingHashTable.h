@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -122,6 +122,7 @@ namespace voltdb {
         KeyEqChecker m_keyEq;             // instance of the key eq checker
         DataEqChecker m_dataEq;           // instance of the value eq checker
 
+
     public:
 
         /**
@@ -177,6 +178,8 @@ namespace voltdb {
 
         /** verification for debugging and testing */
         bool verify();
+        /** Do we have a cached last buffer?  This is used in testing. */
+        bool hasCachedLastBuffer() const { return (m_allocator.hasCachedLastBuffer()); }
 
     protected:
         /** find, given a bucket/key */

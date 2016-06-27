@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,7 +16,6 @@
  */
 #include "storage/ConstraintFailureException.h"
 #include "storage/constraintutil.h"
-#include "storage/persistenttable.h"
 #include "storage/table.h"
 #include <cassert>
 
@@ -24,7 +23,7 @@ using namespace voltdb;
 using std::string;
 
 ConstraintFailureException::ConstraintFailureException(
-        PersistentTable *table,
+        Table *table,
         TableTuple tuple,
         TableTuple otherTuple,
         ConstraintType type) :
@@ -42,13 +41,13 @@ ConstraintFailureException::ConstraintFailureException(
 }
 
 ConstraintFailureException::ConstraintFailureException(
-        PersistentTable *table,
+        Table *table,
         TableTuple tuple,
         string message) :
-    SQLException(
-            SQLException::integrity_constraint_violation,
-            message,
-            VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
+        SQLException(
+                SQLException::integrity_constraint_violation,
+                message,
+                VOLT_EE_EXCEPTION_TYPE_CONSTRAINT_VIOLATION),
     m_table(table),
     m_tuple(tuple),
     m_otherTuple(TableTuple()),
@@ -86,6 +85,7 @@ ConstraintFailureException::message() const
     msg.append(type_string);
     msg.append("\non table: ");
     msg.append(m_table->name());
+
     msg.append("\nNew tuple:\n\t");
     msg.append(m_tuple.debug(m_table->name()));
     if (!m_otherTuple.isNullTuple()) {

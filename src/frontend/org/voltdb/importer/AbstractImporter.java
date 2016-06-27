@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -102,7 +102,7 @@ public abstract class AbstractImporter
     protected final boolean callProcedure(Invocation invocation, ProcedureCallback callback)
     {
         try {
-            boolean result = m_importServerAdapter.callProcedure(this, invocation.getProcedure(), invocation.getParams());
+            boolean result = m_importServerAdapter.callProcedure(this, callback, invocation.getProcedure(), invocation.getParams());
             reportStat(result, invocation.getProcedure());
             applyBackPressureAsNeeded();
             return result;
@@ -117,9 +117,9 @@ public abstract class AbstractImporter
     {
         int count = m_backPressureCount.get();
         if (count > 0) {
-            try { // increase sleep time exponentially to a max of 128ms
-                if (count > 7) {
-                    Thread.sleep(128);
+            try { // increase sleep time exponentially to a max of 256ms
+                if (count > 8) {
+                    Thread.sleep(256);
                 } else {
                     Thread.sleep(1<<count);
                 }
@@ -143,6 +143,15 @@ public abstract class AbstractImporter
         } else {
             m_backPressureCount.set(0);
         }
+    }
+
+    /**
+     * Called to stop the importer from processing more data.
+     */
+    public void stopImporter()
+    {
+        m_stopping = true;
+        stop();
     }
 
     private void reportStat(boolean result, String procName) {

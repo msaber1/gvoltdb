@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -45,6 +45,11 @@ public class SpDurabilityListener implements DurabilityListener {
         public void setLastDurableUniqueId(long uniqueId) {}
 
         @Override
+        public boolean isChanged() {
+            return false;
+        }
+
+        @Override
         public int getTaskListSize() {
             return 0;
         }
@@ -87,6 +92,11 @@ public class SpDurabilityListener implements DurabilityListener {
         }
 
         @Override
+        public boolean isChanged() {
+            return m_changed;
+        }
+
+        @Override
         public int getTaskListSize() {
             return 0;
         }
@@ -104,7 +114,7 @@ public class SpDurabilityListener implements DurabilityListener {
                 }
             }
         }
-    };
+    }
 
     class SyncCompletionChecks extends AsyncCompletionChecks {
         ArrayList<TransactionTask> m_pendingTransactions;
@@ -218,7 +228,9 @@ public class SpDurabilityListener implements DurabilityListener {
 
     @Override
     public void processDurabilityChecks(CommandLog.CompletionChecks completionChecks) {
-        m_spScheduler.processDurabilityChecks(completionChecks);
+        if (completionChecks.isChanged()) {
+            m_spScheduler.processDurabilityChecks(completionChecks);
+        }
     }
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -31,22 +31,22 @@ package vmcTest.pages
 
 class SchemaPageProceduresAndSqlTab extends SchemaPage {
     static content = {
-	
-        procedureName	{ $(class:"tablesorter-header-inner", text:"Procedure Name") }
-        parameters		{ $(class:"tablesorter-header-inner", text:"Parameters") }
-        partitioning 	{ $(class:"tablesorter-header-inner", text:"Partitioning") }
-        rw				{ $(class:"tablesorter-header-inner", text:"R/W") }
-        access			{ $(class:"tablesorter-header-inner", text:"Access") }
-        attributes		{ $(class:"tablesorter-header-inner", text:"Attributes") }
-        
-        //ascending		{ $(class:"tablesorter-icon icon-chevron-up") }
-        ascending		{ $("#proctable > thead > tr.tablesorter-headerRow > th.tablesorter-header.bootstrap-header.tablesorter-headerAsc") }
-        //descending		{ $(class:"tablesorter-icon icon-chevron-down") }
-        descending		{ $("#proctable > thead > tr.tablesorter-headerRow > th.tablesorter-header.bootstrap-header.tablesorter-headerDesc") }
-        expandallproc 	{ $("#p > div > div.dataBlockContent > div > div > label", text:"Expand All")}
-        expandedproc	{ $("#p > div > div.dataBlockContent > div")}
+
+        procedureName   { $(class:"tablesorter-header-inner", text:"Procedure Name") }
+        parameters      { $(class:"tablesorter-header-inner", text:"Parameters") }
+        partitioning    { $(class:"tablesorter-header-inner", text:"Partitioning") }
+        rw              { $(class:"tablesorter-header-inner", text:"R/W") }
+        access          { $(class:"tablesorter-header-inner", text:"Access") }
+        attributes      { $(class:"tablesorter-header-inner", text:"Attributes") }
+
+        //ascending     { $(class:"tablesorter-icon icon-chevron-up") }
+        ascending       { $("#proctable > thead > tr.tablesorter-headerRow > th.tablesorter-header.bootstrap-header.tablesorter-headerAsc") }
+        //descending        { $(class:"tablesorter-icon icon-chevron-down") }
+        descending      { $("#proctable > thead > tr.tablesorter-headerRow > th.tablesorter-header.bootstrap-header.tablesorter-headerDesc") }
+        expandallproc   { $("#p > div > div.dataBlockContent > div > div > label", text:"Expand All")}
+        expandedproc    { $("#p > div > div.dataBlockContent > div")}
         documentationLink { $("#iconDoc") }
-        generatedbytxt	{$("#catalogContainer > div.documentation > span")}
+        generatedbytxt  {$("#catalogContainer > div.documentation > span")}
         expandedlistt    { $(class:"togglex")}
         expandedlisttbox { $(class:"invert")}
         expandedlistt1   { $(class:"togglex",1)}
@@ -54,7 +54,7 @@ class SchemaPageProceduresAndSqlTab extends SchemaPage {
     static at = {
         proceduresTab.displayed
         proceduresTab.attr('class') == 'active'
-        
+
     }
 
 }

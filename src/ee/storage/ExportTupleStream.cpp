@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,7 +40,7 @@ const int METADATA_COL_CNT = 6;
 
 ExportTupleStream::ExportTupleStream(CatalogId partitionId,
                                        int64_t siteId)
-    : TupleStreamBase(),
+    : TupleStreamBase(EL_BUFFER_SIZE),
       m_partitionId(partitionId), m_siteId(siteId),
       m_signature(""), m_generation(0)
 {}
@@ -109,7 +109,7 @@ size_t ExportTupleStream::appendTuple(int64_t lastCommittedSpHandle,
     //Most of the transaction id info and unique id info supplied to commit
     //is nonsense since it isn't currently supplied with a transaction id
     //but it is fine since export isn't currently using the info
-    commit(lastCommittedSpHandle, spHandle, spHandle, uniqueId, false, false);
+    commit(lastCommittedSpHandle, spHandle, uniqueId, false, false);
 
     // Compute the upper bound on bytes required to serialize tuple.
     // exportxxx: can memoize this calculation.

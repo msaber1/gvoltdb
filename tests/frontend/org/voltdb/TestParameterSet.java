@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -405,6 +405,16 @@ public class TestParameterSet extends TestCase {
         p2 = ParameterSet.fromJSONString(json);
 
         assertEquals("0a1A0A", p2.toArray()[6]);
+
+        // this tests that JSON handles special floats
+        params = ParameterSet.fromArrayNoCopy(new Object[]{
+                Double.NaN,
+                Double.POSITIVE_INFINITY,
+                Double.NEGATIVE_INFINITY } );
+
+        json = params.toJSONString();
+        p2 = ParameterSet.fromJSONString(json);
+        assertEquals(p2.toJSONString(), json);
     }
 
     public void testGetCRCWithoutCrash() throws IOException {
@@ -413,7 +423,7 @@ public class TestParameterSet extends TestCase {
         ByteBuffer buf;
 
         Object[] psetObjs = new Object[] {
-                null, VoltType.INTEGER.getNullValue(), VoltType.DECIMAL.getNullValue(), // null values
+                null, VoltType.NULL_INTEGER, VoltType.NULL_DECIMAL, // null values
                 (byte)1, (short)2, (int)3, (long)4, 1.2f, 3.6d, // numbers
                 "This is spinal tap", "", // strings
                 "ABCDF012", new byte[] { 1, 3, 5 }, new byte[0], // binary

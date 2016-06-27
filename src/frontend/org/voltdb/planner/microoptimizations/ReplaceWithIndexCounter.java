@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -22,7 +22,6 @@ import java.util.List;
 
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -85,7 +84,7 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
 
             AbstractExpression postPredicate = aggplan.getPostPredicate();
             if (postPredicate != null) {
-                List<AbstractExpression> aggList = postPredicate.findAllSubexpressionsOfClass(AggregateExpression.class);
+                List<AbstractExpression> aggList = postPredicate.findAllAggregateSubexpressions();
 
                 boolean allCountStar = true;
                 for (AbstractExpression expr: aggList) {

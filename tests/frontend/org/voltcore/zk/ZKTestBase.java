@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -35,7 +35,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.PortGenerator;
 
-import com.google_voltpatches.common.collect.ImmutableSet;
 import com.google_voltpatches.common.collect.Sets;
 
 /**
@@ -59,8 +58,8 @@ public class ZKTestBase {
             config.zkInterface = "127.0.0.1:" + externalPort;
             m_siteIdToZKPort.put(ii, externalPort);
             config.networkThreads = 1;
-            HostMessenger hm = new HostMessenger(config);
-            hm.start();
+            HostMessenger hm = new HostMessenger(config, null, null);
+            hm.start(null);
             m_messengers.add(hm);
         }
     }

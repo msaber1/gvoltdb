@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -18,11 +18,13 @@
 package org.voltdb.jdbc;
 
 import java.sql.*;
+
 import org.voltdb.*;
+import org.voltdb.types.GeographyPointValue;
 
 public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
 {
-    private JDBC4ResultSet sourceResultSet;
+    private final JDBC4ResultSet sourceResultSet;
     public JDBC4ResultSetMetaData(JDBC4ResultSet resultSet)
     {
         sourceResultSet = resultSet;
@@ -80,8 +82,11 @@ public class JDBC4ResultSetMetaData implements java.sql.ResultSetMetaData
                 return 40;
             case TIMESTAMP:
                 return 32;
+            case GEOGRAPHY_POINT:
+                return GeographyPointValue.getValueDisplaySize();
             case STRING:
             case VARBINARY:
+            case GEOGRAPHY:
                 return 128; // That is wrong: should be length in bytes / 3 (max bytes per char for UTF8), but we don't receive the length!
             default:
                 throw SQLError.get(SQLError.TRANSLATION_NOT_FOUND, type);

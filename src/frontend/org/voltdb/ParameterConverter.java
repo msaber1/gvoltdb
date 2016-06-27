@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -27,6 +27,8 @@ import java.util.regex.Pattern;
 
 import org.voltdb.common.Constants;
 import org.voltdb.parser.SQLParser;
+import org.voltdb.types.GeographyPointValue;
+import org.voltdb.types.GeographyValue;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -245,12 +247,14 @@ public class ParameterConverter {
     public static Object tryToMakeCompatible(final Class<?> expectedClz, final Object param)
     throws VoltTypeException
     {
-        // uncomment for debugging
-        /*System.err.printf("Converting %s of type %s to type %s\n",
+        /* uncomment for debugging
+        System.err.printf("Converting %s of type %s to type %s\n",
+
                 String.valueOf(param),
                 param == null ? "NULL" : param.getClass().getName(),
-                paramType.getName());
-        System.err.flush();*/
+                expectedClz.getName());
+        System.err.flush();
+        // */
 
         // Get blatant null out of the way fast, as it avoids some inline checks
         // There are some subtle null values that aren't java null coming up, but wait until
@@ -333,8 +337,10 @@ public class ParameterConverter {
         // null sigils. (ning - if we're not checking if the sigil matches the expected type,
         // why do we have three sigils for three types??)
         else if (param == VoltType.NULL_TIMESTAMP ||
-                 param == VoltType.NULL_STRING_OR_VARBINARY ||
-                 param == VoltType.NULL_DECIMAL) {
+                param == VoltType.NULL_STRING_OR_VARBINARY ||
+                param == VoltType.NULL_GEOGRAPHY ||
+                param == VoltType.NULL_POINT ||
+                param == VoltType.NULL_DECIMAL) {
             return nullValueForType(expectedClz);
         }
 
@@ -349,7 +355,7 @@ public class ParameterConverter {
             return tryToMakeCompatibleArray(expectedClz.getComponentType(), inputClz.getComponentType(), param);
         }
 
-        // The following block switches on the type of the paramter desired.
+        // The following block switches on the type of the parameter desired.
         // It handles all of the paths not trapped in the code above. We can assume
         // values are not null and that most sane primitive stuff has been handled.
         // Downcasting is handled here (e.g. long => short).
@@ -409,7 +415,7 @@ public class ParameterConverter {
                     // Defer errors to the generic Exception throw below, if it's not the right format
                 }
                 try {
-                    return new TimestampType(timestring);
+                    return SQLParser.parseDate(timestring);
                 }
                 catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
@@ -490,6 +496,36 @@ public class ParameterConverter {
                 throw new VoltTypeException(String.format("deserialize BigDecimal from string failed. (%s to %s)",
                         inputClz.getName(), expectedClz.getName()));
             }
+        } else if (expectedClz == GeographyPointValue.class) {
+            // Is it a point already?  If so, just return it.
+            if (inputClz == GeographyPointValue.class) {
+                return param;
+            }
+            // Is it a string from which we can construct a point?
+            // If so, return the newly constructed point.
+            if (inputClz == String.class) {
+                try {
+                    GeographyPointValue pt = GeographyPointValue.fromWKT((String)param);
+                    return pt;
+                } catch (IllegalArgumentException e) {
+                    throw new VoltTypeException(String.format("deserialize GeographyPointValue from string failed (string %s)",
+                                                              (String)param));
+                }
+            }
+        } else if (expectedClz == GeographyValue.class) {
+            if (inputClz == GeographyValue.class) {
+                return param;
+            }
+            if (inputClz == String.class) {
+                String paramStr = (String)param;
+                try {
+                    GeographyValue gv = GeographyValue.fromWKT(paramStr);
+                    return gv;
+                } catch (IllegalArgumentException e) {
+                    throw new VoltTypeException(String.format("deserialize GeographyValue from string failed (string %s)",
+                                                              paramStr));
+                }
+            }
         } else if (expectedClz == VoltTable.class && inputClz == VoltTable.class) {
             return param;
         } else if (expectedClz == String.class) {
@@ -510,34 +546,5 @@ public class ParameterConverter {
         throw new VoltTypeException(
                 "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + inputClz.getName() +
                 " is not a match or is out of range for the target parameter type: " + expectedClz.getName());
-    }
-
-
-    /**
-     * Convert string inputs to Longs for TheHashinator if possible
-     * @param param
-     * @param slot
-     * @return Object parsed as Number or null if types not compatible
-     * @throws Exception if a parse error occurs (consistent with above).
-     */
-    public static Object stringToLong(Object param, Class<?> slot)
-    throws VoltTypeException
-    {
-        try {
-            if (slot == byte.class ||
-                slot == short.class ||
-                slot == int.class ||
-                slot == long.class)
-            {
-                return Long.parseLong((String)param);
-            }
-            return null;
-        }
-        catch (NumberFormatException nfe) {
-            throw new VoltTypeException(
-                    "tryToMakeCompatible: Unable to convert string "
-                    + (String)param + " to "  + slot.getName()
-                    + " value for target parameter " + slot.getName());
-        }
     }
 }

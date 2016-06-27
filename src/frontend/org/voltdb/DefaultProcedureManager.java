@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -70,8 +70,14 @@ public class DefaultProcedureManager {
         for (Table table : m_db.getTables()) {
             String prefix = table.getTypeName() + '.';
 
-            // skip export tables XXX why no insert?
             if (CatalogUtil.isTableExportOnly(m_db, table)) {
+                Column partitioncolumn = table.getPartitioncolumn();
+                if (partitioncolumn != null) {
+                    int partitionIndex = partitioncolumn.getIndex();
+                    addShimProcedure(prefix + "insert", table, null, true, partitionIndex, partitioncolumn, false);
+                } else {
+                    addShimProcedure(prefix + "insert", table, null, true, -1, null, false);
+                }
                 continue;
             }
 

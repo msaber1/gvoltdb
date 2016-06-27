@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -130,6 +130,20 @@ public class TestVoltCompilerErrorMsgs extends TestCase {
     public void testErrorOnSizedInteger() throws Exception {
         // We do not support sized integers.
         ddlErrorTest("unexpected token", "create table hassizedint (i integer(5));");
+    }
+
+    public void testLargeVarcharColumns() throws Exception {
+        // This is a regression test for ENG-10560.
+
+        // Tests for sizes of complete row
+        ddlErrorTest("Table T has a maximum row size of 2097156 but the maximum supported row size is 2097152",
+                "create table t (vc1 varchar(262144), vc2 varchar(262143));");
+
+        ddlErrorTest("Table T has a maximum row size of 2097153 but the maximum supported row size is 2097152",
+                "create table t (vc1 varchar(1048572 bytes), vc2 varchar(1048573 bytes));");
+
+        ddlNonErrorTest(null, "create table t (vc1 varchar(262143), vc2 varchar(262143));");
+        ddlNonErrorTest(null, "create table t (vc1 varchar(1048572 bytes), vc2 varchar(1048572 bytes));");
     }
 
     public void testErrorOnInsertIntoSelect() throws Exception {

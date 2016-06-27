@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -72,7 +72,7 @@ public class OperatorExpression extends AbstractExpression {
         }
         ExpressionType type = getExpressionType();
         if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT) {
-            m_valueType = VoltType.BIGINT;
+            m_valueType = VoltType.BOOLEAN;
             m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             return;
         }
@@ -133,7 +133,7 @@ public class OperatorExpression extends AbstractExpression {
         if (m_right == null) {
             if (type == ExpressionType.OPERATOR_IS_NULL || type == ExpressionType.OPERATOR_NOT ||
                     type == ExpressionType.OPERATOR_EXISTS) {
-                m_valueType = VoltType.BIGINT;
+                m_valueType = VoltType.BOOLEAN;
                 m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
             }
             return;
@@ -179,6 +179,20 @@ public class OperatorExpression extends AbstractExpression {
         return "(" + m_left.explain(impliedTableName) +
             " " + type.symbol() + " " +
             m_right.explain(impliedTableName) + ")";
+    }
+
+    @Override
+    public boolean isValueTypeIndexable(StringBuffer msg) {
+        ExpressionType type = getExpressionType();
+        switch(type) {
+        case OPERATOR_NOT:
+        case OPERATOR_IS_NULL:
+        case OPERATOR_EXISTS:
+            msg.append("operator '" + getExpressionType().symbol() +"'");
+            return false;
+        default:
+            return true;
+        }
     }
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -110,6 +110,8 @@
 #include "common/RecoveryProtoMessage.h"
 #include "common/LegacyHashinator.h"
 #include "common/ElasticHashinator.h"
+#include "storage/DRTupleStream.h"
+#include "storage/CompatibleDRTupleStream.h"
 #include "murmur3/MurmurHash3.h"
 #include "execution/VoltDBEngine.h"
 #include "execution/JNITopend.h"
@@ -264,6 +266,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     jint hostId,
     jbyteArray hostname,
     jint drClusterId,
+    jint defaultDrBufferSize,
     jlong tempTableMemory,
     jboolean createDrReplicatedStream,
     jint compactionThreshold)
@@ -291,6 +294,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    hostId,
                                    hostString,
                                    drClusterId,
+                                   defaultDrBufferSize,
                                    tempTableMemory,
                                    createDrReplicatedStream,
                                    static_cast<int32_t>(compactionThreshold));
@@ -1181,7 +1185,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeHashi
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
         HashinatorType hashinatorType = static_cast<HashinatorType>(voltdb::ValuePeeker::peekAsInteger(params[1]));
         boost::scoped_ptr<TheHashinator> hashinator;
-        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[2]));
+        const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[2]);
         switch (hashinatorType) {
         case HASHINATOR_LEGACY:
             hashinator.reset(LegacyHashinator::newInstance(configValue));
@@ -1225,7 +1229,7 @@ SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeUpdat
         NValueArray& params = engine->getParameterContainer();
         Pool *stringPool = engine->getStringPool();
         deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-        const char *configValue = static_cast<const char*>(voltdb::ValuePeeker::peekObjectValue(params[0]));
+        const char *configValue = voltdb::ValuePeeker::peekObjectValue(params[0]);
         engine->updateHashinator(hashinatorType, configValue, reinterpret_cast<int32_t*>(configPtr), static_cast<uint32_t>(tokenCount));
         stringPool->purge();
     } catch (const FatalException &e) {
@@ -1402,7 +1406,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
         ReferenceSerializeInputBE input(engine->getParameterBuffer(), engine->getParameterBufferCapacity());
         TaskType taskId = static_cast<TaskType>(input.readLong());
-        engine->executeTask(taskId, engine->getParameterBuffer() + sizeof(int64_t));
+        engine->executeTask(taskId, input);
         return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
     } catch (const SerializableEEException &e) {
         engine->resetReusedResultOutputBuffer();
@@ -1417,15 +1421,36 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 /*
  * Class:     org_voltdb_jni_ExecutionEngine
  * Method:    getTestDRBuffer
- * Signature: ()[B
+ * Signature: (ZI[I[I)[B
  */
 SHAREDLIB_JNIEXPORT jbyteArray JNICALL Java_org_voltdb_jni_ExecutionEngine_getTestDRBuffer
-  (JNIEnv *env, jclass clazz) {
+  (JNIEnv *env, jclass clazz, jboolean compatible, jint partitionId, jintArray partitionKeyValues, jintArray flags,
+          jlong startSequenceNumber) {
     try {
+        jint *partitionKeyValuesJPtr = env->GetIntArrayElements(partitionKeyValues, NULL);
+        int32_t *partitionKeyValuesPtr = reinterpret_cast<int32_t *>(partitionKeyValuesJPtr);
+        std::vector<int32_t> partitionKeyValueList(partitionKeyValuesPtr,
+            partitionKeyValuesPtr + env->GetArrayLength(partitionKeyValues));
+        env->ReleaseIntArrayElements(partitionKeyValues, partitionKeyValuesJPtr, JNI_ABORT);
+
+        jint *flagsJPtr = env->GetIntArrayElements(flags, NULL);
+        int32_t *flagsPtr = reinterpret_cast<int32_t *>(flagsJPtr);
+        std::vector<int32_t> flagList(flagsPtr, flagsPtr + env->GetArrayLength(flags));
+        env->ReleaseIntArrayElements(flags, flagsJPtr, JNI_ABORT);
+
+        assert(partitionKeyValueList.size() == flagList.size());
+
         char *output = new char[1024 * 256];
-        int32_t length = DRTupleStream::getTestDRBuffer(output);
+        int32_t length;
+        if (compatible) {
+            length = CompatibleDRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList,
+                    startSequenceNumber, output);
+        } else {
+            length = DRTupleStream::getTestDRBuffer(partitionId, partitionKeyValueList, flagList,
+                    startSequenceNumber, output);
+        }
         jbyteArray array = env->NewByteArray(length);
-        jbyte *arrayBytes = env->GetByteArrayElements( array, NULL);
+        jbyte *arrayBytes = env->GetByteArrayElements(array, NULL);
         ::memcpy(arrayBytes, output, length);
         env->ReleaseByteArrayElements(array, arrayBytes, 0);
         return array;

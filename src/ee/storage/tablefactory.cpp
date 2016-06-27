@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -75,7 +75,7 @@ Table* TableFactory::getPersistentTable(
     Table *table = NULL;
 
     if (exportOnly) {
-        table = new StreamedTable(exportEnabled);
+        table = new StreamedTable(exportEnabled, partitionColumn);
     }
     else {
         table = new PersistentTable(partitionColumn, signature, tableIsMaterialized, tableAllocationTargetSize, tupleLimit, drEnabled);
@@ -92,11 +92,21 @@ Table* TableFactory::getPersistentTable(
     // initialize stats for the table
     configureStats(databaseId, name, table);
 
+    if (!exportOnly) {
+        // Allocate and assign the tuple storage block to the persistent table ahead of time instead
+        // of doing so at time of first tuple insertion. The intent of block allocation ahead of time
+        // is to avoid allocation cost at time of tuple insertion
+        PersistentTable *persistentTable = static_cast <PersistentTable*> (table);
+        TBPtr block = persistentTable->allocateNextBlock();
+        assert(block->hasFreeTuples());
+        persistentTable->m_blocksWithSpace.insert(block);
+    }
+
     return table;
 }
 
 // This is a convenient wrapper for test only.
-Table* TableFactory::getStreamedTableForTest(
+StreamedTable* TableFactory::getStreamedTableForTest(
             voltdb::CatalogId databaseId,
             const std::string &name,
             TupleSchema* schema,
@@ -105,7 +115,7 @@ Table* TableFactory::getStreamedTableForTest(
             bool exportEnabled,
             int32_t compactionThreshold)
 {
-    Table *table = new StreamedTable(exportEnabled, wrapper);
+    StreamedTable *table = new StreamedTable(exportEnabled, wrapper);
 
     initCommon(databaseId,
                table,

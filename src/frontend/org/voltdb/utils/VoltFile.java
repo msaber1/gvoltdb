@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -16,14 +16,15 @@
  */
 package org.voltdb.utils;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
+
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-
-import java.io.File;
-import java.io.IOException;
-import java.io.*;
-import java.nio.*;
-import java.nio.channels.*;
 
 /*
  * Extend the File class and override its constructors to allow a property to be specified
@@ -189,6 +190,22 @@ public class VoltFile extends File {
         m_voltFilePrefix = null;
     }
 
+    public static void recursivelyDelete(File file, boolean deleteRoot) throws IOException {
+        if (!file.exists()) {
+            return;
+        }
+
+        if (deleteRoot) {
+            recursivelyDelete(file);
+        } else {
+            if (file.isDirectory()) {
+                for (File f : file.listFiles()) {
+                    recursivelyDelete(f);
+                }
+            }
+        }
+    }
+
     /*
      * One of those why doesn't Java ship with this functions
      */
@@ -249,7 +266,16 @@ public class VoltFile extends File {
             return pathname;
         }
         if (pathname.contains(m_magic)) {
-            return pathname;
+            if (pathname.contains(m_voltFilePrefix.getAbsolutePath())) {
+                return pathname;
+            }
+            else {
+                int offset = pathname.indexOf(m_magic) + m_magic.length();
+                String relativePath = pathname.substring(offset);
+                // The this is probably a snapshot path and needs to be re-mapped to our snapshot
+                // directory because truncation snapshot requests specify absolute paths
+                return m_voltFilePrefix.getAbsolutePath() + relativePath;
+            }
         }
 
         if (m_voltFilePrefix != null) {

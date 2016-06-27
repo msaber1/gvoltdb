@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -40,12 +40,12 @@ public class ComparisonExpression extends AbstractExpression {
 
     public ComparisonExpression(ExpressionType type) {
         super(type);
-        setValueType(VoltType.BIGINT);
+        setValueType(VoltType.BOOLEAN);
     }
 
     public ComparisonExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
         super(type, left, right);
-        setValueType(VoltType.BIGINT);
+        setValueType(VoltType.BOOLEAN);
     }
 
     public ComparisonExpression() {
@@ -137,7 +137,7 @@ public class ComparisonExpression extends AbstractExpression {
         // Therefore, it is safe to assume that the output is always going to be an
         // integer (for booleans)
         //
-        m_valueType = VoltType.BIGINT;
+        m_valueType = VoltType.BOOLEAN;
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
 
@@ -214,6 +214,13 @@ public class ComparisonExpression extends AbstractExpression {
             (m_quantifier == QuantifierType.NONE ? "" :
                 (m_quantifier.name() + " ")) +
             m_right.explain(impliedTableName) + ")";
+    }
+
+    @Override
+    public boolean isValueTypeIndexable(StringBuffer msg) {
+        // comparison expression result in boolean result type, which is not indexable
+        msg.append("comparison expression '" + getExpressionType().symbol() +"'");
+        return false;
     }
 
 }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -217,8 +217,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field tuplelimit in schema object Table{T1}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -233,8 +232,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field tuplelimit in schema object Table{T1}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -249,8 +247,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field tuplelimit in schema object Table{T1}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -265,8 +262,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Statement{limit_delete} from Table{T1} on master"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -281,8 +277,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("Missing Statement{limit_delete} from Table{T1} on replica"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -297,8 +292,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field sqltext in schema object Statement{limit_delete}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -313,8 +307,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field sqltext in schema object Statement{limit_delete}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -329,8 +322,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field sqltext in schema object Statement{limit_delete}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test
@@ -345,8 +337,7 @@ public class TestDRCatalogDiffs {
                 "DR TABLE T1;";
 
         CatalogDiffEngine diff = runCatalogDiff(masterSchema, replicaSchema);
-        assertFalse(diff.supported());
-        assertTrue(diff.errors().contains("field tuplelimit in schema object Table{T1}"));
+        assertTrue(diff.errors(), diff.supported());
     }
 
     @Test

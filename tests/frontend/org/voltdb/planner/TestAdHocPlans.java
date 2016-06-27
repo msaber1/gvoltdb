@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -62,6 +62,23 @@ public class TestAdHocPlans extends AdHocQueryTester {
     public void testSP() throws Exception {
         //DB is empty so the hashable numbers don't really seem to matter
         runAllAdHocSPtests(0, 1, 2, 3);
+    }
+
+    public void testAdHocQueryForStackOverFlowCondition() throws NoConnectionsException, IOException, ProcCallException {
+        // query with max predicates in where clause
+        String sql = getQueryForLongQueryTable(300);
+        runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+
+        // generate query with lots of predicate to simulate stack overflow when parsing the expression
+        sql = getQueryForLongQueryTable(2000);
+        try {
+            runQueryTest(sql, 1, 1, 1, VALIDATING_SP_RESULT);
+            fail("Query was expected to generate stack over flow error");
+        }
+        catch (StackOverflowError error) {
+            // The test-only interface to the PlannerTool tests at a level below
+            // any StackOverflowError handling, so expect the raw StackOverflowError.
+        }
     }
 
     /**

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -144,8 +144,7 @@ public:
     {
         // sizes for variable length types
         // must be explicitly specified
-        assert (valueType != VALUE_TYPE_VARCHAR
-                && valueType != VALUE_TYPE_VARBINARY);
+        assert (! isVariableLengthType(valueType));
 
         setColumnAtIndex(index, valueType,
                          NValue::getTupleStorageSize(valueType),
@@ -181,8 +180,7 @@ public:
     {
         // sizes for variable length types
         // must be explicitly specified
-        assert (valueType != VALUE_TYPE_VARCHAR
-                && valueType != VALUE_TYPE_VARBINARY);
+        assert (! isVariableLengthType(valueType));
 
         setHiddenColumnAtIndex(index,
                                valueType,

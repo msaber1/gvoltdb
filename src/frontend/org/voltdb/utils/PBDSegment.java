@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -32,7 +32,8 @@ public abstract class PBDSegment {
     static final int COUNT_OFFSET = 0;
     static final int SIZE_OFFSET = 4;
 
-    static final int CHUNK_SIZE = (1024 * 1024) * 64;
+    // Has to be able to hold at least one object (compressed or not)
+    public static final int CHUNK_SIZE = (1024 * 1024) * 64;
     static final int OBJECT_HEADER_BYTES = 8;
     static final int SEGMENT_HEADER_BYTES = 8;
     protected final File m_file;

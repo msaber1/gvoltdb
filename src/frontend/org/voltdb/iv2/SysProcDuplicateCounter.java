@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -23,6 +23,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.utils.MiscUtils;
@@ -42,8 +43,10 @@ public class SysProcDuplicateCounter extends DuplicateCounter
     SysProcDuplicateCounter(
             long destinationHSId,
             long realTxnId,
-            List<Long> expectedHSIds, String procName)    {
-        super(destinationHSId, realTxnId, expectedHSIds, procName);
+            List<Long> expectedHSIds,
+            VoltMessage message)
+    {
+        super(destinationHSId, realTxnId, expectedHSIds, message);
     }
 
     /**

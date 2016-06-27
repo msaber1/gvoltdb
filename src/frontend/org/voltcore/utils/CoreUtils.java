@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -974,10 +974,13 @@ public class CoreUtils {
         return Math.max(1, Runtime.getRuntime().availableProcessors());
     }
 
-    public static final class RetryException extends RuntimeException {
+    public static final class RetryException extends Exception {
         public RetryException() {};
         public RetryException(Throwable cause) {
             super(cause);
+        }
+        public RetryException(String errMsg) {
+            super(errMsg);
         }
     }
 

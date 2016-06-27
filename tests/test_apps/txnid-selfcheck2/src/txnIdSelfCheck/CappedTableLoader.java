@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -97,8 +97,8 @@ public class CappedTableLoader extends BenchmarkThread {
             } else
             if (status != ClientResponse.SUCCESS) {
                 // log what happened
-                log.error("CappedTableLoader ungracefully failed to insert into table " + tableName);
-                log.error(((ClientResponseImpl) clientResponse).toJSONString());
+                log.warn("CappedTableLoader ungracefully failed to insert into table " + tableName);
+                log.warn(((ClientResponseImpl) clientResponse).toJSONString());
             }
             else {
                 Benchmark.txnCount.incrementAndGet();
@@ -152,7 +152,7 @@ public class CappedTableLoader extends BenchmarkThread {
             }
             catch (Exception e) {
                 // on exception, log and end the thread, but don't kill the process
-                log.error("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "', exception msg: " + e.getMessage());
+                log.warn("CappedTableLoader failed a TableInsert procedure call for table '" + tableName + "', exception msg: " + e.getMessage());
                 try { Thread.sleep(3000); } catch (Exception e2) { }
             }
         }

@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -90,6 +90,7 @@ public:
         int m_partitionColumn;
         bool m_multiPartition;
         bool m_isStreamed;
+        bool m_hasStreamView;
         bool m_isUpsert;
         bool m_sourceIsPartitioned;
         bool m_hasPurgeFragment;
@@ -106,7 +107,7 @@ public:
          * into might change.  Passing a pointer-to-pointer allows
          * the callee to update the persistent table pointer.
          */
-        bool executePurgeFragmentIfNeeded(PersistentTable** table);
+        void executePurgeFragmentIfNeeded(PersistentTable** table);
 
         /** A tuple with the target table's schema that is populated
          * with default values for each field. */

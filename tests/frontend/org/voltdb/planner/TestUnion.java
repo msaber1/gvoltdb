@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -217,7 +217,7 @@ public class TestUnion extends PlannerTestCase {
         assertTrue(pn.getChild(1) instanceof SeqScanPlanNode);
 
         // The same table/alias is repeated twice in the union but in the different selects
-        pn = compile("select B from T2 A1, T2 A2 WHERE A1.B = A2.B UNION select B from T2 A1");
+        pn = compile("select A1.B from T2 A1, T2 A2 WHERE A1.B = A2.B UNION select B from T2 A1");
         assertTrue(pn.getChild(0) instanceof UnionPlanNode);
         pn = pn.getChild(0);
         assertTrue(pn.getChildCount() == 2);
@@ -311,7 +311,16 @@ public class TestUnion extends PlannerTestCase {
             AbstractPlanNode pn = compile("(select B as B1, B as B2 from T2 UNION select B as B1, B as B2 from T2) order by B1 asc, B2 desc");
             pn = pn.getChild(0);
             String[] columnNames = {"B1", "B2"};
-            int[] idxs = {1, 1};
+            // We are selecting the same column twice from both sides of the union,
+            // so it doesn't matter if the column indices are 0 or 1 here.
+            int[] idxs = {0, 0};
+            checkOrderByNode(pn, columnNames, idxs);
+        }
+        {
+            AbstractPlanNode pn = compile("(select B as B1, B * -1 as B2 from T2 UNION select B as B1, B * -1 as B2 from T2) order by B1 asc, B2 desc");
+            pn = pn.getChild(0);
+            String[] columnNames = {"B1", "B2"};
+            int[] idxs = {0, 1};
             checkOrderByNode(pn, columnNames, idxs);
         }
         {

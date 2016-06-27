@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -31,9 +31,7 @@ import java.util.concurrent.TimeUnit;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
-
 import org.voltdb.ParameterConverter;
-import org.voltdb.client.HashinatorLite;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTypeException;
@@ -259,7 +257,7 @@ public class PerPartitionTable {
             if (m_isMP) {
                 m_clientImpl.callProcedure(callback, m_procName, m_tableName, m_upsert, toSend);
             } else {
-                Object rpartitionParam = HashinatorLite.valueToBytes(toSend.fetchRow(0).get(
+                Object rpartitionParam = VoltType.valueToBytes(toSend.fetchRow(0).get(
                         m_partitionedColumnIndex, m_partitionColumnType));
                 m_clientImpl.callProcedure(callback, m_procName, rpartitionParam, m_tableName, m_upsert, toSend);
             }

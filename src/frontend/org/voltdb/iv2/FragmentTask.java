@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -282,15 +282,30 @@ public class FragmentTask extends TransactionTask
             } catch (final EEException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(outputDepId,
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                }
                 break;
             } catch (final SQLException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(outputDepId,
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                }
                 break;
             }
             catch (final InterruptException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { Encoder.hexEncode(planHash) }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                if (currentFragResponse.getTableCount() == 0) {
+                    // Make sure the response has at least 1 result with a valid DependencyId
+                    currentFragResponse.addDependency(outputDepId,
+                            new VoltTable(new ColumnInfo[] {new ColumnInfo("UNUSED", VoltType.INTEGER)}, 1));
+                }
                 break;
             }
             finally {

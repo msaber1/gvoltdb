@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -441,6 +441,7 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
             case Types.VARBINARY:
             case Types.VARCHAR:
             case Types.NVARCHAR:
+            case Types.OTHER:
             case Types.NULL:
                 this.parameters[parameterIndex-1] = VoltType.NULL_STRING_OR_VARBINARY;
                 break;
@@ -496,6 +497,9 @@ public class JDBC4PreparedStatement extends JDBC4Statement implements java.sql.P
             case Types.VARCHAR:
             case Types.NVARCHAR:
                 setString(parameterIndex, (String)x);
+                break;
+            case Types.OTHER:
+                setObject(parameterIndex, x);
                 break;
             default:
                 throw SQLError.get(SQLError.ILLEGAL_ARGUMENT);

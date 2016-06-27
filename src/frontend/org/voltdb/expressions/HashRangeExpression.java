@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -46,7 +46,7 @@ public class HashRangeExpression extends AbstractValueExpression {
     public HashRangeExpression() {
         super(ExpressionType.HASH_RANGE);
         //See the comment in ConjunctionExpression
-        setValueType(VoltType.BIGINT);
+        setValueType(VoltType.BOOLEAN);
     }
 
     @Override

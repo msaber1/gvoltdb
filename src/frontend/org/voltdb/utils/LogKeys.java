@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -44,6 +44,7 @@ public enum LogKeys {
     host_VoltDB_ErrorStartAcceptingConnections,
     host_VoltDB_ErrorStartHTTPListener,
     host_VoltDB_ServerCompletedInitialization,
+    host_VoltDB_ServerOpMode,
     host_VoltDB_StartingNetwork,
     host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts,
     host_VoltDB_ProfileLevelIs,

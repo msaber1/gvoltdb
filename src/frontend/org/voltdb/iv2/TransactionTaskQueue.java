@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -59,9 +59,7 @@ public class TransactionTaskQueue
     {
         Iv2Trace.logTransactionTaskQueueOffer(task);
         TransactionState txnState = task.getTransactionState();
-        if (!txnState.isReadOnly()) {
-            m_maxTaskedSpHandle = Math.max(m_maxTaskedSpHandle, txnState.m_spHandle);
-        }
+        m_maxTaskedSpHandle = Math.max(m_maxTaskedSpHandle, txnState.m_spHandle);
         boolean retval = false;
         if (!m_backlog.isEmpty()) {
             /*
@@ -86,7 +84,7 @@ public class TransactionTaskQueue
              * will act as a barrier for single parts, queuing them for execution after the
              * multipart
              */
-            if (!task.getTransactionState().isSinglePartition()) {
+            if (!txnState.isSinglePartition()) {
                 m_backlog.addLast(task);
                 retval = true;
             }

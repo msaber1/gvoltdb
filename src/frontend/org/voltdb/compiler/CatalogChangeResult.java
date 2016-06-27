@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -26,6 +26,7 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     public byte[] catalogBytes;
     public String deploymentString;
     public String encodedDiffCommands;
+    public int diffCommandsLength;
     public String[] tablesThatMustBeEmpty;
     public String[] reasonsForEmptyTables;
     public boolean requiresSnapshotIsolation;
@@ -36,4 +37,7 @@ public class CatalogChangeResult extends AsyncCompilerResult {
     // null or source version string if an automatic upgrade was done.
     public String upgradedFromVersion;
     public byte[] deploymentHash;
+    public boolean isForReplay;
+    public long replayTxnId;
+    public long replayUniqueId;
 }

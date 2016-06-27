@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -30,7 +30,8 @@ public enum IndexLookupType {
     GT      (2, ">"),
     GTE     (3, ">="),
     LT      (4, "<"),
-    LTE     (5, "<=");
+    LTE     (5, "<="),
+    GEO_CONTAINS (6, "contains");
 
     private final String m_symbol;
 

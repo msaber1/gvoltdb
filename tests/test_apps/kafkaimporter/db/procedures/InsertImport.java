@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -43,7 +43,7 @@ import org.voltdb.VoltTable;
 
 public class InsertImport extends VoltProcedure {
     public final String sqlSuffix = "(key, value) VALUES (?, ?)";
-    public final SQLStmt importInsert = new SQLStmt("INSERT INTO kafkaImportTable1 " + sqlSuffix);
+    public final SQLStmt importInsert = new SQLStmt("UPSERT INTO kafkaImportTable1 " + sqlSuffix);
     public final SQLStmt deleteMirrorRow = new SQLStmt("DELETE FROM kafkamirrortable1 WHERE key = ? and value = ?");
     public final SQLStmt selectCounts = new SQLStmt("SELECT key FROM importcounts ORDER BY key LIMIT 1");
     public final SQLStmt insertCounts = new SQLStmt("INSERT INTO importcounts(KEY, TOTAL_ROWS_DELETED) VALUES (?, ?)");

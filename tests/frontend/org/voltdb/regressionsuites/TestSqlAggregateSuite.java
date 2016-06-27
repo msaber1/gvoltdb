@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -46,6 +46,23 @@ public class TestSqlAggregateSuite extends RegressionSuite {
     static final Class<?>[] PROCEDURES = { Insert.class };
 
     static final int ROWS = 10;
+
+    public void testAggregateInArithmetics() throws IOException, ProcCallException {
+        Client client = getClient();
+        String table = "ENG10429";
+        String insert = "INSERT INTO %s VALUES (%d, %d, %d);";
+        client.callProcedure("@AdHoc", String.format(insert, table, 123, 3, 369));
+        client.callProcedure("@AdHoc", String.format(insert, table, 15, 3, 45));
+        client.callProcedure("@AdHoc", String.format(insert, table, 64, 2, 128));
+        client.callProcedure("@AdHoc", String.format(insert, table, 77, 2, 154));
+        String query = "SELECT SUM(a)/b AS val FROM " + table + " GROUP BY b ORDER BY 1;";
+        VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
+        assertEquals(2, results[0].getRowCount());
+        results[0].advanceRow();
+        assertEquals(46, results[0].getLong(0));
+        results[0].advanceRow();
+        assertEquals(70, results[0].getLong(0));
+    }
 
     public void testDistinct() throws IOException, ProcCallException
     {

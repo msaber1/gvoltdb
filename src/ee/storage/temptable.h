@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -63,7 +63,7 @@ class TableStats;
  * Represents a Temporary Table to store temporary result (final
  * result or intermediate result).  Temporary Table has no indexes,
  * constraints and reverting.  So, appending tuples to temporary table
- * is much faster than PersistentTable.  deleteTuple is not suported
+ * is much faster than PersistentTable.  deleteTuple is not supported
  * in TempTable to make it faster, use deleteAllTuples instead.  As
  * there is no deleteTuple, there is no freelist; TempTable does a
  * efficient thing for iterating and deleteAllTuples.
@@ -102,21 +102,10 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     // GENERIC TABLE OPERATIONS
     // ------------------------------------------------------------------
-    virtual void deleteAllTuples(bool freeAllocatedStrings);
-    // Deleting a tuple from temp table is not supported. use deleteAllTuples instead
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool deleteTuple(TableTuple &tuple, bool);
+    virtual void deleteAllTuples(bool freeAllocatedStrings, bool=true);
     // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
     // -- Most callers should be using TempTable::insertTempTuple, anyway.
     virtual bool insertTuple(TableTuple &tuple);
-    // Updating temp tuples is not required in production code
-    // -- it may be used in tests, though, for no especially good reason.
-    // TODO: change meaningless bool return type to void (starting in class Table) and migrate callers.
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                                TableTuple &sourceTupleWithNewValues,
-                                                std::vector<TableIndex*> const &indexesToUpdate,
-                                                bool);
-
 
     void deleteAllTuplesNonVirtual(bool freeAllocatedStrings);
 
@@ -219,7 +208,6 @@ inline void TempTable::deleteAllTuplesNonVirtual(bool freeAllocatedStrings) {
     }
 
     // Mark tuples as deleted and free strings. No indexes to update.
-    // Don't call deleteTuple() here.
     const uint16_t uninlinedStringColumnCount = m_schema->getUninlinedObjectColumnCount();
     if (freeAllocatedStrings && uninlinedStringColumnCount > 0) {
         TableTuple target(m_schema);

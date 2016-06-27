@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -168,7 +168,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
              */
             m_finishedTableScan = true;
             // Note that m_iterator no longer points to (or should reference) the CopyOnWriteIterator
-            m_iterator.reset(m_backedUpTuples.get()->makeIterator());
+            m_iterator.reset(m_backedUpTuples->makeIterator());
         } else {
             /*
              * No more tuples in the temp table and had previously finished the
@@ -224,7 +224,7 @@ int64_t CopyOnWriteContext::handleStreamMore(TupleOutputStreamProcessor &outputS
                     // We have orphaned or corrupted some tables. Let's make them pristine.
                     TBMapI iter = m_surgeon.getData().begin();
                     while (iter != m_surgeon.getData().end()) {
-                        m_surgeon.snapshotFinishedScanningBlock(iter.value(), TBPtr());
+                        m_surgeon.snapshotFinishedScanningBlock(iter.data(), TBPtr());
                         iter++;
                     }
                 }
@@ -360,6 +360,8 @@ void CopyOnWriteContext::notifyBlockWasCompactedAway(TBPtr block) {
     }
     m_blocksCompacted++;
     CopyOnWriteIterator *iter = static_cast<CopyOnWriteIterator*>(m_iterator.get());
+        TBPtr nextBlock = iter->m_blockIterator.data();
+                TBPtr newNextBlock = iter->m_blockIterator.data();
     iter->notifyBlockWasCompactedAway(block);
 }
 
@@ -383,7 +385,7 @@ void CopyOnWriteContext::checkRemainingTuples(const std::string &label) {
     assert(!m_finishedTableScan);
     intmax_t count1 = static_cast<CopyOnWriteIterator*>(m_iterator.get())->countRemaining();
     TableTuple tuple(getTable().schema());
-    boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples.get()->makeIterator());
+    boost::scoped_ptr<TupleIterator> iter(m_backedUpTuples->makeIterator());
     intmax_t count2 = 0;
     while (iter->next(tuple)) {
         count2++;

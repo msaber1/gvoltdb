@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -58,12 +58,13 @@ public class UtilQueries {
         VoltTable importStats = statsCall(client);
         long stats[] = {0, 0, 0, 0};
 
+        // accumulate stats for all partitions
         while (importStats.advanceRow()) {
             int statnum = 0;
-            stats[statnum++] = importStats.getLong("SUCCESSES");
-            stats[statnum++] = importStats.getLong("FAILURES");
-            stats[statnum++] = importStats.getLong("OUTSTANDING_REQUESTS");
-            stats[statnum++] = importStats.getLong("RETRIES");
+            stats[statnum++] += importStats.getLong("SUCCESSES");
+            stats[statnum++] += importStats.getLong("FAILURES");
+            stats[statnum++] += importStats.getLong("OUTSTANDING_REQUESTS");
+            stats[statnum++] += importStats.getLong("RETRIES");
         }
         return stats[2];
     }

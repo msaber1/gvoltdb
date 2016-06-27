@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -42,6 +42,7 @@
 #include "storage/ElasticScanner.h"
 #include "storage/ElasticContext.h"
 #include "storage/DRTupleStream.h"
+#include "stx/btree_set.h"
 #include "common/DefaultTupleSerializer.h"
 #include "jsoncpp/jsoncpp.h"
 #include <vector>
@@ -96,7 +97,7 @@ const size_t MAX_DETAIL_COUNT = 50;
 
 // Handy types and values.
 typedef int64_t T_Value;
-typedef CompactingSet<T_Value> T_ValueSet;
+typedef stx::btree_set<T_Value> T_ValueSet;
 
 class T_HashRange : public std::pair<int32_t, int32_t> {
 public:
@@ -131,7 +132,7 @@ typedef std::vector<T_HashRange> T_HashRangeVector;
  */
 class CopyOnWriteTest : public Test {
 public:
-    CopyOnWriteTest() : m_table(NULL) {
+    CopyOnWriteTest() : m_table(NULL), drStream(0) {
         m_tuplesInserted = 0;
         m_tuplesUpdated = 0;
         m_tuplesDeleted = 0;
@@ -139,7 +140,7 @@ public:
         m_tuplesDeletedInLastUndo = 0;
         m_engine = new voltdb::VoltDBEngine();
         int partitionCount = 1;
-        m_engine->initialize(1,1, 0, 0, "", 0, DEFAULT_TEMP_TABLE_MEMORY, false);
+        m_engine->initialize(1,1, 0, 0, "", 0, 1024, DEFAULT_TEMP_TABLE_MEMORY, false);
         m_engine->updateHashinator( HASHINATOR_LEGACY, (char*)&partitionCount, NULL, 0);
 
         m_columnNames.push_back("1");
@@ -204,7 +205,7 @@ public:
 
         strcpy(m_stage, "Initialize");
 
-        ExecutorContext::getExecutorContext()->setDrStreamForTest(&drStream);
+        ExecutorContext::getExecutorContext()->setDrStream(&drStream);
     }
 
     ~CopyOnWriteTest() {
@@ -422,7 +423,9 @@ public:
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
-            const bool inserted = set.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+            const std::pair<T_ValueSet::iterator, bool> p =
+                    set.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+            const bool inserted = p.second;
             if (!inserted) {
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
                 printf("Failed to insert %d\n", primaryKey);
@@ -693,9 +696,9 @@ public:
         T_ValueSet missing;
         for (T_ValueSet::const_iterator iter = m_returns.begin(); iter != m_returns.end(); ++iter) {
             T_Value value = *iter;
-            if(!m_initial.exists(value) &&
-               !m_inserts.exists(value) &&
-               !m_updatesTgt.exists(value)) {
+            if(m_initial.find(value) == m_initial.end() &&
+               m_inserts.find(value) == m_inserts.end() &&
+               m_updatesTgt.find(value) == m_updatesTgt.end()) {
                 missing.insert(value);
             }
         }
@@ -716,10 +719,10 @@ public:
         for (T_ValueSet::const_iterator iter = m_initial.begin();
              iter != m_initial.end(); ++iter) {
             T_Value value = *iter;
-            if(!m_returns.exists(value) &&
-               !m_deletes.exists(value) &&
-               !m_updatesSrc.exists(value) &&
-               !m_shuffles.exists(value)) {
+            if(m_returns.find(value) == m_returns.end() &&
+               m_deletes.find(value) == m_deletes.end() &&
+               m_updatesSrc.find(value) == m_updatesSrc.end() &&
+               m_shuffles.find(value) == m_shuffles.end()) {
                 missing.insert(value);
             }
         }
@@ -790,23 +793,23 @@ public:
             size_t wtf = 0;
             if (missing.size() > 0) {
                 BOOST_FOREACH(T_Value value, missing) {
-                    bool wasDeleted = m_deletes.exists(value);
-                    bool wasUpdated = m_updatesSrc.exists(value);
+                    bool wasDeleted = m_deletes.find(value) != m_deletes.end();
+                    bool wasUpdated = m_updatesSrc.find(value) != m_updatesSrc.end();
                     bool accountedFor = false;
                     if (!wasDeleted && !wasUpdated) {
-                        if (m_initial.exists(value)) {
+                        if (m_initial.find(value) != m_initial.end()) {
                             ninitialMIA++;
                             accountedFor = true;
                         }
-                        if (m_inserts.exists(value)) {
+                        if (m_inserts.find(value) != m_inserts.end()) {
                             ninsertedMIA++;
                             accountedFor = true;
                         }
-                        if (m_updatesTgt.exists(value)) {
+                        if (m_updatesTgt.find(value) != m_updatesTgt.end()) {
                             nupdatedMIA++;
                             accountedFor = true;
                         }
-                        if (m_moved.exists(value)) {
+                        if (m_moved.find(value) != m_moved.end()) {
                             nmovedMIA++;
                         }
                     }
@@ -1002,7 +1005,7 @@ public:
                 values[1] = ntohl(*reinterpret_cast<const int32_t*>(&m_serializationBuffer[ii + 4]));
                 void *valuesVoid = reinterpret_cast<void*>(values);
                 const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
-                const bool inserted = COWTuples.insert(*values64);
+                const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     error("Failed: total inserted %d, with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
@@ -1189,6 +1192,32 @@ TEST_F(CopyOnWriteTest, TestTableTupleFlags) {
     ASSERT_FALSE(tuple.isDirty());
 }
 
+// Simple test that performs snapshot activation on empty table, inserts tuples and calls stream more tuples
+TEST_F(CopyOnWriteTest, TestTupleInsertionBetweenSnapshotActivateFinish) {
+    initTable(1, 0);
+    int tupleCount = 4;
+
+    // Empty table has an assigned allocated tuple storage
+    ASSERT_EQ(1, m_table->allocatedBlockCount());
+    char config[4];
+    ::memset(config, 0, 4);
+    ReferenceSerializeInputBE input(config, 4);
+    // activate snapshot
+    m_table->activateStream(m_serializer, TABLE_STREAM_SNAPSHOT, 0, m_tableId, input);
+    // insert tuples
+    addRandomUniqueTuples(m_table, tupleCount);
+    // do work - start taking snapshot of the table
+    char serializationBuffer[BUFFER_SIZE];
+    TupleOutputStreamProcessor outputStreams(serializationBuffer, sizeof(serializationBuffer));
+    std::vector<int> retPositions;
+    int64_t remaining = m_table->streamMore(outputStreams, TABLE_STREAM_SNAPSHOT, retPositions);
+    // no work done by snapshot as the table was empty
+    ASSERT_EQ(0, remaining);
+    ASSERT_EQ(outputStreams.size(), retPositions.size());
+    // check the # tuple insertion count is reflected correctly
+    ASSERT_EQ(tupleCount, m_table->visibleTupleCount());
+}
+
 TEST_F(CopyOnWriteTest, BigTest) {
     initTable(1, 0);
     int tupleCount = TUPLE_COUNT;
@@ -1227,7 +1256,7 @@ TEST_F(CopyOnWriteTest, BigTest) {
                 // the following rediculous cast is to placate our gcc treat warnings as errors affliction
                 void *valuesVoid = reinterpret_cast<void*>(values);
                 const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
-                const bool inserted = COWTuples.insert(*values64);
+                const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d, total inserted %d, with values %d and %d\n", qq, totalInserted, values[0], values[1]);
                 }
@@ -1255,7 +1284,9 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
-            const bool inserted = originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+            const std::pair<T_ValueSet::iterator, bool> p =
+            originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+            const bool inserted = p.second;
             if (!inserted) {
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
                 printf("Failed to insert %d\n", primaryKey);
@@ -1292,7 +1323,7 @@ TEST_F(CopyOnWriteTest, BigTestWithUndo) {
                 // the following rediculous cast is to placate our gcc treat warnings as errors affliction
                 void *valuesVoid = reinterpret_cast<void*>(values);
                 const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
-                const bool inserted = COWTuples.insert(*values64);
+                const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
@@ -1321,7 +1352,9 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
         voltdb::TableIterator& iterator = m_table->iterator();
         TableTuple tuple(m_table->schema());
         while (iterator.next(tuple)) {
-            const bool inserted = originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+            const std::pair<T_ValueSet::iterator, bool> p =
+            originalTuples.insert(*reinterpret_cast<const int64_t*>(tuple.address() + 1));
+            const bool inserted = p.second;
             if (!inserted) {
                 int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
                 printf("Failed to insert %d\n", primaryKey);
@@ -1358,7 +1391,7 @@ TEST_F(CopyOnWriteTest, BigTestUndoEverything) {
                 // the following rediculous cast is to placate our gcc treat warnings as errors affliction
                 void *valuesVoid = reinterpret_cast<void*>(values);
                 const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
-                const bool inserted = COWTuples.insert(*values64);
+                const bool inserted = COWTuples.insert(*values64).second;
                 if (!inserted) {
                     printf("Failed in iteration %d with values %d and %d\n", totalInserted, values[0], values[1]);
                 }
@@ -1438,7 +1471,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
             int64_t value = *reinterpret_cast<const int64_t*>(tuple.address() + 1);
             int32_t ipart = (int32_t)(ValuePeeker::peekAsRawInt64(tuple.getNValue(partCol)) % npartitions);
             if (ipart != skippedPartition) {
-                bool inserted = expected[ipart].insert(value);
+                bool inserted = expected[ipart].insert(value).second;
                 if (!inserted) {
                     int32_t primaryKey = ValuePeeker::peekAsInteger(tuple.getNValue(0));
                     error("Duplicate primary key %d iteration=%lu", primaryKey, iteration);
@@ -1493,7 +1526,7 @@ TEST_F(CopyOnWriteTest, MultiStream) {
                     // the following rediculous cast is to placate our gcc treat warnings as errors affliction
                     void *valuesVoid = reinterpret_cast<void*>(values);
                     const int64_t *values64 = reinterpret_cast<const int64_t*>(valuesVoid);
-                    const bool inserted = actual[ipart].insert(*values64);
+                    const bool inserted = actual[ipart].insert(*values64).second;
                     if (!inserted) {
                         valueError(values, "Buffer duplicate: ipart=%lu totalInserted=%d ii=%d",
                                    ipart, totalInserted, ii);
@@ -1954,7 +1987,7 @@ TEST_F(CopyOnWriteTest, ElasticIndexLowerUpperBounds) {
     inserted = index.add(key2);
     ASSERT_TRUE(inserted);
 
-    ASSERT_TRUE(key1 == index.createLowerBoundIterator(1).key());
+    ASSERT_TRUE(key1 == *index.createLowerBoundIterator(1));
     ASSERT_TRUE(index.createUpperBoundIterator(3) == index.end());
 }
 

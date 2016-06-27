@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -56,8 +56,8 @@
 #include "logging/LogProxy.h"
 #include "logging/StdoutLogProxy.h"
 #include "stats/StatsAgent.h"
-#include "storage/DRTupleStream.h"
-#include "storage/BinaryLogSink.h"
+#include "storage/AbstractDRTupleStream.h"
+#include "storage/BinaryLogSinkWrapper.h"
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
@@ -85,12 +85,12 @@ namespace voltdb {
 
 class AbstractExecutor;
 class AbstractPlanNode;
-class CatalogDelegate;
 class EnginePlanSet;  // Locally defined in VoltDBEngine.cpp
 class ExecutorContext;
 class ExecutorVector;
 class PersistentTable;
 class RecoveryProtoMsg;
+class StreamedTable;
 class Table;
 class TableCatalogDelegate;
 class TempTableLimits;
@@ -115,6 +115,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                         int32_t hostId,
                         std::string hostname,
                         int32_t drClusterId,
+                        int32_t defaultDrBufferSize,
                         int64_t tempTableMemoryLimit,
                         bool createDrReplicatedStream,
                         int32_t compactionThreshold = 95);
@@ -126,17 +127,23 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         catalog::Catalog *getCatalog() const; // Only used in tests.
 
         Table* getTable(int32_t tableId) const;
-        Table* getTable(std::string name) const;
+        Table* getTable(const std::string& name) const;
         // Serializes table_id to out. Throws a fatal exception if unsuccessful.
         void serializeTable(int32_t tableId, SerializeOutput& out) const;
 
-        TableCatalogDelegate* getTableDelegate(std::string name) const;
+        TableCatalogDelegate* getTableDelegate(const std::string& name) const;
         catalog::Database* getDatabase() const { return m_database; }
-        catalog::Table* getCatalogTable(std::string name) const;
-        virtual bool getIsActiveActiveDREnabled() const;
-        // virtual keyword here is used to override the functions in test case
-        virtual Table* getPartitionedDRConflictTable() const { return m_drPartitionedConflictExportTable; }
-        virtual Table* getReplicatedDRConflictTable() const { return m_drReplicatedConflictExportTable; }
+        catalog::Table* getCatalogTable(const std::string& name) const;
+        bool getIsActiveActiveDREnabled() const { return m_isActiveActiveDREnabled; }
+        Table* getPartitionedDRConflictTable() const { return m_drPartitionedConflictExportTable; }
+        Table* getReplicatedDRConflictTable() const { return m_drReplicatedConflictExportTable; }
+        void enableActiveActiveForTest(Table* partitionedConflictTable,
+                                       Table* replicatedConflictTable)
+        {
+            m_isActiveActiveDREnabled = true;
+            m_drPartitionedConflictExportTable = partitionedConflictTable;
+            m_drReplicatedConflictExportTable = replicatedConflictTable;
+        }
 
         // -------------------------------------------------
         // Execution Functions
@@ -229,7 +236,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int64_t* getBatchDepIdsContainer() { return m_batchDepIdsContainer; }
 
         /** check if this value hashes to the local partition */
-        bool isLocalSite(const NValue& value);
+        bool isLocalSite(const NValue& value) const;
+
+        /** return partitionId for the provided hash */
+        int32_t getPartitionForPkHash(const int32_t pkHash) const;
+
+        /** check if this hash is in the local partition */
+        bool isLocalSite(const int32_t pkHash) const;
 
         // -------------------------------------------------
         // Non-transactional work methods
@@ -298,11 +311,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             }
             m_undoLog.release(undoToken);
 
-            if (m_drStream) {
-                m_drStream->endTransaction(m_executorContext->currentUniqueId());
+            if (m_executorContext->drStream()) {
+                m_executorContext->drStream()->endTransaction(m_executorContext->currentUniqueId());
             }
-            if (m_drReplicatedStream) {
-                m_drReplicatedStream->endTransaction(m_executorContext->currentUniqueId());
+            if (m_executorContext->drReplicatedStream()) {
+                m_executorContext->drReplicatedStream()->endTransaction(m_executorContext->currentUniqueId());
             }
         }
 
@@ -384,7 +397,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * Execute an arbitrary task represented by the task id and serialized parameters.
          * Returns serialized representation of the results
          */
-        void executeTask(TaskType taskType, const char* taskParams);
+        void executeTask(TaskType taskType, ReferenceSerializeInputBE &taskInfo);
 
         void rebuildTableCollections();
 
@@ -400,11 +413,14 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             return m_partitionId;
         }
 
+    protected:
+        void setHashinator(TheHashinator* hashinator);
+
     private:
         /*
          * Tasks dispatched by executeTask
          */
-        void dispatchValidatePartitioningTask(const char *taskParams);
+        void dispatchValidatePartitioningTask(ReferenceSerializeInputBE &taskInfo);
 
         void collectDRTupleStreamStateInfo();
 
@@ -416,7 +432,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         void processCatalogDeletes(int64_t timestamp);
         void initMaterializedViewsAndLimitDeletePlans();
         bool updateCatalogDatabaseReference();
-
+        void resetExportConflictTables();
         /**
          * Call into the topend with information about how executing a plan fragment is going.
          */
@@ -472,8 +488,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /*
          * Catalog delegates hashed by path.
          */
-        std::map<std::string, CatalogDelegate*> m_catalogDelegates;
-        std::map<std::string, CatalogDelegate*> m_delegatesByName;
+        std::map<std::string, TableCatalogDelegate*> m_catalogDelegates;
+        std::map<std::string, TableCatalogDelegate*> m_delegatesByName;
 
         // map catalog table id to table pointers
         std::map<CatalogId, Table*> m_tables;
@@ -496,7 +512,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /*
          * Map of table signatures to exporting tables.
          */
-        std::map<std::string, Table*> m_exportingTables;
+        std::map<std::string, StreamedTable*> m_exportingTables;
 
         /*
          * Only includes non-materialized tables
@@ -508,6 +524,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         boost::scoped_ptr<catalog::Catalog> m_catalog;
         catalog::Database *m_database;
+        bool m_isActiveActiveDREnabled;
 
         /** reused parameter container. */
         NValueArray m_staticParams;
@@ -592,12 +609,18 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         Table* m_drPartitionedConflictExportTable;
         Table* m_drReplicatedConflictExportTable;
 
-        //Stream of DR data generated by this engine
-        DRTupleStream *m_drStream;
-        DRTupleStream *m_drReplicatedStream;
+        //Stream of DR data generated by this engine, don't use them directly unless you know which mode
+        //are we running now, use m_executorContext->drStream() and m_executorContext->drReplicatedStream()
+        //instead.
+        AbstractDRTupleStream *m_drStream;
+        AbstractDRTupleStream *m_drReplicatedStream;
+        AbstractDRTupleStream *m_compatibleDRStream;
+        AbstractDRTupleStream *m_compatibleDRReplicatedStream;
+
+        uint32_t m_drVersion;
 
         //Sink for applying DR binary logs
-        BinaryLogSink m_binaryLogSink;
+        BinaryLogSinkWrapper m_wrapper;
 
         /** current ExecutorVector **/
         ExecutorVector *m_currExecutorVec;

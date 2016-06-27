@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This file contains original code and/or modifications of original code.
  * Any modifications made by VoltDB Inc. are licensed under the following
@@ -64,29 +64,13 @@ TempTable::~TempTable() {}
 // ------------------------------------------------------------------
 // OPERATIONS
 // ------------------------------------------------------------------
-void TempTable::deleteAllTuples(bool freeAllocatedStrings) {
+void TempTable::deleteAllTuples(bool freeAllocatedStrings, bool) {
     deleteAllTuplesNonVirtual(freeAllocatedStrings);
 }
 
 bool TempTable::insertTuple(TableTuple &source) {
     insertTempTuple(source);
     return true;
-}
-
-bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
-                                               TableTuple &sourceTupleWithNewValues,
-                                               std::vector<TableIndex*> const &indexesToUpdate,
-                                               bool)
-{
-    throwFatalException("TempTable does not support update");
-    // Some day maybe, if we find a use case:
-    // Copy the source tuple into the target
-    // targetTupleToUpdate.copy(sourceTupleWithNewValues);
-}
-
-bool TempTable::deleteTuple(TableTuple &, bool)
-{
-    throwFatalException("TempTable does not support deleting individual tuples");
 }
 
 std::string TempTable::tableType() const { return "TempTable"; }

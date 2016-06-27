@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -107,7 +107,7 @@ Table* StatsAgent::getStats(StatisticsSelectorType sst,
         m_statsTablesByStatsSelector[sst] = statsTable;
     }
 
-    statsTable->deleteAllTuples(false);
+    statsTable->deleteAllTuples(false, false);
 
     for (int ii = 0; ii < catalogIds.size(); ii++) {
         multimap<CatalogId, StatsSource*>::const_iterator iter;

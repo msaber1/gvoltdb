@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -120,5 +120,10 @@ public class TestFunctions extends PlannerTestCase {
         failToCompile("select BIT_SHIFT_LEFT(BIGINT_TYPE)from bit", errorMsg);
         failToCompile("select BIT_SHIFT_RIGHT(BIGINT_TYPE)from bit", errorMsg);
 
+    }
+
+    public void testLikeNoopt() {
+        compile("select case when varchar_type like 'M%' then 1 end as m_state from bit;");
+        compile("select case when varchar_type like '_%' then 1 end as m_state from bit;");
     }
 }

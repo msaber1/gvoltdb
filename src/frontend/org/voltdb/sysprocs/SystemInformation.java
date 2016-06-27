@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -51,6 +51,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.User;
 import org.voltdb.dtxn.DtxnConstants;
+import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
@@ -485,16 +486,14 @@ public class SystemInformation extends VoltSystemProcedure
         }
         results.addRow("snapshotenabled", snap_enabled);
 
-        String export_enabled = "false";
         for (Connector export_conn : database.getConnectors()) {
             if (export_conn != null && export_conn.getEnabled())
             {
-                export_enabled = "true";
                 results.addRow("exportoverflowpath", cluster.getExportoverflow());
                 break;
             }
         }
-        results.addRow("export", export_enabled);
+        results.addRow("export", Boolean.toString(CatalogUtil.isExportEnabled()));
 
         String partition_detect_enabled = "false";
         if (cluster.getNetworkpartition())

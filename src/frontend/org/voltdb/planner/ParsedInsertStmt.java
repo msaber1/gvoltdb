@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -232,9 +232,10 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
 
         for (AbstractExpression expr : m_columns.values()) {
-            if (expr != null) {
-                exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
+            if (expr == null) {
+                continue;
             }
+            exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
         }
 
         if (m_subquery != null) {

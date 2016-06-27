@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2015 VoltDB Inc.
+ * Copyright (C) 2008-2016 VoltDB Inc.
  *
  * This program is free software: you can redistribute it and/or modify
  * it under the terms of the GNU Affero General Public License as
@@ -49,15 +49,15 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
 
     public MultiPartitionParticipantMessage(long initiatorHSId,
                                             long coordinatorHSId,
-                                            long txnId,
+                                            long uniqueId,
                                             long ciHandle,
                                             long connectionId,
                                             boolean isReadOnly,
                                             boolean isForReplay) {
         super(initiatorHSId,
                 coordinatorHSId,
-                txnId,
-                txnId,
+                -1,
+                uniqueId,
                 isReadOnly,
                 isForReplay);
 
