@@ -92,7 +92,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
      * empty.
      * @param context
      */
-    protected void checkForNonEmptyTables(String[] tablesThatMustBeEmpty,
+    private void checkForNonEmptyTables(String[] tablesThatMustBeEmpty,
                                           String[] reasonsForEmptyTables,
                                           SystemProcedureExecutionContext context)
     {
@@ -182,76 +182,86 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             ParameterSet params, SystemProcedureExecutionContext context)
     {
         if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSync) {
+            // This fragment is sent to do the initial round-trip to validate
+            // and synchronize all the cluster's sites before starting the
+            // catalog update.
+            // Only do the actual work in the *next* fragment round-trip below.
             String[] tablesThatMustBeEmpty = (String[]) params.getParam(0);
             String[] reasonsForEmptyTables = (String[]) params.getParam(1);
             checkForNonEmptyTables(tablesThatMustBeEmpty, reasonsForEmptyTables, context);
 
-            // Send out fragments to do the initial round-trip to synchronize
-            // all the cluster sites on the start of catalog update, we'll do
-            // the actual work on the *next* round-trip below
             // Don't actually care about the returned table, just need to send something
-            // back to the MPI scoreboard
+            // back to the MPI scoreboard.
+            DependencyPair normalResult = new DependencyPair(DEP_updateCatalogSync,
+                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
+
+            if ( ! context.isLowestSiteId()) {
+                // Any catalog issues only need to be flagged on one site per host.
+                return normalResult;
+            }
 
             // We know the ZK bytes are okay because the run() method wrote them before sending
-            // out fragments
-            CatalogAndIds catalogStuff = null;
+            // out fragments.
+            String classNameForMsg = "";
             try {
-                catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
+                CatalogAndIds catalogStuff =
+                        CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
                 InMemoryJarfile testjar = new InMemoryJarfile(catalogStuff.catalogBytes);
                 JarLoader testjarloader = testjar.getLoader();
                 for (String classname : testjarloader.getClassNames()) {
-                    try {
-                        m_javaClass.forName(classname, true, testjarloader);
-                    }
-                    // LinkageError catches most of the various class loading errors we'd
-                    // care about here.
-                    catch (UnsupportedClassVersionError e) {
-                        String msg = "Cannot load classes compiled with a higher version of Java than currently" +
-                                     " in use. Class " + classname + " was compiled with ";
-
-                        Integer major = 0;
-                        try {
-                            major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
-                        } catch (Exception ex) {
-                            if (log.isDebugEnabled())
-                                log.debug("Unable to parse compile version number from UnsupportedClassVersionError. " +
-                                          ex.getMessage());
-                        }
-
-                        if (m_versionMap.containsKey(major)) {
-                            msg = msg.concat(m_versionMap.get(major) + ", current runtime version is " +
-                                             System.getProperty("java.version") + ".");
-                        } else {
-                            msg = msg.concat("an incompatable Java version.");
-                        }
-                        log.error(msg);
-                        throw new VoltAbortException(msg);
-                    }
-                    catch (LinkageError | ClassNotFoundException e) {
-                        String cause = e.getMessage();
-                        if (cause == null && e.getCause() != null) {
-                            cause = e.getCause().getMessage();
-                        }
-                        String msg = "Error loading class: " + classname + " from catalog: " +
-                            e.getClass().getCanonicalName() + ", " + cause;
-                        log.warn(msg);
-                        throw new VoltAbortException(e);
-                    }
+                    classNameForMsg = classname;
+                    m_javaClass.forName(classname, true, testjarloader);
                 }
-            } catch (Exception e) {
+                return normalResult;
+            }
+            // LinkageError catches most of the various class loading errors we'd
+            // care about here.
+            catch (UnsupportedClassVersionError e) {
+                String msg = "Cannot load classes compiled with a higher version of Java than currently" +
+                        " in use. Class " + classNameForMsg + " was compiled with ";
+
+                Integer major = 0;
+                try {
+                    major = Integer.parseInt(e.getMessage().split("version")[1].trim().split("\\.")[0]);
+                }
+                catch (NumberFormatException ex) {
+                    log.debug("Unable to parse compile version number from UnsupportedClassVersionError. " +
+                            ex.getMessage());
+                }
+
+                if (m_versionMap.containsKey(major)) {
+                    msg = msg.concat(m_versionMap.get(major) + ", current runtime version is " +
+                            System.getProperty("java.version") + ".");
+                }
+                else {
+                    msg = msg.concat("an incompatable Java version.");
+                }
+                log.error(msg);
+                throw new VoltAbortException(msg);
+            }
+            catch (LinkageError | ClassNotFoundException e) {
+                String cause = e.getMessage();
+                if (cause == null && e.getCause() != null) {
+                    cause = e.getCause().getMessage();
+                }
+                String msg = "Error loading class: " + classNameForMsg + " from catalog: " +
+                        e.getClass().getCanonicalName() + ", " + cause;
+                log.warn(msg);
+                throw new VoltAbortException(e);
+            }
+            catch (Exception e) {
                 Throwables.propagate(e);
             }
-
-            return new DependencyPair(DEP_updateCatalogSync,
-                    new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
-        else if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate) {
+
+        if (fragmentId == SysProcFragmentId.PF_updateCatalogPrecheckAndSyncAggregate) {
             // Don't actually care about the returned table, just need to send something
             // back to the MPI scoreboard
             return new DependencyPair(DEP_updateCatalogSyncAggregate,
                     new VoltTable(new ColumnInfo[] { new ColumnInfo("UNUSED", VoltType.BIGINT) } ));
         }
-        else if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
+
+        if (fragmentId == SysProcFragmentId.PF_updateCatalog) {
             String catalogDiffCommands = (String)params.toArray()[0];
             String commands = Encoder.decodeBase64AndDecompress(catalogDiffCommands);
             int expectedCatalogVersion = (Integer)params.toArray()[1];
@@ -260,7 +270,8 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             CatalogAndIds catalogStuff = null;
             try {
                 catalogStuff = CatalogUtil.getCatalogFromZK(VoltDB.instance().getHostMessenger().getZK());
-            } catch (Exception e) {
+            }
+            catch (Exception e) {
                 Throwables.propagate(e);
             }
 
@@ -295,10 +306,9 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                         replayInfo));
             }
             // if seen before by this code, then check to see if this is a restart
-            else if ((context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
-                     (Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
-                      Arrays.equals(context.getDeploymentHash(), catalogStuff.getDeploymentHash()))))
-            {
+            else if (context.getCatalogVersion() == (expectedCatalogVersion + 1) &&
+                    Arrays.equals(context.getCatalogHash(), catalogStuff.getCatalogHash()) &&
+                    Arrays.equals(context.getDeploymentHash(), catalogStuff.getDeploymentHash())) {
                 log.info(String.format("Site %s will NOT apply an assumed restarted and identical catalog update with catalog hash %s and deployment hash %s.",
                             CoreUtils.hsIdToString(m_site.getCorrespondingSiteId()),
                             Encoder.hexEncode(catalogStuff.getCatalogHash()),
@@ -312,15 +322,14 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
             VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
             result.addRow(VoltSystemProcedure.STATUS_OK);
             return new DependencyPair(DEP_updateCatalog, result);
-        } else if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
+        }
+        if (fragmentId == SysProcFragmentId.PF_updateCatalogAggregate) {
             VoltTable result = VoltTableUtil.unionTables(dependencies.get(DEP_updateCatalog));
             return new DependencyPair(DEP_updateCatalogAggregate, result);
-        } else {
-            VoltDB.crashLocalVoltDB(
-                    "Received unrecognized plan fragment id " + fragmentId + " in UpdateApplicationCatalog",
-                    false,
-                    null);
         }
+        VoltDB.crashLocalVoltDB(
+                "Received unrecognized plan fragment id " + fragmentId + " in UpdateApplicationCatalog",
+                false, null);
         throw new RuntimeException("Should not reach this code");
     }
 
@@ -375,9 +384,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         pfs[1].multipartition = false;
         pfs[1].parameters = ParameterSet.emptyParameterSet();
 
-
-        VoltTable[] results;
-        results = executeSysProcPlanFragments(pfs, DEP_updateCatalogAggregate);
+        VoltTable[] results = executeSysProcPlanFragments(pfs, DEP_updateCatalogAggregate);
         return results;
     }
 
@@ -429,23 +436,20 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
                     ", deployment hash: " + Encoder.hexEncode(deploymentHash).substring(0, 10));
         }
         // restart?
-        else {
-            if (catalogStuff.version == (expectedCatalogVersion + 1) &&
-                (Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
-                 Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)))
-            {
+        else if (catalogStuff.version == (expectedCatalogVersion + 1) &&
+                Arrays.equals(catalogStuff.getCatalogHash(), catalogHash) &&
+                Arrays.equals(catalogStuff.getDeploymentHash(), deploymentHash)) {
                 log.debug("Restarting catalog update: " + catalogStuff.toString());
-            }
-            else {
-                String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
-                        "against one version of the cluster configuration but that version was " +
-                        "no longer live when attempting to apply the change.  This is likely " +
-                        "the result of multiple concurrent attempts to change the cluster " +
-                        "configuration.  Please make such changes synchronously from a single " +
-                        "connection to the cluster.";
-                log.warn(errmsg);
-                throw new VoltAbortException(errmsg);
-            }
+        }
+        else {
+            String errmsg = "Invalid catalog update.  Catalog or deployment change was planned " +
+                    "against one version of the cluster configuration but that version was " +
+                    "no longer live when attempting to apply the change.  This is likely " +
+                    "the result of multiple concurrent attempts to change the cluster " +
+                    "configuration.  Please make such changes synchronously from a single " +
+                    "connection to the cluster.";
+            log.warn(errmsg);
+            throw new VoltAbortException(errmsg);
         }
 
         byte[] deploymentBytes = deploymentString.getBytes("UTF-8");
