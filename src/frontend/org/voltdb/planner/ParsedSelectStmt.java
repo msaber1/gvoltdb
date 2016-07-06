@@ -685,8 +685,12 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // limit and offset can't have both value and parameter
-        if (limitOffset.m_limit != -1) assert limitOffset.m_limitParameterId == -1 : "Parsed value and param. limit.";
-        if (limitOffset.m_offset != 0) assert limitOffset.m_offsetParameterId == -1 : "Parsed value and param. offset.";
+        if (limitOffset.m_limit != -1) {
+            assert limitOffset.m_limitParameterId == -1 : "Parsed value and param. limit.";
+        }
+        if (limitOffset.m_offset != 0) {
+            assert limitOffset.m_offsetParameterId == -1 : "Parsed value and param. offset.";
+        }
     }
 
     private void parseDisplayColumns(VoltXMLElement columnsNode, boolean isDistributed) {
@@ -1171,14 +1175,14 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (selectStmt.m_joinTree.getWhereExpression() != null) {
                 whereList.add(selectStmt.m_joinTree.getWhereExpression());
             }
-            selectStmt.m_joinTree.setWhereExpression(ExpressionUtil.combine(whereList));
+            selectStmt.m_joinTree.setWhereExpression(ExpressionUtil.combinePredicates(whereList));
         }
         // Add new HAVING expressions
         if (!havingList.isEmpty()) {
             if (selectStmt.m_having != null) {
                 havingList.add(selectStmt.m_having);
             }
-            selectStmt.m_having = ExpressionUtil.combine(havingList);
+            selectStmt.m_having = ExpressionUtil.combinePredicates(havingList);
             // reprocess HAVING expressions
             ExpressionUtil.finalizeValueTypes(selectStmt.m_having);
         }
@@ -1479,7 +1483,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                         joinOrderSubNodes.add(subTableNodes.get(j));
                     }
                 }
-                joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes);
+                joinOrderSubTree = JoinNode.reconstructJoinTreeFromTableNodes(joinOrderSubNodes, JoinType.INNER);
                 //Collect all the join/where conditions to reassign them later
                 AbstractExpression combinedWhereExpr = subTree.getAllFilters();
                 if (combinedWhereExpr != null) {
