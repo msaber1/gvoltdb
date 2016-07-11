@@ -1426,8 +1426,10 @@ JAVA COMPILATION
     <!-- voltcore and third-party java (including our zookeeper -->
     <invoke-javac
         srcdir="${src.gpl.dir}:${vendor.src.dir}"
-        includes="org/voltcore/**/*.java,org/apache/**/*.java
-                  au/**/*.java,org/spearce_voltpatches/**/*.java
+        includes="org/voltcore/**/*.java
+                  org/apache/**/*.java
+                  au/**/*.java
+                  org/spearce_voltpatches/**/*.java
                   org/HdrHistogram_voltpatches/**/*.java
                   org/json_voltpatches/**/*.java
                   vanilla/**/*.java
@@ -1658,11 +1660,11 @@ TEST CASES
     scanner = fileset.getDirectoryScanner(project);
     scanner.scan();
     files = scanner.getIncludedFiles();
-    for( j=0; j < files.length; j++) {
+    for (j = 0; j < files.length; j++) {
         jfile = self.project.createTask("antcall");
-        project.setProperty("testfilename", files[j]);
-        project.setProperty("testindex", j + 1);
-        project.setProperty("testcount", files.length);
+        project.setProperty("testsuitefilename", files[j]);
+        project.setProperty("testsuiteindex", j + 1);
+        project.setProperty("testsuitecount", files.length);
         jfile.setTarget("junit_onesuite");
         jfile.execute();
     }
@@ -1692,7 +1694,7 @@ TEST CASES
         <!-- convert the filename to a classname -->
         <!-- assumes the file coming in has 1-1 folders to packages -->
         <loadresource property="testname">
-            <string value="${testfilename}" />
+            <string value="${testsuitefilename}" />
             <filterchain>
                 <replaceregex pattern="/" replace="\." flags="g" />
                 <replaceregex pattern="\.class" replace="" />
@@ -1740,8 +1742,8 @@ TEST CASES
             <!-- junit log4j settings, generates log output of last suite -->
             <jvmarg value="-Dlog4j.configuration=file:${base.dir}/tests/log4j-allconsole.xml" />
 
-            <jvmarg value="-Dtestindex=${testindex}" />
-            <jvmarg value="-Dtestcount=${testcount}" />
+            <jvmarg value="-Dtestsuiteindex=${testsuiteindex}" />
+            <jvmarg value="-Dtestsuitecount=${testsuitecount}" />
 
             <!-- write per-testcase output to console if verbose mode -->
             <formatter type="plain" usefile="false" if="verbosereport"/>
@@ -1760,7 +1762,7 @@ TEST CASES
             <!-- specify the tests here (there should be only one) -->
             <batchtest todir="${build.testoutput.dir}">
                 <fileset dir='${build.test.dir}'>
-                    <include name='${testfilename}'/>
+                    <include name='${testsuitefilename}'/>
                 </fileset>
             </batchtest>
 
