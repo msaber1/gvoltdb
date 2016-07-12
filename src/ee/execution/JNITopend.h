@@ -61,7 +61,9 @@ public:
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
-    double callUserDefinedFunction(int32_t fid, double param);
+    NValue callUserDefinedFunction(const UserDefinedFunctionDescriptor *udfDescr,
+                   const std::vector<NValue> &params,
+                   Pool *pool);
 
 private:
     JNIEnv *m_jniEnv;

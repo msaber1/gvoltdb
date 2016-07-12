@@ -144,4 +144,7 @@ namespace voltdb {
         return "";
     }
 
+    NValue callUserDefinedFunction(const UserDefinedFunctionDescriptor *, const std::vector<NValue> &, Pool *pool) {
+        return NValue::getNullValue(VALUE_TYPE_INVALID);
+    }
 }

@@ -37,6 +37,7 @@ class StreamBlock;
  * allow the engine to cleanly integrate both the JNI and
  * the IPC communication paths.
  */
+class UserDefinedFunctionDescriptor;
 class Topend {
   public:
     virtual int loadNextDependency(
@@ -79,7 +80,9 @@ class Topend {
     /** Calls the java method in org.voltdb.utils.Encoder */
     virtual std::string decodeBase64AndDecompress(const std::string& buffer) = 0;
 
-    virtual double callUserDefinedFunction(int32_t fid, double param) = 0;
+    virtual NValue callUserDefinedFunction(const UserDefinedFunctionDescriptor *udfDescr,
+                       const std::vector<NValue> &params,
+                       Pool *pool) = 0;
 
     virtual ~Topend()
     {
@@ -119,6 +122,15 @@ public:
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
+
+    /**
+     * Call a user defined function.  If the result needs
+     * to allocate storage in the returned NValue, then use the
+     * given Pool.
+     */
+    NValue callUserDefinedFunction(const UserDefinedFunctionDescriptor *udfDescr,
+                   const std::vector<NValue> &params,
+                   Pool *pool);
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;

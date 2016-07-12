@@ -184,7 +184,7 @@ private:
 
     void sendException( int8_t errorCode);
 
-    double callUserDefinedFunction(int32_t fid, double param);
+    NValue callUserDefinedFunction(int32_t fid, const NValueArray &actuals);
 
     int8_t activateTableStream(struct ipc_command *cmd);
     void tableStreamSerializeMore(struct ipc_command *cmd);

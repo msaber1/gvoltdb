@@ -229,11 +229,11 @@ public:
         //TODO: Could make this vector a member, if the memory management implications
         // (of the NValue internal state) were clear -- is there a penalty for longer-lived
         // NValues that outweighs the current per-eval allocation penalty?
-        std::vector<NValue> nValue(m_args.size());
+      std::vector<NValue> nValues(m_args.size());
         for (int i = 0; i < m_args.size(); ++i) {
-            nValue[i] = m_args[i]->eval(tuple1, tuple2);
+            nValues[i] = m_args[i]->eval(tuple1, tuple2);
         }
-        return NValue::callUserDefinedFunction(m_udfDescr, nValue);
+        return NValue::callUserDefinedFunction(m_udfDescr, nValues);
     }
 
     std::string debugInfo(const std::string &spacer) const {
