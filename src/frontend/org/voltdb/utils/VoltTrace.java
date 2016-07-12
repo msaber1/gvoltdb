@@ -37,13 +37,13 @@ public class VoltTrace {
         try {
             s_pid = Integer.parseInt(CoreUtils.getPID());
         } catch(NumberFormatException e) {
-            //TODO: 
+            //TODO:
         }
     }
-    
+
     private static Map<Character, TraceEventType> s_typeMap = new HashMap<>();
     public static enum TraceEventType {
-        
+
         ASYNC_BEGIN('b'),
         ASYNC_END('e'),
         ASYNC_INSTANT('n'),
@@ -64,24 +64,25 @@ public class VoltTrace {
         OBJECT_CREATED('N'),
         OBJECT_DESTROYED('D'),
         OBJECT_SNAPSHOT('O'),
-        SAMPLE('P');
-        
+        SAMPLE('P'),
+        VOLT_INTERNAL_CLOSE('z');
+
         private final char m_typeChar;
-        
+
         private TraceEventType(char typeChar) {
             m_typeChar = typeChar;
             s_typeMap.put(typeChar, this);
         }
-        
+
         public char getTypeChar() {
             return m_typeChar;
         }
-        
+
         public static TraceEventType fromTypeChar(char ch) {
             return s_typeMap.get(ch);
         }
     }
-    
+
     @JsonInclude(Include.NON_NULL)
     public static class TraceEvent {
         private String m_fileName;
@@ -92,132 +93,140 @@ public class VoltTrace {
         private long m_tid;
         private long m_micros;
         private Map<String, String> m_args;
-        
+
         // Empty constructor and setters for jackson deserialization for ease of testing
         public TraceEvent() {
         }
-        
+
         public TraceEvent(String fileName,
                 TraceEventType type,
                 String name,
                 String category,
                 Long asyncId,
-                Map<String, String> args) {
+                String... args) {
             this();
             m_fileName = fileName;
             m_type = type;
             m_name = name;
             m_category = category;
             m_id = asyncId;
-            m_args = args;
+            if (args != null) {
+                mapFromArgArray(args);
+            }
             m_tid = Thread.currentThread().getId();
             m_micros = System.nanoTime()/1000;
         }
-        
+
+        private void mapFromArgArray(String... args) {
+            m_args = new HashMap<>();
+            for (int i=0; i<args.length; i+=2) {
+                if (i+1 == args.length) break;
+                m_args.put(args[i], args[i+1]);
+            }
+        }
+
         @JsonIgnore
         public String getFileName() {
             return m_fileName;
         }
-        
+
         public void setFileName(String fileName) {
             m_fileName = fileName;
         }
-        
+
         @JsonIgnore
         public TraceEventType getType() {
             return m_type;
         }
-        
+
         @JsonProperty("ph")
         public char getTypeChar() {
             return m_type.getTypeChar();
         }
-        
+
         public void setTypeChar(char ch) {
             m_type = TraceEventType.fromTypeChar(ch);
         }
-        
+
         public String getName() {
             return m_name;
         }
-        
+
         public void setName(String name) {
             m_name = name;
         }
-        
+
         @JsonProperty("cat")
         public String getCategory() {
             return m_category;
         }
-        
+
         public void setCategory(String cat) {
             m_category = cat;
         }
-        
+
         public Long getId() {
             return m_id;
         }
-        
+
         public void setId(Long id) {
             m_id = id;
         }
-        
+
         public int getPid() {
             return s_pid;
         }
-        
+
         public void setPid(int pid) {
         }
-        
+
         public long getTid() {
             return m_tid;
         }
-        
+
         public void setTid(long tid) {
             m_tid = tid;
         }
-        
+
         public long getTs() {
             return m_micros;
         }
-        
+
         public void setTs(long ts) {
             m_micros = ts;
         }
-        
+
         public Map<String, String> getArgs() {
             return m_args;
         }
-        
+
         public void setArgs(Map<String, String> args) {
             m_args = args;
         }
     }
-    
+
     private static int QUEUE_SIZE = 1024;
     private static VoltTrace s_tracer = new VoltTrace();
     private LinkedBlockingQueue<TraceEvent> m_traceEvents = new LinkedBlockingQueue<>(QUEUE_SIZE);
-    
+
     private VoltTrace() {
         new Thread(new TraceFileWriter(this)).start();
     }
-    
+
     private void queueEvent(TraceEvent event) {
         boolean queued = m_traceEvents.offer(event);
         if (!queued) {
             //TODO: rate limited log?
         }
     }
-    
+
     public TraceEvent takeEvent() throws InterruptedException {
         return m_traceEvents.take();
     }
-    
+
     public static void main(String[] args) throws Exception {
-        Map<String, String> map = new HashMap<>();
-        map.put("One", "1");
-        map.put("Two", "2");
-        TraceEvent event = new TraceEvent("fileName", TraceEventType.METADATA, "test", "cat1", null, map);
+        String[] eargs = { "One", "1", "Two", "2" };
+        TraceEvent event = new TraceEvent("fileName", TraceEventType.METADATA, "test", "cat1", null, eargs);
         ObjectMapper mapper = new ObjectMapper();
         String str = mapper.writeValueAsString(event);
         System.out.println("JSON=" + str);
@@ -225,29 +234,32 @@ public class VoltTrace {
         str = mapper.writeValueAsString(event);
         System.out.println("JSON looped around=" + str);
     }
-    
-    public static void meta(String fileName, String name, Map<String, String> args) {
-        System.out.println("Meta");
+
+    public static void meta(String fileName, String name, String... args) {
         s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.METADATA, null, null, null, args));
     }
-    
-    public static void beginDuration(String fileName, String name, String category, Map<String, String> args) {
-        System.out.println("beginDur");
+
+    public static void beginDuration(String fileName, String name, String category, String... args) {
         s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.DURATION_BEGIN, name, category, null, args));
     }
-    
-    public static void endDuration(String fileName, String name, String category, Map<String, String> args) {
-        System.out.println("endDur");
+
+    public static void endDuration(String fileName, String name, String category, String... args) {
         s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.DURATION_END, name, category, null, args));
     }
-    
-    public static void beginAsync(String fileName, String name, String category, long id, Map<String, String> args) {
-        System.out.println("beginAsync");
+
+    public static void beginAsync(String fileName, String name, String category, long id, String... args) {
         s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.ASYNC_BEGIN, name, category, id, args));
     }
-    
-    public static void endAsync(String fileName, String name, String category, long id, Map<String, String> args) {
-        System.out.println("endAsync");
+
+    public static void endAsync(String fileName, String name, String category, long id, String... args) {
         s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.ASYNC_END, name, category, id, args));
+    }
+
+    public static void close(String fileName) {
+        s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.VOLT_INTERNAL_CLOSE, null, null, null));
+    }
+
+    public static boolean hasEvents() {
+        return !s_tracer.m_traceEvents.isEmpty();
     }
 }

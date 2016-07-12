@@ -17,6 +17,7 @@
 package org.voltdb.utils;
 
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -33,33 +34,27 @@ public class TraceFileWriter implements Runnable {
     private final VoltTrace m_voltTrace;
     private boolean m_shutdown;
     private Map<String, BufferedWriter> m_fileWriters = new HashMap<>();
-    
+
     public TraceFileWriter(VoltTrace voltTrace) {
         m_voltTrace = voltTrace;
     }
-    
+
     public void run() {
         while (!m_shutdown) {
             try {
                 VoltTrace.TraceEvent event = m_voltTrace.takeEvent();
-                BufferedWriter bw = m_fileWriters.get(event.getFileName());
-                if (bw == null) {
-                    try {
-                        //TODO: Path and full file name
-                        // Uses the default platform encoding for now.
-                        bw = new BufferedWriter(new FileWriter(event.getFileName(), true));
-                        m_fileWriters.put(event.getFileName(), bw);
-                        bw.write("[");
-                        bw.newLine();
-                    } catch(FileNotFoundException e) {
-                        //TODO: rate limited log
-                        continue;
-                    }
+                if (event.getType()==VoltTrace.TraceEventType.VOLT_INTERNAL_CLOSE) {
+                    handleCloseEvent(event);
+                } else {
+                    startTraceFile(event);
                 }
-                String json = m_jsonMapper.writeValueAsString(event);
-                bw.write(json);
-                bw.newLine();
-                bw.flush();
+                BufferedWriter bw = m_fileWriters.get(event.getFileName());
+                if (bw != null) {
+                    String json = m_jsonMapper.writeValueAsString(event);
+                    bw.write(json);
+                    bw.newLine();
+                    bw.flush();
+                }
             } catch(InterruptedException e) {
                 e.printStackTrace();
                 //TODO: log that thread got interrupted
@@ -70,6 +65,43 @@ public class TraceFileWriter implements Runnable {
                 //TODO: log exception and log that thread is exiting
                 m_shutdown = true;
             }
+        }
+    }
+
+    private void handleCloseEvent(VoltTrace.TraceEvent event) {
+        BufferedWriter bw = m_fileWriters.get(event.getFileName());
+        if (bw==null) return;
+
+        try {
+            bw.write("]");
+            bw.newLine();
+            bw.close();
+        } catch(IOException e) {
+            //TODO: Debug log
+        }
+        m_fileWriters.remove(event.getFileName());
+    }
+
+    private void startTraceFile(VoltTrace.TraceEvent event) {
+        BufferedWriter bw = m_fileWriters.get(event.getFileName());
+        if (bw != null) return;
+
+        File file = new File(event.getFileName());
+        // if the file exists already, we don't want to overwrite
+        if (file.exists()) {
+            // TODO: log
+            return;
+        }
+
+        try {
+            //TODO: Path and full file name
+            // Uses the default platform encoding for now.
+            bw = new BufferedWriter(new FileWriter(event.getFileName()));
+            m_fileWriters.put(event.getFileName(), bw);
+            bw.write("[");
+            bw.newLine();
+        } catch(IOException e) {
+            //TODO: rate limited log
         }
     }
 }

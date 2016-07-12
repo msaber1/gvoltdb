@@ -24,6 +24,7 @@
 package org.voltdb.utils;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentLinkedQueue;
@@ -37,24 +38,31 @@ import junit.framework.TestCase;
 
 public class TestVoltTrace extends TestCase {
 
+    private static final String FILE_NAME = "testfile1";
     private ObjectMapper m_mapper = new ObjectMapper();
     private final String[] m_testData = {
-            //TODO: generate process name metadata event 
+            //TODO: generate process name metadata event
             "{\"ph\":\"M\",\"name\":\"process_name\",\"args\":{\"Seq\":\"1\"}}",
             "{\"ph\":\"B\",\"name\":\"test-dur-beg\",\"args\":{\"Seq\":\"2\"},\"cat\":\"cat1\"}",
             "{\"ph\":\"E\",\"name\":\"test-dur-end\",\"args\":{\"Seq\":\"3\"},\"cat\":\"cat1\"}",
             "{\"ph\":\"b\",\"name\":\"test-async-beg\",\"args\":{\"Seq\":\"4\"},\"cat\":\"cat2\",\"id\":101}",
             "{\"ph\":\"e\",\"name\":\"test-async-end\",\"args\":{\"Seq\":\"5\"},\"cat\":\"cat2\",\"id\":101}",
     };
-    
+
     private ConcurrentLinkedQueue<VoltTrace.TraceEvent> m_eventQueue = new ConcurrentLinkedQueue<>();
-    
+
     @Override
     protected void setUp() throws Exception {
+        File file = new File(FILE_NAME);
+        if (file.exists()) {
+            if (!file.delete()) {
+                throw new RuntimeException("Failed to delete file " + file);
+            }
+        }
         for (int i=0; i<m_testData.length; i++) {
             VoltTrace.TraceEvent event = m_mapper.readValue(m_testData[i], VoltTrace.TraceEvent.class);
             // TODO: use single file name for now
-            event.setFileName("testfile1");
+            event.setFileName(FILE_NAME);
             m_eventQueue.offer(event);
         }
     }
@@ -65,32 +73,42 @@ public class TestVoltTrace extends TestCase {
         es.submit(new SenderRunnable());
         es.shutdown();
         es.awaitTermination(60, TimeUnit.SECONDS);
-        Thread.sleep(10000);
-        
+
+        while (VoltTrace.hasEvents()) {
+            Thread.sleep(250);
+        }
+        VoltTrace.close(FILE_NAME);
+
         // TODO: read from file and verify
     }
-    
+
     public class SenderRunnable implements Runnable {
         public void run() {
             VoltTrace.TraceEvent event = null;
             while ((event=m_eventQueue.poll()) != null) {
+                String[] args = new String[event.getArgs().size()*2];
+                int i=0;
+                for (String key : event.getArgs().keySet()) {
+                    args[i++] = key;
+                    args[i++] = event.getArgs().get(key);
+                }
                 switch(event.getType()) {
                 case METADATA:
-                    VoltTrace.meta(event.getFileName(), event.getName(), event.getArgs());
+                    VoltTrace.meta(event.getFileName(), event.getName(), args);
                     break;
                 case DURATION_BEGIN:
-                    VoltTrace.beginDuration(event.getFileName(), event.getName(), event.getCategory(), event.getArgs());
+                    VoltTrace.beginDuration(event.getFileName(), event.getName(), event.getCategory(), args);
                     break;
                 case DURATION_END:
-                    VoltTrace.endDuration(event.getFileName(), event.getName(), event.getCategory(), event.getArgs());
+                    VoltTrace.endDuration(event.getFileName(), event.getName(), event.getCategory(), args);
                     break;
                 case ASYNC_BEGIN:
                     VoltTrace.beginAsync(event.getFileName(), event.getName(), event.getCategory(),
-                            event.getId(), event.getArgs());
+                            event.getId(), args);
                     break;
                 case ASYNC_END:
                     VoltTrace.endAsync(event.getFileName(), event.getName(), event.getCategory(),
-                            event.getId(), event.getArgs());
+                            event.getId(), args);
                     break;
                 default:
                     throw new IllegalArgumentException("Unsupported event type: " + event.getType());
