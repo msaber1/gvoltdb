@@ -444,9 +444,6 @@ public class CatalogDiffEngine {
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
                 return "May not dynamically add, drop, or rename export table columns.";
             }
-            if (table.getIsdred()) {
-                return "May not dynamically add, drop, or rename DR table columns.";
-            }
             if (changeType == ChangeType.ADDITION) {
                 Column col = (Column) suspect;
                 if ((! col.getNullable()) && (col.getDefaultvalue() == null)) {
@@ -555,9 +552,6 @@ public class CatalogDiffEngine {
             Column column = (Column)suspect;
             Table table = (Table)column.getParent();
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
-                return null;
-            }
-            if (table.getIsdred()) {
                 return null;
             }
             retval[0] = parent.getTypeName();
@@ -714,9 +708,6 @@ public class CatalogDiffEngine {
             Table table = (Table) parent;
             if (CatalogUtil.isTableExportOnly((Database)table.getParent(), table)) {
                 return "May not dynamically change the columns of export tables.";
-            }
-            if (table.getIsdred()) {
-                return "May not dynamically modify DR table columns.";
             }
 
             if (field.equals("index")) {
@@ -908,9 +899,6 @@ public class CatalogDiffEngine {
 
             // for now, no changes to export tables
             if (CatalogUtil.isTableExportOnly(db, table)) {
-                return null;
-            }
-            if (table.getIsdred()) {
                 return null;
             }
 

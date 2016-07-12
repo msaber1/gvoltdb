@@ -54,6 +54,8 @@
 #include "executors/executorutil.h"
 #include "executors/indexscanexecutor.h"
 #include "execution/ProgressMonitorProxy.h"
+#include "executors/aggregateexecutor.h"
+#include "executors/executorutil.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 
@@ -158,7 +160,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     // target table is a persistent table
     assert(dynamic_cast<PersistentTable*>(m_indexNode->getTargetTable()));
     PersistentTable* inner_table = static_cast<PersistentTable*>(m_indexNode->getTargetTable());
-
 
     TableIndex* index = inner_table->index(m_indexNode->getTargetIndexName());
     assert(index);

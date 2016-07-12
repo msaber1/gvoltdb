@@ -97,6 +97,8 @@ namespace voltdb {
         this->actionType = action;
         this->deleteConflictType = deleteConflict;
         this->insertConflictType = insertConflict;
+        this->remoteClusterId = remoteClusterId;
+        this->remoteTimestamp = remoteTimestamp;
         char signature[20];
 
         if (existingMetaTableForDelete) {
@@ -144,7 +146,7 @@ namespace voltdb {
         return "";
     }
 
-    NValue callUserDefinedFunction(const UserDefinedFunctionDescriptor *, const std::vector<NValue> &, Pool *pool) {
+    NValue DummyTopend::callUserDefinedFunction(const UserDefinedFunctionDescriptor *, const std::vector<NValue> &, Pool *pool) {
         return NValue::getNullValue(VALUE_TYPE_INVALID);
     }
 }

@@ -1,31 +1,18 @@
-"""
-This file is part of VoltDB.
-
-Copyright (C) 2008-2016 VoltDB Inc.
-
-This file contains original code and/or modifications of original code.
-Any modifications made by VoltDB Inc. are licensed under the following
-terms and conditions:
-
-Permission is hereby granted, free of charge, to any person obtaining
-a copy of this software and associated documentation files (the
-"Software"), to deal in the Software without restriction, including
-without limitation the rights to use, copy, modify, merge, publish,
-distribute, sublicense, and/or sell copies of the Software, and to
-permit persons to whom the Software is furnished to do so, subject to
-the following conditions:
-
-The above copyright notice and this permission notice shall be
-included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
-EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
-MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
-IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR
-OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
-ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
-OTHER DEALINGS IN THE SOFTWARE.
-"""
+# This file is part of VoltDB.
+# Copyright (C) 2008-2016 VoltDB Inc.
+#
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU Affero General Public License as
+# published by the Free Software Foundation, either version 3 of the
+# License, or (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU Affero General Public License for more details.
+#
+# You should have received a copy of the GNU Affero General Public License
+# along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
 
 import unittest
 import requests
@@ -97,11 +84,11 @@ class Server(unittest.TestCase):
                 print "ServerId to be deleted is " + str(last_server_id)
                 url += str(last_server_id)
                 response = requests.delete(url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
                 # Delete database
                 db_url = __db_url__ + str(last_db_id)
                 response = requests.delete(db_url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
             else:
                 print "The Server list is empty"
         else:
@@ -162,18 +149,18 @@ class Cluster(unittest.TestCase):
                 print "ServerId to be deleted is " + str(last_server_id)
                 url += str(last_server_id)
                 response = requests.delete(url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
                 # Delete database
                 db_url = __db_url__ + str(last_db_id)
                 response = requests.delete(db_url)
-                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.status_code, 204)
             else:
                 print "The Server list is empty"
         else:
             print "The database list is empty"
 
 
-class DefaultStartServer(Server):
+class Default_01_StartServer(Server):
     """
     Create Server
     """
@@ -193,9 +180,9 @@ class DefaultStartServer(Server):
             print "Starting..."
             response = requests.put(url)
             value = response.json()
-            if not value['statusstring']:
+            if not value['statusString']:
                 print "The Server list is empty"
-            elif "Start request sent successfully to servers" in value['statusstring']:
+            elif "Start request sent successfully to servers" in value['statusString']:
                 self.assertEqual(response.status_code, 200)
                 time.sleep(20)
                 CheckServerStatus(self, last_db_id, 'running')
@@ -205,7 +192,41 @@ class DefaultStartServer(Server):
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Server shutdown successfully." in value['statusstring']:
+                if "Server shutdown successfully." in value['statusString']:
+                    self.assertEqual(response.status_code, 200)
+                    time.sleep(15)
+                    CheckServerStatus(self, last_db_id, 'stopped')
+            elif response.status_code == 500:
+                self.assertEqual(response.status_code, 500)
+
+    def test_start_stop_server_pause_admin_mode(self):
+        """
+        ensure Start and stop server is working properly
+        """
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+
+            url = 'http://%s:8000/api/1.0/databases/%u/start?pause=true' % \
+                (__host_or_ip__,last_db_id)
+            print "Starting with pause enabled..."
+            response = requests.put(url)
+            value = response.json()
+            if not value['statusString']:
+                print "The Server list is empty"
+            elif "Start request sent successfully to servers" in value['statusString']:
+                self.assertEqual(response.status_code, 200)
+                time.sleep(20)
+                CheckServerStatus(self, last_db_id, 'running')
+                time.sleep(10)
+                print "Stopping Cluster...."
+                url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
+                (__host_or_ip__,last_db_id)
+                response = requests.put(url_stop)
+                value = response.json()
+                if "Server shutdown successfully." in value['statusString']:
                     self.assertEqual(response.status_code, 200)
                     time.sleep(15)
                     CheckServerStatus(self, last_db_id, 'stopped')
@@ -234,9 +255,9 @@ class StartServer(Cluster):
             response = requests.put(url)
             print "Starting...."
             value = response.json()
-            if not value['statusstring']:
+            if not value['statusString']:
                 print "error"
-            elif "Start request sent successfully to servers" in value['statusstring']:
+            elif "Start request sent successfully to servers" in value['statusString']:
                 self.assertEqual(response.status_code, 200)
                 time.sleep(20)
                 CheckServerStatus(self, last_db_id, 'running')
@@ -246,14 +267,15 @@ class StartServer(Cluster):
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Server shutdown successfully." in value['statusstring']:
+                if "Server shutdown successfully." in value['statusString']:
                     self.assertEqual(response.status_code, 200)
                     time.sleep(15)
                     CheckServerStatus(self, last_db_id, 'stopped')
             elif response.status_code == 500:
                 self.assertEqual(response.status_code, 500)
 
-class DefaultRecoverServer(Server):
+
+class Default_02_RecoverServer(Server):
     """
     Create Server
     """
@@ -274,11 +296,11 @@ class DefaultRecoverServer(Server):
             response = requests.put(url)
             value = response.json()
 
-            if not value['statusstring']:
+            if not value['statusString']:
                 print "Error"
-            elif "FATAL: VoltDB Community Edition" in value['statusstring']:
+            elif "FATAL: VoltDB Community Edition" in value['statusString']:
                 print "Voltdb recover is only supported in Enterprise Edition"
-            elif "Start request sent successfully to servers" in value['statusstring']:
+            elif "Start request sent successfully to servers" in value['statusString']:
                 self.assertEqual(response.status_code, 200)
                 time.sleep(20)
                 CheckServerStatus(self, last_db_id, 'running')
@@ -288,7 +310,44 @@ class DefaultRecoverServer(Server):
                 (__host_or_ip__,last_db_id)
                 response = requests.put(url_stop)
                 value = response.json()
-                if "Server shutdown successfully." in value['statusstring']:
+                if "Server shutdown successfully." in value['statusString']:
+                    self.assertEqual(response.status_code, 200)
+                    time.sleep(15)
+                    CheckServerStatus(self, last_db_id, 'stopped')
+            elif response.status_code == 500:
+                self.assertEqual(response.status_code, 500)
+
+    def test_recover_stop_server_pause_admin_mode(self):
+        """
+        ensure Start and stop server is working properly
+        """
+        response = requests.get(__db_url__)
+        value = response.json()
+        if value:
+            db_length = len(value['databases'])
+            last_db_id = value['databases'][db_length-1]['id']
+
+            url = 'http://%s:8000/api/1.0/databases/%u/recover' % \
+                (__host_or_ip__,last_db_id)
+            print "Recovering with pause enabled..."
+            response = requests.put(url)
+            value = response.json()
+
+            if not value['statusString']:
+                print "Error"
+            elif "FATAL: VoltDB Community Edition" in value['statusString']:
+                print "Voltdb recover is only supported in Enterprise Edition"
+            elif "Start request sent successfully to servers" in value['statusString']:
+                self.assertEqual(response.status_code, 200)
+                time.sleep(20)
+                CheckServerStatus(self, last_db_id, 'running')
+                time.sleep(10)
+                print "Stopping Cluster...."
+                url_stop = 'http://%s:8000/api/1.0/databases/%u/stop' % \
+                (__host_or_ip__,last_db_id)
+                response = requests.put(url_stop)
+                value = response.json()
+                if "Server shutdown successfully." in value['statusString']:
                     self.assertEqual(response.status_code, 200)
                     time.sleep(15)
                     CheckServerStatus(self, last_db_id, 'stopped')
@@ -302,10 +361,10 @@ def CheckServerStatus(self, last_db_id, status):
     print "Checking status..."
     response = requests.get(status_url)
     value = response.json()
-    if value['status'] and value['status'][0]['status']:
-        print "Status: " + value['status'][0]['status']
-        self.assertEqual(value['status'][0]['status'], status)
-        self.assertEqual(value['serverDetails'][0][__host_or_ip__]['status'], status)
+    if value['status'] and value['dbStatus']['status']:
+        print "Status: " + value['dbStatus']['status']
+        self.assertEqual(value['dbStatus']['status'], status)
+        self.assertEqual(value['dbStatus']['serverStatus'][0][__host_or_ip__]['status'], status)
     else:
         assert False
 
