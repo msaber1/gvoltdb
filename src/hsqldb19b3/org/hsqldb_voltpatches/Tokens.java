@@ -47,6 +47,9 @@ public class Tokens {
     //
     // SQL 200n reserved words full set
     static final String        T_ABS              = "ABS";
+    // A VoltDB extension AGGREGATE
+    static final String        T_AGGREGATE        = "AGGREGATE";
+    // End of VoltDB extension
     public static final String T_ALL              = "ALL";
     static final String        T_ALLOCATE         = "ALLOCATE";
     public static final String T_ALTER            = "ALTER";
@@ -211,6 +214,9 @@ public class Tokens {
     static final String        T_LEADING           = "LEADING";
     static final String        T_LEAVE             = "LEAVE";
     static final String        T_LEFT              = "LEFT";
+    // A VoltDB extension LIBRARY
+    static final String        T_LIBRARY           = "LIBRARY";
+    // End of VoltDB extension
     static final String        T_LIKE              = "LIKE";
     static final String        T_LIKE_REGX         = "LIKE_REGX";
     static final String        T_LN                = "LN";
@@ -304,6 +310,9 @@ public class Tokens {
     static final String        T_ROW_NUMBER        = "ROW_NUMBER";
     static final String        T_ROWS              = "ROWS";
     static final String        T_SAVEPOINT         = "SAVEPOINT";
+    // A VoltDB extension SCALAR
+    static final String        T_SCALAR            = "SCALAR";
+    // End of VoltDB extension
     static final String        T_SCOPE             = "SCOPE";
     static final String        T_SCROLL            = "SCROLL";
     static final String        T_SEARCH            = "SEARCH";
@@ -818,6 +827,9 @@ public class Tokens {
     //
     //SQL 200n Standard reserved keywords - full set
     public static final int ABS                              = 1;
+    // A VoltDB extension AGGREGATE
+    public static final int AGGREGATE                        = 1306;
+    // End of VoltDB extension
     public static final int ALL                              = 2;
     public static final int ALLOCATE                         = 3;
     public static final int ALTER                            = 4;
@@ -971,6 +983,9 @@ public class Tokens {
     public static final int LEADING                          = 149;
     public static final int LEAVE                            = 150;
     public static final int LEFT                             = 151;
+    // A VoltDB extension LIBRARY
+    public static final int LIBRARY                          = 1307;
+    // End of VoltDB extension
     public static final int LIKE                             = 152;
     public static final int LIKE_REGEX                       = 153;
     public static final int LN                               = 154;
@@ -1064,6 +1079,9 @@ public class Tokens {
     public static final int ROW_NUMBER                       = 242;
     public static final int ROWS                             = 243;
     public static final int SAVEPOINT                        = 244;
+    // A VoltDB extension SCALAR
+    public static final int SCALAR                           = 1308;
+    // End of VoltDB extension
     public static final int SCOPE                            = 245;
     public static final int SCROLL                           = 246;
     public static final int SEARCH                           = 247;
@@ -1607,6 +1625,9 @@ public class Tokens {
 
     static {
         reservedKeys.put(Tokens.T_ABS, ABS);
+        // A VoltDB extension AGGREGATE
+        reservedKeys.put(Tokens.T_AGGREGATE, AGGREGATE);
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_ALL, ALL);
         reservedKeys.put(Tokens.T_ALLOCATE, ALLOCATE);
         reservedKeys.put(Tokens.T_ALTER, ALTER);
@@ -1770,6 +1791,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_LEADING, LEADING);
         reservedKeys.put(Tokens.T_LEAVE, LEAVE);
         reservedKeys.put(Tokens.T_LEFT, LEFT);
+        // A VoltDB extension LIBRARY
+        reservedKeys.put(Tokens.T_LIBRARY, LIBRARY);
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_LIKE, LIKE);
         reservedKeys.put(Tokens.T_LIKE_REGX, LIKE_REGEX);
         reservedKeys.put(Tokens.T_LN, LN);
@@ -1862,6 +1886,9 @@ public class Tokens {
         reservedKeys.put(Tokens.T_ROW_NUMBER, ROW_NUMBER);
         reservedKeys.put(Tokens.T_ROWS, ROWS);
         reservedKeys.put(Tokens.T_SAVEPOINT, SAVEPOINT);
+        // A VoltDB extension SCALAR
+        reservedKeys.put(Tokens.T_SCALAR, SCALAR);
+        // End of VoltDB extension
         reservedKeys.put(Tokens.T_SCOPE, SCOPE);
         reservedKeys.put(Tokens.T_SCROLL, SCROLL);
         reservedKeys.put(Tokens.T_SEARCH, SEARCH);
