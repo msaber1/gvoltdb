@@ -136,6 +136,22 @@ public class SQLParser extends SQLPatternFactory
 
     //TODO: Convert to pattern factory usage below this point.
 
+    private static final Pattern PAT_CREATE_LIBRARY =
+        SPF.statement(
+            SPF.token("create"), SPF.token("library"), SPF.capture("libraryName", SPF.databaseObjectName()),
+            SPF.token("from"), SPF.capture("filePath", SPF.filePath())
+        ).compile("PAT_CREATE_LIBRARY");
+
+    private static final Pattern PAT_CREATE_FUNCTION =
+        SPF.statementLeader(
+            SPF.token("create"),
+            SPF.capture("functionType", SPF.tokenAlternatives("scalar", "aggregate")),
+            SPF.token("function"), SPF.capture("functionName", SPF.databaseObjectName()),
+            SPF.token("from"), SPF.capture("entryName", SPF.databaseObjectName()),
+            SPF.token("in"), SPF.token("library"),
+            SPF.capture("libraryName", SPF.databaseObjectName())
+        ).compile("PAT_CREATE_FUNCTION");
+
     /*
      * CREATE PROCEDURE [ <MODIFIER_CLAUSE> ... ] FROM <JAVA_CLASS>
      *
@@ -357,7 +373,8 @@ public class SQLParser extends SQLPatternFactory
             // <= means zero-width positive lookbehind.
             // This means that the "CREATE\\s{}" is required to match but is not part of the capture.
             "(?<=\\ACREATE\\s{0,1024})" +          //TODO: 0 min whitespace should be 1?
-            "(?:PROCEDURE|ROLE)|" +                // token options after CREATE
+            "(?:PROCEDURE|ROLE|LIBRARY|(SCALAR|AGGREGATE)\\sFUNCTION)|" +
+            // token options after CREATE
             // the rest are stand-alone token options
             "\\ADROP|" +
             "\\APARTITION|" +
@@ -687,6 +704,16 @@ public class SQLParser extends SQLPatternFactory
     public static Matcher matchPartitionProcedure(String statement)
     {
         return PAT_PARTITION_PROCEDURE.matcher(statement);
+    }
+
+    public static Matcher matchCreateLibrary(String statement)
+    {
+        return PAT_CREATE_LIBRARY.matcher(statement);
+    }
+
+    public static Matcher matchCreateFunction(String statement)
+    {
+        return PAT_CREATE_FUNCTION.matcher(statement);
     }
 
     /**

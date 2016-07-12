@@ -156,6 +156,12 @@ public class SQLPatternFactory
             return oneOf(strs);
         }
 
+        // For file path.
+        public static SQLPatternPart filePath()
+        {
+            return new SQLPatternPartElement("(/{0,1}[^/\\s]+)+");
+        }
+
         /*
          * For table, column, index, view, etc. names.
          */

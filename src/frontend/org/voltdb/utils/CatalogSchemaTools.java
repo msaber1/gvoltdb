@@ -47,6 +47,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.UDFLibrary;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compilereport.ProcedureAnnotation;
@@ -422,6 +423,13 @@ public abstract class CatalogSchemaTools {
         sb.append(";\n");
     }
 
+    public static void toSchema(StringBuilder sb, UDFLibrary udflib) {
+        sb.append(
+            String.format("CREATE LIBRARY %s FROM '%s';\n\n",
+                udflib.getLibraryname(),
+                udflib.getFilepath()));
+    }
+
     /**
      * Convert a Catalog Procedure into a DDL string.
      * @param proc
@@ -590,6 +598,14 @@ public abstract class CatalogSchemaTools {
                         toSchema(sb, proc);
                     }
                 }
+
+                CatalogMap<UDFLibrary> udflibs = db.getUdflibraries();
+                if (! udflibs.isEmpty()) {
+                    for (UDFLibrary udflib : udflibs) {
+                        toSchema(sb, udflib);
+                    }
+                }
+
                 if (! tables.isEmpty()) {
                     sb.append(endBatch);
                 }

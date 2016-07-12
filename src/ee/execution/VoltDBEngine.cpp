@@ -54,6 +54,7 @@
 #include "catalog/connector.h"
 #include "catalog/database.h"
 #include "catalog/index.h"
+#include "catalog/udflibrary.h"
 #include "catalog/materializedviewinfo.h"
 #include "catalog/planfragment.h"
 #include "catalog/statement.h"
@@ -102,6 +103,7 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(UDFLibrary);
 
 static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
@@ -118,6 +120,7 @@ typedef std::pair<std::string, catalog::Column*> LabeledColumn;
 typedef std::pair<std::string, catalog::Index*> LabeledIndex;
 typedef std::pair<std::string, catalog::Table*> LabeledTable;
 typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
+typedef std::pair<std::string, catalog::UDFLibrary*> LabeledUDFLibrary;
 
 /**
  * The set of plan bytes is explicitly maintained in MRU-first order,
@@ -276,6 +279,11 @@ VoltDBEngine::~VoltDBEngine() {
     BOOST_FOREACH (TID tid, m_snapshottingTables) {
         tid.second->decrementRefcount();
     }
+
+    for (auto nameLibraryPair : m_libraries) {
+        delete nameLibraryPair.second;
+    }
+    m_libraries.clear();
 
     delete m_executorContext;
 
@@ -1048,6 +1056,16 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
                 persistentTable->dropMaterializedView(toDrop);
             }
         }
+    }
+
+    for (auto nameLibraryPair : m_libraries) {
+        delete nameLibraryPair.second;
+    }
+    m_libraries.clear();
+    BOOST_FOREACH (LabeledUDFLibrary labeledUDFLibrary, m_database->UDFLibraries()) {
+        catalog::UDFLibrary *catalogUDFLibrary = labeledUDFLibrary.second;
+        UDFLibrary *udflib = new UDFLibrary(catalogUDFLibrary->filePath());
+        m_libraries[catalogUDFLibrary->libraryName()] = udflib;
     }
 
     // new plan fragments are handled differently.

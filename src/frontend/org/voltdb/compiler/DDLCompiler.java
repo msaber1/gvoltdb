@@ -57,6 +57,7 @@ import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.UDFLibrary;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
 import org.voltdb.compiler.ClassMatcher.ClassNameMatchStatus;
@@ -78,14 +79,11 @@ import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.planner.StatementPartitioning;
 import org.voltdb.planner.SubPlanAssembler;
-import org.voltdb.planner.parseinfo.BranchNode;
-import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
-import org.voltdb.types.JoinType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -517,6 +515,43 @@ public class DDLCompiler {
         return retIdent;
     }
 
+    private boolean processCreateLibraryStatement(Matcher statementMatcher, Database db) {
+        String libraryName = statementMatcher.group("libraryName");
+        String filePath = statementMatcher.group("filePath");
+        filePath = filePath.substring(1, filePath.length()-1); // Remove the quotation marks.
+        UDFLibrary udflib = db.getUdflibraries().add(libraryName);
+        udflib.setLibraryname(libraryName);
+        udflib.setFilepath(filePath);
+        return true;
+    }
+
+    private boolean processCreateFunctionStatement(
+            Matcher statementMatcher, Database db
+            ) throws VoltCompilerException {
+        String functionName = statementMatcher.group("functionName");
+        StringBuilder msg = new StringBuilder(String.format("Cannot create function %s: ", functionName));
+        String functionType = statementMatcher.group("functionType");
+        if (functionType.equalsIgnoreCase("aggregate")) {
+            msg.append("user-defined aggregate function is not supported yet.");
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+        String libraryName = statementMatcher.group("libraryName");
+        UDFLibrary udflib = db.getUdflibraries().get(libraryName);
+        if (udflib == null) {
+            msg.append(String.format("library %s was not found.", libraryName));
+            throw m_compiler.new VoltCompilerException(msg.toString());
+        }
+
+
+        System.out.println(
+            String.format("FunctionType: %s\nFunctionName: %s\nEntryName: %s\nLibraryName: %s",
+                statementMatcher.group("functionType"),
+                statementMatcher.group("functionName"),
+                statementMatcher.group("entryName"),
+                statementMatcher.group("libraryName")));
+        return true;
+    }
+
    /**
      * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE,
      * CREATE PROCEDURE, and CREATE ROLE.
@@ -545,6 +580,16 @@ public class DDLCompiler {
 
         // either PROCEDURE, REPLICATE, PARTITION, ROLE, EXPORT or DR
         String commandPrefix = statementMatcher.group(1).toUpperCase();
+
+        statementMatcher = SQLParser.matchCreateLibrary(statement);
+        if (statementMatcher.matches()) {
+            return processCreateLibraryStatement(statementMatcher, db);
+        }
+
+        statementMatcher = SQLParser.matchCreateFunction(statement);
+        if (statementMatcher.matches()) {
+            return processCreateFunctionStatement(statementMatcher, db);
+        }
 
         // matches if it is CREATE PROCEDURE [ALLOW <role> ...] [PARTITION ON ...] FROM CLASS <class-name>;
         statementMatcher = SQLParser.matchCreateProcedureFromClass(statement);

@@ -81,11 +81,13 @@ public class SQLLexer extends SQLPatternFactory
         // Non-rename-able objects
         new ObjectToken("view", false),
         new ObjectToken("procedure", false),
-        new ObjectToken("role", false)
+        new ObjectToken("role", false),
+        new ObjectToken("library", false),
+        new ObjectToken("function", false)
     };
 
     private final static String[] MODIFIER_TOKENS = {
-        "assumeunique", "unique"
+        "assumeunique", "unique", "scalar", "aggregate"
     };
 
     static final char BLOCK_DELIMITER_CHAR = '#';

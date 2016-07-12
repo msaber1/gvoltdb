@@ -218,6 +218,9 @@ CTX.INPUT['catalog'] = """
  statement.cpp
  table.cpp
  viewtrigger.cpp
+ udf.cpp
+ udflibrary.cpp
+ udfparameter.cpp
 """
 
 CTX.INPUT['structures'] = """

@@ -38,17 +38,18 @@ begin Systemsettings javaonly "Container for deployment systemsettings element"
   int querytimeout            "The maximum latency for a query batch before timing out"
 end
 
-begin Database                       "A set of schema, procedures and other metadata that together comprise an application"
-  string     schema                  "Full SQL DDL for the database's schema"
-  User*      users                   "The set of users"
-  Group*     groups                  "The set of groups"
-  Table*     tables                  "The set of Tables for the database"
-  Program*   programs                "The set of programs allowed to access this database"
-  Procedure* procedures              "The set of stored procedures/transactions for this database"
-  Connector* connectors              "Export connector configuration"
-  SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
-  bool   isActiveActiveDRed          "Are all DR tables in this database active-active DRed"
-  string securityprovider            "The security provider used to authenticate users"
+begin Database                            "A set of schema, procedures and other metadata that together comprise an application"
+  string             schema               "Full SQL DDL for the database's schema"
+  User*              users                "The set of users"
+  Group*             groups               "The set of groups"
+  Table*             tables               "The set of Tables for the database"
+  Program*           programs             "The set of programs allowed to access this database"
+  Procedure*         procedures           "The set of stored procedures/transactions for this database"
+  Connector*         connectors           "Export connector configuration"
+  UDFLibrary*        UDFLibraries         "The set of libraries loaded in this database"
+  SnapshotSchedule*  snapshotSchedule     "Schedule for automated snapshots"
+  bool               isActiveActiveDRed   "Are all DR tables in this database active-active DRed"
+  string             securityprovider     "The security provider used to authenticate users"
 end
 
 begin CommandLog javaonly     "Configuration for a command log"
@@ -103,6 +104,25 @@ begin User javaonly
 end
 
 begin Program javaonly "The name of a program with access (effectively a username for an app server)"
+end
+
+begin UDFParameter     "A user-defined function parameter"
+  int index            "The index of the parameter"
+  int parameterType    "The type of the parameter"
+end
+
+begin UDF                         "A user-defined function"
+  string         functionName     "The name of the function"
+  int            functionType     "The type of the function"
+  UDFLibrary?    sourceLibrary    "The library that holds this function"
+  string         entryName        "The entry class name of the function"
+  UDFParameter*  parameters       "The parameters of the function"
+end
+
+begin UDFLibrary           "A user-defined function library"
+  string  libraryName      "The name of the library"
+  string  filePath         "The path of the shared library file"
+  UDF*    loadedUDFs       "A collection of loaded functions from this library"
 end
 
 begin Procedure javaonly    "A stored procedure (transaction) in the system"
