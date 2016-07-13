@@ -43,16 +43,21 @@ public class TraceFileWriter implements Runnable {
         while (!m_shutdown) {
             try {
                 VoltTrace.TraceEvent event = m_voltTrace.takeEvent();
+                boolean firstRow = false;
                 if (event.getType()==VoltTrace.TraceEventType.VOLT_INTERNAL_CLOSE) {
                     handleCloseEvent(event);
                 } else {
+                    if (m_fileWriters.get(event.getFileName()) == null) {
+                        firstRow = true;
+                    }
                     startTraceFile(event);
                 }
                 BufferedWriter bw = m_fileWriters.get(event.getFileName());
                 if (bw != null) {
                     String json = m_jsonMapper.writeValueAsString(event);
-                    bw.write(json);
+                    if (!firstRow) bw.write(",");
                     bw.newLine();
+                    bw.write(json);
                     bw.flush();
                 }
             } catch(InterruptedException e) {
@@ -73,6 +78,7 @@ public class TraceFileWriter implements Runnable {
         if (bw==null) return;
 
         try {
+            bw.newLine();
             bw.write("]");
             bw.newLine();
             bw.close();
@@ -99,7 +105,6 @@ public class TraceFileWriter implements Runnable {
             bw = new BufferedWriter(new FileWriter(event.getFileName()));
             m_fileWriters.put(event.getFileName(), bw);
             bw.write("[");
-            bw.newLine();
         } catch(IOException e) {
             //TODO: rate limited log
         }

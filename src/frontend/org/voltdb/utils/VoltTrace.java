@@ -20,13 +20,12 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 
+import org.codehaus.jackson.annotate.JsonIgnore;
+import org.codehaus.jackson.annotate.JsonProperty;
+import org.codehaus.jackson.annotate.JsonWriteNullProperties;
+import org.codehaus.jackson.map.ObjectMapper;
+import org.codehaus.jackson.map.annotate.JsonSerialize;
 import org.voltcore.utils.CoreUtils;
-
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonInclude;
-import com.fasterxml.jackson.annotation.JsonInclude.Include;
-import com.fasterxml.jackson.annotation.JsonProperty;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  *TODO:
@@ -83,7 +82,7 @@ public class VoltTrace {
         }
     }
 
-    @JsonInclude(Include.NON_NULL)
+    @JsonSerialize(include=JsonSerialize.Inclusion.NON_NULL)
     public static class TraceEvent {
         private String m_fileName;
         private TraceEventType m_type;
@@ -92,6 +91,7 @@ public class VoltTrace {
         private Long m_id;
         private long m_tid;
         private long m_micros;
+        private String[] m_argsArr;
         private Map<String, String> m_args;
 
         // Empty constructor and setters for jackson deserialization for ease of testing
@@ -110,18 +110,20 @@ public class VoltTrace {
             m_name = name;
             m_category = category;
             m_id = asyncId;
-            if (args != null) {
-                mapFromArgArray(args);
-            }
+            m_argsArr = args;
             m_tid = Thread.currentThread().getId();
             m_micros = System.nanoTime()/1000;
         }
 
-        private void mapFromArgArray(String... args) {
+        private void mapFromArgArray() {
             m_args = new HashMap<>();
-            for (int i=0; i<args.length; i+=2) {
-                if (i+1 == args.length) break;
-                m_args.put(args[i], args[i+1]);
+            if (m_argsArr == null) {
+                return;
+            }
+            
+            for (int i=0; i<m_argsArr.length; i+=2) {
+                if (i+1 == m_argsArr.length) break;
+                m_args.put(m_argsArr[i], m_argsArr[i+1]);
             }
         }
 
@@ -197,6 +199,9 @@ public class VoltTrace {
         }
 
         public Map<String, String> getArgs() {
+            if (m_args==null) {
+                mapFromArgArray();
+            }
             return m_args;
         }
 
@@ -236,15 +241,19 @@ public class VoltTrace {
     }
 
     public static void meta(String fileName, String name, String... args) {
-        s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.METADATA, null, null, null, args));
+        s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.METADATA, name, null, null, args));
+    }
+
+    public static void instant(String fileName, String name, String category, long id, String... args) {
+        s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.INSTANT, name, category, id, args));
     }
 
     public static void beginDuration(String fileName, String name, String category, String... args) {
         s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.DURATION_BEGIN, name, category, null, args));
     }
 
-    public static void endDuration(String fileName, String name, String category, String... args) {
-        s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.DURATION_END, name, category, null, args));
+    public static void endDuration(String fileName) {
+        s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.DURATION_END, null, null, null));
     }
 
     public static void beginAsync(String fileName, String name, String category, long id, String... args) {
@@ -253,6 +262,9 @@ public class VoltTrace {
 
     public static void endAsync(String fileName, String name, String category, long id, String... args) {
         s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.ASYNC_END, name, category, id, args));
+    }
+    public static void instantAsync(String fileName, String name, String category, long id, String... args) {
+        s_tracer.queueEvent(new TraceEvent(fileName, TraceEventType.ASYNC_INSTANT, name, category, id, args));
     }
 
     public static void close(String fileName) {

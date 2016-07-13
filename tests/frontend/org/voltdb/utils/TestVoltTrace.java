@@ -26,13 +26,16 @@ package org.voltdb.utils;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
+import java.util.ArrayList;
+import java.util.EnumSet;
+import java.util.Random;
 import java.util.TreeSet;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import org.codehaus.jackson.map.ObjectMapper;
 
 import junit.framework.TestCase;
 
@@ -82,6 +85,33 @@ public class TestVoltTrace extends TestCase {
         // TODO: read from file and verify
     }
 
+    private ArrayList<VoltTrace.TraceEventType> m_allEventTypes = new ArrayList<>(EnumSet.allOf(VoltTrace.TraceEventType.class));
+    private Random m_random = new Random();
+    private void generateRandomEvent(String fileName) {
+        VoltTrace.TraceEventType type = m_allEventTypes.get(m_random.nextInt(m_allEventTypes.size()));
+        VoltTrace.TraceEvent event = null;
+        while (event==null) {
+            switch(type) {
+            case ASYNC_BEGIN:
+            case ASYNC_END:
+            case ASYNC_INSTANT:
+            case DURATION_BEGIN:
+            case DURATION_END:
+            case INSTANT:
+            case METADATA:
+                event = generateRandomMeta(fileName);
+                break;
+            default:
+                break;
+            }
+        }
+    }
+
+    private VoltTrace.TraceEvent generateRandomMeta(String fileName) {
+        //TODO: do args
+        return new VoltTrace.TraceEvent(fileName, VoltTrace.TraceEventType.METADATA, null, null, null);
+    }
+
     public class SenderRunnable implements Runnable {
         public void run() {
             VoltTrace.TraceEvent event = null;
@@ -100,7 +130,7 @@ public class TestVoltTrace extends TestCase {
                     VoltTrace.beginDuration(event.getFileName(), event.getName(), event.getCategory(), args);
                     break;
                 case DURATION_END:
-                    VoltTrace.endDuration(event.getFileName(), event.getName(), event.getCategory(), args);
+                    VoltTrace.endDuration(event.getFileName());
                     break;
                 case ASYNC_BEGIN:
                     VoltTrace.beginAsync(event.getFileName(), event.getName(), event.getCategory(),
