@@ -22,6 +22,9 @@
 
 namespace voltdb {
 
+class StreamedTable;
+class TableCatalogDelegate;
+
 /**
  * Manage the inserts, deletes and updates for a materialized view table based
  * on inserts, deletes and updates to a source table. An instance sits between
@@ -53,11 +56,11 @@ public:
     }
 
 
-private:
+protected:
     MaterializedViewTriggerForWrite(PersistentTable *srcTable,
                                     PersistentTable *destTable,
                                     catalog::MaterializedViewInfo *mvInfo);
-
+private:
     void setupMinMaxRecalculation(const catalog::CatalogMap<catalog::IndexRef> &indexForMinOrMax,
                                   const catalog::CatalogMap<catalog::Statement> &fallbackQueryStmts);
 
@@ -92,6 +95,30 @@ private:
     std::vector<boost::shared_ptr<ExecutorVector> > m_fallbackExecutorVectors;
     std::vector<bool> m_usePlanForAgg;
 
+};
+
+/**
+ * Manage the inserts, deletes and updates for a materialized view table based
+ * on inserts, deletes and updates to a source table. An instance sits between
+ * two tables translasting changes in one table into changes in the other table.
+ * The factory method, build, uses information parsed from the catalog to configure
+ * initializers for the private constructor.
+ */
+class MaterializedViewTriggerForStreamInsert : public MaterializedViewTriggerForWrite {
+public:
+    static void build(StreamedTable *srcTable,
+                      PersistentTable *destTable,
+                      catalog::MaterializedViewInfo *mvInfo);
+
+private:
+    MaterializedViewTriggerForStreamInsert(PersistentTable *srcTable,
+                                    PersistentTable *destTable,
+                                    catalog::MaterializedViewInfo *mvInfo)
+    : MaterializedViewTriggerForWrite(srcTable, destTable, mvInfo)
+    , m_window(srcTable)
+    {}
+    // the materialized view window table
+    PersistentTable *m_window;
 };
 
 } // namespace voltdb

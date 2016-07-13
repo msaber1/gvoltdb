@@ -18,7 +18,7 @@
 #include "streamedtable.h"
 
 #include "ExportTupleStream.h"
-#include "MaterializedViewTriggerForInsert.h"
+#include "MaterializedViewTriggerForWrite.h"
 #include "StreamedTableUndoAction.hpp"
 #include "tableiterator.h"
 
@@ -230,4 +230,10 @@ void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUs
     if (m_wrapper) {
         m_wrapper->setBytesUsed(streamBytesUsed);
     }
+}
+
+PersistentTable* StreamedTable::redirectStreamToWindow() {
+    VoltDBEngine* engine = ExecutorContext::getEngine();
+    TableCatalogDelegate *tcd = engine->getTableDelegate(m_name);
+    return  tcd->createWindowTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
 }

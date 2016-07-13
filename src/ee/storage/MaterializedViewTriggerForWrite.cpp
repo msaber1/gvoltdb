@@ -17,6 +17,8 @@
 #include "MaterializedViewTriggerForWrite.h"
 
 #include "persistenttable.h"
+#include "streamedtable.h"
+#include "TableCatalogDelegate.hpp"
 
 #include "catalog/indexref.h"
 #include "catalog/planfragment.h"
@@ -468,6 +470,26 @@ void MaterializedViewTriggerForWrite::processTupleDelete(const TableTuple &oldTu
     // since their keys shouldn't ever change, but do update other indexes.
     m_target->updateTupleWithSpecificIndexes(m_existingTuple, m_updatedTuple,
                                              m_updatableIndexList, fallible);
+}
+
+void MaterializedViewTriggerForStreamInsert::build(StreamedTable *srcTable,
+                                            PersistentTable *destTable,
+                                            catalog::MaterializedViewInfo *mvInfo) {
+    VOLT_TRACE("construct MaterializedViewTriggerForStreamInsertTrigger...");
+    PersistentTable* windowTable = srcTable->redirectStreamToWindow();
+    MaterializedViewTriggerForStreamInsert* view =
+        new MaterializedViewTriggerForStreamInsert(windowTable, destTable, mvInfo);
+    srcTable->addMaterializedView(view);
+    VOLT_TRACE("finished initialization.");
+}
+
+// redirct the write to the temp persistent table
+void processTupleInsert(const TableTuple &newTuple, bool fallible) {
+    if (true) {
+        printf(" Window is full\n");
+    } else {
+        printf(" Window is still not full \n");
+    }
 }
 
 } // namespace voltdb

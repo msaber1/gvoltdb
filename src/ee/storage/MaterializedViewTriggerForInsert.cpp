@@ -17,7 +17,6 @@
 #include "MaterializedViewTriggerForInsert.h"
 
 #include "persistenttable.h"
-#include "streamedtable.h"
 
 #include "catalog/column.h"
 #include "catalog/columnref.h"
@@ -379,17 +378,6 @@ bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple
     m_index->moveToKey(&m_searchKeyTuple, indexCursor);
     m_existingTuple = m_index->nextValueAtKey(indexCursor);
     return ! m_existingTuple.isNullTuple();
-}
-
-
-void MaterializedViewTriggerForStreamInsert::build(StreamedTable *srcTable,
-                                                   PersistentTable *destTable,
-                                                   catalog::MaterializedViewInfo *mvInfo) {
-    VOLT_TRACE("construct MaterializedViewStreamInsertTrigger...");
-    MaterializedViewTriggerForStreamInsert* view =
-        new MaterializedViewTriggerForStreamInsert(destTable, mvInfo);
-    srcTable->addMaterializedView(view);
-    VOLT_TRACE("finished initialization.");
 }
 
 } // namespace voltdb

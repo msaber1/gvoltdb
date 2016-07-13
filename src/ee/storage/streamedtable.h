@@ -126,7 +126,9 @@ public:
         return std::vector<uint64_t>();
     }
 
+    PersistentTable* redirectStreamToWindow();
 private:
+
     // Just say 0
     size_t allocatedBlockCount() const;
 

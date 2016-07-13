@@ -2382,6 +2382,26 @@ public class DDLCompiler {
             }
 
             MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
+            // hacky: use last int as slide size
+            // should also split time-based sliding windows vs tuple-based sliding window
+            int slideSize =  Integer.MAX_VALUE;
+            String[] output = viewName.split("_");
+            String lastToken = output[output.length - 1];
+            if (lastToken.startsWith("R")) {
+                try {
+                    slideSize = Integer.parseInt(lastToken.substring(1));
+                    matviewinfo.setIstuplebased(true);
+                } catch (NumberFormatException | NullPointerException ignore) {
+                }
+            } else if (lastToken.startsWith("T")) {
+                try {
+                    slideSize = Integer.parseInt(lastToken.substring(1, lastToken.length() - 1));
+                    matviewinfo.setIstuplebased(false);
+                } catch (NumberFormatException | NullPointerException ignore) {
+                }
+            }
+            matviewinfo.setViewlimit(slideSize);
+
             matviewinfo.setDest(destTable);
             AbstractExpression where = stmt.getSingleTableFilterExpression();
             if (where != null) {

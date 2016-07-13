@@ -39,7 +39,6 @@ namespace voltdb {
 class AbstractExpression;
 class ExecutorVector;
 class PersistentTable;
-class StreamedTable;
 class Table;
 class TableIndex;
 
@@ -181,25 +180,6 @@ protected:
     // aggregated columns, but there might be some other mostly harmless ones in there that are based
     // solely on the immutable primary key (GROUP BY columns).
     std::vector<TableIndex*> m_updatableIndexList;
-};
-
-/**
- * Manage the inserts and updates for a materialized view table based on inserts to a stream.
- * An instance sits between two tables translasting inserts in one table into
- * changes in the other table.
- * The factory method, build, uses information parsed from the catalog to configure
- * initializers for the private constructor.
- */
-class MaterializedViewTriggerForStreamInsert : public  MaterializedViewTriggerForInsert {
-public:
-    static void build(StreamedTable *srcTable,
-                      PersistentTable *destTable,
-                      catalog::MaterializedViewInfo *mvInfo);
-private:
-    MaterializedViewTriggerForStreamInsert(PersistentTable *destTable,
-                                        catalog::MaterializedViewInfo *mvInfo)
-        : MaterializedViewTriggerForInsert(destTable, mvInfo)
-    { }
 };
 
 } // namespace voltdb

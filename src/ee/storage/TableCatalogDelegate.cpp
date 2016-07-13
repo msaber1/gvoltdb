@@ -460,6 +460,15 @@ void TableCatalogDelegate::init(catalog::Database const &catalogDatabase,
     m_table->incrementRefcount();
 }
 
+PersistentTable* TableCatalogDelegate::createWindowTable(catalog::Database const &catalogDatabase,
+         catalog::Table const &catalogTable)
+ {
+    Table *windowTable = constructTableFromCatalog(catalogDatabase, catalogTable);
+    windowTable->incrementRefcount();
+    return dynamic_cast<PersistentTable*>(windowTable);
+}
+
+
 //After catalog is updated call this to ensure your export tables are connected correctly.
 void TableCatalogDelegate::evaluateExport(catalog::Database const &catalogDatabase,
                            catalog::Table const &catalogTable)
