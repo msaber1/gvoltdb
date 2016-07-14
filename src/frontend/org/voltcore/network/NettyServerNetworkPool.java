@@ -37,21 +37,17 @@ public class NettyServerNetworkPool {
     private String m_poolName;
     private int m_numThreads;
     private int m_port;
-    private ChannelInitializer<ServerSocketChannel> m_initializer;
     private ChannelInitializer<SocketChannel> m_childInitializer;
 
     private EventLoopGroup m_eventLoopGroup;
 
     public NettyServerNetworkPool(String poolName, int numThreads, int port,
-                                  ChannelInitializer<ServerSocketChannel> initializer,
                                   ChannelInitializer<SocketChannel> childInitializer) {
         checkArgument(numThreads > 0, "number of threads should be positive");
-        checkNotNull(initializer, "initializer cannot be null");
         checkNotNull(childInitializer, "child initializer cannot be null");
         m_poolName = poolName;
         m_numThreads = numThreads;
         m_port = port;
-        m_initializer = initializer;
         m_childInitializer = childInitializer;
     }
 
@@ -68,7 +64,6 @@ public class NettyServerNetworkPool {
         b.group(m_eventLoopGroup)
                 .channel(isOnLinux ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
                 .localAddress(new InetSocketAddress(m_port))
-                .handler(m_initializer)
                 .childHandler(m_childInitializer);
 
         return b.bind().sync();
