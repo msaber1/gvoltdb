@@ -50,6 +50,7 @@
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
 #include "common/ThreadLocalPool.h"
+#include "common/UDFLibrary.h"
 #include "common/UndoLog.h"
 #include "common/valuevector.h"
 #include "logging/LogManager.h"
@@ -58,7 +59,6 @@
 #include "stats/StatsAgent.h"
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/BinaryLogSinkWrapper.h"
-#include "UDFLibrary.h"
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
