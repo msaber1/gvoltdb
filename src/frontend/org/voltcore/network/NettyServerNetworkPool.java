@@ -27,7 +27,6 @@ import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.epoll.EpollEventLoopGroup;
 import io.netty.channel.epoll.EpollServerSocketChannel;
-import io.netty.channel.socket.ServerSocketChannel;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
 
@@ -39,7 +38,8 @@ public class NettyServerNetworkPool {
     private int m_port;
     private ChannelInitializer<SocketChannel> m_childInitializer;
 
-    private EventLoopGroup m_eventLoopGroup;
+    private EventLoopGroup m_parentEventLoopGroup;
+    private EventLoopGroup m_childEventLoopGroup;
 
     public NettyServerNetworkPool(String poolName, int numThreads, int port,
                                   ChannelInitializer<SocketChannel> childInitializer) {
@@ -54,14 +54,16 @@ public class NettyServerNetworkPool {
     public ChannelFuture start() throws Exception {
         boolean isOnLinux = System.getProperty("os.name").toLowerCase().contains("linux");
         if (isOnLinux) {
-            m_eventLoopGroup = new EpollEventLoopGroup(m_numThreads);
+            m_parentEventLoopGroup = new EpollEventLoopGroup(1);
+            m_childEventLoopGroup = new EpollEventLoopGroup(m_numThreads);
         }
         else {
-            m_eventLoopGroup = new NioEventLoopGroup(m_numThreads);
+            m_parentEventLoopGroup = new NioEventLoopGroup(1);
+            m_childEventLoopGroup = new NioEventLoopGroup(m_numThreads);
         }
 
         ServerBootstrap b = new ServerBootstrap();
-        b.group(m_eventLoopGroup)
+        b.group(m_parentEventLoopGroup, m_childEventLoopGroup)
                 .channel(isOnLinux ? EpollServerSocketChannel.class : NioServerSocketChannel.class)
                 .localAddress(new InetSocketAddress(m_port))
                 .childHandler(m_childInitializer);
@@ -70,6 +72,7 @@ public class NettyServerNetworkPool {
     }
 
     public void shutdown() throws Exception {
-        m_eventLoopGroup.shutdownGracefully().sync();
+        m_parentEventLoopGroup.shutdownGracefully().sync();
+        m_childEventLoopGroup.shutdownGracefully().sync();
     }
 }
