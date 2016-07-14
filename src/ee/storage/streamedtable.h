@@ -33,6 +33,7 @@ namespace voltdb {
 class ExecutorContext;
 class ExportTupleStream;
 class MaterializedViewTriggerForStreamInsert;
+class WindowTable;
 
 /**
  * A streamed table does not store data. It may not be read. It may
@@ -126,7 +127,7 @@ public:
         return std::vector<uint64_t>();
     }
 
-    PersistentTable* redirectStreamToWindow();
+    WindowTable* createWindowFromStream(bool isTupleBased, int viewLimit);
 private:
 
     // Just say 0

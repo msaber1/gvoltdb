@@ -361,6 +361,7 @@ CTX.INPUT['storage'] = """
  RecoveryContext.cpp
  streamedtable.cpp
  StreamedTableStats.cpp
+ windowtable.cpp
  table.cpp
  TableCatalogDelegate.cpp
  tablefactory.cpp

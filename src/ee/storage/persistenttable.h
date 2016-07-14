@@ -527,7 +527,7 @@ public:
 
     std::vector<uint64_t> getBlockAddresses() const;
 
-private:
+protected:
     // Zero allocation size uses defaults.
     PersistentTable(int partitionColumn, const char *signature, bool isMaterialized, int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX, bool drEnabled = false);
 

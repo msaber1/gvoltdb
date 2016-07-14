@@ -42,7 +42,6 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-
 #include <sstream>
 #include "tablefactory.h"
 #include "common/executorcontext.hpp"
@@ -53,54 +52,37 @@
 #include "storage/streamedtable.h"
 #include "storage/temptable.h"
 #include "storage/TempTableLimits.h"
+#include "storage/windowtable.h"
 #include "indexes/tableindexfactory.h"
 #include "common/Pool.hpp"
 
 namespace voltdb {
-Table* TableFactory::getPersistentTable(
-            voltdb::CatalogId databaseId,
-            const std::string &name,
-            TupleSchema* schema,
-            const std::vector<std::string> &columnNames,
-            char *signature,
-            bool tableIsMaterialized,
-            int partitionColumn,
-            bool exportEnabled,
-            bool exportOnly,
-            int tableAllocationTargetSize,
-            int tupleLimit,
-            int32_t compactionThreshold,
-            bool drEnabled)
-{
+Table* TableFactory::getPersistentTable(voltdb::CatalogId databaseId,
+        const std::string &name, TupleSchema* schema,
+        const std::vector<std::string> &columnNames, char *signature,
+        bool tableIsMaterialized, int partitionColumn, bool exportEnabled,
+        bool exportOnly, int tableAllocationTargetSize, int tupleLimit,
+        int32_t compactionThreshold, bool drEnabled) {
     Table *table = NULL;
     StreamedTable *streamedTable = NULL;
     PersistentTable *persistentTable = NULL;
 
     if (exportOnly) {
-        table = streamedTable = new StreamedTable(exportEnabled, partitionColumn);
-    }
-    else {
+        table = streamedTable = new StreamedTable(exportEnabled,
+                partitionColumn);
+    } else {
         table = persistentTable = new PersistentTable(partitionColumn,
-                                                      signature,
-                                                      tableIsMaterialized,
-                                                      tableAllocationTargetSize,
-                                                      tupleLimit,
-                                                      drEnabled);
+                signature, tableIsMaterialized, tableAllocationTargetSize,
+                tupleLimit, drEnabled);
     }
 
-    initCommon(databaseId,
-               table,
-               name,
-               schema,
-               columnNames,
-               true,  // table will take ownership of TupleSchema object
-               compactionThreshold);
+    initCommon(databaseId, table, name, schema, columnNames, true, // table will take ownership of TupleSchema object
+            compactionThreshold);
 
     TableStats *stats;
     if (exportOnly) {
         stats = streamedTable->getTableStats();
-    }
-    else {
+    } else {
         stats = persistentTable->getTableStats();
         // Allocate and assign the tuple storage block to the persistent table ahead of time instead
         // of doing so at time of first tuple insertion. The intent of block allocation ahead of time
@@ -116,25 +98,52 @@ Table* TableFactory::getPersistentTable(
     return table;
 }
 
+WindowTable* TableFactory::getWindowTable(voltdb::CatalogId databaseId,
+        const std::string &name,
+        TupleSchema* schema,
+        const std::vector<std::string> &columnNames,
+        char *signature,
+        int partitionColumn, // defaults provided for ease of testing.
+        int32_t compactionThreshold,
+        bool isTupleBased,
+        int rowLimit,
+        int timeLimit,
+        int slideSize) {
+    Table *table = NULL;
+    WindowTable *windowTable =NULL;
+    table = windowTable = new WindowTable(partitionColumn, signature,
+            isTupleBased, rowLimit, timeLimit, slideSize);
+
+    initCommon(databaseId, table, name, schema, columnNames, true, // table will take ownership of TupleSchema object
+            compactionThreshold);
+
+    // TODO figure out data stats
+
+    TableStats *stats = windowTable->getTableStats();
+    // Allocate and assign the tuple storage block to the persistent table ahead of time instead
+    // of doing so at time of first tuple insertion. The intent of block allocation ahead of time
+    // is to avoid allocation cost at time of tuple insertion
+    TBPtr block = windowTable->allocateNextBlock();
+    assert(block->hasFreeTuples());
+    windowTable->m_blocksWithSpace.insert(block);
+
+    // initialize stats for the table
+    configureStats(name, stats);
+
+    return windowTable;
+
+}
+
 // This is a convenient wrapper for test only.
 StreamedTable* TableFactory::getStreamedTableForTest(
-            voltdb::CatalogId databaseId,
-            const std::string &name,
-            TupleSchema* schema,
-            const std::vector<std::string> &columnNames,
-            ExportTupleStream* wrapper,
-            bool exportEnabled,
-            int32_t compactionThreshold)
-{
+        voltdb::CatalogId databaseId, const std::string &name,
+        TupleSchema* schema, const std::vector<std::string> &columnNames,
+        ExportTupleStream* wrapper, bool exportEnabled,
+        int32_t compactionThreshold) {
     StreamedTable *table = new StreamedTable(exportEnabled, wrapper);
 
-    initCommon(databaseId,
-               table,
-               name,
-               schema,
-               columnNames,
-               true,  // table will take ownership of TupleSchema object
-               compactionThreshold);
+    initCommon(databaseId, table, name, schema, columnNames, true, // table will take ownership of TupleSchema object
+            compactionThreshold);
 
     // initialize stats for the table
     configureStats(name, table->getTableStats());
@@ -142,11 +151,9 @@ StreamedTable* TableFactory::getStreamedTableForTest(
     return table;
 }
 
-TempTable* TableFactory::buildTempTable(
-            const std::string &name,
-            TupleSchema* schema,
-            const std::vector<std::string> &columnNames,
-            TempTableLimits* limits) {
+TempTable* TableFactory::buildTempTable(const std::string &name,
+        TupleSchema* schema, const std::vector<std::string> &columnNames,
+        TempTableLimits* limits) {
     TempTable* table = new TempTable();
     initCommon(0, table, name, schema, columnNames, true);
     table->m_limits = limits;
@@ -156,24 +163,19 @@ TempTable* TableFactory::buildTempTable(
 /**
  * Creates a temp table with the same schema as the provided template table
  */
-TempTable* TableFactory::buildCopiedTempTable(
-            const std::string &name,
-            const Table* template_table,
-            TempTableLimits* limits) {
+TempTable* TableFactory::buildCopiedTempTable(const std::string &name,
+        const Table* template_table, TempTableLimits* limits) {
     TempTable* table = new TempTable();
-    initCommon(0, table, name, template_table->m_schema, template_table->m_columnNames, false);
+    initCommon(0, table, name, template_table->m_schema,
+            template_table->m_columnNames, false);
     table->m_limits = limits;
     return table;
 }
 
-void TableFactory::initCommon(
-            voltdb::CatalogId databaseId,
-            Table *table,
-            const std::string &name,
-            TupleSchema *schema,
-            const std::vector<std::string> &columnNames,
-            const bool ownsTupleSchema,
-            const int32_t compactionThreshold) {
+void TableFactory::initCommon(voltdb::CatalogId databaseId, Table *table,
+        const std::string &name, TupleSchema *schema,
+        const std::vector<std::string> &columnNames, const bool ownsTupleSchema,
+        const int32_t compactionThreshold) {
 
     assert(table != NULL);
     assert(schema != NULL);
@@ -181,12 +183,12 @@ void TableFactory::initCommon(
 
     table->m_databaseId = databaseId;
     table->m_name = name;
-    table->initializeWithColumns(schema, columnNames, ownsTupleSchema, compactionThreshold);
-    assert (table->columnCount() == schema->columnCount());
+    table->initializeWithColumns(schema, columnNames, ownsTupleSchema,
+            compactionThreshold);
+    assert(table->columnCount() == schema->columnCount());
 }
 
-void TableFactory::configureStats(std::string name,
-                                  TableStats *tableStats) {
+void TableFactory::configureStats(std::string name, TableStats *tableStats) {
     // initialize stats for the table
     tableStats->configure(name + " stats");
 }

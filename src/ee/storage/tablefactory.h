@@ -47,7 +47,6 @@
 #define HSTORETABLEFACTORY_H
 
 #include "persistenttable.h"
-
 #include "common/ids.h"
 #include "common/types.h"
 
@@ -62,87 +61,83 @@ class ExportTupleStream;
 class StreamedTable;
 class TempTable;
 class TempTableLimits;
+class WindowTable;
 
 class TableFactory {
-public:
-    //
-    // Every PersistentTable must be instantiated via one of these methods.
-    //
+    public:
+        //
+        // Every PersistentTable must be instantiated via one of these methods.
+        //
 
-    /**
-    * Creates an empty persistent table with given name, columns, PK index, other indexes, partition column, etc.
-    * Every PersistentTable must be instantiated via this method.
-    * Also, columns can't be added/changed/removed after a PersistentTable
-    * instance is made. TableColumn is immutable.
-    */
-    static Table* getPersistentTable(
-        voltdb::CatalogId databaseId,
-        const std::string &name,
-        TupleSchema* schema,
-        const std::vector<std::string> &columnNames,
-        char *signature,
-        bool tableIsMaterialized = false,
-        int partitionColumn = -1, // defaults provided for ease of testing.
-        bool exportEnabled = false,
-        bool exportOnly = false,
-        int tableAllocationTargetSize = 0,
-        int tuplelimit = INT_MAX,
-        int32_t compactionThreshold = 95,
-        bool drEnabled = false);
+        /**
+         * Creates an empty persistent table with given name, columns, PK index, other indexes, partition column, etc.
+         * Every PersistentTable must be instantiated via this method.
+         * Also, columns can't be added/changed/removed after a PersistentTable
+         * instance is made. TableColumn is immutable.
+         */
+        static Table* getPersistentTable(voltdb::CatalogId databaseId,
+                const std::string &name, TupleSchema* schema,
+                const std::vector<std::string> &columnNames, char *signature,
+                bool tableIsMaterialized = false,
+                int partitionColumn = -1, // defaults provided for ease of testing.
+                bool exportEnabled = false, bool exportOnly = false,
+                int tableAllocationTargetSize = 0, int tuplelimit = INT_MAX,
+                int32_t compactionThreshold = 95, bool drEnabled = false);
 
-    static StreamedTable* getStreamedTableForTest(
-                voltdb::CatalogId databaseId,
+        static StreamedTable* getStreamedTableForTest(
+                voltdb::CatalogId databaseId, const std::string &name,
+                TupleSchema* schema,
+                const std::vector<std::string> &columnNames,
+                ExportTupleStream* mockWrapper = NULL, bool exportEnabled =
+                        false, int32_t compactionThreshold = 95);
+
+        static WindowTable* getWindowTable(voltdb::CatalogId databaseId,
                 const std::string &name,
                 TupleSchema* schema,
                 const std::vector<std::string> &columnNames,
-                ExportTupleStream* mockWrapper = NULL,
-                bool exportEnabled = false,
-                int32_t compactionThreshold = 95);
+                char *signature,
+                int partitionColumn = -1, // defaults provided for ease of testing.
+                int32_t compactionThreshold = 95,
+                bool isTupleBased = true,
+                int rowLimit = 10,
+                int timeLimit = 1,
+                int slideSize = 1);
 
-    /**
-     * Creates an empty temp table with given name and columns.
-     * Every TempTable must be instantiated via these factory methods.
-     * TempTable doesn't have constraints or indexes. Also, insert/delete/update
-     * of tuples doesn't involve Undolog.
-     */
-    static TempTable* buildTempTable(
-        const std::string &name,
-        TupleSchema* schema,
-        const std::vector<std::string> &columnNames,
-        TempTableLimits* limits);
+        /**
+         * Creates an empty temp table with given name and columns.
+         * Every TempTable must be instantiated via these factory methods.
+         * TempTable doesn't have constraints or indexes. Also, insert/delete/update
+         * of tuples doesn't involve Undolog.
+         */
+        static TempTable* buildTempTable(const std::string &name,
+                TupleSchema* schema,
+                const std::vector<std::string> &columnNames,
+                TempTableLimits* limits);
 
-    // DEPRECATED name and signature. Use buildTempTable.
-    static TempTable* getTempTable(voltdb::CatalogId databaseId,
-                                   const std::string &name,
-                                   TupleSchema* schema,
-                                   const std::vector<std::string> &columnNames,
-                                   TempTableLimits* limits) {
-        return buildTempTable(name, schema, columnNames, limits);
-    }
+        // DEPRECATED name and signature. Use buildTempTable.
+        static TempTable* getTempTable(voltdb::CatalogId databaseId,
+                const std::string &name, TupleSchema* schema,
+                const std::vector<std::string> &columnNames,
+                TempTableLimits* limits) {
+            return buildTempTable(name, schema, columnNames, limits);
+        }
 
-    /**
-     * Creates an empty temp table from the given template table.
-     */
-    static TempTable* buildCopiedTempTable(
-        const std::string &name,
-        const Table* templateTable,
-        TempTableLimits* limits);
+        /**
+         * Creates an empty temp table from the given template table.
+         */
+        static TempTable* buildCopiedTempTable(const std::string &name,
+                const Table* templateTable, TempTableLimits* limits);
 
-private:
-    static void initCommon(
-        voltdb::CatalogId databaseId,
-        Table *table,
-        const std::string &name,
-        TupleSchema *schema,
-        const std::vector<std::string> &columnNames,
-        const bool ownsTupleSchema,
-        const int32_t compactionThreshold = 95);
+    private:
+        static void initCommon(voltdb::CatalogId databaseId, Table *table,
+                const std::string &name, TupleSchema *schema,
+                const std::vector<std::string> &columnNames,
+                const bool ownsTupleSchema, const int32_t compactionThreshold =
+                        95);
 
-    static void configureStats(
-        std::string name,
-        TableStats *tableStats);
+        static void configureStats(std::string name, TableStats *tableStats);
 };
 
-}// namespace voltdb
+} // namespace voltdb
 
 #endif

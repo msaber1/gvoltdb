@@ -16,7 +16,6 @@
  */
 
 #include "streamedtable.h"
-
 #include "ExportTupleStream.h"
 #include "MaterializedViewTriggerForWrite.h"
 #include "StreamedTableUndoAction.hpp"
@@ -33,30 +32,24 @@
 #include <cstdio>
 #include <sstream>
 
-using namespace voltdb;
+#include "storage/tablefactory.h"
 
-StreamedTable::StreamedTable(bool exportEnabled, int partitionColumn)
-    : Table(1)
-    , m_stats(this)
-    , m_executorContext(ExecutorContext::getExecutorContext())
-    , m_wrapper(NULL)
-    , m_sequenceNo(0)
-    , m_partitionColumn(partitionColumn)
-{
+using namespace voltdb;
+static const std::string WINDOW_TABLE_NAME_SUFFIX = "_WINDOW";
+StreamedTable::StreamedTable(bool exportEnabled, int partitionColumn) :
+        Table(1), m_stats(this), m_executorContext(
+                ExecutorContext::getExecutorContext()), m_wrapper(NULL), m_sequenceNo(
+                0), m_partitionColumn(partitionColumn) {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
         enableStream();
     }
 }
 
-StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper)
-    : Table(1)
-    , m_stats(this)
-    , m_executorContext(ExecutorContext::getExecutorContext())
-    , m_wrapper(wrapper)
-    , m_sequenceNo(0)
-    , m_partitionColumn(-1)
-{
+StreamedTable::StreamedTable(bool exportEnabled, ExportTupleStream* wrapper) :
+        Table(1), m_stats(this), m_executorContext(
+                ExecutorContext::getExecutorContext()), m_wrapper(wrapper), m_sequenceNo(
+                0), m_partitionColumn(-1) {
     // In StreamedTable, a non-null m_wrapper implies export enabled.
     if (exportEnabled) {
         enableStream();
@@ -74,7 +67,7 @@ StreamedTable::createForTest(size_t wrapperBufSize, ExecutorContext *ctx) {
 bool StreamedTable::enableStream() {
     if (!m_wrapper) {
         m_wrapper = new ExportTupleStream(m_executorContext->m_partitionId,
-                                           m_executorContext->m_siteId);
+                m_executorContext->m_siteId);
         return true;
     }
     return false;
@@ -83,16 +76,19 @@ bool StreamedTable::enableStream() {
 /*
  * claim ownership of a view. table is responsible for this view*
  */
-void StreamedTable::addMaterializedView(MaterializedViewTriggerForStreamInsert* view) {
+void StreamedTable::addMaterializedView(
+        MaterializedViewTriggerForStreamInsert* view) {
     m_views.push_back(view);
 }
 
-void StreamedTable::dropMaterializedView(MaterializedViewTriggerForStreamInsert* targetView) {
-    assert( ! m_views.empty());
+void StreamedTable::dropMaterializedView(
+        MaterializedViewTriggerForStreamInsert* targetView) {
+    assert(!m_views.empty());
     MaterializedViewTriggerForStreamInsert* lastView = m_views.back();
     if (targetView != lastView) {
         // iterator to vector element:
-        std::vector<MaterializedViewTriggerForStreamInsert*>::iterator toView = find(m_views.begin(), m_views.end(), targetView);
+        std::vector<MaterializedViewTriggerForStreamInsert*>::iterator toView =
+                find(m_views.begin(), m_views.end(), targetView);
         assert(toView != m_views.end());
         // Use the last view to patch the potential hole.
         *toView = lastView;
@@ -113,42 +109,39 @@ StreamedTable::~StreamedTable() {
 
 TableIterator& StreamedTable::iterator() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not iterate a streamed table.");
+            "May not iterate a streamed table.");
 }
 
-void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible)
-{
+void StreamedTable::deleteAllTuples(bool freeAllocatedStrings, bool fallible) {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not delete all tuples of a streamed"
-                                  " table.");
+            "May not delete all tuples of a streamed"
+                    " table.");
 }
 
 TBPtr StreamedTable::allocateNextBlock() {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not use block alloc interface with "
-                                  "streamed tables.");
+            "May not use block alloc interface with "
+                    "streamed tables.");
 }
 
 void StreamedTable::nextFreeTuple(TableTuple *) {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not use nextFreeTuple with streamed tables.");
+            "May not use nextFreeTuple with streamed tables.");
 }
 
-bool StreamedTable::insertTuple(TableTuple &source)
-{
+bool StreamedTable::insertTuple(TableTuple &source) {
     size_t mark = 0;
     if (m_wrapper) {
         // handle any materialized views
         for (int i = 0; i < m_views.size(); i++) {
             m_views[i]->processTupleInsert(source, true);
         }
-        mark = m_wrapper->appendTuple(m_executorContext->m_lastCommittedSpHandle,
-                                      m_executorContext->currentSpHandle(),
-                                      m_sequenceNo++,
-                                      m_executorContext->currentUniqueId(),
-                                      m_executorContext->currentTxnTimestamp(),
-                                      source,
-                                      ExportTupleStream::INSERT);
+        mark = m_wrapper->appendTuple(
+                m_executorContext->m_lastCommittedSpHandle,
+                m_executorContext->currentSpHandle(), m_sequenceNo++,
+                m_executorContext->currentUniqueId(),
+                m_executorContext->currentTxnTimestamp(), source,
+                ExportTupleStream::INSERT);
         m_tupleCount++;
         UndoQuantum *uq = m_executorContext->getCurrentUndoQuantum();
         if (!uq) {
@@ -156,8 +149,7 @@ bool StreamedTable::insertTuple(TableTuple &source)
             return true;
         }
         uq->registerUndoAction(new (*uq) StreamedTableUndoAction(this, mark));
-    }
-    else {
+    } else {
         // handle any materialized views even though we dont have any connector.
         for (int i = 0; i < m_views.size(); i++) {
             m_views[i]->processTupleInsert(source, true);
@@ -168,20 +160,21 @@ bool StreamedTable::insertTuple(TableTuple &source)
 
 void StreamedTable::loadTuplesFrom(SerializeInputBE&, Pool*) {
     throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                  "May not update a streamed table.");
+            "May not update a streamed table.");
 }
 
 void StreamedTable::flushOldTuples(int64_t timeInMillis) {
     if (m_wrapper) {
         m_wrapper->periodicFlush(timeInMillis,
-                                 m_executorContext->m_lastCommittedSpHandle);
+                m_executorContext->m_lastCommittedSpHandle);
     }
 }
 
 /**
  * Inform the tuple stream wrapper of the table's delegate id
  */
-void StreamedTable::setSignatureAndGeneration(std::string signature, int64_t generation) {
+void StreamedTable::setSignatureAndGeneration(std::string signature,
+        int64_t generation) {
     if (m_wrapper) {
         m_wrapper->setSignatureAndGeneration(signature, generation);
     }
@@ -212,7 +205,8 @@ int64_t StreamedTable::allocatedTupleMemory() const {
  * Get the current offset in bytes of the export stream for this Table
  * since startup.
  */
-void StreamedTable::getExportStreamPositions(int64_t &seqNo, size_t &streamBytesUsed) {
+void StreamedTable::getExportStreamPositions(int64_t &seqNo,
+        size_t &streamBytesUsed) {
     seqNo = m_sequenceNo;
     if (m_wrapper) {
         streamBytesUsed = m_wrapper->bytesUsed();
@@ -223,7 +217,8 @@ void StreamedTable::getExportStreamPositions(int64_t &seqNo, size_t &streamBytes
  * Set the current offset in bytes of the export stream for this Table
  * since startup (used for rejoin/recovery).
  */
-void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUsed) {
+void StreamedTable::setExportStreamPositions(int64_t seqNo,
+        size_t streamBytesUsed) {
     // assume this only gets called from a fresh rejoined node
     assert(m_sequenceNo == 0);
     m_sequenceNo = seqNo;
@@ -232,8 +227,20 @@ void StreamedTable::setExportStreamPositions(int64_t seqNo, size_t streamBytesUs
     }
 }
 
-PersistentTable* StreamedTable::redirectStreamToWindow() {
-    VoltDBEngine* engine = ExecutorContext::getEngine();
-    TableCatalogDelegate *tcd = engine->getTableDelegate(m_name);
-    return  tcd->createWindowTable(*engine->getDatabase(), *engine->getCatalogTable(m_name));
+WindowTable* StreamedTable::createWindowFromStream(bool isTupleBased,
+        int viewLimit) {
+    std::string name = m_name + WINDOW_TABLE_NAME_SUFFIX;
+    char signature[20];
+    WindowTable *window = TableFactory::getWindowTable(m_databaseId,
+            name,
+            m_schema,
+            m_columnNames,
+            signature,
+            m_partitionColumn,
+            95,
+            isTupleBased,
+            viewLimit,
+            viewLimit,
+            1);
+    return window;
 }

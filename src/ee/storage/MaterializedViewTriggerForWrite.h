@@ -23,6 +23,7 @@
 namespace voltdb {
 
 class StreamedTable;
+class WindowTable;
 class TableCatalogDelegate;
 
 /**
@@ -110,15 +111,15 @@ public:
                       PersistentTable *destTable,
                       catalog::MaterializedViewInfo *mvInfo);
 
+    void processTupleInsert(const TableTuple &newTuple, bool fallible);
+
 private:
-    MaterializedViewTriggerForStreamInsert(PersistentTable *srcTable,
+    MaterializedViewTriggerForStreamInsert(WindowTable *srcTable,
                                     PersistentTable *destTable,
-                                    catalog::MaterializedViewInfo *mvInfo)
-    : MaterializedViewTriggerForWrite(srcTable, destTable, mvInfo)
-    , m_window(srcTable)
-    {}
+                                    catalog::MaterializedViewInfo *mvInfo);
+
     // the materialized view window table
-    PersistentTable *m_window;
+    WindowTable *m_window;
 };
 
 } // namespace voltdb

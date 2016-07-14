@@ -66,8 +66,7 @@ class TableCatalogDelegate {
 
     void init(catalog::Database const &catalogDatabase,
             catalog::Table const &catalogTable);
-    PersistentTable *createWindowTable(catalog::Database const &catalogDatabase,
-                 catalog::Table const &catalogTable);
+
     void evaluateExport(catalog::Database const &catalogDatabase,
             catalog::Table const &catalogTable);
 

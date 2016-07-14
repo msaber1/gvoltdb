@@ -18,6 +18,7 @@
 
 #include "persistenttable.h"
 #include "streamedtable.h"
+#include "windowtable.h"
 #include "TableCatalogDelegate.hpp"
 
 #include "catalog/indexref.h"
@@ -476,19 +477,31 @@ void MaterializedViewTriggerForStreamInsert::build(StreamedTable *srcTable,
                                             PersistentTable *destTable,
                                             catalog::MaterializedViewInfo *mvInfo) {
     VOLT_TRACE("construct MaterializedViewTriggerForStreamInsertTrigger...");
-    PersistentTable* windowTable = srcTable->redirectStreamToWindow();
+    WindowTable* temp = srcTable->createWindowFromStream(mvInfo->isTupleBased(),(int) mvInfo->viewlimit());
     MaterializedViewTriggerForStreamInsert* view =
-        new MaterializedViewTriggerForStreamInsert(windowTable, destTable, mvInfo);
+        new MaterializedViewTriggerForStreamInsert(temp, destTable, mvInfo);
     srcTable->addMaterializedView(view);
     VOLT_TRACE("finished initialization.");
 }
 
+MaterializedViewTriggerForStreamInsert::MaterializedViewTriggerForStreamInsert(WindowTable *srcTable,
+                                                            PersistentTable *destTable,
+                                                  catalog::MaterializedViewInfo *mvInfo)
+    :MaterializedViewTriggerForWrite(dynamic_cast<PersistentTable*>(srcTable), destTable, mvInfo)
+    ,m_window(srcTable)
+    {}
+
 // redirct the write to the temp persistent table
-void processTupleInsert(const TableTuple &newTuple, bool fallible) {
-    if (true) {
-        printf(" Window is full\n");
-    } else {
-        printf(" Window is still not full \n");
+void MaterializedViewTriggerForStreamInsert::processTupleInsert(const TableTuple &newTuple, bool fallible) {
+    TableTuple & tempTuple = newTuple;
+    if (! m_window->insertWindowTuple(tempTuple)) {
+        std::cout <<"Error insert into window" << endl;
+    }
+    MaterializedViewTriggerForInsert::processTupleInsert(newTuple, fallible);
+    std::cout << m_window->debugWindowTupleQueue();
+    while (m_window->isWindowTableFull()) {
+        TableTuple oldTuple = m_window->popWindowTuple();
+        MaterializedViewTriggerForWrite::processTupleDelete(oldTuple, fallible);
     }
 }
 

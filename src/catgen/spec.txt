@@ -168,7 +168,6 @@ begin MaterializedViewInfo          "Information used to build and update a mate
   Statement* fallbackQueryStmts     "Statements to search for mview min/max fallback value"
   int viewlimit                     "A maximum number of rows in a view for groupbycols"
   bool isTupleBased                 "Is this sliding window tuple based or time based"
-  Table? window                      "
 end
 
 begin AuthProgram javaonly "The name of a program with access to a specific procedure. This is effectively a weak reference to a 'program'"
