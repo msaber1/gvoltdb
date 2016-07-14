@@ -370,6 +370,15 @@ enum IndexLookupType {
 };
 
 // ------------------------------------------------------------------
+// User-defined function Types
+// ------------------------------------------------------------------
+enum UDFType {
+    UDF_TYPE_INVALID   = 0,
+    UDF_TYPE_SCALAR    = 1,
+    UDF_TYPE_AGGREGATE = 2,
+};
+
+// ------------------------------------------------------------------
 // Table Stream Types
 //
 // IMPORTANT: Keep this enum in sync with the Java equivalent
@@ -615,6 +624,9 @@ ExpressionType stringToExpression(std::string str );
 
 std::string indexLookupToString(IndexLookupType type);
 IndexLookupType stringToIndexLookup(std::string str );
+
+std::string UDFToString(UDFType type);
+UDFType stringToUDF(std::string str );
 
 int64_t getMaxTypeValue (ValueType type);
 

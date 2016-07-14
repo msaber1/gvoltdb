@@ -823,6 +823,31 @@ IndexLookupType stringToIndexLookup(string str)
     return INDEX_LOOKUP_TYPE_INVALID;
 }
 
+string UDFToString(UDFType type) {
+    switch(type) {
+        case UDF_TYPE_INVALID:
+            return "INVALID";
+        case UDF_TYPE_SCALAR:
+            return "SCALAR";
+        case UDF_TYPE_AGGREGATE:
+            return "AGGREGATE";
+    }
+    return "INVALID";
+}
+
+UDFType stringToUDF(string str) {
+    if (str == "INVALID") {
+        return UDF_TYPE_INVALID;
+    }
+    if (str == "SCALAR") {
+        return UDF_TYPE_SCALAR;
+    }
+    if (str == "AGGREGATE") {
+        return UDF_TYPE_AGGREGATE;
+    }
+    return UDF_TYPE_INVALID;
+}
+
 /** takes in 0-F, returns 0-15 */
 int32_t hexCharToInt(char c) {
     c = static_cast<char>(toupper(c));

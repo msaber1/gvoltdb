@@ -47,6 +47,7 @@ import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.UDF;
 import org.voltdb.catalog.UDFLibrary;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
@@ -55,6 +56,7 @@ import org.voltdb.compilereport.TableAnnotation;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.types.UDFType;
 
 /**
  *
@@ -427,7 +429,27 @@ public abstract class CatalogSchemaTools {
         sb.append(
             String.format("CREATE LIBRARY %s FROM '%s';\n\n",
                 udflib.getLibraryname(),
-                udflib.getFilepath()));
+                udflib.getFilepath())
+            );
+        for (UDF udf : udflib.getLoadedudfs()) {
+            toSchema(sb, udf);
+        }
+    }
+
+    public static void toSchema(StringBuilder sb, UDF udf) {
+        sb.append("CREATE ");
+        if (UDFType.get(udf.getFunctiontype()) == UDFType.SCALAR) {
+            sb.append("SCALAR");
+        }
+        else {
+            sb.append("AGGREGATE");
+        }
+        sb.append(
+            String.format(" FUNCTION %s FROM %s IN LIBRARY %s;\n\n",
+                udf.getFunctionname(),
+                udf.getEntryname(),
+                udf.getSourcelibrary().getLibraryname())
+            );
     }
 
     /**

@@ -57,6 +57,7 @@ import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.MaterializedViewInfo;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
+import org.voltdb.catalog.UDF;
 import org.voltdb.catalog.UDFLibrary;
 import org.voltdb.common.Constants;
 import org.voltdb.common.Permission;
@@ -84,6 +85,7 @@ import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
+import org.voltdb.types.UDFType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
 import org.voltdb.utils.CatalogUtil;
@@ -541,7 +543,12 @@ public class DDLCompiler {
             msg.append(String.format("library %s was not found.", libraryName));
             throw m_compiler.new VoltCompilerException(msg.toString());
         }
-
+        String entryName = statementMatcher.group("entryName");
+        UDF udf = udflib.getLoadedudfs().add(functionName);
+        udf.setFunctionname(functionName);
+        udf.setFunctiontype(UDFType.SCALAR.getValue());
+        udf.setSourcelibrary(udflib);
+        udf.setEntryname(entryName);
 
         System.out.println(
             String.format("FunctionType: %s\nFunctionName: %s\nEntryName: %s\nLibraryName: %s",
