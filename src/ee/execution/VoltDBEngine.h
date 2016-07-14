@@ -50,7 +50,7 @@
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
 #include "common/ThreadLocalPool.h"
-#include "common/UDFLibrary.h"
+#include "udf/UDFLibrary.h"
 #include "common/UndoLog.h"
 #include "common/valuevector.h"
 #include "logging/LogManager.h"

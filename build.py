@@ -220,7 +220,7 @@ CTX.INPUT['catalog'] = """
  viewtrigger.cpp
  udf.cpp
  udflibrary.cpp
- udfparameter.cpp
+ udfargument.cpp
 """
 
 CTX.INPUT['structures'] = """
@@ -386,6 +386,10 @@ CTX.INPUT['stats'] = """
 CTX.INPUT['logging'] = """
  JNILogProxy.cpp
  LogManager.cpp
+"""
+
+CTX.INPUT['udf'] = """
+ UDFValidator.cpp
 """
 
 # specify the third party input

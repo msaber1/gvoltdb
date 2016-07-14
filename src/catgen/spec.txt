@@ -106,9 +106,9 @@ end
 begin Program javaonly "The name of a program with access (effectively a username for an app server)"
 end
 
-begin UDFParameter     "A user-defined function parameter"
-  int index            "The index of the parameter"
-  int parameterType    "The type of the parameter"
+begin UDFArgument     "A user-defined function argument"
+  int index           "The index of the argument"
+  int argumentType    "The type of the argument"
 end
 
 begin UDF                         "A user-defined function"
@@ -116,7 +116,8 @@ begin UDF                         "A user-defined function"
   int            functionType     "The type of the function"
   UDFLibrary?    sourceLibrary    "The library that holds this function"
   string         entryName        "The entry class name of the function"
-  UDFParameter*  parameters       "The parameters of the function"
+  int            returnType       "Return type of the function"
+  UDFArgument*   arguments        "The arguments of the function"
 end
 
 begin UDFLibrary           "A user-defined function library"
