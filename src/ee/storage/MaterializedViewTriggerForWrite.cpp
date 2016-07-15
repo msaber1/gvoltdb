@@ -480,6 +480,7 @@ void MaterializedViewTriggerForStreamInsert::build(StreamedTable *srcTable,
     WindowTable* temp = srcTable->createWindowFromStream(mvInfo->isTupleBased(),(int) mvInfo->viewlimit());
     MaterializedViewTriggerForStreamInsert* view =
         new MaterializedViewTriggerForStreamInsert(temp, destTable, mvInfo);
+    temp->addMaterializedView(view);
     srcTable->addMaterializedView(view);
     VOLT_TRACE("finished initialization.");
 }
@@ -493,15 +494,14 @@ MaterializedViewTriggerForStreamInsert::MaterializedViewTriggerForStreamInsert(W
 
 // redirct the write to the temp persistent table
 void MaterializedViewTriggerForStreamInsert::processTupleInsert(const TableTuple &newTuple, bool fallible) {
-    TableTuple & tempTuple = newTuple;
+    TableTuple& tempTuple = const_cast<TableTuple&>(newTuple); 
     if (! m_window->insertWindowTuple(tempTuple)) {
         std::cout <<"Error insert into window" << endl;
     }
-    MaterializedViewTriggerForInsert::processTupleInsert(newTuple, fallible);
     std::cout << m_window->debugWindowTupleQueue();
     while (m_window->isWindowTableFull()) {
-        TableTuple oldTuple = m_window->popWindowTuple();
-        MaterializedViewTriggerForWrite::processTupleDelete(oldTuple, fallible);
+    		m_window->popWindowTuple();
+        // TableTuple oldTuple = m_window->popWindowTuple();
     }
 }
 

@@ -100,7 +100,7 @@ bool WindowTable::insertWindowTuple(TableTuple &source) {
 
 bool WindowTable::isWindowTableFull() {
     if (m_isTupleBased) {
-        return m_tupleCount > m_rowLimit;
+        return (m_tupleCount > m_rowLimit);
     } else {
         return false; // TODO time based window
     }
@@ -136,10 +136,10 @@ std::string WindowTable::tableType() const {
 
 std::string WindowTable::debugWindowTupleQueue() {
     std::ostringstream buffer;
-    buffer << "m_windowTupleQueue is tupleBased " << m_isTupleBased << endl;
+    buffer << this << " m_windowTupleQueue is tupleBased " << m_isTupleBased << endl;
 
     buffer << "There are currently " << m_windowTupleQueue.size() << endl;
-
+    buffer << "There should be " << m_tupleCount<< " Visible "<< visibleTupleCount() << endl;
     // buffer << " Front is: " << m_windowTupleQueue.front().toJsonArray() << endl;
 
     // buffer  << " Back is: " << m_windowTupleQueue.back().toJsonArray() << endl;
