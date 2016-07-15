@@ -71,6 +71,8 @@
     <pathelement location='${build.client.dir}' />
     <fileset dir='${vendor.lib.dir}'>
         <include name='javaee-api-6.0.jar' />
+        <include name='netty-all-4.1.2.Final.jar' />
+        <include name='guava-18.0.jar' />
     </fileset>
     <pathelement path="${java.class.path}"/>
 </path>
