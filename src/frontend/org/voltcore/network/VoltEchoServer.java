@@ -29,8 +29,8 @@ import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
 public class VoltEchoServer implements Runnable {
-    private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
-            CoreUtils.getThreadFactory("Client acceptor threads", "Client acceptor"));
+    //private final ExecutorService m_executor = CoreUtils.getBoundedThreadPoolExecutor(128, 10L, TimeUnit.SECONDS,
+    //        CoreUtils.getThreadFactory("Client acceptor threads", "Client acceptor"));
     private VoltNetworkPool m_networkPool;
     private int m_port;
     private ServerSocketChannel m_serverSocket;
@@ -86,15 +86,7 @@ public class VoltEchoServer implements Runnable {
             do {
                 final SocketChannel socket = m_serverSocket.accept();
                 final AcceptorRunnable acceptorRunnable = new AcceptorRunnable(socket);
-                while (true) {
-                    try {
-                        m_executor.execute(acceptorRunnable);
-                        break;
-                    } catch (RejectedExecutionException e) {
-                        e.printStackTrace();
-                        Thread.sleep(1);
-                    }
-                }
+                acceptorRunnable.run();
             } while (m_running);
         } catch (Exception e) {
             e.printStackTrace();
@@ -104,16 +96,6 @@ public class VoltEchoServer implements Runnable {
             } catch (IOException e) {
                 e.printStackTrace();
                 System.exit(-1);
-            }
-            synchronized (this) {
-                Thread.interrupted();
-                m_executor.shutdownNow();
-                try {
-                    m_executor.awaitTermination(5, TimeUnit.MINUTES);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
             }
         }
     }
