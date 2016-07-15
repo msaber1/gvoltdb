@@ -494,14 +494,13 @@ MaterializedViewTriggerForStreamInsert::MaterializedViewTriggerForStreamInsert(W
 
 // redirct the write to the temp persistent table
 void MaterializedViewTriggerForStreamInsert::processTupleInsert(const TableTuple &newTuple, bool fallible) {
-    TableTuple& tempTuple = const_cast<TableTuple&>(newTuple); 
+    TableTuple& tempTuple = const_cast<TableTuple&>(newTuple);
     if (! m_window->insertWindowTuple(tempTuple)) {
         std::cout <<"Error insert into window" << endl;
     }
     std::cout << m_window->debugWindowTupleQueue();
     while (m_window->isWindowTableFull()) {
-    		m_window->popWindowTuple();
-        // TableTuple oldTuple = m_window->popWindowTuple();
+        m_window->popWindowTuple();
     }
 }
 
