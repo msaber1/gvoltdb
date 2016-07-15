@@ -60,7 +60,9 @@ public:
     }
 };
 
+
 REGISTER_VOLTDB_SCALAR_UDF(Sine);
 REGISTER_VOLTDB_SCALAR_UDF(Cosine);
 REGISTER_VOLTDB_SCALAR_UDF(Tangent);
-}
+
+} // namespace voltdb
