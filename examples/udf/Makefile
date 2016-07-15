@@ -7,7 +7,7 @@ CXXFLAGS = -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qua
            -DBOOST_ALL_NO_LIB -Wno-unused-local-typedefs -Wno-absolute-value \
            -Wno-ignored-qualifiers -fno-strict-aliasing --std=c++11 -g3 -O3 -mmmx -msse \
            -msse2 -msse3 -DNDEBUG -DVOLT_LOG_LEVEL=500 -DMACOSX -arch x86_64 -MMD -MP \
-           -fPIC -shared
+           -fPIC -shared -DUDF_COMPILE
 ISYSTEM = -isystem /Users/yzhang/Github/voltdb/third_party/cpp \
 		  -isystem /Users/yzhang/Github/voltdb/third_party/cpp/google-s2-geometry/geometry/include
 INCLUDE = -I/Users/yzhang/Github/voltdb/src/ee -I.

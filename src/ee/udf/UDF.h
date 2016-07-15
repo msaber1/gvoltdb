@@ -67,27 +67,22 @@ public:
 
 protected:
     double getDoubleArgument(int index) {
-        assert(ValuePeeker::peekValueType(m_arguments[index]) == VALUE_TYPE_DOUBLE);
         return ValuePeeker::peekDouble(m_arguments[index]);
     }
 
     int8_t getTinyIntArgument(int index) {
-        assert(ValuePeeker::peekValueType(m_arguments[index]) == VALUE_TYPE_TINYINT);
         return ValuePeeker::peekTinyInt(m_arguments[index]);
     }
 
     int16_t getSmallIntArgument(int index) {
-        assert(ValuePeeker::peekValueType(m_arguments[index]) == VALUE_TYPE_SMALLINT);
         return ValuePeeker::peekSmallInt(m_arguments[index]);
     }
 
     int32_t getIntegerArgument(int index) {
-        assert(ValuePeeker::peekValueType(m_arguments[index]) == VALUE_TYPE_INTEGER);
         return ValuePeeker::peekInteger(m_arguments[index]);
     }
 
     bool getBooleanArgument(int index) {
-        assert(ValuePeeker::peekValueType(m_arguments[index]) == VALUE_TYPE_BOOLEAN);
         return ValuePeeker::peekBoolean(m_arguments[index]);
     }
 
