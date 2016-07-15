@@ -49,13 +49,13 @@ extern "C" JNIEXPORT jintArray JNICALL Java_org_voltdb_compiler_UDFCompiler_getF
         throwFatalException("%s\n", error);
     }
     UserDefinedFunction *udf = createFunction();
-    vector<ValueType> parameterTypes = udf->getParameterTypes();
+    vector<ValueType> argumentTypes = udf->getArgumentTypes();
     ValueType returnType = udf->getReturnType();
-    jintArray ret = env->NewIntArray(parameterTypes.size()+1);
+    jintArray ret = env->NewIntArray(argumentTypes.size()+1);
     jint *retarr = env->GetIntArrayElements(ret, NULL);
     retarr[0] = returnType;
-    for (int i=0; i<parameterTypes.size(); i++) {
-        retarr[i+1] = parameterTypes[i];
+    for (int i=0; i<argumentTypes.size(); i++) {
+        retarr[i+1] = argumentTypes[i];
     }
     env->ReleaseIntArrayElements(ret, retarr, 0);
     env->ReleaseStringUTFChars(libFilePath, nativeLibFilePath);

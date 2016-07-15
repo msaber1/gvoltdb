@@ -36,18 +36,18 @@ public:
         m_returnType = returnType;
     }
 
-    const std::vector<ValueType>& getParameterTypes() const {
-        return m_parameterTypes;
+    const std::vector<ValueType>& getArgumentTypes() const {
+        return m_argumentTypes;
     }
 
-    void addParameterOfType(ValueType parameterType) {
-        m_parameterTypes.push_back(parameterType);
+    void addArgumentOfType(ValueType parameterType) {
+        m_argumentTypes.push_back(parameterType);
     }
 
     virtual UDFType getFunctionType() = 0;
 
 private:
-    std::vector<ValueType> m_parameterTypes;
+    std::vector<ValueType> m_argumentTypes;
     ValueType m_returnType;
 };
 

@@ -18,34 +18,49 @@
 #include "udf/UDF.h"
 #include "udf/UDFRegistrar.h"
 
+#include <cmath>
+
+#define PI 3.14159
+
 namespace voltdb {
 
-class Increment : public ScalarFunction {
+class Sine : public ScalarFunction {
 public:
-    Increment() {
-        addParameterOfType(VALUE_TYPE_INTEGER);
-        setReturnType(VALUE_TYPE_INTEGER);
+    Sine() {
+        addArgumentOfType(VALUE_TYPE_DOUBLE);
+        setReturnType(VALUE_TYPE_DOUBLE);
     }
     NValue p_execute() {
-        int32_t value = getIntegerArgument(0);
-        return ValueFactory::getIntegerValue(value + 1);
+        double degree = getDoubleArgument(0);
+        return ValueFactory::getDoubleValue(sin(degree / 180 * PI));
     }
 };
 
-class Addition : public ScalarFunction {
+class Cosine : public ScalarFunction {
 public:
-    Addition() {
-        addParameterOfType(VALUE_TYPE_INTEGER);
-        addParameterOfType(VALUE_TYPE_INTEGER);
-        setReturnType(VALUE_TYPE_INTEGER);
+    Cosine() {
+        addArgumentOfType(VALUE_TYPE_DOUBLE);
+        setReturnType(VALUE_TYPE_DOUBLE);
     }
     NValue p_execute() {
-        int32_t value1 = getIntegerArgument(0);
-        int32_t value2 = getIntegerArgument(1);
-        return ValueFactory::getIntegerValue(value1 + value2);
+        double degree = getDoubleArgument(0);
+        return ValueFactory::getDoubleValue(cos(degree / 180 * PI));
     }
 };
 
-REGISTER_VOLTDB_SCALAR_UDF(Increment);
-REGISTER_VOLTDB_SCALAR_UDF(Addition);
+class Tangent : public ScalarFunction {
+public:
+    Tangent() {
+        addArgumentOfType(VALUE_TYPE_DOUBLE);
+        setReturnType(VALUE_TYPE_DOUBLE);
+    }
+    NValue p_execute() {
+        double degree = getDoubleArgument(0);
+        return ValueFactory::getDoubleValue(tan(degree / 180 * PI));
+    }
+};
+
+REGISTER_VOLTDB_SCALAR_UDF(Sine);
+REGISTER_VOLTDB_SCALAR_UDF(Cosine);
+REGISTER_VOLTDB_SCALAR_UDF(Tangent);
 }
