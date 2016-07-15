@@ -41,7 +41,9 @@ extern "C" JNIEXPORT jintArray JNICALL Java_org_voltdb_compiler_UDFCompiler_getF
         fprintf(stderr, "Failed to load shared library file %s\n", nativeLibFilePath);
         throwFatalException("Failed to load shared library file %s", nativeLibFilePath);
     }
-    CreateFunction createFunction = (CreateFunction)(dlsym(libHandle, "createFunction"));
+    char createFunctionName[50];
+    sprintf(createFunctionName, "createFunction%s", nativeEntryName);
+    CreateFunction createFunction = (CreateFunction)(dlsym(libHandle, createFunctionName));
     if ((error = dlerror()) != NULL)  {
         fprintf(stderr, "%s\n", error);
         throwFatalException("%s\n", error);

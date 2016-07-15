@@ -117,6 +117,7 @@ begin UDF                         "A user-defined function"
   UDFLibrary?    sourceLibrary    "The library that holds this function"
   string         entryName        "The entry class name of the function"
   int            returnType       "Return type of the function"
+  int            functionId       "Function ID"
   UDFArgument*   arguments        "The arguments of the function"
 end
 

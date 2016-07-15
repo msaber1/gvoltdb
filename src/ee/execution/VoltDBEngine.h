@@ -50,6 +50,7 @@
 #include "common/Pool.hpp"
 #include "common/serializeio.h"
 #include "common/ThreadLocalPool.h"
+#include "udf/UDF.h"
 #include "udf/UDFLibrary.h"
 #include "common/UndoLog.h"
 #include "common/valuevector.h"
@@ -144,6 +145,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_drPartitionedConflictStreamedTable = partitionedConflictTable;
             m_drReplicatedConflictStreamedTable = replicatedConflictTable;
         }
+
+        ScalarFunction *getScalarFunction(const int functionId);
 
         // -------------------------------------------------
         // Execution Functions
@@ -498,6 +501,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         std::map<std::string, Table*> m_tablesByName;
 
         std::map<std::string, UDFLibrary*> m_libraries;
+        std::map<int, ScalarFunction*> m_scalarFunctions;
 
         /*
          * Map of catalog table ids to snapshotting tables.

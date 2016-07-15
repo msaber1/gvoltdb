@@ -15,6 +15,8 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#include "common/executorcontext.hpp"
+#include "execution/VoltDBEngine.h"
 #include "expressions/functionexpression.h"
 #include "expressions/geofunctions.h"
 #include "expressions/expressionutil.h"
@@ -83,6 +85,10 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }
     throw SQLException(sqlstatecode, msg_format_buffer);
+}
+
+NValue NValue::callScalarFunction(ScalarFunction *scalarFunction, const std::vector<NValue>& arguments) {
+    return scalarFunction->execute(arguments);
 }
 
 namespace functionexpression {
@@ -189,6 +195,57 @@ private:
     const std::vector<AbstractExpression *>& m_args;
 };
 
+/*
+ * User-defined scalar function.
+ */
+class ScalarFunctionExpression : public AbstractExpression {
+public:
+    ScalarFunctionExpression(ScalarFunction *scalarFunction,
+                                        const std::vector<AbstractExpression *>& args)
+        : AbstractExpression(EXPRESSION_TYPE_FUNCTION),
+          m_args(args),
+          m_scalarFunction(scalarFunction) {}
+
+    virtual ~ScalarFunctionExpression() {
+        size_t i = m_args.size();
+        while (i--) {
+            delete m_args[i];
+        }
+        delete &m_args;
+    }
+
+    virtual bool hasParameter() const {
+        for (size_t i = 0; i < m_args.size(); i++) {
+            assert(m_args[i]);
+            if (m_args[i]->hasParameter()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
+        //TODO: Could make this vector a member, if the memory management implications
+        // (of the NValue internal state) were clear -- is there a penalty for longer-lived
+        // NValues that outweighs the current per-eval allocation penalty?
+        std::vector<NValue> nValue(m_args.size());
+        for (int i = 0; i < m_args.size(); ++i) {
+            nValue[i] = m_args[i]->eval(tuple1, tuple2);
+        }
+        return NValue::callScalarFunction(m_scalarFunction, nValue);
+    }
+
+    std::string debugInfo(const std::string &spacer) const {
+        std::stringstream buffer;
+        buffer << spacer << "ScalarFunctionExpression " << std::endl;
+        return (buffer.str());
+    }
+
+private:
+    const std::vector<AbstractExpression *>& m_args;
+    ScalarFunction *m_scalarFunction;
+};
+
 }
 
 using namespace functionexpression;
@@ -198,6 +255,11 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     AbstractExpression* ret = 0;
     assert(arguments);
     size_t nArgs = arguments->size();
+    if (IS_USER_DEFINED_ID(functionId)) {
+        VoltDBEngine *engine = ExecutorContext::getEngine();
+        ScalarFunction *scalarFunction = engine->getScalarFunction(functionId);
+        return new ScalarFunctionExpression(scalarFunction, *arguments);
+    }
     if (nArgs == 0) {
         switch(functionId) {
         case FUNC_CURRENT_TIMESTAMP:

@@ -285,6 +285,16 @@ static const int FUNC_VOLT_MIN_VALID_TIMESTAMP         = 21021;     // minimum v
 static const int FUNC_VOLT_MAX_VALID_TIMESTAMP         = 21022;     // maximum valid timestamp
 static const int FUNC_VOLT_IS_VALID_TIMESTAMP          = 21023;     // is a timestamp valid
 
+/*
+ * These are the first and last user defined function indices.
+ * We also need a generic user defined function, to make a
+ * user defined template instance.  The range of ids is
+ * [FUNC_VOLT_BEGIN_UDF_ID, FUNC_VOLT_END_UDF_ID).
+ */
+static const int FUNC_VOLT_BEGIN_UDF_ID                = 1000000;
+static const int FUNC_VOLT_END_UDF_ID                  = 2000000;
+#define IS_USER_DEFINED_ID(id) ((FUNC_VOLT_BEGIN_UDF_ID <= (id)) && ((id) < FUNC_VOLT_END_UDF_ID))
+
 // From Tokens.java.
 static const int SQL_TRIM_LEADING                     = 149;
 static const int SQL_TRIM_TRAILING                    = 284;

@@ -18,10 +18,16 @@
 #ifndef UDFLIBRARY_H
 #define UDFLIBRARY_H
 
-#include "common/FatalException.hpp"
 #include <dlfcn.h>
+#include <map>
+#include <cstdio>
+
+#include "common/FatalException.hpp"
+#include "udf/UDF.h"
 
 namespace voltdb {
+
+typedef UserDefinedFunction *(*CreateFunction)();
 
 class UDFLibrary {
 public:
@@ -33,6 +39,17 @@ public:
     }
     ~UDFLibrary() {
         dlclose(m_libHandle);
+    }
+
+    ScalarFunction *loadScalarFunction(const string &functionName, const string &entryName) {
+        char *error;
+        char createFunctionName[50];
+        sprintf(createFunctionName, "createFunction%s", entryName.c_str());
+        CreateFunction createFunction = (CreateFunction)(dlsym(m_libHandle, createFunctionName));
+        if ((error = dlerror()) != NULL)  {
+            throwFatalException("%s\n", error);
+        }
+        return static_cast<ScalarFunction*>(createFunction());
     }
 private:
     void *m_libHandle;

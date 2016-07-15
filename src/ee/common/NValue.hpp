@@ -52,6 +52,8 @@
 
 namespace voltdb {
 
+class ScalarFunction;
+
 /*
  * Objects are length preceded with a short length value or a long length value
  * depending on how many bytes are needed to represent the length. These
@@ -451,6 +453,8 @@ class NValue {
 
     template <int F> // template for SQL functions of multiple NValues
     static NValue call(const std::vector<NValue>& arguments);
+
+    static NValue callScalarFunction(ScalarFunction *scalarFunction, const std::vector<NValue>& arguments);
 
     /// Iterates over UTF8 strings one character "code point" at a time, being careful not to walk off the end.
     class UTF8Iterator {

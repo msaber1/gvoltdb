@@ -18,9 +18,9 @@
 #ifndef UDFFACTORY_H
 #define UDFFACTORY_H
 
-#define REGISTER_VOLTDB_SCALAR_UDF(FunctionClass)            \
-extern "C" UserDefinedFunction *createFunction() {          \
-    return new FunctionClass();                             \
+#define REGISTER_VOLTDB_SCALAR_UDF(FunctionClass)                    \
+extern "C" UserDefinedFunction *createFunction##FunctionClass() {    \
+    return new FunctionClass();                                      \
 }
 
 #endif

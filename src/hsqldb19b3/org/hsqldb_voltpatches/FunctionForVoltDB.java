@@ -88,6 +88,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         // These ID numbers need to be unique values for FunctionSQL.functType.
         // Assume that 1-19999 are reserved for existing HSQL functions.
         // That leaves new VoltDB-specific functions free to use values in the 20000s.
+        //
+        // We allocate function ids in the range [1000000, 2000000) for VoltDB
+        // User Defined Functions.
         static final int FUNC_CONCAT                     = 124;
 
         private static final int FUNC_VOLT_SQL_ERROR     = 20000;
@@ -171,6 +174,11 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_MAX_VALID_TIMESTAMP          = 21022;    // Maximum valid timestamp.
         static final int FUNC_VOLT_IS_VALID_TIMESTAMP           = 21023;    // Is a timestamp value in range?
 
+        /*
+         * All VoltDB User Defined Functions must have ids in this range.
+         */
+        static final int FUNC_VOLT_BEGIN_UDF_ID                 = 1000000;
+        static final int FUNC_VOLT_END_UDF_ID                   = 2000000;
 
         /*
          * Note: The name must be all lower case.
@@ -389,6 +397,18 @@ public class FunctionForVoltDB extends FunctionSQL {
             return m_typeParameter;
         }
 
+        private static int udfCount = 0;
+
+        static int addUserDefinedFunctionId(String functionName,
+                                                   Type returnType,
+                                                   Type[] parameterTypes,
+                                                   short[] syntax) {
+            int seqId = udfCount + FUNC_VOLT_BEGIN_UDF_ID;
+            udfCount++;
+            FunctionId fid = new FunctionId(functionName, returnType, seqId, -1, parameterTypes, syntax);
+            by_LC_name.put(functionName, fid);
+            return seqId;
+        }
     }
 
     public static final int FUNC_VOLT_ID_FOR_CONTAINS = FunctionId.FUNC_VOLT_CONTAINS;
@@ -742,6 +762,29 @@ public class FunctionForVoltDB extends FunctionSQL {
         }
         sb.append(Tokens.T_CLOSEBRACKET);
         return sb.toString();
+    }
+
+    public static int registerUserDefinedFunction(String functionName,
+                                                  Type returnType, Type[] parameterTypes) {
+        short [] syntax = new short[parameterTypes.length * 2 + 1];
+        syntax[0] = Tokens.OPENBRACKET;
+        int idx = 1;
+        for (int parId = 0; parId < parameterTypes.length; parId++) {
+            if (parId > 0) {
+                syntax[idx++] = Tokens.COMMA;
+            }
+            syntax[idx++] = Tokens.QUESTION;
+        }
+        syntax[syntax.length - 1] = Tokens.CLOSEBRACKET;
+        return FunctionId.addUserDefinedFunctionId(functionName, returnType, parameterTypes, syntax);
+    }
+
+    public static int getFunctionId(String functionName) {
+        FunctionId fid = FunctionId.fn_by_name(functionName);
+        if (fid == null) {
+            return -1;
+        }
+        return fid.getId();
     }
 
 }

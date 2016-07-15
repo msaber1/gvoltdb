@@ -19,11 +19,14 @@ package org.voltdb.compiler;
 
 import java.util.regex.Matcher;
 
+import org.hsqldb_voltpatches.FunctionForVoltDB;
+import org.hsqldb_voltpatches.types.Type;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.UDF;
-import org.voltdb.catalog.UDFLibrary;
 import org.voltdb.catalog.UDFArgument;
+import org.voltdb.catalog.UDFLibrary;
 import org.voltdb.compiler.VoltCompiler.VoltCompilerException;
 import org.voltdb.types.UDFType;
 
@@ -61,23 +64,62 @@ public class UDFCompiler {
             msg.append(String.format("library %s was not found.", libraryName));
             throw compiler.new VoltCompilerException(msg.toString());
         }
-
-        String entryName = statementMatcher.group("entryName");
         UDF udf = udflib.getLoadedudfs().add(functionName);
         udf.setFunctionname(functionName);
         udf.setFunctiontype(UDFType.SCALAR.getValue());
         udf.setSourcelibrary(udflib);
+        String entryName = statementMatcher.group("entryName");
         udf.setEntryname(entryName);
+
         // Get the function prototype
         int[] prototype = getFunctionPrototype(udflib.getFilepath(), entryName);
+        Type[] parameterTypes = new Type[prototype.length-1];
+        Type returnType = getHSQLType(prototype[0]);
         udf.setReturntype(prototype[0]);
         CatalogMap<UDFArgument> arguments = udf.getArguments();
-        for (int i=1; i<prototype.length; i++) {
-            int index = i-1;
+        for (int i=1, index=0; i<prototype.length; i++, index++) {
             UDFArgument argument = arguments.add(String.valueOf(index));
             argument.setIndex(index);
             argument.setArgumenttype(prototype[i]);
+            parameterTypes[index] = getHSQLType(prototype[i]);
         }
+        int functionId = FunctionForVoltDB.getFunctionId(functionName);
+        if (functionId == -1) {
+            // If the function is already registered, we do not register it again.
+            functionId = FunctionForVoltDB.registerUserDefinedFunction(functionName, returnType, parameterTypes);
+        }
+        udf.setFunctionid(functionId);
         return true;
+    }
+
+    public static Type getHSQLType(int voltTypeId) {
+        VoltType voltType = VoltType.get((byte)voltTypeId);
+        switch(voltType) {
+            case FLOAT:
+                return Type.SQL_DOUBLE;
+            case TINYINT:
+                return Type.SQL_CHAR;
+            case SMALLINT:
+                return Type.SQL_SMALLINT;
+            case INTEGER:
+                return Type.SQL_INTEGER;
+            case BIGINT:
+                return Type.SQL_BIGINT;
+            case TIMESTAMP:
+                return Type.SQL_TIMESTAMP;
+            case GEOGRAPHY_POINT:
+                return Type.VOLT_GEOGRAPHY_POINT;
+            case GEOGRAPHY:
+                return Type.VOLT_GEOGRAPHY;
+            case STRING:
+                return Type.SQL_VARCHAR;
+            case VARBINARY:
+                return Type.SQL_VARBINARY;
+            case BOOLEAN:
+                return Type.SQL_BOOLEAN;
+            case DECIMAL:
+                return Type.SQL_DECIMAL;
+        }
+        return null;
     }
 }

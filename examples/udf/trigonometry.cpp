@@ -32,5 +32,20 @@ public:
     }
 };
 
-REGISTER_VOLTDB_SCALAR_UDF(Increment)
+class Addition : public ScalarFunction {
+public:
+    Addition() {
+        addParameterOfType(VALUE_TYPE_INTEGER);
+        addParameterOfType(VALUE_TYPE_INTEGER);
+        setReturnType(VALUE_TYPE_INTEGER);
+    }
+    NValue p_execute() {
+        int32_t value1 = getIntegerArgument(0);
+        int32_t value2 = getIntegerArgument(1);
+        return ValueFactory::getIntegerValue(value1 + value2);
+    }
+};
+
+REGISTER_VOLTDB_SCALAR_UDF(Increment);
+REGISTER_VOLTDB_SCALAR_UDF(Addition);
 }
