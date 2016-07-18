@@ -103,7 +103,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
         }
 
-        ((SpScheduler) m_scheduler).setShortCircuitRead();
+        ((SpScheduler) m_scheduler).setShortCircuitRead(false);
 
         // configure DR
         PartitionDRGateway drGateway =

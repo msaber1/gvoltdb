@@ -144,16 +144,16 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     private PartitionDRGateway m_drGateway = new PartitionDRGateway();
     private final SnapshotCompletionMonitor m_snapMonitor;
     // used to decide if we should shortcut reads
-    private final Consistency.ReadLevel m_defaultConsistencyReadLevel;
+    private Consistency.ReadLevel m_defaultConsistencyReadLevel;
     private ShortCircuitReadLog m_shortCircuitReadLog = null;
-    public final long MAX_BUFFERED_READ_DURATION_CHECK = 50; // millisecond
+    public final long MAX_BUFFERED_READ_DURATION_CHECK = 1000; // millisecond
 
     // Need to track when command log replay is complete (even if not performed) so that
     // we know when we can start writing viable replay sets to the fault log.
     boolean m_replayComplete = false;
     // The DurabilityListener is not thread-safe. Access it only on the Site thread.
     private final DurabilityListener m_durabilityListener;
-    //Generator of pre-IV2ish timestamp based unique IDs
+    // Generator of pre-IV2ish timestamp based unique IDs
     private final UniqueIdGenerator m_uniqueIdGenerator;
 
     // the current not-needed-any-more point of the repair log.
@@ -419,7 +419,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
          */
         boolean shortcutRead = message.isReadOnly() &&
                 Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
-        if (!m_isLeader) {
+        if (!m_isLeader && m_shortCircuitReadLog != null) {
             m_shortCircuitReadLog.setLastSpTruncationHandle(message.getTruncationHandle());
         }
 
@@ -708,7 +708,8 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                 m_mailbox.send(message.getInitiatorHSId(), message);
                 return;
             }
-            if (m_defaultConsistencyReadLevel == ReadLevel.SAFE_1) {
+            if (m_shortCircuitReadLog != null) {
+                assert(m_defaultConsistencyReadLevel == ReadLevel.SAFE_1);
                 m_shortCircuitReadLog.offerSp(message, m_isLeader, m_repairLogTruncationHandle);
                 return;
             }
@@ -787,7 +788,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         boolean shortcutRead = message.isReadOnly() &&
                 Consistency.ReadLevel.isShortcutRead(m_defaultConsistencyReadLevel);
-        m_shortCircuitReadLog.setLastMpTruncationHandle(message.getTruncationHandle());
+        if (m_shortCircuitReadLog != null) {
+            m_shortCircuitReadLog.setLastMpTruncationHandle(message.getTruncationHandle());
+        }
 
         FragmentTaskMessage msg = message;
         long newSpHandle;
@@ -1000,7 +1003,9 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
-        m_shortCircuitReadLog.setLastMpTruncationHandle(message.getTruncationHandle());
+        if (m_shortCircuitReadLog != null) {
+            m_shortCircuitReadLog.setLastMpTruncationHandle(message.getTruncationHandle());
+        }
 
         CompleteTransactionMessage msg = message;
         if (m_isLeader) {
@@ -1166,11 +1171,14 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
     }
 
-    public void setShortCircuitRead() {
+    public void setConsistentReadLevel(ReadLevel readLevel) {
+        m_defaultConsistencyReadLevel = readLevel;
+    }
+
+    public void setShortCircuitRead(boolean isForTest) {
         if (m_defaultConsistencyReadLevel != ReadLevel.SAFE_1) {
             return;
         }
-
         m_shortCircuitReadLog = new ShortCircuitReadLog(m_mailbox);
 
         VoltDB.instance().schedulePriorityWork(
@@ -1181,10 +1189,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
                             TruncationHandleMessage message = new TruncationHandleMessage(
                                     m_repairLogTruncationHandle);
                             m_mailbox.send(m_sendToHSIds, message);
+                            System.out.println("TruncationHandleMessage sent to ids: " + m_sendToHSIds.length);
                         }
                     }
                 },
-                10,
+                MAX_BUFFERED_READ_DURATION_CHECK,
                 MAX_BUFFERED_READ_DURATION_CHECK,
                 TimeUnit.MILLISECONDS);
     }
