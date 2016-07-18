@@ -23,6 +23,8 @@ import io.netty.channel.socket.SocketChannel;
 public class NettyEchoServerChannelInitializer extends ChannelInitializer<SocketChannel> {
     @Override
     protected void initChannel(SocketChannel ch) throws Exception {
+        ch.config().setKeepAlive(true);
+        ch.config().setTcpNoDelay(true);
         ch.pipeline().addLast(new NettyEchoServerHandler());
     }
 }
