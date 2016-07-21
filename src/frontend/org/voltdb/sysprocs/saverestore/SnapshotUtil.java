@@ -152,6 +152,15 @@ public class SnapshotUtil {
         int clusterId)
     throws IOException
     {
+        System.out.println("path: " + path);
+        System.out.println("nonce " + nonce);
+
+        // create the parent directory if it doesn't already exist.
+        final File parent = new File(path);
+        if (!parent.exists() || !parent.isDirectory()) {
+            parent.mkdir();
+        }
+
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
         if (f.exists()) {
             if (!f.delete()) {
@@ -160,6 +169,7 @@ public class SnapshotUtil {
         }
         boolean success = false;
         try {
+            System.out.println("absolutePath: " + f.getAbsolutePath());
             final FileOutputStream fos = new FileOutputStream(f);
             StringWriter sw = new StringWriter();
             JSONStringer stringer = new JSONStringer();
