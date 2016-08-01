@@ -51,7 +51,7 @@ public class Dr2MultipartTaskMessage extends VoltMessage {
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        buf.put(VoltDbMessageFactory.SNAPSHOT_CHECK_RESPONSE_ID);
+        buf.put(VoltDbMessageFactory.DR2_MULTIPART_TASK_ID);
 
         if (m_invocation != null) {
             m_invocation.flattenToBuffer(buf);
