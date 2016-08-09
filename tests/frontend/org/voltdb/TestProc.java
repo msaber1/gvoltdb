@@ -41,38 +41,159 @@
  * the License.
  */package org.voltdb;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.types.TimestampType;
 
 public class TestProc {
     public static void main(String[] args) throws Exception {
-
+        String          hostname            = null;
+        String          alertSeverity       = null;
+        String          alertStatus[]       = null;
+        int             sourceTopologyId[]  = null;
+        TimestampType   fromDate            = null;
+        TimestampType   toDate              = null;
+        String          categories[]        = null;
+        String          source              = null;
+        int             start               = -1;
+        int             limit               = -1;
         /*
          * Instantiate a client and connect to the database.
          */
+        for (int argc = 0; argc < args.length; argc += 1) {
+            if ("-H".equals(args[argc])) {
+                argc += 1;
+                hostname = stringArg(args, argc);
+            } else if ("--alertSeverity".equals(args[argc])) {
+                argc += 1;
+                alertSeverity = stringArg(args, argc);
+            } else if ("--alertStatus".equals(args[argc])) {
+                argc += 1;
+                alertStatus = stringArrayArg(args, argc);
+            } else if ("--source".equals(args[argc])) {
+                argc += 1;
+                source = stringArg(args, argc);
+            } else if ("--sourceTopologyId".equals(args[argc])) {
+                argc += 1;
+                sourceTopologyId = intArrayArg(args, argc);
+            } else if ("--fromDate".equals(args[argc])) {
+                argc += 1;
+                fromDate = timestampArg(args, argc);
+            } else if ("--toDate".equals(args[argc])) {
+                argc += 1;
+                toDate = timestampArg(args, argc);
+            } else if ("--categories".equals(args[argc])) {
+                argc += 1;
+                categories = stringArrayArg(args, argc);
+            } else if ("--start".equals(args[argc])) {
+                argc += 1;
+                start = intArg(args, argc);
+            } else if ("--limit".equals(args[argc])) {
+                argc += 1;
+                limit = intArg(args, argc);
+            } else {
+                System.err.printf("Unknown command line parameter: \"%s\"\n",
+                                  args[argc]);
+                System.exit(100);
+            }
+
+        }
+        if (hostname == null) {
+            System.err.printf("Need a hostname.\n");
+            System.exit(100);
+        } else if (start < 0) {
+            System.err.printf("Start is negative.\n");
+            System.exit(100);
+        } else if (limit < 0) {
+            System.err.printf("Limit it negative.\n");
+            System.exit(100);
+        }
         org.voltdb.client.Client myApp;
         myApp = ClientFactory.createClient();
-        myApp.createConnection("volt12j");
-
+        myApp.createConnection(hostname);
         /*
          * Load the database.
          */
         ClientResponse cr = myApp.callProcedure("t_alert_select_alert_criteria",
-                                                "HIGH",
-                                                null,
-                                                new int[]{3},
-                                                null,
-                                                null,
-                                                new String[]{"Table"},
-                                                null,
-                                                0,
-                                                5);
+                                                alertSeverity,
+                                                alertStatus,
+                                                sourceTopologyId,
+                                                fromDate,
+                                                toDate,
+                                                categories,
+                                                source,
+                                                start,
+                                                limit);
         if (ClientResponse.SUCCESS != cr.getStatus()) {
             System.out.printf("Failed: Client Response is %d\n", cr.getStatus());
             return;
         }
         VoltTable vt = cr.getResults()[0];
         System.out.printf("Table:\n%s\n", vt.toString());
+    }
+
+    private static boolean isNull(String arg) {
+        return "null".equals(arg);
+    }
+
+    private static String getArg(String[] args, int argc) {
+        return args[argc];
+    }
+
+    private static int intArg(String[] args, int argc) {
+        String arg = getArg(args, argc);
+        return Integer.valueOf(arg);
+    }
+
+    private static TimestampType timestampArg(String[] args, int argc) {
+        String arg = getArg(args, argc);
+        if (isNull(arg)) {
+            return null;
+        }
+        return null;
+    }
+
+    private static String[] stringArrayArg(String[] args, int argc) {
+        String arg = getArg(args, argc);
+        if (isNull(arg)) {
+            return null;
+        }
+        String strings[] = arg.split("\\.");
+        List<String> l = new ArrayList<>();
+        for (String str : strings) {
+            if (str.length() > 0) {
+                l.add(str);
+            }
+        }
+        strings = new String[l.size()];
+        for (int idx = 0; idx < l.size(); idx += 1) {
+            strings[idx] = l.get(idx);
+        }
+        return strings;
+    }
+
+    private static int[] intArrayArg(String[] args, int argc) {
+        String arg = getArg(args, argc);
+        if (isNull(arg)) {
+            return null;
+        }
+        String[] strings = stringArrayArg(args, argc);
+        int  answer[] = new int[strings.length];
+        for (int idx = 0; idx < strings.length; idx += 1) {
+            answer[idx] = Integer.parseInt(strings[idx]);
+        }
+        return answer;
+    }
+
+    private static String stringArg(String[] args, int argc) {
+        String arg = getArg(args, argc);
+        if (isNull(arg)) {
+            return null;
+        }
+        return arg;
     }
 
 }
