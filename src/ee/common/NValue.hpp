@@ -862,6 +862,20 @@ private:
             return storage + SHORT_OBJECT_LENGTHLENGTH; // skip prefix.
         }
         const StringRef* sref = getObjectPointer();
+        // Disable the line below to debug
+        //*
+        if (NULL == sref) {
+            if (!isNull()) {
+                VOLT_TRACE("NValue::getObject_withoutNull: null string ref in non-null object.");
+                PRINT_STACK_TRACE();
+                throwDynamicSQLException("NValue::getObject_withoutNull: null string ref in non-null object.");
+            } else {
+                VOLT_TRACE("NValue::getObject_withoutNull: null string ref..");
+                PRINT_STACK_TRACE();
+                throwDynamicSQLException("NValue::getObject_withoutNull: null string ref.")
+            }
+        }
+        // */
         return sref->getObject(lengthOut);
     }
 
@@ -2764,6 +2778,21 @@ inline NValue NValue::initFromTupleStorage(const void *storage, ValueType type, 
                                  getTypeName(type).c_str());
                                  /* no break */
     }
+    //*/  Disable this to debug.
+    switch (type) {
+    case VALUE_TYPE_VARBINARY:
+    case VALUE_TYPE_VARCHAR:
+    case VALUE_TYPE_GEOGRAPHY:
+        if (0 == reinterpret_cast<void *>(retval.m_data) && (retval.m_data[13] & OBJECT_NULL_BIT) != 0) {
+            VOLT_TRACE("NValue::initFromTupleStorage(): Zero string data without null flag.\n");
+            PRINT_STACK_TRACE();
+            throwDynamicSQLException("NValue::initFromTupleStorage(): Zero string data without null flag.\n");
+        }
+        break;
+    default:
+        break;
+    }
+    // */
     return retval;
 }
 
