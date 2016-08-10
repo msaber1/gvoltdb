@@ -51,22 +51,40 @@ import org.voltdb.types.TimestampType;
 public class TestProc {
     public static void main(String[] args) throws Exception {
         String          hostname            = null;
-        String          alertSeverity       = null;
+        int             port                = 0;
+        Object          alertSeverity       = null;
         String          alertStatus[]       = null;
         int             sourceTopologyId[]  = null;
         TimestampType   fromDate            = null;
         TimestampType   toDate              = null;
         String          categories[]        = null;
-        String          source              = null;
+        Object          source              = null;
         int             start               = -1;
         int             limit               = -1;
+        TimestampType   now                 = new TimestampType();
         /*
          * Instantiate a client and connect to the database.
          */
         for (int argc = 0; argc < args.length; argc += 1) {
-            if ("-H".equals(args[argc])) {
+            if (("-H".equals(args[argc])) || ("--hostname".equals(args[argc]))) {
                 argc += 1;
-                hostname = stringArg(args, argc);
+                Object hnobj = stringArg(args, argc);
+                if ( ! (hnobj instanceof String)) {
+                    System.err.printf("Parameter to %s must a non-null string\n", args[argc - 1]);
+                    System.exit(100);
+                }
+                String hn = (String)hnobj;
+                String hh[] = hn.split(":");
+                if (hh.length == 2) {
+                    hostname = hh[0];
+                    port = Integer.parseInt(hh[1]);
+                } else if (hh.length == 1) {
+                    hostname = hn;
+                    port = 21212;
+                } else {
+                    System.err.printf("Usage: --hostname name:port or --hostname name\n");
+                    System.exit(100);
+                }
             } else if ("--alertSeverity".equals(args[argc])) {
                 argc += 1;
                 alertSeverity = stringArg(args, argc);
@@ -113,7 +131,11 @@ public class TestProc {
         }
         org.voltdb.client.Client myApp;
         myApp = ClientFactory.createClient();
-        myApp.createConnection(hostname);
+        if (port <= 0) {
+            myApp.createConnection(hostname);
+        } else {
+            myApp.createConnection(hostname, port);
+        }
         /*
          * Load the database.
          */
@@ -132,7 +154,7 @@ public class TestProc {
             return;
         }
         VoltTable vt = cr.getResults()[0];
-        System.out.printf("Table:\n%s\n", vt.toString());
+        System.out.printf("Table - %d rows:\n%s\n", vt.getRowCount(), vt.toString());
     }
 
     private static boolean isNull(String arg) {
@@ -151,9 +173,11 @@ public class TestProc {
     private static TimestampType timestampArg(String[] args, int argc) {
         String arg = getArg(args, argc);
         if (isNull(arg)) {
-            return null;
+            return new TimestampType(Long.MIN_VALUE);
         }
-        return null;
+        long stamp = Long.parseLong(arg);
+        TimestampType tp = new TimestampType(stamp);
+        return tp;
     }
 
     private static String[] stringArrayArg(String[] args, int argc) {
@@ -188,10 +212,10 @@ public class TestProc {
         return answer;
     }
 
-    private static String stringArg(String[] args, int argc) {
+    private static Object stringArg(String[] args, int argc) {
         String arg = getArg(args, argc);
         if (isNull(arg)) {
-            return null;
+            return VoltType.NULL_STRING_OR_VARBINARY;
         }
         return arg;
     }
