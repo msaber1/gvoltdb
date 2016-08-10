@@ -114,13 +114,18 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     Table* input_table = m_abstractNode->getInputTable();
     assert (input_table);
 
-    VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
+    VOLT_DEBUG("Sequential Scanning table : %s which has %d active, %d"
+               " allocated",
+               input_table->name().c_str(),
+               (int)input_table->activeTupleCount(),
+               (int)input_table->allocatedTupleCount());
+    VOLT_DEBUG("INPUT TABLE: %s\n", input_table->debug().c_str());
 
     assert (m_columnCount == (int)node->getOutputColumnNames().size());
     if (all_tuple_array == NULL && all_param_array == NULL) {
         for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
             assert(expression_array[ctr]);
-            VOLT_TRACE("predicate[%d]: %s", ctr,
+            VOLT_DEBUG("predicate[%d]: %s", ctr,
                        expression_array[ctr]->debug(true).c_str());
         }
     }
@@ -138,23 +143,26 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
         //
         TableTuple &temp_tuple = output_table->tempTuple();
         if (all_tuple_array != NULL) {
-            VOLT_TRACE("sweet, all tuples");
+            VOLT_DEBUG("sweet, all tuples");
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+		VOLT_DEBUG("Copying tuple column %d", ctr);
                 temp_tuple.setNValue(ctr, tuple.getNValue(all_tuple_array[ctr]));
             }
         } else if (all_param_array != NULL) {
-            VOLT_TRACE("sweet, all params");
+            VOLT_DEBUG("sweet, all params");
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+		VOLT_DEBUG("Copying param column %d", ctr);
                 temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
             }
         } else {
             for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+		VOLT_DEBUG("Copying column %d", ctr);
                 temp_tuple.setNValue(ctr, expression_array[ctr]->eval(&tuple, NULL));
             }
         }
         output_table->insertTupleNonVirtual(temp_tuple);
 
-        VOLT_TRACE("OUTPUT TABLE: %s\n", output_table->debug().c_str());
+        VOLT_DEBUG("OUTPUT TABLE: %s\n", output_table->debug().c_str());
     }
 
     cleanupInputTempTable(input_table);
