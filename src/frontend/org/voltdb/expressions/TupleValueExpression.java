@@ -119,19 +119,6 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public Object clone() {
-        TupleValueExpression clone = (TupleValueExpression)super.clone();
-        clone.m_columnIndex = m_columnIndex;
-        clone.m_tableName = m_tableName;
-        clone.m_tableAlias = m_tableAlias;
-        clone.m_columnName = m_columnName;
-        clone.m_columnAlias = m_columnAlias;
-        clone.m_origStmtId = m_origStmtId;
-        clone.m_differentiator = m_differentiator;
-        return clone;
-    }
-
-    @Override
     public void validate() throws Exception {
         super.validate();
 

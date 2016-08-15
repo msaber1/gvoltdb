@@ -1137,10 +1137,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         // load the output schema if it was marked significant.
         if ( !jobj.isNull( Members.OUTPUT_SCHEMA.name() ) ) {
-            m_outputSchema = new NodeSchema();
             m_hasSignificantOutputSchema = true;
             jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA.name() );
             int size = jarray.length();
+            m_outputSchema = new NodeSchema(size);
             for( int i = 0; i < size; i++ ) {
                 m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
             }

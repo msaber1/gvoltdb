@@ -112,7 +112,7 @@ public class MaterializedScanPlanNode extends AbstractPlanNode {
         m_hasSignificantOutputSchema = true;
         // fill in the table schema if we haven't already
         if (m_outputSchema == null) {
-            m_outputSchema = new NodeSchema();
+            m_outputSchema = new NodeSchema(1);
             // must produce a tuple value expression for the one column.
             m_outputSchema.addColumn(
                 new SchemaColumn(m_outputExpression.getTableName(),

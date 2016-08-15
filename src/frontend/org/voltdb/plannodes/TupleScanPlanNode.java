@@ -54,7 +54,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
         m_hasSignificantOutputSchema = true;
         // copy columns
         for (AbstractExpression columnExpr : columnExprs) {
-            m_columnList.add((AbstractExpression) columnExpr.clone());
+            m_columnList.add(columnExpr.clone());
         }
     }
 
@@ -66,7 +66,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void generateOutputSchema(Database db) {
         if (m_tableSchema == null) {
-            m_tableSchema = new NodeSchema();
+            m_tableSchema = new NodeSchema(m_columnList.size());
             int columnIdx = 1;
             for (AbstractExpression colExpr : m_columnList) {
                 assert(colExpr instanceof ParameterValueExpression);

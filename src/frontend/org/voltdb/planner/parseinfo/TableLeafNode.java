@@ -72,7 +72,7 @@ public class TableLeafNode extends JoinNode {
     @Override public String getTableAlias() { return m_tableScan.getTableAlias(); }
 
     @Override
-    public void analyzeJoinExpressions(List<AbstractExpression> noneList) {
+    public void analyzeJoinExpressions(List<AbstractExpression> noneList, int stmtScanCount) {
         m_joinInnerList.addAll(ExpressionUtil.uncombineAny(getJoinExpression()));
         m_whereInnerList.addAll(ExpressionUtil.uncombineAny(getWhereExpression()));
     }

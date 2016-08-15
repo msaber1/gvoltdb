@@ -584,8 +584,7 @@ public abstract class AbstractParsedStmt {
                 throw new PlanningErrorException("invalid RANK expression found: " + ele.name);
             }
         }
-        String columnName = WINDOWED_AGGREGATE_COLUMN_NAME;
-        String alias      = WINDOWED_AGGREGATE_COLUMN_NAME;
+        String alias = WINDOWED_AGGREGATE_COLUMN_NAME;
         if (exprNode.attributes.containsKey("alias")) {
             alias = exprNode.attributes.get("alias");
         }
@@ -958,10 +957,10 @@ public abstract class AbstractParsedStmt {
         if (expr instanceof AggregateExpression) {
             int paramIdx = NEXT_PARAMETER_ID++;
             ParameterValueExpression pve = new ParameterValueExpression(paramIdx, expr);
+            assert(m_parentStmt != null);
             // Disallow aggregation of parent columns in a subquery.
             // except the case HAVING AGG(T1.C1) IN (SELECT T2.C2 ...)
             List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
-            assert(m_parentStmt != null);
             for (TupleValueExpression tve : tves) {
                 int origId = tve.getOrigStmtId();
                 if (m_stmtId != origId && m_parentStmt.m_stmtId != origId) {
@@ -1295,7 +1294,8 @@ public abstract class AbstractParsedStmt {
      */
     HashMap<AbstractExpression, Set<AbstractExpression>> analyzeValueEquivalence() {
         // collect individual where/join expressions
-        m_joinTree.analyzeJoinExpressions(m_noTableSelectionList);
+        m_joinTree.analyzeJoinExpressions(m_noTableSelectionList,
+                m_tableList.size());
         return m_joinTree.getAllEquivalenceFilters();
     }
 
@@ -1570,8 +1570,7 @@ public abstract class AbstractParsedStmt {
         // table aliases we will map table scans to expressions rather
         // than tables to expressions, and not confuse ourselves with
         // different instances of the same table in self joins.
-        HashMap<String, List<AbstractExpression> > baseTableAliases =
-                new HashMap< >();
+        HashMap<String, List<AbstractExpression> > baseTableAliases = new HashMap<>();
         for (ParsedColInfo col : orderByColumns()) {
             AbstractExpression expr = col.expression;
             //
@@ -1581,16 +1580,9 @@ public abstract class AbstractParsedStmt {
             //      The table must have an alias.  It might not have a name.
             //   3. If the HashSet has size > 1 we can't use this expression.
             //
-            List<AbstractExpression> baseTVEExpressions = expr.findAllTupleValueSubexpressions();
-            Set<String> baseTableNames = new HashSet<>();
-            for (AbstractExpression ae : baseTVEExpressions) {
-                assert(ae instanceof TupleValueExpression);
-                TupleValueExpression atve = (TupleValueExpression)ae;
-                String tableAlias = atve.getTableAlias();
-                assert(tableAlias != null);
-                baseTableNames.add(tableAlias);
-            }
-            if (baseTableNames.size() != 1) {
+            Set<String> foundTableAliases = new HashSet<>();
+            expr.findTVEAliases(foundTableAliases);
+            if (foundTableAliases.size() != 1) {
                 // Table-spanning ORDER BYs -- like ORDER BY A.X + B.Y are not helpful.
                 // Neither are (nonsense) constant (table-less) expressions.
                 continue;
@@ -1598,11 +1590,7 @@ public abstract class AbstractParsedStmt {
             // Everything in the baseTVEExpressions table is a column
             // in the same table and has the same alias. So just grab the first one.
             // All we really want is the alias.
-            AbstractExpression baseTVE = baseTVEExpressions.get(0);
-            String nextTableAlias = ((TupleValueExpression)baseTVE).getTableAlias();
-            // This was tested above.  But the assert above may prove to be over cautious
-            // and disappear.
-            assert(nextTableAlias != null);
+            String nextTableAlias = foundTableAliases.iterator().next();
             List<AbstractExpression> perTable = baseTableAliases.get(nextTableAlias);
             if (perTable == null) {
                 perTable = new ArrayList<>();

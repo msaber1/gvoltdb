@@ -129,7 +129,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super(srcNode.m_targetTableName, srcNode.m_targetTableAlias);
         m_tableSchema = srcNode.m_tableSchema;
         m_predicate = srcNode.m_predicate;
-        m_tableScanSchema = srcNode.m_tableScanSchema.clone();
+        m_tableScanSchema = srcNode.m_tableScanSchema;
         m_differentiatorMap = new HashMap<>(srcNode.m_differentiatorMap);
         for (AbstractPlanNode inlineChild : srcNode.getInlinePlanNodes().values()) {
             addInlinePlanNode(inlineChild);

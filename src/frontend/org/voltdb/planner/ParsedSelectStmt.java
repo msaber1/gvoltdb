@@ -465,7 +465,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
 
         // Replace TVE for display columns
-        m_projectSchema = new NodeSchema();
+        m_projectSchema = new NodeSchema(m_displayColumns.size());
         for (ParsedColInfo col : m_displayColumns) {
             AbstractExpression expr = col.expression;
             if (hasComplexAgg()) {
@@ -540,7 +540,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             }
 
             ParsedColInfo col = new ParsedColInfo();
-            col.expression = (AbstractExpression) expr.clone();
+            col.expression = expr.clone();
             assert(col.expression instanceof AggregateExpression);
             if (col.expression.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
                 m_hasAverage = true;
@@ -630,25 +630,26 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
     }
 
-    private void updateAvgExpressions () {
-        List<AbstractExpression> optimalAvgAggs = new ArrayList<>();
+    private void replaceAvgExpressions () {
+        List<AbstractExpression> avgAggs = new ArrayList<>(m_aggregationList.size());
         Iterator<AbstractExpression> itr = m_aggregationList.iterator();
         while (itr.hasNext()) {
             AbstractExpression aggExpr = itr.next();
             assert(aggExpr instanceof AggregateExpression);
             if (aggExpr.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
+                avgAggs.add(aggExpr);
                 itr.remove();
-
-                AbstractExpression left = new AggregateExpression(ExpressionType.AGGREGATE_SUM);
-                left.setLeft((AbstractExpression)aggExpr.getLeft().clone());
-                AbstractExpression right = new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
-                right.setLeft((AbstractExpression)aggExpr.getLeft().clone());
-
-                optimalAvgAggs.add(left);
-                optimalAvgAggs.add(right);
             }
         }
-        m_aggregationList.addAll(optimalAvgAggs);
+        for (AbstractExpression aggExpr : avgAggs) {
+            AbstractExpression aggArgument = aggExpr.getLeft();
+            AbstractExpression left = new AggregateExpression(ExpressionType.AGGREGATE_SUM);
+            left.setLeft(aggArgument);
+            m_aggregationList.add(left);
+            AbstractExpression right = new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
+            right.setLeft(aggArgument.clone());
+            m_aggregationList.add(right);
+        }
     }
 
     static void parseLimitAndOffset(VoltXMLElement limitNode, VoltXMLElement offsetNode, LimitOffset limitOffset) {
@@ -730,7 +731,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         if (isDistributed) {
             colExpr = colExpr.replaceAVG();
-            updateAvgExpressions();
+            replaceAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(colExpr);
 
@@ -741,7 +742,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                     "into a value of some other type.");
         }
         // ENG-6291: If parent is UNION, voltdb wants to make inline varchar to be outlined
-        if(isParentUnionClause() && AbstractExpression.hasInlineVarType(colExpr)) {
+        if (isParentUnionClause() && AbstractExpression.hasInlineVarType(colExpr)) {
             AbstractExpression expr = new OperatorExpression();;
             expr.setExpressionType(ExpressionType.OPERATOR_CAST);
             VoltType voltType = colExpr.getValueType();
@@ -929,7 +930,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             public AbstractExpression adjust(AbstractExpression expr) {
                 if (isDistributed) {
                     expr = expr.replaceAVG();
-                    updateAvgExpressions();
+                    replaceAvgExpressions();
                 }
 
                 ExpressionUtil.finalizeValueTypes(expr);
@@ -988,7 +989,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         }
         if (isDistributed) {
             m_having = m_having.replaceAVG();
-            updateAvgExpressions();
+            replaceAvgExpressions();
         }
         ExpressionUtil.finalizeValueTypes(m_having);
         m_having = ExpressionUtil.evaluateExpression(m_having);
@@ -1003,7 +1004,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
         for (AbstractExpression expr: m_aggregationList) {
             ParsedColInfo col = new ParsedColInfo();
-            col.expression = (AbstractExpression) expr.clone();
+            col.expression = expr.clone();
             assert(col.expression instanceof AggregateExpression);
             if (col.expression.getExpressionType() == ExpressionType.AGGREGATE_AVG) {
                 m_hasAverage = true;
@@ -1041,8 +1042,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             return groupbyElement;
         }
         // DISTINCT with GROUP BY
-        m_distinctGroupByColumns = new ArrayList<>();
-        m_distinctProjectSchema = new NodeSchema();
+        m_distinctGroupByColumns = new ArrayList<>(m_displayColumns.size());
+        m_distinctProjectSchema = new NodeSchema(m_displayColumns.size());
 
         // Iterate the Display columns
         for (ParsedColInfo col: m_displayColumns) {
@@ -1206,9 +1207,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
 
             // Create new compare equal expression
             AbstractExpression equalityExpr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                    expr, (AbstractExpression) colInfo.expression.clone());
+                    expr, colInfo.expression.clone());
             // Check if this column contains aggregate expression
-            if (ExpressionUtil.containsAggregateExpression(colInfo.expression)) {
+            if (colInfo.expression.hasAggregateSubexpression()) {
                 // we are not creating any new aggregate expressions so
                 // the aggregation list doen't need to be updated. Only HAVING expression itself
                 havingList.add(equalityExpr);
@@ -1533,7 +1534,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 //Collect all the join/where conditions to reassign them later
                 AbstractExpression combinedWhereExpr = subTree.getAllFilters();
                 if (combinedWhereExpr != null) {
-                    joinOrderSubTree.setWhereExpression((AbstractExpression)combinedWhereExpr.clone());
+                    joinOrderSubTree.setWhereExpression(combinedWhereExpr.clone());
                 }
                 // The new tree root node id must match the original one to be able to reconnect the
                 // subtrees
