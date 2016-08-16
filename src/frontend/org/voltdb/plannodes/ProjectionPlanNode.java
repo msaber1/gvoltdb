@@ -96,8 +96,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     void resolveColumnIndexesUsingSchema(NodeSchema inputSchema)
     {
         // get all the TVEs in the output columns
-        List<TupleValueExpression> output_tves =
-            new ArrayList<>();
+        List<TupleValueExpression> output_tves = new ArrayList<>(); // will grow
         int i = 0;
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
@@ -125,9 +124,9 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         // to replace any aggregate expressions in the display columns
         // with a tuple value expression that matches what we're going
         // to generate out of the aggregate node
-        NodeSchema new_schema = new NodeSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
+        List<SchemaColumn> columns = m_outputSchema.getColumns();
+        NodeSchema new_schema = new NodeSchema(columns.size());
+        for (SchemaColumn col : columns) {
             if (col.getExpression().getExpressionType().isAggregateExpression()) {
                 NodeSchema input_schema = m_children.get(0).getOutputSchema();
                 SchemaColumn agg_col = input_schema.find(col.getTableName(),

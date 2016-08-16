@@ -70,10 +70,11 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         //     or appending the LimitPlanNode to the existing
         //     qualified IndexScanPlanNode.
 
-        ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
-
-        for (int i = 0; i < plan.getChildCount(); i++)
+        int childCount = plan.getChildCount();
+        ArrayList<AbstractPlanNode> children = new ArrayList<>(childCount);
+        for (int i = 0; i < childCount; i++) {
             children.add(plan.getChild(i));
+        }
 
         for (AbstractPlanNode child : children) {
             // TODO this will break when children feed multiple parents
@@ -130,7 +131,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
             }
 
             // create an empty bindingExprs list, used for store (possible) bindings for adHoc query
-            ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
+            ArrayList<AbstractExpression> bindings = new ArrayList<>(); // will grow
             Index ret = findQualifiedIndex(((SeqScanPlanNode)child), aggExpr, bindings);
 
             if (ret == null) {
@@ -357,7 +358,7 @@ public class ReplaceWithIndexLimit extends MicroOptimization {
         String fromTableAlias = seqScan.getTargetTableAlias();
 
         for (Index index : allIndexes) {
-            if (checkIndex(index, aggExpr, new ArrayList<AbstractExpression>(), bindingExprs, fromTableAlias)) {
+            if (checkIndex(index, aggExpr, new ArrayList<>(0), bindingExprs, fromTableAlias)) {
                 return index;
             }
         }

@@ -207,7 +207,7 @@ public class QueryPlanner {
     public String parameterize() {
         m_paramzInfo = ParameterizationInfo.parameterize(m_xmlSQL);
 
-        Set<Integer> paramIds = new HashSet<Integer>();
+        Set<Integer> paramIds = new HashSet<>(); // will grow
         ParameterizationInfo.findUserParametersRecursively(m_xmlSQL, paramIds);
         m_adhocUserParamsCount = paramIds.size();
 

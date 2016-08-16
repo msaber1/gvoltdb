@@ -36,12 +36,13 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
         PARAM_IDX;
     }
 
-    private List<AbstractExpression> m_columnList = new ArrayList<AbstractExpression>();
+    private final List<AbstractExpression> m_columnList;
 
     public TupleScanPlanNode() {
         super();
         m_isSubQuery = true;
         m_hasSignificantOutputSchema = true;
+        m_columnList = new ArrayList<>(); // will grow
     }
 
     /*
@@ -53,6 +54,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
         m_isSubQuery = true;
         m_hasSignificantOutputSchema = true;
         // copy columns
+        m_columnList = new ArrayList<>(columnExprs.size());
         for (AbstractExpression columnExpr : columnExprs) {
             m_columnList.add((AbstractExpression) columnExpr.clone());
         }
@@ -66,7 +68,7 @@ public class TupleScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void generateOutputSchema(Database db) {
         if (m_tableSchema == null) {
-            m_tableSchema = new NodeSchema();
+            m_tableSchema = new NodeSchema(m_columnList.size());
             int columnIdx = 1;
             for (AbstractExpression colExpr : m_columnList) {
                 assert(colExpr instanceof ParameterValueExpression);

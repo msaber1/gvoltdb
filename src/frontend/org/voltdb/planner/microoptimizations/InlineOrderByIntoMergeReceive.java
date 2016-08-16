@@ -52,7 +52,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
             return planNode; // Do not apply the optimization.
         }
 
-        Queue<AbstractPlanNode> children = new LinkedList<AbstractPlanNode>();
+        Queue<AbstractPlanNode> children = new LinkedList<>();
         children.add(planNode);
 
         while(!children.isEmpty()) {
@@ -199,9 +199,9 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
     AbstractPlanNode convertToSerialAggregation(AbstractPlanNode aggregateNode, OrderByPlanNode orderbyNode) {
         assert(aggregateNode instanceof HashAggregatePlanNode);
         HashAggregatePlanNode hashAggr = (HashAggregatePlanNode) aggregateNode;
-        List<AbstractExpression> groupbys = new ArrayList<AbstractExpression>(hashAggr.getGroupByExpressions());
-        List<AbstractExpression> orderbys = new ArrayList<AbstractExpression>(orderbyNode.getSortExpressions());
-        Set<Integer> coveredGroupByColumns = new HashSet<Integer>();
+        List<AbstractExpression> groupbys = hashAggr.getGroupByExpressions();
+        List<AbstractExpression> orderbys = new ArrayList<>(orderbyNode.getSortExpressions());
+        Set<Integer> coveredGroupByColumns = new HashSet<>(orderbys.size());
 
         Iterator<AbstractExpression> orderbyIt = orderbys.iterator();
         while (orderbyIt.hasNext()) {
@@ -224,8 +224,7 @@ public class InlineOrderByIntoMergeReceive extends MicroOptimization {
         }
         if (orderbys.isEmpty() && !coveredGroupByColumns.isEmpty() ) {
             // Partial aggregation
-            List<Integer> coveredGroupByColumnList = new ArrayList<Integer>();
-            coveredGroupByColumnList.addAll(coveredGroupByColumns);
+            List<Integer> coveredGroupByColumnList = new ArrayList<>(coveredGroupByColumns);
             return AggregatePlanNode.convertToPartialAggregatePlanNode(hashAggr, coveredGroupByColumnList);
         }
         return aggregateNode;

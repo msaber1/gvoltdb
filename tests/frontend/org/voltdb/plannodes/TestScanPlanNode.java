@@ -126,7 +126,7 @@ public class TestScanPlanNode extends TestCase
         // be the tuple address, the second one a parameter expression, next
         // will be a constant, and the other will be a more complex expression
         // that uses some TVEs.
-        NodeSchema proj_schema = new NodeSchema();
+        NodeSchema proj_schema = new NodeSchema(4);
         String[] cols = new String[4];
 
         TupleAddressExpression col1_exp = new TupleAddressExpression();

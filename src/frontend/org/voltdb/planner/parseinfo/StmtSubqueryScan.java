@@ -124,7 +124,7 @@ public class StmtSubqueryScan extends StmtTableScan {
                     }
                 }
                 if (values == null) {
-                    values = new HashSet<>();
+                    values = new HashSet<>(); // will grow
                 }
             }
             updateEqualSets(values, valueEquivalence, eqSets, tveKey, spExpr);
@@ -158,7 +158,7 @@ public class StmtSubqueryScan extends StmtTableScan {
         if (m_partitioningColumns != null)
             return m_partitioningColumns;
 
-        m_partitioningColumns = new ArrayList<>();
+        m_partitioningColumns = new ArrayList<>(); // will grow
         assert(m_subqueriesPartitioning != null);
 
         if (m_subqueriesPartitioning.getCountOfPartitionedTables() > 0) {
@@ -228,7 +228,7 @@ public class StmtSubqueryScan extends StmtTableScan {
     }
 
     public List<StmtTargetTableScan> getAllTargetTables() {
-        List <StmtTargetTableScan> stmtTables = new ArrayList<>();
+        List<StmtTargetTableScan> stmtTables = new ArrayList<>(); // will grow
         for (StmtTableScan tableScan : m_subqueryStmt.allScans()) {
             if (tableScan instanceof StmtTargetTableScan) {
                 stmtTables.add((StmtTargetTableScan)tableScan);
@@ -242,7 +242,8 @@ public class StmtSubqueryScan extends StmtTableScan {
         return stmtTables;
     }
 
-    static final List<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<>();
+    static final List<Index> noIndexesSupportedOnSubqueryScans = new ArrayList<>(0);
+
     @Override
     public List<Index> getIndexes() {
         return noIndexesSupportedOnSubqueryScans;

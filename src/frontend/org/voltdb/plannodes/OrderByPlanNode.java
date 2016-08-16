@@ -42,11 +42,11 @@ public class OrderByPlanNode extends AbstractPlanNode {
         SORT_DIRECTION;
     }
 
-    protected List<AbstractExpression> m_sortExpressions = new ArrayList<AbstractExpression>();
+    private List<AbstractExpression> m_sortExpressions = new ArrayList<>();
     /**
      * Sort Directions
      */
-    protected List<SortDirectionType> m_sortDirections = new ArrayList<SortDirectionType>();
+    private List<SortDirectionType> m_sortDirections = new ArrayList<>();
 
     public OrderByPlanNode() {
         super();
@@ -132,8 +132,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
 
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
-        List<TupleValueExpression> sort_tves =
-            new ArrayList<TupleValueExpression>();
+        List<TupleValueExpression> sort_tves = new ArrayList<>(); // will grow
         for (AbstractExpression sort_exps : m_sortExpressions)
         {
             sort_tves.addAll(ExpressionUtil.getTupleValueExpressions(sort_exps));

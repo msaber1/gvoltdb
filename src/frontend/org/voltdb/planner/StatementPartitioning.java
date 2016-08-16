@@ -115,7 +115,7 @@ public class StatementPartitioning implements Cloneable{
     /*
      * Any constant/parameter-based expressions found to be equality-filtering partitioning columns.
      */
-    private final Set<AbstractExpression> m_inferredExpression = new HashSet<AbstractExpression>();
+    private final Set<AbstractExpression> m_inferredExpression = new HashSet<>(); // will grow
     /*
      * The actual number of partitioned table scans in the query (when supported, self-joins should count as multiple).
      */
@@ -388,7 +388,7 @@ public class StatementPartitioning implements Cloneable{
             HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence)
     {
         TupleValueExpression tokenPartitionKey = null;
-        Set< Set<AbstractExpression> > eqSets = new HashSet< Set<AbstractExpression> >();
+        Set< Set<AbstractExpression> > eqSets = new HashSet<>(); // will grow
         int unfilteredPartitionKeyCount = 0;
 
         // reset this flag to forget the last result of the multiple partition access path.

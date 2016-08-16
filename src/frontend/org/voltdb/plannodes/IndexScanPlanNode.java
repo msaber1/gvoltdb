@@ -84,7 +84,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
-    protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+    protected final List<AbstractExpression> m_searchkeyExpressions = new ArrayList<>();
 
     // for reverse scan LTE only.
     // The initial expression is needed to control a (short?) forward scan to adjust the start of a reverse
@@ -104,7 +104,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    private ArrayList<AbstractExpression> m_bindings = new ArrayList<AbstractExpression>();
+    private ArrayList<AbstractExpression> m_bindings = new ArrayList<>();
 
     private static final int FOR_SCANNING_PERFORMANCE_OR_ORDERING = 1;
     private static final int FOR_GROUPING = 2;
@@ -113,7 +113,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     private int m_purpose = FOR_SCANNING_PERFORMANCE_OR_ORDERING;
 
     // Post-filters that got eliminated by exactly matched partial index filters
-    private final List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<AbstractExpression>();
+    private final List<AbstractExpression> m_eliminatedPostFilterExpressions = new ArrayList<>();
 
     public IndexScanPlanNode() {
         super();
@@ -179,7 +179,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         String exprsjson = catalogIndex.getExpressionsjson();
         List<AbstractExpression> indexedExprs = null;
         if (exprsjson.isEmpty()) {
-            indexedExprs = new ArrayList<AbstractExpression>();
+            indexedExprs = new ArrayList<>(nextKeyIndex);
 
             List<ColumnRef> indexedColRefs = CatalogUtil.getSortedCatalogItems(catalogIndex.getColumns(), "index");
             assert(nextKeyIndex < indexedColRefs.size());
@@ -216,15 +216,15 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 assert(false);
             }
             if (ExpressionUtil.isNullRejectingExpression(indexPredicate, tableScan.getTableAlias())) {
-                notNullTves = new HashSet<TupleValueExpression>();
-                notNullTves.addAll(ExpressionUtil.getTupleValueExpressions(indexPredicate));
+                List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(indexPredicate);
+                notNullTves = new HashSet<>(tves);
             }
         }
 
         AbstractExpression nullExpr = indexedExprs.get(nextKeyIndex);
         AbstractExpression skipNullPredicate = null;
         if (notNullTves == null || !notNullTves.contains(nullExpr)) {
-            List<AbstractExpression> exprs = new ArrayList<AbstractExpression>();
+            List<AbstractExpression> exprs = new ArrayList<>(nextKeyIndex);
             for (int i = 0; i < nextKeyIndex; i++) {
                 AbstractExpression idxExpr = indexedExprs.get(i);
                 AbstractExpression expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
@@ -343,8 +343,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
         // Verify that all sort expressions are covered by the consecutive index expressions
         // starting from the first one
-        List<AbstractExpression> indexedExprs = new ArrayList<AbstractExpression>();
-        List<ColumnRef> indexedColRefs = new ArrayList<ColumnRef>();
+        List<AbstractExpression> indexedExprs = new ArrayList<>(); // will grow
+        List<ColumnRef> indexedColRefs = new ArrayList<>(); // will grow
         boolean columnIndex = CatalogUtil.getCatalogIndexExpressions(getCatalogIndex(), getTableScan(),
                 indexedExprs, indexedColRefs);
         int indexExprCount = (columnIndex) ? indexedColRefs.size() : indexedExprs.size();
@@ -522,8 +522,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // m_endExpression
 
         // Collect all the TVEs in the end expression and search key expressions
-        List<TupleValueExpression> index_tves =
-            new ArrayList<TupleValueExpression>();
+        List<TupleValueExpression> index_tves = new ArrayList<>(); // will grow
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_initialExpression));
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_skip_null_predicate));

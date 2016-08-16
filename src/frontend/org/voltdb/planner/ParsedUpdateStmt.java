@@ -18,6 +18,7 @@
 package org.voltdb.planner;
 
 import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -33,8 +34,7 @@ import org.voltdb.expressions.AbstractExpression;
 public class ParsedUpdateStmt extends AbstractParsedStmt {
     // maintaining column ordering is important for deterministic
     // schema generation: see ENG-1660.
-    LinkedHashMap<Column, AbstractExpression> columns =
-        new LinkedHashMap<Column, AbstractExpression>();
+    private LinkedHashMap<Column, AbstractExpression> m_columns;
 
     /**
     * Class constructor
@@ -55,7 +55,8 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
 
         for (VoltXMLElement child : stmtNode.children) {
             if (child.name.equalsIgnoreCase("columns")) {
-                parseTargetColumns(child, table, columns);
+                m_columns = new LinkedHashMap<>(child.children.size());
+                parseTargetColumns(child, table, m_columns);
             }
         }
     }
@@ -65,9 +66,9 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
         String retval = super.toString() + "\n";
 
         retval += "COLUMNS:\n";
-        for (Column col : columns.keySet()) {
+        for (Column col : m_columns.keySet()) {
             retval += "\tColumn: " + col.getTypeName() + ": ";
-            retval += columns.get(col).toString() + "\n";
+            retval += m_columns.get(col).toString() + "\n";
         }
 
         retval = retval.trim();
@@ -75,11 +76,13 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
         return retval;
     }
 
+    Map<Column, AbstractExpression> targetColumns() { return m_columns; }
+
     @Override
     public Set<AbstractExpression> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
         Set<AbstractExpression> exprs = super.findAllSubexpressionsOfClass(aeClass);
 
-        for (AbstractExpression expr : columns.values()) {
+        for (AbstractExpression expr : m_columns.values()) {
             if (expr != null) {
                 exprs.addAll(expr.findAllSubexpressionsOfClass(aeClass));
             }
