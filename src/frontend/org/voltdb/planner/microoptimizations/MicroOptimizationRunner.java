@@ -17,32 +17,27 @@
 
 package org.voltdb.planner.microoptimizations;
 
-import java.util.ArrayList;
-
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.CompiledPlan;
 
 public class MicroOptimizationRunner {
 
     // list all of the micro optimizations here
-    static ArrayList<MicroOptimization> optimizations = new ArrayList<MicroOptimization>();
-    static {
+    static MicroOptimization[] s_optimizations = new MicroOptimization[] {
         // The orders here is important
-        optimizations.add(new PushdownLimits());
-        optimizations.add(new ReplaceWithIndexCounter());
-        optimizations.add(new ReplaceWithIndexLimit());
+        new PushdownLimits(),
+        new ReplaceWithIndexCounter(),
+        new ReplaceWithIndexLimit(),
 
         // Inline aggregation has to be applied after Index counter and Index Limit with MIN/MAX.
-        optimizations.add(new InlineAggregation());
+        new InlineAggregation(),
 
         // MP ORDER BY Optimization
-        optimizations.add(new InlineOrderByIntoMergeReceive());
-    }
+        new InlineOrderByIntoMergeReceive(),
+    };
 
-    public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt)
-    {
-        for (int i = 0; i < optimizations.size(); i++) {
-            MicroOptimization opt = optimizations.get(i);
+    public static void applyAll(CompiledPlan plan, AbstractParsedStmt parsedStmt) {
+        for (MicroOptimization opt : s_optimizations) {
             opt.apply(plan, parsedStmt);
         }
     }

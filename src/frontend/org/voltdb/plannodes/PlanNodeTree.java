@@ -42,14 +42,14 @@ public class PlanNodeTree implements JSONString {
     private static final String STATEMENT_ID_MEMBER_NAME = "STATEMENT_ID";
 
     // Subquery ID / subquery plan node list map. The top level statement always has id = 0
-    protected final Map<Integer, List<AbstractPlanNode>> m_planNodesListMap = new HashMap<Integer, List<AbstractPlanNode>>();
+    protected final Map<Integer, List<AbstractPlanNode>> m_planNodesListMap = new HashMap<>();
 
     public PlanNodeTree() {
     }
 
     public PlanNodeTree(AbstractPlanNode root_node) {
         try {
-            List<AbstractPlanNode> nodeList = new ArrayList<AbstractPlanNode>();
+            List<AbstractPlanNode> nodeList = new ArrayList<>(); // will grow
             m_planNodesListMap.put(0, nodeList);
             constructTree(nodeList, root_node);
         }
@@ -220,8 +220,8 @@ public class PlanNodeTree implements JSONString {
      * @throws JSONException
      */
     private void loadPlanNodesFromJSONArrays(int stmtId, JSONArray jArray, Database db) {
-        List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
         int size = jArray.length();
+        List<AbstractPlanNode> planNodes = new ArrayList<>(size);
 
         try {
             for (int i = 0; i < size; i++) {
@@ -283,7 +283,7 @@ public class PlanNodeTree implements JSONString {
             assert(nextexpr instanceof AbstractSubqueryExpression);
             AbstractSubqueryExpression subqueryExpr = (AbstractSubqueryExpression) nextexpr;
             int stmtId = subqueryExpr.getSubqueryId();
-            List<AbstractPlanNode> planNodes = new ArrayList<AbstractPlanNode>();
+            List<AbstractPlanNode> planNodes = new ArrayList<>(); // will grow
             assert(!m_planNodesListMap.containsKey(stmtId));
             m_planNodesListMap.put(stmtId, planNodes);
             constructTree(planNodes, subqueryExpr.getSubqueryNode());

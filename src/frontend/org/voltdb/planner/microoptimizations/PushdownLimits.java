@@ -39,9 +39,11 @@ public class PushdownLimits extends MicroOptimization {
         //     disconnect the LimitPlanNode
         //     and inline the LimitPlanNode in to the AbstractScanPlanNode
 
-        ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
-        for (int i = 0; i < plan.getChildCount(); i++)
+        int childCount = plan.getChildCount();
+        ArrayList<AbstractPlanNode> children = new ArrayList<>(childCount);
+        for (int i = 0; i < childCount; i++) {
             children.add(plan.getChild(i));
+        }
         plan.clearChildren();
 
         for (AbstractPlanNode child : children) {

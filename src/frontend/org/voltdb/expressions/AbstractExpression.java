@@ -184,7 +184,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             clone.m_right = right_clone;
         }
         if (m_args != null) {
-            clone.m_args = new ArrayList<>();
+            clone.m_args = new ArrayList<>(m_args.size());
             for (AbstractExpression argument : m_args) {
                 clone.m_args.add((AbstractExpression) argument.clone());
             }
@@ -485,7 +485,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             if (m_args.size() != expr.m_args.size()) {
                 return null;
             }
-            argBindings = new ArrayList<>();
+            argBindings = new ArrayList<>(); // will grow
             int ii = 0;
             // iterate the args lists in parallel, binding pairwise
             for (AbstractExpression rhs : expr.m_args) {
@@ -502,7 +502,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         // It's rare (if even possible) for the same bound parameter to get listed twice,
         // so don't worry about duplicate entries, here.
         // That should not cause any issue for the caller.
-        List<AbstractExpression> result = new ArrayList<>();
+        List<AbstractExpression> result = new ArrayList<>(); // will grow
         if (leftBindings != null) { // null here can only mean no left child
             result.addAll(leftBindings);
         }
@@ -638,14 +638,6 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
     /**
      * For TVEs, it is only serialized column index and table index. In order to match expression,
-     * there needs more information to revert back the table name, table alisa and column name.
-     * Without adding extra information, TVEs will only have column index and table index available.
-     *
-     *
-     */
-
-    /**
-     * For TVEs, it is only serialized column index and table index. In order to match expression,
      * there needs more information to revert back the table name, table alias and column name.
      * Without adding extra information, TVEs will only have column index and table index available.
      * This function is only used for various of plan nodes, except AbstractScanPlanNode.
@@ -699,7 +691,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         if (!obj.isNull(Members.ARGS.name())) {
             JSONArray jarray = obj.getJSONArray(Members.ARGS.name());
-            ArrayList<AbstractExpression> arguments = new ArrayList<>();
+            ArrayList<AbstractExpression> arguments = new ArrayList<>(jarray.length());
             loadFromJSONArray(arguments, jarray, tableScan);
             expr.setArgs(arguments);
         }
@@ -747,7 +739,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public static List<AbstractExpression> fromJSONArrayString(String jsontext, StmtTableScan tableScan) throws JSONException
     {
         JSONArray jarray = new JSONArray(jsontext);
-        List<AbstractExpression> result = new ArrayList<>();
+        List<AbstractExpression> result = new ArrayList<>(jarray.length());
         loadFromJSONArray(result, jarray, tableScan);
         return result;
     }
@@ -833,7 +825,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         boolean changed = false;
         if (m_args != null) {
-            newArgs = new ArrayList<>();
+            newArgs = new ArrayList<>(m_args.size());
             for (AbstractExpression expr: m_args) {
                 AbstractExpression ex = expr.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
                 newArgs.add(ex);
@@ -900,7 +892,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
         boolean changed = false;
         if (m_args != null) {
-            newArgs = new ArrayList<>();
+            newArgs = new ArrayList<>(m_args.size());
             for (AbstractExpression expr: m_args) {
                 AbstractExpression ex = expr.replaceAVG();
                 newArgs.add(ex);
@@ -916,8 +908,31 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             resExpr.setArgs(newArgs);
             return resExpr;
         }
-
         return this;
+    }
+
+    /**
+     * Recursively walk an expression and return a list of all its
+     * contained tuple value expressions' table aliases.
+     */
+    public void findTVEAliases(Set<String> aliases) {
+        if (this instanceof TupleValueExpression) {
+            aliases.add(((TupleValueExpression)this).getTableAlias());
+            return;
+        }
+
+        // recursive calls
+        if (m_left != null) {
+            m_left.findTVEAliases(aliases);
+        }
+        if (m_right != null) {
+            m_right.findTVEAliases(aliases);
+        }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.findTVEAliases(aliases);
+            }
+        }
     }
 
     /**
@@ -926,7 +941,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @return a list of contained expressions that are instances of the desired class
      */
     public <aeClass> List<aeClass> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        ArrayList<aeClass> collected = new ArrayList<>();
+        ArrayList<aeClass> collected = new ArrayList<>(); // will grow
         findAllSubexpressionsOfClass_recurse(aeClass, collected);
         return collected;
     }
@@ -997,33 +1012,78 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * Searches the expression tree rooted at this for nodes for which "pred"
-     * evaluates to true.
-     * @param pred  Predicate object instantiated by caller
-     * @return      true if the predicate ever returns true, false otherwise
+     * Searches the expression tree rooted at this for any node of the
+     * specified class that also matches the specified condition.
+     * @param aeClass the expected AbstractExpression-based class of the matching
+     * instance
+     * @param condition a Predicate object instantiated by the caller
+     * @return true if the condition is true for any instance of the class in the
+     * AbstractExpression's tree
      */
-    public boolean hasAnySubexpressionWithPredicate(SubexprFinderPredicate pred) {
-        if (pred.matches(this)) {
+    public boolean hasAnyMatchingSubexpressionOfClass(
+            Class< ? extends AbstractExpression> aeClass,
+            SubexprFinderPredicate condition) {
+        if (aeClass.isInstance(this)) {
+            if (condition.matches(this)) {
+                return true;
+            }
+        }
+
+        if (m_left != null &&
+                m_left.hasAnyMatchingSubexpressionOfClass(aeClass, condition)) {
             return true;
         }
 
-        if (m_left != null && m_left.hasAnySubexpressionWithPredicate(pred)) {
-            return true;
-        }
-
-        if (m_right != null && m_right.hasAnySubexpressionWithPredicate(pred)) {
+        if (m_right != null &&
+                m_right.hasAnyMatchingSubexpressionOfClass(aeClass, condition)) {
             return true;
         }
 
         if (m_args != null) {
             for (AbstractExpression argument : m_args) {
-                if (argument.hasAnySubexpressionWithPredicate(pred)) {
+                if (argument.hasAnyMatchingSubexpressionOfClass(aeClass, condition)) {
                     return true;
                 }
             }
         }
-
         return false;
+    }
+
+    private static final SubexprFinderPredicate TVE_AGG_PROXY_MATCHER = new SubexprFinderPredicate() {
+        @Override
+        public boolean matches(AbstractExpression expr) {
+            return ((TupleValueExpression)expr).hasAggregate();
+        }
+    };
+
+    public boolean hasAggregateProxyTVE() {
+        return hasAnyMatchingSubexpressionOfClass(
+                TupleValueExpression.class,
+                TVE_AGG_PROXY_MATCHER);
+    }
+
+    /**
+     * Recursively walk an expression and determine whether it contains
+     * any tuple value expression referencing the given table aliases.
+     */
+    boolean containsMatchingTVE(String tableAlias) {
+        SubexprFinderPredicate matchesTableAlias = new SubexprFinderPredicate() {
+            @Override
+            public boolean matches(AbstractExpression expr) {
+                return tableAlias.equals(((TupleValueExpression)expr).getTableAlias());
+            }
+        };
+        return hasAnyMatchingSubexpressionOfClass(TupleValueExpression.class, matchesTableAlias);
+    }
+
+    public boolean containsNonMatchingTVE(String tableAlias) {
+        SubexprFinderPredicate matchesAllButTableAlias = new SubexprFinderPredicate() {
+            @Override
+            public boolean matches(AbstractExpression expr) {
+                return ! tableAlias.equals(((TupleValueExpression)expr).getTableAlias());
+            }
+        };
+        return hasAnyMatchingSubexpressionOfClass(TupleValueExpression.class, matchesAllButTableAlias);
     }
 
     /**
@@ -1369,4 +1429,5 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
         return true;
     }
+
 }

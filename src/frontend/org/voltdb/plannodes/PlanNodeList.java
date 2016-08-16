@@ -87,8 +87,8 @@ public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
         // Create a counter for each node based on the # of children that it has
         // If any node has no children, put it in the execute list
         //
-        List<AbstractPlanNode> execute_list = Collections.synchronizedList(new ArrayList<AbstractPlanNode>());
-        Map<AbstractPlanNode, Integer> child_cnts = new HashMap<AbstractPlanNode, Integer>();
+        List<AbstractPlanNode> execute_list = Collections.synchronizedList(new ArrayList<>()); // will grow
+        Map<AbstractPlanNode, Integer> child_cnts = new HashMap<>(); // will grow
         for (AbstractPlanNode node : planNodes) {
             int num_of_children = node.getChildCount();
             if (num_of_children == 0) {
@@ -101,7 +101,7 @@ public class PlanNodeList implements JSONString, Comparable<PlanNodeList> {
         // Now run through a simulation
         // Doing it this way maintains the nuances of the parent-child relationships
         //
-        List<AbstractPlanNode> list = new ArrayList<AbstractPlanNode>();
+        List<AbstractPlanNode> list = new ArrayList<>(); // will grow
         while (!execute_list.isEmpty()) {
             AbstractPlanNode node = execute_list.remove(0);
             //

@@ -20,6 +20,7 @@ package org.voltdb.planner.parseinfo;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -90,7 +91,7 @@ public class StmtTargetTableScan extends StmtTableScan {
         tve.setTypeSizeBytes(partitionCol.getType(), partitionCol.getSize(), partitionCol.getInbytes());
 
         SchemaColumn scol = new SchemaColumn(tbName, m_tableAlias, colName, colName, tve);
-        m_partitioningColumns = new ArrayList<SchemaColumn>();
+        m_partitioningColumns = new ArrayList<>(1);
         m_partitioningColumns.add(scol);
         return m_partitioningColumns;
     }
@@ -98,8 +99,9 @@ public class StmtTargetTableScan extends StmtTableScan {
     @Override
     public List<Index> getIndexes() {
         if (m_indexes == null) {
-            m_indexes = new ArrayList<Index>();
-            for (Index index : m_table.getIndexes()) {
+            CatalogMap<Index> indexes = m_table.getIndexes();
+            m_indexes = new ArrayList<>(indexes.size());
+            for (Index index : indexes) {
                 m_indexes.add(index);
             }
         }

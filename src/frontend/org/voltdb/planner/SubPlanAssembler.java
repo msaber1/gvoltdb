@@ -82,7 +82,7 @@ public abstract class SubPlanAssembler {
     // but just get their contents dumped into a summary List that was created
     // inline and NOT initialized here.
     private final static List<AbstractExpression> s_reusableImmutableEmptyBinding =
-        new ArrayList<AbstractExpression>();
+        new ArrayList<>(0);
 
     // Constants to specify how getIndexableExpressionFromFilters should react
     // to finding a filter that matches the current criteria.
@@ -125,9 +125,8 @@ public abstract class SubPlanAssembler {
                                                                    List<AbstractExpression> joinExprs,
                                                                    List<AbstractExpression> filterExprs,
                                                                    List<AbstractExpression> postExprs) {
-        ArrayList<AccessPath> paths = new ArrayList<AccessPath>();
-        List<AbstractExpression> allJoinExprs = new ArrayList<AbstractExpression>();
-        List<AbstractExpression> allExprs = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> allJoinExprs = new ArrayList<>();
+        List<AbstractExpression> allExprs = new ArrayList<>();
         // add the empty seq-scan access path
         if (joinExprs != null) {
             allExprs.addAll(joinExprs);
@@ -141,9 +140,11 @@ public abstract class SubPlanAssembler {
         }
 
         AccessPath naivePath = getRelevantNaivePath(allJoinExprs, filterExprs);
-        paths.add(naivePath);
 
         Collection<Index> indexes = tableScan.getIndexes();
+        ArrayList<AccessPath> paths = new ArrayList<>(1 + indexes.size());
+        paths.add(naivePath);
+
         for (Index index : indexes) {
             AccessPath path = getRelevantAccessPathForIndex(tableScan, allExprs, index);
             if (path != null) {
@@ -156,7 +157,7 @@ public abstract class SubPlanAssembler {
                     // All index WHERE sub-expressions must be covered to enable the index.
                     // For optimization purposes, keep track of the covering (query) expressions that exactly match the
                     // covered index sub-expression. They can be eliminated from the post-filter expressions.
-                    List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+                    List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<>(); // will grow
                     if (isPartialIndexPredicateCovered(tableScan, allExprs, path.index, exactMatchCoveringExprs)) {
                         filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
                     } else {
@@ -166,7 +167,7 @@ public abstract class SubPlanAssembler {
             } else if (!index.getPredicatejson().isEmpty()) {
                 // Partial index can be used solely to eliminate a post-filter
                 // even when the indexed columns are irrelevant
-                List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<AbstractExpression>();
+                List<AbstractExpression> exactMatchCoveringExprs = new ArrayList<>(); // will grow
                 if (isPartialIndexPredicateCovered(tableScan, allExprs, index, exactMatchCoveringExprs)) {
                     path = getRelevantNaivePath(allJoinExprs, filterExprs);
                     filterPostPredicateForPartialIndex(path, exactMatchCoveringExprs);
@@ -325,8 +326,7 @@ public abstract class SubPlanAssembler {
         }
 
         // Copy the expressions to a new working list that can be culled as filters are processed.
-        List<AbstractExpression> filtersToCover = new ArrayList<AbstractExpression>();
-        filtersToCover.addAll(exprs);
+        List<AbstractExpression> filtersToCover = new ArrayList<>(exprs);
 
         boolean indexIsGeographical;
         String exprsjson = index.getExpressionsjson();
@@ -388,7 +388,7 @@ public abstract class SubPlanAssembler {
         // In some borderline cases, the determination to use the index's order is optimistic and
         // provisional; it can be undone later in this function as new info comes to light.
         int orderSpoilers[] = new int[keyComponentCount];
-        List<AbstractExpression> bindingsForOrder = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> bindingsForOrder = new ArrayList<>(); // will grow
         int nSpoilers = determineIndexOrdering(tableScan, keyComponentCount,
                                                indexedExprs, indexedColRefs,
                                                retval, orderSpoilers, bindingsForOrder);
@@ -1100,7 +1100,7 @@ public abstract class SubPlanAssembler {
         // Filters leveraged for an optimization, such as the skipping of an ORDER BY plan node
         // always risk adding a dependency on a particular parameterization, so be prepared to
         // add prerequisite parameter bindings to the plan.
-        List<AbstractExpression> otherBindingsForOrder = new ArrayList<AbstractExpression>();
+        List<AbstractExpression> otherBindingsForOrder = new ArrayList<>(); // will grow
         // Order spoilers must be recovered in the order they were found
         // for the index ordering to be considered acceptable.
         // Each spoiler key component is recovered by the detection of an equality filter on it.
@@ -1228,8 +1228,7 @@ public abstract class SubPlanAssembler {
                             // bindingIfValidIndexedFilterOperand above
                             // is often a "shared object" and is intended to be treated as immutable.
                             // To add a parameter to it, first copy the List.
-                            List<AbstractExpression> moreBinding =
-                                new ArrayList<AbstractExpression>(binding);
+                            List<AbstractExpression> moreBinding = new ArrayList<>(binding);
                             moreBinding.add(pve);
                             binding = moreBinding;
                         } else if (otherExpr instanceof ConstantValueExpression) {
@@ -1359,7 +1358,7 @@ public abstract class SubPlanAssembler {
      */
     private static List<AbstractExpression> removeNotNullCoveredExpressions(StmtTableScan tableScan, List<AbstractExpression> coveringExprs, List<AbstractExpression> exprsToCover) {
         // Collect all TVEs from NULL-rejecting covering expressions
-        Set<TupleValueExpression> coveringTves = new HashSet<TupleValueExpression>();
+        Set<TupleValueExpression> coveringTves = new HashSet<>(); // will grow
         for (AbstractExpression coveringExpr : coveringExprs) {
             if (ExpressionUtil.isNullRejectingExpression(coveringExpr, tableScan.getTableAlias())) {
                 coveringTves.addAll(ExpressionUtil.getTupleValueExpressions(coveringExpr));

@@ -66,21 +66,21 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected String m_targetIndexName;
 
     //
-    protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<AbstractExpression>();
+    private List<AbstractExpression> m_endkeyExpressions = new ArrayList<>();
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
-    protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
+    private List<AbstractExpression> m_searchkeyExpressions = new ArrayList<>();
 
     // The overall index lookup operation type
-    protected IndexLookupType m_lookupType = IndexLookupType.EQ;
+    private IndexLookupType m_lookupType = IndexLookupType.EQ;
 
     // The overall index lookup operation type
-    protected IndexLookupType m_endType = IndexLookupType.EQ;
+    private IndexLookupType m_endType = IndexLookupType.EQ;
 
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
-    protected Index m_catalogIndex = null;
+    private Index m_catalogIndex = null;
 
     private ArrayList<AbstractExpression> m_bindings;
 
@@ -181,10 +181,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     {
         // add support for reverse scan
         // for ASC scan, check endExpression; for DESC scan, need to check searchkeys
-        List<AbstractExpression> endKeys = new ArrayList<AbstractExpression>();
         // Initially assume that there will be an equality filter on all key components.
         IndexLookupType endType = IndexLookupType.EQ;
         List<AbstractExpression> endComparisons = ExpressionUtil.uncombinePredicate(isp.getEndExpression());
+        List<AbstractExpression> endKeys = new ArrayList<>(endComparisons.size());
         for (AbstractExpression ae: endComparisons) {
             // There should be no more end expressions after an LT or LTE has reset the end type.
             assert(endType == IndexLookupType.EQ);

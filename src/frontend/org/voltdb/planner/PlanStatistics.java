@@ -34,19 +34,19 @@ import java.util.Map.Entry;
  */
 public class PlanStatistics {
 
-    final int MAX_LEVELS = 20;
+    private final int MAX_LEVELS = 20;
 
-    int m_levelCount;
-    ArrayList<HashMap<StatsField, Long>> m_levels;
+    private int m_levelCount;
+    private ArrayList<HashMap<StatsField, Long>> m_levels;
 
     /**
      * Initialize an empty map for each possible level.
      */
     PlanStatistics() {
         m_levelCount = 0;
-        m_levels = new ArrayList<HashMap<StatsField, Long>>();
+        m_levels = new ArrayList<>(MAX_LEVELS);
         for (int i = 0; i < MAX_LEVELS; i++)
-            m_levels.add(new HashMap<StatsField, Long>());
+            m_levels.add(new HashMap<>()); // map will grow
     }
 
     /**

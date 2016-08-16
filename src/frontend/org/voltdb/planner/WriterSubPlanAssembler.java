@@ -39,10 +39,10 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     final Table m_targetTable;
 
     /** The list of generated plans. This allows generation in batches.*/
-    final ArrayDeque<AbstractPlanNode> m_plans = new ArrayDeque<AbstractPlanNode>();
+    private final ArrayDeque<AbstractPlanNode> m_plans = new ArrayDeque<>(); // will grow
 
     /** Only create access plans once - all are created in the first pass. */
-    boolean m_generatedPlans = false;
+    private boolean m_generatedPlans = false;
 
     /**
      *
@@ -70,7 +70,8 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             // only once on the node.
             JoinNode tableNode = (JoinNode) m_parsedStmt.m_joinTree.clone();
             // Analyze join conditions
-            tableNode.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList);
+            tableNode.analyzeJoinExpressions(m_parsedStmt.m_noTableSelectionList,
+                    m_parsedStmt.m_tableList.size());
             // these just shouldn't happen right?
             assert(m_parsedStmt.m_noTableSelectionList.size() == 0);
 
@@ -86,7 +87,6 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
 
             for (AccessPath path : tableNode.m_accessPaths) {
                 tableNode.m_currentAccessPath = path;
-
                 AbstractPlanNode plan = getAccessPlanForTable(tableNode);
                 m_plans.add(plan);
             }

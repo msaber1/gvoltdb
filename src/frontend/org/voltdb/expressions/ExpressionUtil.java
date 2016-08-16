@@ -341,7 +341,7 @@ public abstract class ExpressionUtil {
             // Handling AND and OR expressions requires a "negated" flag to the recursion that tweaks
             // (switches?) the handling of ANDs and ORs to enforce the above equivalences.
             if (expr.m_left.getExpressionType() == ExpressionType.OPERATOR_IS_NULL) {
-                return containsMatchingTVE(expr, tableAlias);
+                return expr.containsMatchingTVE(tableAlias);
             }
             if (expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_AND ||
                     expr.m_left.getExpressionType() == ExpressionType.CONJUNCTION_OR) {
@@ -387,7 +387,7 @@ public abstract class ExpressionUtil {
             List<OperatorExpression> coalesceExprs = expr.findAllSubexpressionsOfClass(OperatorExpression.class);
             for (OperatorExpression coalesceExpr : coalesceExprs) {
                 if ((coalesceExpr.getExpressionType() == ExpressionType.OPERATOR_ALTERNATIVE) &&
-                    containsMatchingTVE(coalesceExpr, tableAlias)) {
+                        coalesceExpr.containsMatchingTVE(tableAlias)) {
                     // This table is part of the COALESCE expression - not NULL-rejecting
                     return false;
                 }
@@ -404,7 +404,7 @@ public abstract class ExpressionUtil {
         // would be support for standard pseudo-functions that take logical condition arguments.
         // These should probably be supported as special non-functions/operations for a number
         // of reasons and may need special casing here.
-        return containsMatchingTVE(expr, tableAlias);
+        return expr.containsMatchingTVE(tableAlias);
     }
 
     /**
@@ -432,37 +432,6 @@ public abstract class ExpressionUtil {
             }
         }
         return result;
-    }
-
-    /**
-     *  Return true/false whether an expression contains any aggregate expression
-     *
-     * @param expr
-     * @return true is expression contains an aggregate subexpression
-     */
-    public static boolean containsAggregateExpression(AbstractExpression expr) {
-        AbstractExpression.SubexprFinderPredicate pred = new AbstractExpression.SubexprFinderPredicate() {
-            @Override
-            public boolean matches(AbstractExpression expr) {
-                return expr.getExpressionType().isAggregateExpression();
-            }
-        };
-        return expr.hasAnySubexpressionWithPredicate(pred);
-    }
-
-    private static boolean containsMatchingTVE(AbstractExpression expr, String tableAlias) {
-        assert(expr != null);
-        List<TupleValueExpression> tves = getTupleValueExpressions(expr);
-        for (TupleValueExpression tve : tves) {
-            if (tve.m_tableAlias != null) {
-                if (tve.m_tableAlias.equals(tableAlias)) {
-                    return true;
-                }
-            } else if (tve.m_tableName.equals(tableAlias)) {
-                return true;
-            }
-        }
-        return false;
     }
 
     /**

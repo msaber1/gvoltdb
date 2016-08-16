@@ -36,25 +36,17 @@ import org.voltdb.types.PlanNodeType;
  * Note that this is a trivial kind of an AggregatePlanNode.
  */
 public class PartitionByPlanNode extends AggregatePlanNode {
-    private enum Members {
-        ORDER_BY_EXPRS
-    };
-
     // This member is not serialized to JSON but the ORDER BY expressions,
     // which it contains, are serialized
     private WindowedExpression     m_windowedExpression = null;
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
-        if (m_outputSchema == null) {
-            m_outputSchema = new NodeSchema();
-        } else {
-            assert(getOutputSchema().size() == 0);
-        }
+    public void generateOutputSchema(Database db) {
         assert(m_children.size() == 1);
         m_children.get(0).generateOutputSchema(db);
         NodeSchema inputSchema = m_children.get(0).getOutputSchema();
+        List<SchemaColumn> inputColumns = inputSchema.getColumns();
+        m_outputSchema = new NodeSchema(1 + inputColumns.size());
         // We already created the TVE for this expression.
         TupleValueExpression tve = m_windowedExpression.getDisplayListExpression();
         SchemaColumn aggCol = new SchemaColumn(tve.getTableName(),
@@ -62,10 +54,10 @@ public class PartitionByPlanNode extends AggregatePlanNode {
                                                tve.getColumnName(),
                                                tve.getColumnAlias(),
                                                tve);
-        getOutputSchema().addColumn(aggCol);
+        m_outputSchema.addColumn(aggCol);
         // Just copy the input columns to the output schema.
         for (SchemaColumn col : inputSchema.getColumns()) {
-            getOutputSchema().addColumn(col.clone());
+            m_outputSchema.addColumn(col.clone());
         }
         m_hasSignificantOutputSchema = true;
     }

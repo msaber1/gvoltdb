@@ -64,8 +64,8 @@ class ParameterizationInfo {
 
         VoltXMLElement parameterizedXmlSQL = xmlSQL.duplicate();
 
-        Map<String, Integer> idToParamIndexMap = new HashMap<String, Integer>();
-        List<String> paramValues = new ArrayList<String>();
+        Map<String, Integer> idToParamIndexMap = new HashMap<>(); // will grow
+        List<String> paramValues = new ArrayList<>(); // will grow
 
         parameterizeRecursively(parameterizedXmlSQL, idToParamIndexMap, paramValues);
 
@@ -114,7 +114,7 @@ class ParameterizationInfo {
         if (parameterizedXmlSQL.name.equals("union")) {
             // Set ops may may have their own nodes to parameterize (limit/offset)
             // in addition to children's nodes. Process children  first
-            unionChildren = new ArrayList<VoltXMLElement>();
+            unionChildren = new ArrayList<>(parameterizedXmlSQL.children.size());
             Iterator<VoltXMLElement> iter = parameterizedXmlSQL.children.iterator();
             while (iter.hasNext()) {
                 VoltXMLElement xmlChildSQL = iter.next();

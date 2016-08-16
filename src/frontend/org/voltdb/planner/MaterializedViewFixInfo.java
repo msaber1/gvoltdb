@@ -138,7 +138,6 @@ public class MaterializedViewFixInfo {
 
         m_mvTableScan = mvTableScan;
 
-        Set<String> mvDDLGroupbyColumnNames = new HashSet<>();
         List<Column> mvColumnArray =
                 CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");
 
@@ -191,8 +190,9 @@ public class MaterializedViewFixInfo {
 
         // Start to do real materialized view processing to fix the duplicates problem.
         // (1) construct new projection columns for scan plan node.
+        Set<String> mvDDLGroupbyColumnNames = new HashSet<>(numOfGroupByColumns);
         Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<>();
-        NodeSchema inlineProjSchema = new NodeSchema();
+        NodeSchema inlineProjSchema = new NodeSchema(scanColumns.size());
         for (SchemaColumn scol: scanColumns) {
             inlineProjSchema.addColumn(scol);
         }
@@ -219,8 +219,9 @@ public class MaterializedViewFixInfo {
             }
         }
 
-        // Record the re-aggregation type for each scan columns.
-        Map<String, ExpressionType> mvColumnReAggType = new HashMap<>();
+        // Record the re-aggregation type for each agg column.
+        Map<String, ExpressionType> mvColumnReAggType =
+                new HashMap<>(mvColumnArray.size() - numOfGroupByColumns);
         for (int i = numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
             ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
@@ -242,7 +243,7 @@ public class MaterializedViewFixInfo {
         m_reAggNode = new HashAggregatePlanNode();
         int outputColumnIndex = 0;
         // inlineProjSchema contains the group by columns, while aggSchema may do not.
-        NodeSchema aggSchema = new NodeSchema();
+        NodeSchema aggSchema = new NodeSchema(scanColumns.size());
 
         // Construct reAggregation node's aggregation and group by list.
         for (SchemaColumn scol: scanColumns) {
@@ -266,11 +267,13 @@ public class MaterializedViewFixInfo {
 
 
         // Collect all TVEs that need to be do re-aggregation in coordinator.
-        List<TupleValueExpression> needReAggTVEs = new ArrayList<>();
-        List<AbstractExpression> aggPostExprs = new ArrayList<>();
-
-        for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
-            Column mvCol = mvColumnArray.get(i);
+        List<TupleValueExpression> needReAggTVEs = new ArrayList<>(); // will grow
+        int skippedGroupByColumns = numOfGroupByColumns;
+        for (Column mvCol : mvColumnArray) {
+            // Ignore the initial columns that are not aggs.
+            if (skippedGroupByColumns-- > 0) {
+                continue;
+            }
             String colName = mvCol.getName();
 
             TupleValueExpression tve = new TupleValueExpression(mvTableName, mvTableAlias, colName, colName);
@@ -281,6 +284,7 @@ public class MaterializedViewFixInfo {
             needReAggTVEs.add(tve);
         }
 
+        List<AbstractExpression> aggPostExprs = new ArrayList<>(); // will grow
         collectReAggNodePostExpressions(joinTree, needReAggTVEs, aggPostExprs);
 
         AbstractExpression aggPostExpr = ExpressionUtil.combinePredicates(aggPostExprs);
@@ -439,11 +443,11 @@ public class MaterializedViewFixInfo {
             return null;
         }
 
-        // Collect all TVEs that need re-aggregation in the coordinator.
-        List<AbstractExpression> remaningExprs = new ArrayList<>();
         // Check where clause.
         List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
 
+        // Collect all TVEs that need re-aggregation in the coordinator.
+        List<AbstractExpression> remainingExprs = new ArrayList<>(exprs.size());
         for (AbstractExpression expr: exprs) {
             List<AbstractExpression> tves = expr.findAllTupleValueSubexpressions();
 
@@ -461,13 +465,13 @@ public class MaterializedViewFixInfo {
                 }
             }
             if (canPushdown) {
-                remaningExprs.add(expr);
+                remainingExprs.add(expr);
             } else {
                 aggPostExprs.add(expr);
             }
         }
-        AbstractExpression remaningFilters = ExpressionUtil.combinePredicates(remaningExprs);
+        AbstractExpression remainingFilters = ExpressionUtil.combinePredicates(remainingExprs);
         // Update new filters for the scanNode.
-        return remaningFilters;
+        return remainingFilters;
     }
 }

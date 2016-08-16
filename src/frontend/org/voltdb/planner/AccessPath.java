@@ -35,13 +35,13 @@ public class AccessPath {
     // The initial expression is needed to adjust (forward) the start of the reverse
     // iteration when it had to initially settle for starting at
     // "greater than a prefix key".
-    final ArrayList<AbstractExpression> initialExpr = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> indexExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> endExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> otherExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> joinExprs = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> bindings = new ArrayList<AbstractExpression>();
-    final ArrayList<AbstractExpression> eliminatedPostExprs = new ArrayList<AbstractExpression>();
+    final ArrayList<AbstractExpression> initialExpr = new ArrayList<>();
+    final ArrayList<AbstractExpression> indexExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> endExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> otherExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> joinExprs = new ArrayList<>();
+    final ArrayList<AbstractExpression> bindings = new ArrayList<>();
+    final ArrayList<AbstractExpression> eliminatedPostExprs = new ArrayList<>();
 
     @Override
     public String toString() {

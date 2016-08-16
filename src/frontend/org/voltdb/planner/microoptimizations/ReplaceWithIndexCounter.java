@@ -46,10 +46,11 @@ public class ReplaceWithIndexCounter extends MicroOptimization {
         //     Replace any qualifying AggregatePlanNode / AbstractScanPlanNode pair
         //     with an IndexCountPlanNode or TableCountPlanNode
 
-        ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
-
-        for (int i = 0; i < plan.getChildCount(); i++)
+        int childCount = plan.getChildCount();
+        ArrayList<AbstractPlanNode> children = new ArrayList<>(childCount);
+        for (int i = 0; i < childCount; i++) {
             children.add(plan.getChild(i));
+        }
 
         for (AbstractPlanNode child : children) {
             // TODO this will break when children feed multiple parents
