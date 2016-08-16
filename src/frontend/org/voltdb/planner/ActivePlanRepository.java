@@ -53,9 +53,12 @@ public abstract class ActivePlanRepository {
         }
     }
 
-    private static HashMap<Sha1Wrapper, FragInfo> m_plansByHash = new HashMap<Sha1Wrapper, FragInfo>();
-    private static HashMap<Long, FragInfo> m_plansById = new HashMap<Long, FragInfo>();
-    private static TreeMap<Long, FragInfo> m_plansLRU = new TreeMap<Long, FragInfo>();
+    private static HashMap<Sha1Wrapper, FragInfo> m_plansByHash =
+            new HashMap<>(ExecutionEngine.EE_PLAN_CACHE_SIZE);
+    private static HashMap<Long, FragInfo> m_plansById =
+            new HashMap<>(ExecutionEngine.EE_PLAN_CACHE_SIZE);
+    private static TreeMap<Long, FragInfo> m_plansLRU =
+            new TreeMap<>();
     /// A ticker that provides temporary ids for all cached fragments, for communicating with the EE.
     private static final long INITIAL_FRAG_ID = 5000;
     private static long m_nextFragId = INITIAL_FRAG_ID;

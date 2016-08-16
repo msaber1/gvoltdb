@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.voltdb.catalog.Column;
@@ -107,7 +108,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
                 return null;
             }
 
-            List<StmtTableScan> tables = new ArrayList<>();
+            List<StmtTableScan> tables = new ArrayList<>(2);
             StmtTargetTableScan stmtTargetTableScan = new StmtTargetTableScan(targetTable, targetTable.getTypeName());
             tables.add(stmtTargetTableScan);
             tables.add(subquery);
@@ -115,10 +116,13 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
             // Create value equivalence between the partitioning column of the target table
             // and the corresponding expression produced by the subquery.
 
-            HashMap<AbstractExpression, Set<AbstractExpression>>  valueEquivalence = new HashMap<>();
+            Map<Column, AbstractExpression> targetColumns = insertStmt.targetColumns();
+
+            HashMap<AbstractExpression, Set<AbstractExpression>> valueEquivalence =
+                    new HashMap<>(targetColumns.size()*2);
             int i = 0;
             boolean setEquivalenceForPartitioningCol = false;
-            for (Column col : insertStmt.m_columns.keySet()) {
+            for (Column col : targetColumns.keySet()) {
                 if (partitioningCol.compareTo(col) == 0) {
                     List<SchemaColumn> partitioningColumns = stmtTargetTableScan.getPartitioningColumns();
                     assert(partitioningColumns.size() == 1);
@@ -127,7 +131,7 @@ public class InsertSubPlanAssembler extends SubPlanAssembler {
                     assert(!valueEquivalence.containsKey(targetPartitionColExpr));
                     assert(!valueEquivalence.containsKey(selectedExpr));
 
-                    Set<AbstractExpression> equivSet = new HashSet<>();
+                    Set<AbstractExpression> equivSet = new HashSet<>(2);
                     equivSet.add(targetPartitionColExpr);
                     equivSet.add(selectedExpr);
 

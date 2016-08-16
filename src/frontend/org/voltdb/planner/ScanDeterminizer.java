@@ -38,7 +38,6 @@ import org.voltdb.utils.CatalogUtil;
 /// Unlike the other MicroOptimization classes, this is not actually a
 /// performance optimization. It is instead "optimizing for reliability".
 public class ScanDeterminizer {
-
     /**
      * Only applies when stronger determinism is needed.
      */
@@ -67,9 +66,9 @@ public class ScanDeterminizer {
         //     Find Sequential Scan node.
         //     Replace with any unique tree index scan if possible.
 
-        ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
-
-        for (int i = 0; i < plan.getChildCount(); i++) {
+        int childCount = plan.getChildCount();
+        ArrayList<AbstractPlanNode> children = new ArrayList<>(childCount);
+        for (int i = 0; i < childCount; i++) {
             children.add(plan.getChild(i));
         }
 

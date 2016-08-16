@@ -326,10 +326,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         m_wherePredicate = AbstractExpression.fromJSONChild(jobj, Members.WHERE_PREDICATE.name());
 
         if ( !jobj.isNull( Members.OUTPUT_SCHEMA_PRE_AGG.name() ) ) {
-            m_outputSchemaPreInlineAgg = new NodeSchema();
             m_hasSignificantOutputSchema = true;
             JSONArray jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA_PRE_AGG.name() );
             int size = jarray.length();
+            m_outputSchemaPreInlineAgg = new NodeSchema(size);
             for( int i = 0; i < size; i++ ) {
                 m_outputSchemaPreInlineAgg.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
             }

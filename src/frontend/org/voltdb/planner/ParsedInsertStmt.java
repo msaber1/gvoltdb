@@ -20,6 +20,7 @@ package org.voltdb.planner;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
@@ -46,7 +47,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
      * linked hash map so we retain the order in which the user
      * specified the columns.
      */
-    public LinkedHashMap<Column, AbstractExpression> m_columns = new LinkedHashMap<Column, AbstractExpression>();
+    private LinkedHashMap<Column, AbstractExpression> m_columns;
 
     /**
      * The SELECT statement for INSERT INTO ... SELECT.
@@ -75,32 +76,44 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
     void parse(VoltXMLElement stmtNode) {
         // An INSERT statement may have table scans if its an INSERT INTO ... SELECT,
         // but those table scans will belong to the corresponding ParsedSelectStmt
-        assert(m_tableList.isEmpty());
+        assert(m_tableList == null);
 
         String tableName = stmtNode.attributes.get("table");
         // Need to add the table to the cache. It may be required to resolve the
         // correlated TVE in case of WHERE clause contains IN subquery
         Table table = getTableFromDB(tableName);
         addTableToStmtCache(table, tableName);
-
+        m_tableList = new ArrayList<>(1);
         m_tableList.add(table);
 
+        VoltXMLElement columnsNode = null;
+        VoltXMLElement subselectNode = null;
         for (VoltXMLElement node : stmtNode.children) {
             if (node.name.equalsIgnoreCase("columns")) {
-                parseTargetColumns(node, table, m_columns);
+                columnsNode = node;
             }
             else if (node.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
-                m_subquery = new StmtSubqueryScan (parseSubquery(node), "__VOLT_INSERT_SUBQUERY__");
-                // Until scalar subqueries are allowed in INSERT ... VALUES statements,
-                // The top-level SELECT subquery in an INSERT ... SELECT statement
-                // is the only possible subselect in an INSERT statement.
-                m_scans.add(m_subquery);
+               subselectNode = node;
             }
             else if (node.name.equalsIgnoreCase(UNION_NODE_NAME)) {
                 throw new PlanningErrorException(
                         "INSERT INTO ... SELECT is not supported for UNION or other set operations.");
             }
         }
+
+        if (columnsNode != null) {
+            m_columns = new LinkedHashMap<>(columnsNode.children.size());
+            parseTargetColumns(columnsNode, table, m_columns);
+        }
+
+        if (subselectNode != null) {
+            m_subquery = new StmtSubqueryScan(parseSubquery(subselectNode), "__VOLT_INSERT_SUBQUERY__");
+            // Until scalar subqueries are allowed in INSERT ... VALUES statements,
+            // The top-level SELECT subquery in an INSERT ... SELECT statement
+            // is the only possible subselect in an INSERT statement.
+            m_scans.add(m_subquery);
+        }
+
         calculateContentDeterminismMessage();
     }
 
@@ -193,6 +206,8 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
         return expr;
     }
 
+    public Map<Column, AbstractExpression> targetColumns() { return m_columns; }
+
     public StmtSubqueryScan getSubqueryScan() { return m_subquery; }
 
     /**
@@ -258,6 +273,7 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
             updateContentDeterminismMessage(m_subquery.calculateContentDeterminismMessage());
             return getContentDeterminismMessage();
         }
+        assert(m_columns != null);
         if (m_columns != null) {
             for (AbstractExpression expr : m_columns.values()) {
                 String emsg = expr.getContentDeterminismMessage();
@@ -272,4 +288,5 @@ public class ParsedInsertStmt extends AbstractParsedStmt {
 
     @Override
     public boolean isDML() { return true; }
+
 }

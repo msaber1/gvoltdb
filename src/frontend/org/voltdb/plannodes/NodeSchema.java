@@ -47,12 +47,13 @@ public class NodeSchema
             int nameCompare = col1.compareNames(col2);
             if (nameCompare != 0) {
                 return nameCompare;
-
             }
 
             return col1.getDifferentiator() - col2.getDifferentiator();
         }
     }
+
+    private static final SchemaColumnComparator SCHEMA_COLUMN_COMPARATOR = new SchemaColumnComparator();
 
     // The list of columns produced by a plan node, in storage order.
     private final ArrayList<SchemaColumn> m_columns;
@@ -60,10 +61,9 @@ public class NodeSchema
     // A helpful map that goes from a schema column to the columns index in the list.
     private final TreeMap<SchemaColumn, Integer> m_columnsMapHelper;
 
-    public NodeSchema()
-    {
-        m_columns = new ArrayList<SchemaColumn>();
-        m_columnsMapHelper = new TreeMap<>(new SchemaColumnComparator());
+    public NodeSchema(int preallocateColumnSlots) {
+        m_columns = new ArrayList<>(preallocateColumnSlots);
+        m_columnsMapHelper = new TreeMap<>(SCHEMA_COLUMN_COMPARATOR);
     }
 
     /**
@@ -172,12 +172,34 @@ public class NodeSchema
         return findIndexOfColumn(col);
     }
 
+    private static class TveColComparator implements Comparator<SchemaColumn> {
+        @Override
+        public int compare(SchemaColumn col1, SchemaColumn col2) {
+            if (!(col1.getExpression() instanceof TupleValueExpression) ||
+                !(col2.getExpression() instanceof TupleValueExpression)) {
+                throw new ClassCastException();
+            }
+            TupleValueExpression tve1 =
+                (TupleValueExpression) col1.getExpression();
+            TupleValueExpression tve2 =
+                (TupleValueExpression) col2.getExpression();
+            if (tve1.getColumnIndex() < tve2.getColumnIndex()) {
+                return -1;
+            }
+            if (tve1.getColumnIndex() > tve2.getColumnIndex()) {
+                return 1;
+            }
+            return 0;
+        }
+    }
+
+    private static final TveColComparator TVE_COL_COMPARATOR = new TveColComparator();
     /**
      * Sort schema columns by TVE index.  All elements
      * must be TupleValueExpressions.  Modification is made in-place.
      */
     void sortByTveIndex() {
-        sortByTveIndex(0, size());
+        Collections.sort(m_columns, TVE_COL_COMPARATOR);
     }
 
     /**
@@ -186,55 +208,21 @@ public class NodeSchema
      * @param fromIndex   lower bound of range to be sorted, inclusive
      * @param toIndex     upper bound of range to be sorted, exclusive
      */
-    void sortByTveIndex(int fromIndex, int toIndex)
-    {
-        class TveColCompare implements Comparator<SchemaColumn>
-        {
-            @Override
-            public int compare(SchemaColumn col1, SchemaColumn col2)
-            {
-                if (!(col1.getExpression() instanceof TupleValueExpression) ||
-                    !(col2.getExpression() instanceof TupleValueExpression))
-                {
-                    throw new ClassCastException();
-                }
-                TupleValueExpression tve1 =
-                    (TupleValueExpression) col1.getExpression();
-                TupleValueExpression tve2 =
-                    (TupleValueExpression) col2.getExpression();
-                if (tve1.getColumnIndex() < tve2.getColumnIndex())
-                {
-                    return -1;
-                }
-                else if (tve1.getColumnIndex() > tve2.getColumnIndex())
-                {
-                    return 1;
-                }
-                return 0;
-            }
-        }
-
-        if (fromIndex == 0 && toIndex == size()) {
-            Collections.sort(m_columns, new TveColCompare());
-        }
-        else {
-            Collections.sort(m_columns.subList(fromIndex, toIndex), new TveColCompare());
-        }
+    void sortByTveIndex(int fromIndex, int toIndex) {
+        Collections.sort(m_columns.subList(fromIndex, toIndex), TVE_COL_COMPARATOR);
     }
 
     @Override
-    public NodeSchema clone()
-    {
-        NodeSchema copy = new NodeSchema();
-        for (int i = 0; i < m_columns.size(); ++i)
-        {
-            copy.addColumn(m_columns.get(i).clone());
+    public NodeSchema clone() {
+        NodeSchema copy = new NodeSchema(m_columns.size());
+        for (SchemaColumn col : m_columns) {
+            copy.addColumn(col.clone());
         }
         return copy;
     }
 
     public NodeSchema replaceTableClone(String tableAlias) {
-        NodeSchema copy = new NodeSchema();
+        NodeSchema copy = new NodeSchema(m_columns.size());
         for (int i = 0; i < m_columns.size(); ++i) {
             SchemaColumn col = m_columns.get(i);
             String colAlias = col.getColumnAlias();
@@ -246,7 +234,6 @@ public class NodeSchema
             SchemaColumn sc = new SchemaColumn(tableAlias, tableAlias, colAlias, colAlias, tve, col.getDifferentiator());
             copy.addColumn(sc);
         }
-
         return copy;
     }
 
@@ -304,12 +291,10 @@ public class NodeSchema
      * a node's output schema based on its childrens' schema; we want to
      * carry the columns across but leave any non-TVE expressions behind.
      */
-    NodeSchema copyAndReplaceWithTVE()
-    {
-        NodeSchema copy = new NodeSchema();
-        for (int i = 0; i < m_columns.size(); ++i)
-        {
-            copy.addColumn(m_columns.get(i).copyAndReplaceWithTVE());
+    NodeSchema copyAndReplaceWithTVE() {
+        NodeSchema copy = new NodeSchema(m_columns.size());
+        for (SchemaColumn col: m_columns) {
+            copy.addColumn(col.copyAndReplaceWithTVE());
         }
         return copy;
     }
@@ -364,9 +349,6 @@ public class NodeSchema
                 continue;
             }
             Collection<AbstractExpression> found = colExpr.findAllSubexpressionsOfClass(aeClass);
-            if (found.isEmpty()) {
-                continue;
-            }
             exprs.addAll(found);
         }
     }

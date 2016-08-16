@@ -55,20 +55,20 @@ public class AggregatePlanNode extends AbstractPlanNode {
         ;
     }
 
-    protected List<ExpressionType> m_aggregateTypes = new ArrayList<>();
+    protected List<ExpressionType> m_aggregateTypes = new ArrayList<>(); // will grow
     // a list of whether the aggregate is over distinct elements
     // 0 is not distinct, 1 is distinct
-    protected List<Integer> m_aggregateDistinct = new ArrayList<>();
+    protected List<Integer> m_aggregateDistinct = new ArrayList<>(); // will grow
     // a list of column offsets/indexes not plan column guids.
-    protected List<Integer> m_aggregateOutputColumns = new ArrayList<>();
+    protected List<Integer> m_aggregateOutputColumns = new ArrayList<>(); // will grow
     // List of the input TVEs into the aggregates.  Maybe should become
     // a list of SchemaColumns someday
     protected List<AbstractExpression> m_aggregateExpressions =
-        new ArrayList<>();
+        new ArrayList<>(); // will grow
 
-    // At the moment these are guaranteed to be TVES.  This might always be true
+    // At the moment these are guaranteed to be TVES.  This might not always be true
     protected List<AbstractExpression> m_groupByExpressions
-        = new ArrayList<>();
+        = new ArrayList<>(); // will grow
 
     // This list is only used for the special case of instances of PartialAggregatePlanNode.
     protected List<Integer> m_partialGroupByColumns = null;
@@ -296,7 +296,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
      * @return
      */
     protected List<TupleValueExpression> getExpressionsNeedingResolution() {
-        List<TupleValueExpression> answer = new ArrayList<>();
+        List<TupleValueExpression> answer = new ArrayList<>(); // will grow
         for (SchemaColumn col : m_outputSchema.getColumns()) {
             answer.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
         }
@@ -324,8 +324,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // Aggregates also need to resolve indexes for aggregate inputs
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
-        List<TupleValueExpression> agg_tves =
-            new ArrayList<>();
+        List<TupleValueExpression> agg_tves = new ArrayList<>(); // will grow
         for (AbstractExpression agg_exp : m_aggregateExpressions) {
             agg_tves.addAll(ExpressionUtil.getTupleValueExpressions(agg_exp));
         }
@@ -335,8 +334,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
 
         // Aggregates also need to resolve indexes for group_by inputs
-        List<TupleValueExpression> group_tves =
-            new ArrayList<>();
+        List<TupleValueExpression> group_tves = new ArrayList<>(); // will grow
         for (AbstractExpression group_exp : m_groupByExpressions) {
             group_tves.addAll(ExpressionUtil.getTupleValueExpressions(group_exp));
         }

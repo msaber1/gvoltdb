@@ -123,14 +123,12 @@ public class MaterializedViewFixInfo {
         }
         m_mvTableScan = mvTableScan;
 
-        Set<String> mvDDLGroupbyColumnNames = new HashSet<String>();
         List<Column> mvColumnArray =
                 CatalogUtil.getSortedCatalogItems(table.getColumns(), "index");
 
         // Start to do real materialized view processing to fix the duplicates problem.
         // (1) construct new projection columns for scan plan node.
-        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<SchemaColumn>();
-        NodeSchema inlineProjSchema = new NodeSchema();
+        NodeSchema inlineProjSchema = new NodeSchema(scanColumns.size());
         for (SchemaColumn scol: scanColumns) {
             inlineProjSchema.addColumn(scol);
         }
@@ -162,6 +160,8 @@ public class MaterializedViewFixInfo {
             numOfGroupByColumns = mvHandlerInfo.getGroupbycolumncount();
         }
 
+        Set<String> mvDDLGroupbyColumnNames = new HashSet<>(numOfGroupByColumns);
+        Set<SchemaColumn> mvDDLGroupbyColumns = new HashSet<>();
         for (int i = 0; i < numOfGroupByColumns; i++) {
             Column mvCol = mvColumnArray.get(i);
             String colName = mvCol.getName();
@@ -183,9 +183,9 @@ public class MaterializedViewFixInfo {
             }
         }
 
-
-        // Record the re-aggregation type for each scan columns.
-        Map<String, ExpressionType> mvColumnReAggType = new HashMap<String, ExpressionType>();
+        // Record the re-aggregation type for each agg column.
+        Map<String, ExpressionType> mvColumnReAggType =
+                new HashMap<>(mvColumnArray.size() - numOfGroupByColumns);
         for (int i = numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
             ExpressionType reAggType = ExpressionType.get(mvCol.getAggregatetype());
@@ -206,7 +206,7 @@ public class MaterializedViewFixInfo {
         m_reAggNode = new HashAggregatePlanNode();
         int outputColumnIndex = 0;
         // inlineProjSchema contains the group by columns, while aggSchema may do not.
-        NodeSchema aggSchema = new NodeSchema();
+        NodeSchema aggSchema = new NodeSchema(scanColumns.size());
 
         // Construct reAggregation node's aggregation and group by list.
         for (SchemaColumn scol: scanColumns) {
@@ -228,10 +228,10 @@ public class MaterializedViewFixInfo {
 
 
         // Collect all TVEs that need to be do re-aggregation in coordinator.
-        List<TupleValueExpression> needReAggTVEs = new ArrayList<TupleValueExpression>();
-        List<AbstractExpression> aggPostExprs = new ArrayList<AbstractExpression>();
+        List<TupleValueExpression> needReAggTVEs = new ArrayList<>(); // no upper bpund
+        List<AbstractExpression> aggPostExprs = new ArrayList<>(); // no upper bpund
 
-        for (int i=numOfGroupByColumns; i < mvColumnArray.size(); i++) {
+        for (int i = numOfGroupByColumns; i < mvColumnArray.size(); i++) {
             Column mvCol = mvColumnArray.get(i);
             String colName = mvCol.getName();
 
@@ -378,11 +378,11 @@ public class MaterializedViewFixInfo {
             return null;
         }
 
-        // Collect all TVEs that need re-aggregation in the coordinator.
-        List<AbstractExpression> remaningExprs = new ArrayList<AbstractExpression>();
         // Check where clause.
         List<AbstractExpression> exprs = ExpressionUtil.uncombinePredicate(filters);
 
+        // Collect all TVEs that need re-aggregation in the coordinator.
+        List<AbstractExpression> remaningExprs = new ArrayList<>(exprs.size());
         for (AbstractExpression expr: exprs) {
             List<AbstractExpression> tves = expr.findAllTupleValueSubexpressions();
 

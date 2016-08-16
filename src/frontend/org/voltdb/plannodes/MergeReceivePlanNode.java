@@ -103,12 +103,12 @@ public class MergeReceivePlanNode extends AbstractReceivePlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         if (jobj.has(Members.OUTPUT_SCHEMA_PRE_AGG.name())) {
-            m_outputSchemaPreInlineAgg = new NodeSchema();
             m_hasSignificantOutputSchema = true;
             JSONArray jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA_PRE_AGG.name() );
             int size = jarray.length();
-            for( int i = 0; i < size; i++ ) {
-                m_outputSchemaPreInlineAgg.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i)) );
+            m_outputSchemaPreInlineAgg = new NodeSchema(size);
+            for (int i = 0; i < size; i++) {
+                m_outputSchemaPreInlineAgg.addColumn(SchemaColumn.fromJSONObject(jarray.getJSONObject(i)));
             }
         }
     }

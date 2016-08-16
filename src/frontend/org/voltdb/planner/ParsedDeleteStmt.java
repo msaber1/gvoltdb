@@ -38,7 +38,7 @@ import org.voltdb.plannodes.LimitPlanNode;
 public class ParsedDeleteStmt extends AbstractParsedStmt {
 
     /** Columns in the statements ORDER BY clause, if any */
-    private final List<ParsedColInfo> m_orderColumns = new ArrayList<>();
+    private List<ParsedColInfo> m_orderColumns;
 
     /** Limit plan node for this statement */
     private LimitPlanNode m_limitPlanNode = null;
@@ -54,10 +54,14 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
 
     /** Given XML for ORDER BY, add each column to m_orderColumns */
     private void parseOrderColumns(VoltXMLElement orderColumnsXml) {
-        assert(m_orderColumns.size() == 0);
-        if (orderColumnsXml == null)
-            return;
+        assert(m_orderColumns == null);
 
+        if (orderColumnsXml == null) {
+            m_orderColumns = new ArrayList<>(0);
+            return;
+        }
+
+        m_orderColumns = new ArrayList<>(orderColumnsXml.children.size());
         for (VoltXMLElement orderColXml : orderColumnsXml.children) {
             m_orderColumns.add(ParsedColInfo.fromOrderByXml(this, orderColXml));
         }
@@ -69,9 +73,10 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
 
         VoltXMLElement limitXml = null;
         VoltXMLElement offsetXml = null;
+        VoltXMLElement orderByXml = null;
         for (VoltXMLElement elem : stmtNode.children) {
             if (elem.name.equalsIgnoreCase("ordercolumns")) {
-                parseOrderColumns(elem);
+                orderByXml = elem;
             }
             else if (elem.name.equalsIgnoreCase("limit")) {
                 limitXml = elem;
@@ -81,6 +86,7 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
             }
         }
 
+        parseOrderColumns(orderByXml);
         m_limitPlanNode = limitPlanNodeFromXml(limitXml, offsetXml);
     }
 
@@ -124,8 +130,8 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
         // Just build a set of all column names
 
         // There could be non-trivial expressions in the order by clause
-        Set<String> allCols = new HashSet<>();
         Table t = m_tableList.get(0);
+        Set<String> allCols = new HashSet<>(t.getColumns().size());
         for (Column c : t.getColumns()) {
             allCols.add(c.getName());
         }
