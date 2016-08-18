@@ -51,7 +51,7 @@ public abstract class ExpressionUtil {
                 continue;
             }
             for (AbstractExpression expr : exps) {
-                stack.add((AbstractExpression)expr.clone());
+                stack.add(expr.clone());
             }
         }
         if (stack.isEmpty()) {
