@@ -62,12 +62,11 @@ public class ParameterValueExpression extends AbstractValueExpression {
     }
 
     @Override
-    public Object clone() {
-        ParameterValueExpression clone = (ParameterValueExpression)super.clone();
-        clone.m_paramIndex = m_paramIndex;
-        clone.m_paramIsVector = m_paramIsVector;
-        clone.m_originalValue = m_originalValue;
-        clone.m_correlatedExpr = m_correlatedExpr;
+    public ParameterValueExpression clone() {
+        ParameterValueExpression clone = (ParameterValueExpression) super.clone();
+        //XXX: Are these subexpression clones purposely being skipped? --paul
+        //clone.m_originalValue = m_originalValue.clone();
+        //clone.m_correlatedExpr = m_correlatedExpr.clone();
         return clone;
     }
 

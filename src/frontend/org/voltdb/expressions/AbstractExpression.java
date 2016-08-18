@@ -160,33 +160,25 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     @Override
-    public Object clone() {
+    public AbstractExpression clone() {
         AbstractExpression clone = null;
         try {
             clone = (AbstractExpression)super.clone();
-        } catch (CloneNotSupportedException e) {
+        }
+        catch (CloneNotSupportedException e) {
             // umpossible
             return null;
         }
-        clone.m_id = m_id;
-        clone.m_type = m_type;
-        clone.m_valueType = m_valueType;
-        clone.m_valueSize = m_valueSize;
-        clone.m_inBytes = m_inBytes;
-        if (m_left != null)
-        {
-            AbstractExpression left_clone = (AbstractExpression)m_left.clone();
-            clone.m_left = left_clone;
+        if (m_left != null) {
+            clone.m_left = m_left.clone();
         }
-        if (m_right != null)
-        {
-            AbstractExpression right_clone = (AbstractExpression)m_right.clone();
-            clone.m_right = right_clone;
+        if (m_right != null) {
+            clone.m_right = m_right.clone();
         }
         if (m_args != null) {
             clone.m_args = new ArrayList<>(m_args.size());
             for (AbstractExpression argument : m_args) {
-                clone.m_args.add((AbstractExpression) argument.clone());
+                clone.m_args.add(argument.clone());
             }
         }
 
@@ -787,7 +779,15 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * This function recursively replace any Expression that in the aggTableIndexMap to a TVEs. Its column index and alias are also built up here.
+     * Produce a re-write of this expression tree that uses a new TVE
+     * in the place of any subexpression that occurs is in the
+     * aggTableIndexMap.
+     * The column index and alias of the TVE are determined by the
+     * aggTableIndexMap and indexToColumnMap, respectively.
+     * The original expression tree is considered obsolete so its
+     * unchanged components are considered available for cannibalizing or
+     * in-place mutation into components of the result.
+     * @return an equivalent expression without any uses of AVG.
      * @param aggTableIndexMap
      * @param indexToColumnMap
      * @return
@@ -814,33 +814,21 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             return tve;
         }
 
-        AbstractExpression lnode = null, rnode = null;
-        ArrayList<AbstractExpression> newArgs = null;
         if (m_left != null) {
-            lnode = m_left.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+            m_left = m_left.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
         }
         if (m_right != null) {
-            rnode = m_right.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+            m_right = m_right.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
         }
 
-        boolean changed = false;
         if (m_args != null) {
-            newArgs = new ArrayList<>(m_args.size());
-            for (AbstractExpression expr: m_args) {
-                AbstractExpression ex = expr.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
-                newArgs.add(ex);
-                if (ex != expr) {
-                    changed = true;
+            int index = 0;
+            for (AbstractExpression arg: m_args) {
+                AbstractExpression newArg = arg.replaceWithTVE(aggTableIndexMap, indexToColumnMap);
+                if (newArg != arg) {
+                    m_args.set(index, newArg);
                 }
             }
-        }
-
-        if (m_left != lnode || m_right != rnode || changed) {
-            AbstractExpression resExpr = (AbstractExpression) this.clone();
-            resExpr.setLeft(lnode);
-            resExpr.setRight(rnode);
-            resExpr.setArgs(newArgs);
-            return resExpr;
         }
 
         return this;
@@ -868,45 +856,41 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     }
 
     /**
-     * Replace avg expression with sum/count for optimization.
-     * @return
+     * Replace AVG everywhere in the expression with SUM/COUNT
+     * to enable push-down optimizations.
+     * The original expression tree is considered obsolete so its
+     * components are considered available for cannibalizing or
+     * in-place mutation into components of the result.
+     * @return an equivalent expression without any uses of AVG.
      */
     public AbstractExpression replaceAVG () {
         if (getExpressionType() == ExpressionType.AGGREGATE_AVG) {
             AbstractExpression child = getLeft();
             AbstractExpression left = new AggregateExpression(ExpressionType.AGGREGATE_SUM);
-            left.setLeft((AbstractExpression) child.clone());
+            left.setLeft(child);
             AbstractExpression right = new AggregateExpression(ExpressionType.AGGREGATE_COUNT);
-            right.setLeft((AbstractExpression) child.clone());
+            // Clone the second instance of the AVG's child expression to keep the
+            // expression as a proper tree structure (vs. a more general DAG).
+            right.setLeft(child.clone());
 
             return new OperatorExpression(ExpressionType.OPERATOR_DIVIDE, left, right);
         }
 
-        AbstractExpression lnode = null, rnode = null;
-        ArrayList<AbstractExpression> newArgs = null;
         if (m_left != null) {
-            lnode = m_left.replaceAVG();
+            m_left = m_left.replaceAVG();
         }
         if (m_right != null) {
-            rnode = m_right.replaceAVG();
+            m_right = m_right.replaceAVG();
         }
-        boolean changed = false;
         if (m_args != null) {
-            newArgs = new ArrayList<>(m_args.size());
+            int index = 0;
             for (AbstractExpression expr: m_args) {
-                AbstractExpression ex = expr.replaceAVG();
-                newArgs.add(ex);
-                if (ex != expr) {
-                    changed = true;
+                AbstractExpression rewrite = expr.replaceAVG();
+                if (rewrite != expr) {
+                    m_args.set(index, rewrite);
                 }
+                ++index;
             }
-        }
-        if (m_left != lnode || m_right != rnode || changed) {
-            AbstractExpression resExpr = (AbstractExpression) this.clone();
-            resExpr.setLeft(lnode);
-            resExpr.setRight(rnode);
-            resExpr.setArgs(newArgs);
-            return resExpr;
         }
         return this;
     }

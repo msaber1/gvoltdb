@@ -278,6 +278,7 @@ public class PlannerTool {
                 if (!((e instanceof PlanningErrorException) || (e instanceof HSQLParseException))) {
                     logException(e, "Error compiling query");
                     loggedMsg = " (Stack trace has been written to the log.)";
+                    //* enable to debug */ e.printStackTrace();
                 }
                 throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
                                            e);
