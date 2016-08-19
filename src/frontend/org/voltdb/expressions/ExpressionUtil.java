@@ -262,35 +262,6 @@ public abstract class ExpressionUtil {
     }
 
     /**
-     * Recursively walk an expression and return a list of all the tuple
-     * value expressions it contains.
-     */
-    public static List<TupleValueExpression>
-    getTupleValueExpressions(AbstractExpression input)
-    {
-        ArrayList<TupleValueExpression> tves =
-            new ArrayList<TupleValueExpression>();
-        // recursive stopping steps
-        if (input == null)
-        {
-            return tves;
-        } else if (input instanceof TupleValueExpression) {
-            tves.add((TupleValueExpression) input);
-            return tves;
-        }
-
-        // recursive calls
-        tves.addAll(getTupleValueExpressions(input.m_left));
-        tves.addAll(getTupleValueExpressions(input.m_right));
-        if (input.m_args != null) {
-            for (AbstractExpression argument : input.m_args) {
-                tves.addAll(getTupleValueExpressions(argument));
-            }
-        }
-        return tves;
-    }
-
-    /**
      * Method to simplify an expression by eliminating identical subexpressions (same id)
      * If the expression is a logical conjunction of the form e1 AND e2 AND e3 AND e4,
      * and subexpression e1 is identical to the subexpression e2 the simplified expression is

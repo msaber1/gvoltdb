@@ -372,32 +372,24 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // The following applies to both seq and index scan.  Index scan has
         // some additional expressions that need to be handled as well
 
-        // predicate expression
-        List<TupleValueExpression> predicate_tves =
-            ExpressionUtil.getTupleValueExpressions(m_predicate);
-        for (TupleValueExpression tve : predicate_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-            tve.setColumnIndex(index);
+        if (m_predicate != null) {
+            m_predicate.resolveColumnIndexes(m_tableSchema);
         }
 
         // inline projection
         ProjectionPlanNode proj =
             (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
-        if (proj != null)
-        {
-            proj.resolveColumnIndexesUsingSchema(m_tableSchema);
+        if (proj != null) {
+            proj.resolveOutputSchemaColumnIndexesUsingInputSchema(m_tableSchema);
             m_outputSchema = proj.getOutputSchema().clone();
             m_hasSignificantOutputSchema = false; // It's just a cheap knock-off of the projection's
         }
-        else
-        {
+        else {
             // output columns
             // if there was an inline projection we will have copied these already
             // otherwise we need to iterate through the output schema TVEs
             // and sort them by table schema index order.
-            for (SchemaColumn col : m_outputSchema.getColumns())
-            {
+            for (SchemaColumn col : m_outputSchema.getColumns()) {
                 // At this point, they'd better all be TVEs.
                 assert(col.getExpression() instanceof TupleValueExpression);
                 TupleValueExpression tve = (TupleValueExpression)col.getExpression();

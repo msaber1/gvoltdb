@@ -29,7 +29,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
@@ -91,7 +90,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
         // PlanNodes all need private deep copies of expressions
         // so that the resolveColumnIndexes results
         // don't get bashed by other nodes or subsequent planner runs
-        m_sortExpressions.add((AbstractExpression) sortExpr.clone());
+        m_sortExpressions.add(sortExpr.clone());
         m_sortDirections.add(sortDir);
     }
 
@@ -114,33 +113,23 @@ public class OrderByPlanNode extends AbstractPlanNode {
         // the sort columns
         assert(m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
-        NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
+        NodeSchema inputSchema = m_children.get(0).getOutputSchema();
+        for (SchemaColumn col : m_outputSchema.getColumns()) {
             // At this point, they'd better all be TVEs.
             assert(col.getExpression() instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col.getExpression();
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
+            int index = tve.resolveColumnIndexesUsingSchema(inputSchema);
             tve.setColumnIndex(index);
         }
         m_outputSchema.sortByTveIndex();
 
-        resolveSortIndexesUsingSchema(input_schema);
+        resolveSortIndexesUsingSchema(inputSchema);
     }
 
-    public void resolveSortIndexesUsingSchema(NodeSchema input_schema) {
-
-        // Find the proper index for the sort columns.  Not quite
-        // sure these should be TVEs in the long term.
-        List<TupleValueExpression> sort_tves = new ArrayList<>(); // will grow
-        for (AbstractExpression sort_exps : m_sortExpressions)
-        {
-            sort_tves.addAll(ExpressionUtil.getTupleValueExpressions(sort_exps));
-        }
-        for (TupleValueExpression tve : sort_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+    public void resolveSortIndexesUsingSchema(NodeSchema inputSchema) {
+        // Find the proper index for the sort columns.
+        for (AbstractExpression sortExpr : m_sortExpressions) {
+            sortExpr.resolveColumnIndexes(inputSchema);
         }
     }
 

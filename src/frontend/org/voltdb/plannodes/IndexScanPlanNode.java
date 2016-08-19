@@ -216,8 +216,8 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
                 assert(false);
             }
             if (ExpressionUtil.isNullRejectingExpression(indexPredicate, tableScan.getTableAlias())) {
-                List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(indexPredicate);
-                notNullTves = new HashSet<>(tves);
+                notNullTves = new HashSet<>(); // will grow
+                indexPredicate.findAllSubexpressionsOfClass_recurse(TupleValueExpression.class, notNullTves);
             }
         }
 
@@ -228,7 +228,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             for (int i = 0; i < nextKeyIndex; i++) {
                 AbstractExpression idxExpr = indexedExprs.get(i);
                 AbstractExpression expr = new ComparisonExpression(ExpressionType.COMPARE_EQUAL,
-                        idxExpr, (AbstractExpression) searchkeyExpressions.get(i).clone());
+                        idxExpr, searchkeyExpressions.get(i).clone());
                 exprs.add(expr);
             }
             AbstractExpression expr = new OperatorExpression(ExpressionType.OPERATOR_IS_NULL, nullExpr, null);
@@ -438,7 +438,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
-            m_endExpression = (AbstractExpression) endExpression.clone();
+            m_endExpression = endExpression.clone();
         }
     }
 
@@ -447,7 +447,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         if (newExpr != null)
         {
             List<AbstractExpression> newEndExpressions = ExpressionUtil.uncombinePredicate(m_endExpression);
-            newEndExpressions.add((AbstractExpression)newExpr.clone());
+            newEndExpressions.add(newExpr.clone());
             m_endExpression = ExpressionUtil.combinePredicates(newEndExpressions);
         }
     }
@@ -464,7 +464,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
-            m_searchkeyExpressions.add((AbstractExpression) expr.clone());
+            m_searchkeyExpressions.add(expr.clone());
         }
     }
 
@@ -496,7 +496,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public void setInitialExpression(AbstractExpression expr) {
         if (expr != null) {
-            m_initialExpression = (AbstractExpression)expr.clone();
+            m_initialExpression = expr.clone();
         }
     }
 
@@ -515,26 +515,20 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
 
     @Override
-    public void resolveColumnIndexes()
-    {
-        // IndexScanPlanNode has TVEs that need index resolution in:
-        // m_searchkeyExpressions
-        // m_endExpression
-
-        // Collect all the TVEs in the end expression and search key expressions
-        List<TupleValueExpression> index_tves = new ArrayList<>(); // will grow
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_initialExpression));
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_skip_null_predicate));
-        for (AbstractExpression search_exp : m_searchkeyExpressions)
-        {
-            index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
-        }
+    public void resolveColumnIndexes() {
+        // Find all the TVEs in the index-scan-specific expressions
         // and update their indexes against the table schema
-        for (TupleValueExpression tve : index_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
-            tve.setColumnIndex(index);
+        if (m_endExpression != null) {
+            m_endExpression.resolveColumnIndexes(m_tableSchema);
+        }
+        if (m_initialExpression != null) {
+            m_initialExpression.resolveColumnIndexes(m_tableSchema);
+        }
+        if (m_skip_null_predicate != null) {
+            m_skip_null_predicate.resolveColumnIndexes(m_tableSchema);
+        }
+        for (AbstractExpression searchExpr : m_searchkeyExpressions) {
+            searchExpr.resolveColumnIndexes(m_tableSchema);
         }
         // now do the common scan node work
         super.resolveColumnIndexes();
@@ -945,7 +939,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public void setEliminatedPostFilters(List<AbstractExpression> exprs) {
         for (AbstractExpression expr : exprs) {
-            m_eliminatedPostFilterExpressions.add((AbstractExpression)expr.clone());
+            m_eliminatedPostFilterExpressions.add(expr.clone());
             // Add eliminated PVEs to the bindings. They will be used by the PlannerTool to compare
             // bound plans in the cache
             List<AbstractExpression> pves = expr.findAllParameterSubexpressions();

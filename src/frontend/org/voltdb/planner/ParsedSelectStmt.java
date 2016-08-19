@@ -263,7 +263,8 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         ArrayList<ParsedColInfo> tmpGroupByColumns = m_groupByColumns;
         m_groupByColumns = new ArrayList<>(m_groupByColumns.size());
         ArrayList<ParsedColInfo> tmpDistinctGroupByColumns = m_distinctGroupByColumns;
-        m_distinctGroupByColumns = new ArrayList<>(m_distinctGroupByColumns.size());
+        m_distinctGroupByColumns = (m_distinctGroupByColumns == null) ?
+                null : new ArrayList<>(m_distinctGroupByColumns.size());
         ArrayList<ParsedColInfo> tmpOrderColumns = m_orderColumns;
         m_orderColumns = new ArrayList<>(m_orderColumns.size());
         AbstractExpression tmpHaving = m_having;
@@ -1885,7 +1886,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         int sizeUpperBound = orderByExprs.size();
         HashSet<AbstractExpression> orderByTVEs = new HashSet<>(sizeUpperBound);
         ArrayList<AbstractExpression> orderByNonTVEs = new ArrayList<>(sizeUpperBound);
-        ArrayList<List<AbstractExpression>> orderByNonTVEBaseTVEs = new ArrayList<>(sizeUpperBound);
+        ArrayList<List<TupleValueExpression>> orderByNonTVEBaseTVEs = new ArrayList<>(sizeUpperBound);
         HashSet<AbstractExpression> orderByAllBaseTVEs = new HashSet<>(); // will grow
 
         for (AbstractExpression orderByExpr : orderByExprs) {
@@ -1894,7 +1895,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 orderByAllBaseTVEs.add(orderByExpr);
             } else {
                 orderByNonTVEs.add(orderByExpr);
-                List<AbstractExpression> baseTVEs = orderByExpr.findAllTupleValueSubexpressions();
+                List<TupleValueExpression> baseTVEs = orderByExpr.findAllTupleValueSubexpressions();
                 orderByNonTVEBaseTVEs.add(baseTVEs);
                 orderByAllBaseTVEs.addAll(baseTVEs);
             }
@@ -1903,7 +1904,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         boolean result = true;
 
         for (AbstractExpression candidateExpr : candidateExprHardCases) {
-            Collection<AbstractExpression> candidateBases = candidateExpr.findAllTupleValueSubexpressions();
+            Collection<TupleValueExpression> candidateBases = candidateExpr.findAllTupleValueSubexpressions();
             if (orderByTVEs.containsAll(candidateBases)) {
                 continue;
             }

@@ -32,7 +32,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
 import org.voltdb.expressions.AggregateExpression;
-import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.AbstractParsedStmt;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
@@ -298,22 +297,21 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<TupleValueExpression> getExpressionsNeedingResolution() {
         List<TupleValueExpression> answer = new ArrayList<>(); // will grow
         for (SchemaColumn col : m_outputSchema.getColumns()) {
-            answer.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+            col.getExpression().findAllSubexpressionsOfClass_recurse(TupleValueExpression.class, answer);
         }
         return answer;
     }
 
-    void resolveColumnIndexesUsingSchema(NodeSchema input_schema)
-    {
+    void resolveColumnIndexesUsingSchema(NodeSchema inputSchema) {
         // get all the TVEs in the output columns
         List<TupleValueExpression> output_tves = getExpressionsNeedingResolution();
         for (TupleValueExpression tve : output_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
+            int index = tve.resolveColumnIndexesUsingSchema(inputSchema);
             if (index == -1) {
                 // check to see if this TVE is the aggregate output
                 if (!tve.getTableName().equals(AbstractParsedStmt.TEMP_TABLE_NAME)) {
-                throw new RuntimeException("Unable to find index for column: " +
-                                           tve.getColumnName());
+                    throw new RuntimeException("Unable to find index for column: " +
+                            tve.getColumnName());
                 }
             }
             else {
@@ -324,31 +322,22 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // Aggregates also need to resolve indexes for aggregate inputs
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
-        List<TupleValueExpression> agg_tves = new ArrayList<>(); // will grow
         for (AbstractExpression agg_exp : m_aggregateExpressions) {
-            agg_tves.addAll(ExpressionUtil.getTupleValueExpressions(agg_exp));
-        }
-        for (TupleValueExpression tve : agg_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            if (agg_exp == null) {
+                // COUNT(*) has no argument
+                continue;
+            }
+            agg_exp.resolveColumnIndexes(inputSchema);
         }
 
         // Aggregates also need to resolve indexes for group_by inputs
-        List<TupleValueExpression> group_tves = new ArrayList<>(); // will grow
         for (AbstractExpression group_exp : m_groupByExpressions) {
-            group_tves.addAll(ExpressionUtil.getTupleValueExpressions(group_exp));
-        }
-        for (TupleValueExpression tve : group_tves) {
-            int index = tve.resolveColumnIndexesUsingSchema(input_schema);
-            tve.setColumnIndex(index);
+            group_exp.resolveColumnIndexes(inputSchema);
         }
 
         // Post filter also needs to resolve indexes.
-        List<TupleValueExpression> postFilter_tves =
-                ExpressionUtil.getTupleValueExpressions(m_postPredicate);
-        for (TupleValueExpression tve : postFilter_tves) {
-            int index = m_outputSchema.getIndexOfTve(tve);
-            tve.setColumnIndex(index);
+        if (m_postPredicate != null) {
+            m_postPredicate.resolveColumnIndexes(m_outputSchema);
         }
 
         resolveSubqueryColumnIndexes();
@@ -391,7 +380,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
             m_aggregateExpressions.add(null);
         } else {
             assert(aggInputExpr != null);
-            m_aggregateExpressions.add((AbstractExpression) aggInputExpr.clone());
+            m_aggregateExpressions.add(aggInputExpr.clone());
         }
     }
 
@@ -418,7 +407,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         if (expr == null) {
             return;
         }
-        m_groupByExpressions.add((AbstractExpression) expr.clone());
+        m_groupByExpressions.add(expr.clone());
     }
 
     @Override

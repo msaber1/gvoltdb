@@ -17,7 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
 import java.util.Collection;
 import java.util.List;
 
@@ -27,8 +26,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AbstractSubqueryExpression;
-import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
 public class ProjectionPlanNode extends AbstractPlanNode {
@@ -81,7 +78,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         assert(m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        resolveColumnIndexesUsingSchema(input_schema);
+        resolveOutputSchemaColumnIndexesUsingInputSchema(input_schema);
 
         // Resolve subquery expression indexes
         resolveSubqueryColumnIndexes();
@@ -93,22 +90,14 @@ public class ProjectionPlanNode extends AbstractPlanNode {
      * inlined projection nodes that don't have a child from which they can get
      * an output schema.
      */
-    void resolveColumnIndexesUsingSchema(NodeSchema inputSchema)
-    {
+    void resolveOutputSchemaColumnIndexesUsingInputSchema(NodeSchema inputSchema) {
         // get all the TVEs in the output columns
-        List<TupleValueExpression> output_tves = new ArrayList<>(); // will grow
+        // and update their differentiators
+        // and update indexes against the table schema
         int i = 0;
-        for (SchemaColumn col : m_outputSchema.getColumns())
-        {
-            col.setDifferentiator(i);
-            output_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
-            ++i;
-        }
-        // and update their indexes against the table schema
-        for (TupleValueExpression tve : output_tves)
-        {
-            int index = tve.resolveColumnIndexesUsingSchema(inputSchema);
-            tve.setColumnIndex(index);
+        for (SchemaColumn col : m_outputSchema.getColumns()) {
+            col.setDifferentiator(i++);
+            col.getExpression().resolveColumnIndexes(inputSchema);
         }
         // DON'T RE-SORT HERE
     }

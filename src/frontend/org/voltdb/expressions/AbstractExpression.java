@@ -18,6 +18,7 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -32,6 +33,7 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.SortDirectionType;
 
@@ -607,15 +609,15 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
                                                List<AbstractExpression> sortExpressions,
                                                List<SortDirectionType>  sortDirections) throws JSONException {
         stringer.key(SortMembers.SORT_COLUMNS.name()).array();
-        int listSize = sortExpressions.size();
-        for (int ii = 0; ii < listSize; ii++) {
+        int ii = 0;
+        for (AbstractExpression sortExpr : sortExpressions) {
             stringer.object();
             stringer.key(SortMembers.SORT_EXPRESSION.name());
             stringer.object();
-            sortExpressions.get(ii).toJSONString(stringer);
+            sortExpr.toJSONString(stringer);
             stringer.endObject();
             if (sortDirections != null) {
-                stringer.key(SortMembers.SORT_DIRECTION.name()).value(sortDirections.get(ii).toString());
+                stringer.key(SortMembers.SORT_DIRECTION.name()).value(sortDirections.get(ii++).toString());
             }
             stringer.endObject();
         }
@@ -924,20 +926,22 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
      * @param aeClass AbstractExpression-based class of instances to search for.
      * @return a list of contained expressions that are instances of the desired class
      */
-    public <aeClass> List<aeClass> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        ArrayList<aeClass> collected = new ArrayList<>(); // will grow
-        findAllSubexpressionsOfClass_recurse(aeClass, collected);
-        return collected;
+    public <T extends AbstractExpression> List<T> findAllSubexpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass) {
+        List<T> collector = new ArrayList<>(); // will grow
+        findAllSubexpressionsOfClass_recurse(aeClass, collector);
+        return collector;
     }
 
-    public <aeClass> void findAllSubexpressionsOfClass_recurse(Class< ? extends AbstractExpression> aeClass,
-            ArrayList<aeClass> collected) {
+    public <T extends AbstractExpression> void findAllSubexpressionsOfClass_recurse(
+            Class<? extends AbstractExpression> aeClass,
+            Collection<T> collector) {
         if (aeClass.isInstance(this)) {
             // Suppress the expected warning for the "unchecked" cast.
             // The runtime isInstance check ensures that it is typesafe.
             @SuppressWarnings("unchecked")
-            aeClass e = (aeClass) this;
-            collected.add(e);
+            T e = (T) this;
+            collector.add(e);
             // Don't return early, because in a few rare cases,
             // like when searching for function expressions,
             // an instance CAN be a parent expression of another instance.
@@ -945,14 +949,14 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         }
 
         if (m_left != null) {
-            m_left.findAllSubexpressionsOfClass_recurse(aeClass, collected);
+            m_left.findAllSubexpressionsOfClass_recurse(aeClass, collector);
         }
         if (m_right != null) {
-            m_right.findAllSubexpressionsOfClass_recurse(aeClass, collected);
+            m_right.findAllSubexpressionsOfClass_recurse(aeClass, collector);
         }
         if (m_args != null) {
             for (AbstractExpression argument : m_args) {
-                argument.findAllSubexpressionsOfClass_recurse(aeClass, collected);
+                argument.findAllSubexpressionsOfClass_recurse(aeClass, collector);
             }
         }
     }
@@ -1321,7 +1325,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return findAllSubexpressionsOfClass(ParameterValueExpression.class);
     }
 
-    public List<AbstractExpression> findAllTupleValueSubexpressions() {
+    public List<TupleValueExpression> findAllTupleValueSubexpressions() {
         return findAllSubexpressionsOfClass(TupleValueExpression.class);
     }
 
@@ -1412,6 +1416,15 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             return false;
         }
         return true;
+    }
+
+    public void resolveColumnIndexes(NodeSchema inputSchema) {
+        List<TupleValueExpression> collector = new ArrayList<>(); // will grow
+        findAllSubexpressionsOfClass_recurse(TupleValueExpression.class, collector);
+        for (TupleValueExpression tve : collector) {
+            int index = tve.resolveColumnIndexesUsingSchema(inputSchema);
+            tve.setColumnIndex(index);
+        }
     }
 
 }

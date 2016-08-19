@@ -360,11 +360,10 @@ public class MaterializedViewFixInfo {
     }
 
 
-    private boolean fromMVTableOnly(List<AbstractExpression> tves) {
+    private boolean fromMVTableOnly(List<TupleValueExpression> tves) {
         String mvTableName = getMVTableName();
-        for (AbstractExpression tve: tves) {
-            assert(tve instanceof TupleValueExpression);
-            String tveTableName = ((TupleValueExpression)tve).getTableName();
+        for (TupleValueExpression tve: tves) {
+            String tveTableName = tve.getTableName();
             if (!mvTableName.equals(tveTableName)) {
                 return false;
             }
@@ -384,7 +383,7 @@ public class MaterializedViewFixInfo {
         // Collect all TVEs that need re-aggregation in the coordinator.
         List<AbstractExpression> remaningExprs = new ArrayList<>(exprs.size());
         for (AbstractExpression expr: exprs) {
-            List<AbstractExpression> tves = expr.findAllTupleValueSubexpressions();
+            List<TupleValueExpression> tves = expr.findAllTupleValueSubexpressions();
 
             boolean canPushdown = true;
 

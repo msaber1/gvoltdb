@@ -141,15 +141,17 @@ public class WindowedExpression extends AbstractExpression {
      * partition by and order by lists.
      */
     @Override
-    public <aeClass> List<aeClass> findAllSubexpressionsOfClass(Class< ? extends AbstractExpression> aeClass) {
-        List<aeClass> list = super.findAllSubexpressionsOfClass(aeClass);
-        for (AbstractExpression pbexpr : m_partitionByExpressions) {
-            list.addAll(pbexpr.findAllSubexpressionsOfClass(aeClass));
+    public <T extends AbstractExpression> List<T> findAllSubexpressionsOfClass(
+            Class< ? extends AbstractExpression> aeClass) {
+        List<T> collector = new ArrayList<>(); // will grow
+        for (AbstractExpression pbExpr : m_partitionByExpressions) {
+            pbExpr.findAllSubexpressionsOfClass_recurse(aeClass, collector);
         }
-        for (AbstractExpression sortExpr : m_orderByExpressions) {
-            list.addAll(sortExpr.findAllSubexpressionsOfClass(aeClass));
+        for (AbstractExpression sortExpr : m_orderByExpressions ) {
+            sortExpr.findAllSubexpressionsOfClass_recurse(aeClass, collector);
         }
-        return list;
+        findAllSubexpressionsOfClass_recurse(aeClass, collector);
+        return collector;
     }
 
     @Override
