@@ -112,7 +112,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
      */
     @Override
     void parseTablesAndParams(VoltXMLElement stmtNode) {
-        m_tableList.clear();
+        m_tableList = new ArrayList<>(); // will grow
         // Parse parameters first to satisfy a dependency of expression parsing
         // which happens during table scan parsing.
         parseParameters(stmtNode);
@@ -443,7 +443,7 @@ public class ParsedUnionStmt extends AbstractParsedStmt {
             }
             newExpr.setExpressionType(expr.getExpressionType());
             if (ExpressionType.COMPARE_EQUAL == expr.getExpressionType()) {
-                newExpr.setLeft((AbstractExpression) expr.getLeft().clone());
+                newExpr.setLeft(expr.getLeft().clone());
                 newExpr.setRight(childSubqueryExpr);
                 assert(newExpr instanceof ComparisonExpression);
                 ((ComparisonExpression)newExpr).setQuantifier(((ComparisonExpression)expr).getQuantifier());

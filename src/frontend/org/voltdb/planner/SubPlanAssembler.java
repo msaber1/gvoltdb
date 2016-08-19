@@ -843,7 +843,7 @@ public abstract class SubPlanAssembler {
             assert searchKeyArg.getValueType() == VoltType.GEOGRAPHY_POINT;
             // Search key operand must not be from the same table,
             // e.g. contains(t.a, t.b) is not indexable.
-            if (isOperandDependentOnTable(searchKeyArg, tableScan)) {
+            if (TupleValueExpression.isOperandDependentOnTable(searchKeyArg, tableScan.getTableAlias())) {
                 continue;
             }
 
@@ -1361,7 +1361,7 @@ public abstract class SubPlanAssembler {
         Set<TupleValueExpression> coveringTves = new HashSet<>(); // will grow
         for (AbstractExpression coveringExpr : coveringExprs) {
             if (ExpressionUtil.isNullRejectingExpression(coveringExpr, tableScan.getTableAlias())) {
-                coveringTves.addAll(ExpressionUtil.getTupleValueExpressions(coveringExpr));
+                coveringExpr.findAllSubexpressionsOfClass_recurse(TupleValueExpression.class, coveringTves);
             }
         }
         // For each NOT NULL expression to cover extract the TVE expressions. If all of them are also part
@@ -1369,27 +1369,21 @@ public abstract class SubPlanAssembler {
         Iterator<AbstractExpression> iter = exprsToCover.iterator();
         while (iter.hasNext()) {
             AbstractExpression filter = iter.next();
-            if (ExpressionType.OPERATOR_NOT == filter.getExpressionType()) {
-                assert(filter.getLeft() != null);
-                if (ExpressionType.OPERATOR_IS_NULL == filter.getLeft().getExpressionType()) {
-                    assert(filter.getLeft().getLeft() != null);
-                    List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(filter.getLeft().getLeft());
-                    if (coveringTves.containsAll(tves)) {
-                        iter.remove();
-                    }
-                }
+            if (ExpressionType.OPERATOR_NOT != filter.getExpressionType()) {
+                continue;
+            }
+            assert(filter.getLeft() != null);
+            if (ExpressionType.OPERATOR_IS_NULL != filter.getLeft().getExpressionType()) {
+                continue;
+            }
+            AbstractExpression child = filter.getLeft().getLeft();
+            assert(child != null);
+            List<TupleValueExpression> tves = child.findAllTupleValueSubexpressions();
+            if (coveringTves.containsAll(tves)) {
+                iter.remove();
             }
         }
         return exprsToCover;
-    }
-
-    private static boolean isOperandDependentOnTable(AbstractExpression expr, StmtTableScan tableScan) {
-        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            if (tableScan.getTableAlias().equals(tve.getTableAlias())) {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static List<AbstractExpression> bindingIfValidIndexedFilterOperand(StmtTableScan tableScan,
@@ -1415,7 +1409,7 @@ public abstract class SubPlanAssembler {
         }
         // Left and right operands must not be from the same table,
         // e.g. where t.a = t.b is not indexable with the current technology.
-        if (isOperandDependentOnTable(otherExpr, tableScan)) {
+        if (TupleValueExpression.isOperandDependentOnTable(otherExpr, tableScan.getTableAlias())) {
             return null;
         }
 

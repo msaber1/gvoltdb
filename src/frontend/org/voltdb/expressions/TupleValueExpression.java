@@ -374,16 +374,14 @@ public class TupleValueExpression extends AbstractValueExpression {
     // this function is somewhat TVE-related because TVEs DO represent the points where expression trees
     // depend on tables.
     public static boolean isOperandDependentOnTable(AbstractExpression expr, String tableAlias) {
-        assert(tableAlias != null);
-        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
-            //TODO: This clumsy testing of table names regardless of table aliases is
-            // EXACTLY why we can't have nice things like self-joins.
-            if (tableAlias.equals(tve.getTableAlias()))
-            {
-                return true;
+        SubexprFinderPredicate withAlias = new SubexprFinderPredicate() {
+            @Override
+            public boolean matches(AbstractExpression expr) {
+                TupleValueExpression tve = (TupleValueExpression)expr;
+                return tableAlias.equals(tve.getTableAlias());
             }
-        }
-        return false;
+        };
+        return expr.hasAnyMatchingSubexpressionOfClass(TupleValueExpression.class, withAlias);
     }
 
     @Override

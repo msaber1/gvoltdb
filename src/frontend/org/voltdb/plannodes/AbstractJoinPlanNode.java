@@ -116,7 +116,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void setWherePredicate(AbstractExpression predicate)
     {
         if (predicate != null) {
-            m_wherePredicate = (AbstractExpression) predicate.clone();
+            m_wherePredicate = predicate.clone();
         } else {
             m_wherePredicate = null;
         }
@@ -128,7 +128,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void setPreJoinPredicate(AbstractExpression predicate)
     {
         if (predicate != null) {
-            m_preJoinPredicate = (AbstractExpression) predicate.clone();
+            m_preJoinPredicate = predicate.clone();
         } else {
             m_preJoinPredicate = null;
         }
@@ -140,7 +140,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     public void setJoinPredicate(AbstractExpression predicate)
     {
         if (predicate != null) {
-            m_joinPredicate = (AbstractExpression) predicate.clone();
+            m_joinPredicate = predicate.clone();
         } else {
             m_joinPredicate = null;
         }
@@ -346,10 +346,12 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
      * @param inner_schema
      */
     protected static void resolvePredicate(AbstractExpression expression,
-            NodeSchema outer_schema, NodeSchema inner_schema)
-    {
+            NodeSchema outer_schema, NodeSchema inner_schema) {
+        if (expression == null) {
+            return;
+        }
         List<TupleValueExpression> predicate_tves =
-                ExpressionUtil.getTupleValueExpressions(expression);
+                expression.findAllTupleValueSubexpressions();
         for (TupleValueExpression tve : predicate_tves) {
             int index = tve.resolveColumnIndexesUsingSchema(outer_schema);
             int tableIdx = 0;   // 0 for outer table
@@ -388,16 +390,16 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collected) {
-        super.findAllExpressionsOfClass(aeClass, collected);
+    public void findAllExpressionsOfClass(Class< ? extends AbstractExpression> aeClass, Set<AbstractExpression> collector) {
+        super.findAllExpressionsOfClass(aeClass, collector);
         if (m_preJoinPredicate != null) {
-            collected.addAll(m_preJoinPredicate.findAllSubexpressionsOfClass(aeClass));
+            m_preJoinPredicate.findAllSubexpressionsOfClass_recurse(aeClass, collector);
         }
         if (m_joinPredicate != null) {
-            collected.addAll(m_joinPredicate.findAllSubexpressionsOfClass(aeClass));
+            m_joinPredicate.findAllSubexpressionsOfClass_recurse(aeClass, collector);
         }
         if (m_wherePredicate != null) {
-            collected.addAll(m_wherePredicate.findAllSubexpressionsOfClass(aeClass));
+            m_wherePredicate.findAllSubexpressionsOfClass_recurse(aeClass, collector);
         }
     }
 

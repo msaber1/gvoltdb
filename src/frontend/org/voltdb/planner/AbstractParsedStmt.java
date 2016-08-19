@@ -841,7 +841,7 @@ public abstract class AbstractParsedStmt {
         // The only known-safe case is where each (column) argument to a
         // RowSubqueryExpression is based on exactly one column value.
         for (AbstractExpression arg : rowExpression.getArgs()) {
-            Collection<AbstractExpression> tves = arg.findAllTupleValueSubexpressions();
+            Collection<TupleValueExpression> tves = arg.findAllTupleValueSubexpressions();
             if (tves.size() != 1) {
                 if (tves.isEmpty()) {
                     throw new PlanningErrorException(
@@ -967,7 +967,7 @@ public abstract class AbstractParsedStmt {
             assert(m_parentStmt != null);
             // Disallow aggregation of parent columns in a subquery.
             // except the case HAVING AGG(T1.C1) IN (SELECT T2.C2 ...)
-            List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
+            List<TupleValueExpression> tves = expr.findAllTupleValueSubexpressions();
             for (TupleValueExpression tve : tves) {
                 int origId = tve.getOrigStmtId();
                 if (m_stmtId != origId && m_parentStmt.m_stmtId != origId) {

@@ -57,8 +57,6 @@ public abstract class JoinNode implements Cloneable {
 
     // All possible access paths for this node
     public List<AccessPath> m_accessPaths = new ArrayList<>();
-    // Reformatted final state of m_accessPaths optimizes frequent re-iterations.
-    public AccessPath[] m_accessPathArray;
     // Access path under the evaluation
     public AccessPath m_currentAccessPath = null;
 
