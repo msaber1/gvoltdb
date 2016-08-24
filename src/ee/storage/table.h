@@ -111,6 +111,7 @@ class Table {
 
     void decrementRefcount() {
         m_refcount -= 1;
+{ std::cout << "DEBUG:decr " << (void*)this << ' ' << m_refcount << std::endl; }
         if (m_refcount == 0) {
             delete this;
         }

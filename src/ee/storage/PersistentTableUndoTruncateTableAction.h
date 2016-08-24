@@ -28,7 +28,7 @@ public:
     inline PersistentTableUndoTruncateTableAction(VoltDBEngine * engine, TableCatalogDelegate * tcd,
             PersistentTable *originalTable, PersistentTable *emptyTable)
     :  m_engine(engine), m_tcd(tcd), m_originalTable(originalTable), m_emptyTable(emptyTable)
-    {}
+    { std::cout << "DEBUG:log  " << (void*)this << ' ' << (void*)m_originalTable << std::endl; }
 
 private:
     virtual ~PersistentTableUndoTruncateTableAction() {}
@@ -39,6 +39,7 @@ private:
      *
      */
     virtual void undo() {
+      { std::cout << "DEBUG:undo " << (void*)this << ' ' << (void*)m_originalTable << std::endl; }
         m_emptyTable->truncateTableForUndo(m_engine, m_tcd, m_originalTable);
     }
 
@@ -48,6 +49,7 @@ private:
      * tuple in the original table.
      */
     virtual void release() {
+  { std::cout << "DEBUG:rlse " << (void*)this << ' ' << (void*)m_originalTable << std::endl; }
         //It's very important not to add anything else to this release method
         //Put all the implementation in truncateTableRelease
         //The reason is that truncateTableRelease is called directly when a binary log
