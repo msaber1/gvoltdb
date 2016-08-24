@@ -38,6 +38,8 @@ import java.util.Properties;
 import java.util.Random;
 import java.util.regex.Pattern;
 
+import junit.framework.TestCase;
+
 import org.apache.commons.lang3.StringUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -57,8 +59,6 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 import com.google_voltpatches.common.net.HostAndPort;
-
-import junit.framework.TestCase;
 
 /**
  * Base class for a set of JUnit tests that perform regression tests
@@ -364,6 +364,7 @@ public class RegressionSuite extends TestCase {
      * @param config An instance of VoltServerConfig to run tests with.
      */
     void setConfig(final VoltServerConfig config) {
+        assert config != null;
         m_config = config;
     }
 

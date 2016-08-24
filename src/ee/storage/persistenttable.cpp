@@ -382,9 +382,9 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
     // Joined table view.
     BOOST_FOREACH (MaterializedViewHandler *viewHandler, originalTable->m_viewHandlers) {
         PersistentTable *destTable = viewHandler->destTable();
-	{ std::cout << "DEBUG:drel " << (void*)this << " OD " << (void*)destTable
-                    << " ND 0x-------- VH " << (void*)viewHandler 
-		    << ' ' << name() << ' ' << destTable->name() << ' ' << std::endl; }
+    { std::cout << "DEBUG:drel " << (void*)this << " OD " << (void*)destTable
+                    << " ND 0x-------- VH " << (void*)viewHandler
+            << ' ' << name() << ' ' << destTable->name() << ' ' << std::endl; }
         destTable->decrementRefcount();
     }
     originalTable->decrementRefcount();
@@ -466,7 +466,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         destTcd->init(*engine->getDatabase(), *catalogViewTable);
         PersistentTable *destEmptyTable = destTcd->getPersistentTable();
         assert(destEmptyTable);
-void* newHandler = 
+void* newHandler =
         new MaterializedViewHandler(destEmptyTable, catalogViewTable->mvHandlerInfo().get("mvHandlerInfo"), engine);
 { std::cout << "DEBUG:dest " << (void*)this << " OD " << (void*)destTable
             << " ND " << (void*)destEmptyTable

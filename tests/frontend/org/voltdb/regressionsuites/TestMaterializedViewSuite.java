@@ -29,6 +29,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 
+import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -47,11 +49,10 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.Eng798Insert;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateTables;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
 import com.google_voltpatches.common.collect.Lists;
-
-import junit.framework.Test;
 
 
 public class TestMaterializedViewSuite extends RegressionSuite {
@@ -63,7 +64,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
- TruncateMatViewDataMP.class
+        AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
+        SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class,
+        Eng798Insert.class, TruncateMatViewDataMP.class, TruncateTables.class
     };
 
     public TestMaterializedViewSuite(String name) {
@@ -84,6 +87,13 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         } catch (ProcCallException e) {
             e.printStackTrace();
             fail("Unexpected:" + e);
+        }
+        int nStatement = 0;
+        for (VoltTable countTable : results) {
+            ++nStatement;
+            long count = countTable.asScalarLong();
+            assertEquals("COUNT statement " + nStatement + "/" +
+            results.length + " should have found no undeleted rows.", 0, count);
         }
     }
 
@@ -1454,33 +1464,97 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     public void testViewOnJoinQuery() throws IOException, ProcCallException
     {
         Client client = getClient();
+        truncateBeforeTest(client);
         ArrayList<Object[]> dataList1 = Lists.newArrayList(
             new Object[][] {
                 {"CUSTOMERS", 1, "Tom", "VoltDB"},
+                {"CUSTOMERS", 2, "Jerry", "Bedford"},
+                {"CUSTOMERS", 3, "Rachael", "USA"},
+                {"CUSTOMERS", 4, "Ross", "Massachusetts"},
+                {"CUSTOMERS", 5, "Stephen", "Houston TX"},
                 {"ORDERS", 1, 2, "2016-04-23 13:24:57.671000"},
+                {"ORDERS", 2, 7, "2015-04-12 10:24:10.671400"},
+                {"ORDERS", 3, 5, "2016-01-20 09:24:15.943000"},
+                {"ORDERS", 4, 1, "2015-10-30 19:24:00.644000"},
                 {"PRODUCTS", 1, "H MART", 20.97},
                 {"PRODUCTS", 2, "COSTCO WHOLESALE", 62.66},
+                {"PRODUCTS", 3, "CENTRAL ROCK GYM", 22.00},
+                {"PRODUCTS", 4, "ATT*BILL PAYMENT", 48.90},
+                {"PRODUCTS", 5, "APL* ITUNES", 16.23},
+                {"PRODUCTS", 6, "GOOGLE *YouTube", 10.81},
+                {"PRODUCTS", 7, "UNIV OF HOUSTON SYSTEM", 218.35},
+                {"PRODUCTS", 8, "THE UPS STORE 2287", 36.31},
+                {"PRODUCTS", 9, "NNU*XFINITYWIFI", 7.95},
+                {"PRODUCTS", 10, "IKEA STOUGHTON", 61.03},
+                {"PRODUCTS", 11, "WM SUPERCENTER #5752", 9.74},
+                {"PRODUCTS", 12, "STOP & SHOP 0831", 12.28},
+                {"PRODUCTS", 13, "VERANDA NOODLE HOUSE", 29.81},
+                {"PRODUCTS", 14, "AMC 34TH ST 14 #2120", 38.98},
+                {"PRODUCTS", 15, "STARBUCKS STORE 19384", 5.51},
                 {"ORDERITEMS", 1, 2, 1},
+                {"ORDERITEMS", 1, 7, 1},
+                {"ORDERITEMS", 2, 5, 2},
+                {"ORDERITEMS", 3, 1, 3},
+                {"ORDERITEMS", 3, 15, 1},
+                {"ORDERITEMS", 3, 20, 1},
+                {"ORDERITEMS", 3, 4, 2},
+                {"ORDERITEMS", 3, 26, 5},
+                {"ORDERITEMS", 4, 30, 1},
+                {"ORDERITEMS", 5, 8, 1},
             }
         );
         ArrayList<Object[]> dataList2 = Lists.newArrayList(
             new Object[][] {
                 {"CUSTOMERS", 6, "Mike", "WPI"},
+                {"CUSTOMERS", 7, "Max", "New York"},
+                {"CUSTOMERS", 8, "Ethan", "Beijing China"},
+                {"CUSTOMERS", 9, "Selina", "France"},
+                {"CUSTOMERS", 10, "Harry Potter", "Hogwarts"},
                 {"ORDERS", 5, 3, "2015-04-23 00:24:45.768000"},
+                {"ORDERS", 6, 2, "2016-07-05 16:24:31.384000"},
+                {"ORDERS", 7, 4, "2015-03-09 21:24:15.768000"},
+                {"ORDERS", 8, 2, "2015-09-01 16:24:42.279300"},
                 {"PRODUCTS", 16, "SAN SOO KAP SAN SHUSHI", 10.69},
                 {"PRODUCTS", 17, "PLASTC INC.", 155.00},
+                {"PRODUCTS", 18, "MANDARIN MALDEN", 34.70},
+                {"PRODUCTS", 19, "MCDONALDS F16461", 7.25},
+                {"PRODUCTS", 20, "UBER US JUL20 M2E3D", 31.33},
+                {"PRODUCTS", 21, "TOUS LES JOURS", 13.25},
+                {"PRODUCTS", 22, "GINGER JAPANESE RESTAU", 69.20},
+                {"PRODUCTS", 23, "WOO JEON II", 9.58},
+                {"PRODUCTS", 24, "INFLIGHT WI-FI - LTV", 7.99},
+                {"PRODUCTS", 25, "EXPEDIA INC", 116.70},
+                {"PRODUCTS", 26, "THE ICE CREAM STORE", 5.23},
+                {"PRODUCTS", 27, "WEGMANS BURLINGTON #59", 22.13},
+                {"PRODUCTS", 28, "ACADEMY EXPRESS", 46.80},
+                {"PRODUCTS", 29, "TUCKS CANDY FACTORY INC", 7.00},
+                {"PRODUCTS", 30, "SICHUAN GOURMET", 37.12},
                 {"ORDERITEMS", 5, 12, 6},
+                {"ORDERITEMS", 5, 1, 0},
+                {"ORDERITEMS", 5, 27, 1},
+                {"ORDERITEMS", 6, 0, 1},
+                {"ORDERITEMS", 6, 21, 1},
+                {"ORDERITEMS", 7, 8, 1},
+                {"ORDERITEMS", 7, 19, 1},
+                {"ORDERITEMS", 7, 30, 4},
+                {"ORDERITEMS", 7, 1, 1},
+                {"ORDERITEMS", 8, 25, 2}
             }
         );
         assertEquals(dataList1.size(), dataList2.size());
 
         // -- 1 -- Test updating the data in the source tables.
         // There are two lists of data, we first insert the data in the first list
-        // to the corresponding source tables, then update each row with the data
+        // into the corresponding source tables, then update each row with the data
         // from the second data list.
         System.out.println("Now testing updating the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
             insertRow(client, dataList1.get(i));
+            verifyViewOnJoinQueryResult(client);
+        }
+        for (int i=0; i<dataList2.size(); i++) {
+            updateRow(client, dataList1.get(i), dataList2.get(i));
+            verifyViewOnJoinQueryResult(client);
         }
 
         // -- 2 -- Test inserting the data into the source tables.
@@ -1489,7 +1563,144 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         // all the rows. The cases updating values of all kinds of aggregations will be
         // tested in one row or another.
         truncateBeforeTest(client);
+        // Merge two sub-lists for the following tests.
+        dataList1.addAll(dataList2);
+        Collections.shuffle(dataList1);
+        System.out.println("Now testing inserting data to the join query view source table.");
+        for (int i=0; i<dataList1.size(); i++) {
+            insertRow(client, dataList1.get(i));
+            verifyViewOnJoinQueryResult(client);
+        }
 
+        // -- 3 -- Test altering the source table
+        // This alter table test will alter the source table schema first, then test if the view still
+        // has the correct content. Columns referenced by the views are not altered (we don't allow it).
+        // Our HSQL backend testing code does not support AdHoc DDL, disable this on HSQLBackend.
+        // This is fine because we don't use HSQL as reference in this test anyway.
+        if (! isHSQL()) {
+            System.out.println("Now testing altering the source table of a view.");
+            // 3.1 add column
+            try {
+                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;" +
+                        "ALTER TABLE WAS_ORDERITEMS ADD COLUMN x FLOAT;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to add column to a view source table.");
+            }
+            verifyViewOnJoinQueryResult(client);
+            // 3.2 drop column
+            try {
+                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;" +
+                        "ALTER TABLE WAS_ORDERITEMS DROP COLUMN x;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop column on a view source table.");
+            }
+            verifyViewOnJoinQueryResult(client);
+            // 3.3 alter column
+            try {
+                client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);" +
+                        "ALTER TABLE WAS_CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to alter column in a view source table.");
+            }
+            verifyViewOnJoinQueryResult(client);
+        }
+
+        // -- 4 -- Test defining view after the data is loaded.
+        if (! isHSQL()) {
+            System.out.println("Now testing view data catching-up.");
+            try {
+                client.callProcedure("@AdHoc", "DROP VIEW ORDER_DETAIL_WITHPCOL;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to drop a view.");
+            }
+            try {
+                client.callProcedure("@AdHoc",
+                    "CREATE VIEW ORDER_DETAIL_WITHPCOL (NAME, ORDER_ID, CNT, SUMAMT, MINUNIT, MAXUNIT, ITEMCOUNT) AS " +
+                    "SELECT " +
+                        "CUSTOMERS.NAME, " +
+                        "ORDERS.ORDER_ID, " +
+                        "COUNT(*), " +
+                        "SUM(PRODUCTS.PRICE * ORDERITEMS.QTY), " +
+                        "MIN(PRODUCTS.PRICE), " +
+                        "MAX(PRODUCTS.PRICE), " +
+                        "COUNT(ORDERITEMS.PID) " +
+                    "FROM CUSTOMERS JOIN ORDERS ON CUSTOMERS.CUSTOMER_ID = ORDERS.CUSTOMER_ID " +
+                                   "JOIN ORDERITEMS ON ORDERS.ORDER_ID = ORDERITEMS.ORDER_ID " +
+                                   "JOIN PRODUCTS ON ORDERITEMS.PID = PRODUCTS.PID " +
+                    "GROUP BY CUSTOMERS.NAME, ORDERS.ORDER_ID;");
+            } catch (ProcCallException pce) {
+                pce.printStackTrace();
+                fail("Should be able to create a view.");
+            }
+            verifyViewOnJoinQueryResult(client);
+        }
+
+        // -- 5 -- Test truncating one or more tables, then manually restoring their content.
+        System.out.println("Now testing truncating the join query view source table.");
+        int[] yesOrNo = new int[]{1, 0};
+        for (int rollback : yesOrNo) {
+            for (int truncateTable1 : yesOrNo) {
+                for (int truncateTable2 : yesOrNo) {
+                    for (int truncateTable3 : yesOrNo) {
+                        for (int truncateTable4 : yesOrNo) {
+                            truncateSourceTables(client, rollback,
+                                    truncateTable1,
+                                    truncateTable2,
+                                    truncateTable3,
+                                    truncateTable4);
+                            // truncateTable verifies the effects of truncation and
+                            // restoration within the transaction.
+                            // Now, verify them outside the transaction.
+                        verifyViewOnJoinQueryResult(client);
+                    }
+                }
+            }
+        }
+        }
+
+        // -- 6 -- Test deleting the data from the source tables.
+        Collections.shuffle(dataList1);
+        System.out.println("Now testing deleting data from the join query view source table.");
+        for (int i=0; i<dataList1.size(); i++) {
+            deleteRow(client, dataList1.get(i));
+            verifyViewOnJoinQueryResult(client);
+        }
+    }
+
+    private void truncateSourceTables(Client client, int rollback,
+            int truncateTable1, int truncateTable2, int truncateTable3,
+            int truncateTable4) {
+        try {
+            try {
+                VoltTable vt = client.callProcedure("TruncateTables", rollback,
+                        truncateTable1,
+                        truncateTable2,
+                        truncateTable3,
+                        truncateTable4).getResults()[0];
+                assertEquals("TruncateTables was expected to roll back", 0, rollback);
+                String result = " UNEXPECTED EMPTY RETURN FROM TruncateTables";
+                if (vt.advanceRow()) {
+                    result = vt.getString(0);
+                }
+                if ( ! "".equals(result)) {
+                    fail("TruncateTables detected an unexpected difference: " + result);
+                }
+            }
+            catch (ProcCallException vae) {
+                /*/* enable to debug */  System.out.println(vae);
+                if ( ! vae.getMessage().contains("Rolling back as requested")) {
+                    throw vae;
+                }
+                assertEquals("TruncateTables was not requested to roll back", 1, rollback);
+            }
+        }
+        catch (Exception other) {
+            fail("The call to TruncateTables unexpectedly threw: " + other);
+        }
     }
 
     public void UNtestEng11024() throws Exception {
@@ -1611,18 +1822,30 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         project.addProcedures(PROCEDURES);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partition running on JNI backend
+        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
 
-        // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalCluster("matview-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-
+        // get a server config for the native backend with two sites/partitions
+        LocalCluster config = new LocalCluster("matview-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         // build the jarfile
-        boolean success = config.compile(project);
-        assertTrue(success);
-
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("matview-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        assertTrue(config.compile(project));
+        builder.addServerConfig(config);
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #3: 3-node k=1 cluster
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("matview-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        assertTrue(config.compile(project));
+        builder.addServerConfig(config);
+
         return builder;
     }
 }
