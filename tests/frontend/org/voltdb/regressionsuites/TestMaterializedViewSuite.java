@@ -1489,11 +1489,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         // all the rows. The cases updating values of all kinds of aggregations will be
         // tested in one row or another.
         truncateBeforeTest(client);
-        // Merge two sub-lists for the following tests.
 
     }
 
-    public void testEng11024() throws Exception {
+    public void UNtestEng11024() throws Exception {
         // Regression test for ENG-11024, found by sqlcoverage
         Client client = getClient();
 
@@ -1519,7 +1518,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, vt.asScalarLong());
     }
 
-    public void testUpdateAndMinMax() throws Exception {
+    public void UNtestUpdateAndMinMax() throws Exception {
         Client client = getClient();
 
         //        CREATE TABLE P2_ENG_11024 (

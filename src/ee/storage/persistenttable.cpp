@@ -392,7 +392,7 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 
 
 void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
-    if (isPersistentTableEmpty()) {
+    if (isPersistentTableEmpty() == true) {
         return;
     }
 
@@ -466,11 +466,12 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         destTcd->init(*engine->getDatabase(), *catalogViewTable);
         PersistentTable *destEmptyTable = destTcd->getPersistentTable();
         assert(destEmptyTable);
-        void* newHandler = new MaterializedViewHandler(destEmptyTable, catalogViewTable->mvHandlerInfo().get("mvHandlerInfo"), engine);
-	{ std::cout << "DEBUG:dest " << (void*)this << " OD " << (void*)destTable
-                    << " ND " << (void*)destEmptyTable
-                    << " VH " << (void*)viewHandler << " NH " << (void*)newHandler
-                    << ' ' << name() << ' ' << destEmptyTable->name() << std::endl; }
+void* newHandler = 
+        new MaterializedViewHandler(destEmptyTable, catalogViewTable->mvHandlerInfo().get("mvHandlerInfo"), engine);
+{ std::cout << "DEBUG:dest " << (void*)this << " OD " << (void*)destTable
+            << " ND " << (void*)destEmptyTable
+            << " VH " << (void*)viewHandler << " NH " << (void*)newHandler
+            << ' ' << name() << ' ' << destEmptyTable->name() << std::endl; }
     }
 
     // If there is a purge fragment on the old table, pass it on to the new one
@@ -1969,8 +1970,8 @@ void PersistentTable::dropViewHandler(MaterializedViewHandler *viewHandler) {
 }
 
 void PersistentTable::polluteViews() {
-    BOOST_FOREACH (auto mvHandler, m_viewHandlers) {
-        mvHandler->pollute();
+    BOOST_FOREACH (auto mvHanlder, m_viewHandlers) {
+        mvHanlder->pollute();
     }
 }
 
