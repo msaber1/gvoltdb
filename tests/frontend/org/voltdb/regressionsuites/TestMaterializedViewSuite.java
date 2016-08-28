@@ -29,6 +29,8 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 
+import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -47,11 +49,10 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.Eng798Insert;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateTables;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
 import com.google_voltpatches.common.collect.Lists;
-
-import junit.framework.Test;
 
 
 public class TestMaterializedViewSuite extends RegressionSuite {
@@ -65,7 +66,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     static final Class<?>[] PROCEDURES = {
         AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
         SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class,
-        Eng798Insert.class, TruncateMatViewDataMP.class
+        Eng798Insert.class, TruncateMatViewDataMP.class, TruncateTables.class
     };
 
     // For comparing tables with FLOAT columns
@@ -1547,7 +1548,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         // -- 1 -- Test updating the data in the source tables.
         // There are two lists of data, we first insert the data in the first list
-        // to the corresponding source tables, then update each row with the data
+        // into the corresponding source tables, then update each row with the data
         // from the second data list.
         System.out.println("Now testing updating the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
@@ -1567,8 +1568,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         truncateBeforeTest(client);
         // Merge two sub-lists for the following tests.
         dataList1.addAll(dataList2);
-        //
-        // For more deterministic debugging, consider doing this:
+        // For more deterministic debugging, consider this instead of shuffle:
         // Collections.reverse(dataList1);
         Collections.shuffle(dataList1);
         System.out.println("Now testing inserting data to the join query view source table.");
@@ -1586,7 +1586,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             System.out.println("Now testing altering the source table of a view.");
             // 3.1 add column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;");
+                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;" +
+                        "ALTER TABLE WAS_ORDERITEMS ADD COLUMN x FLOAT;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to add column to a view source table.");
@@ -1594,7 +1595,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
             // 3.2 drop column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;");
+                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;" +
+                        "ALTER TABLE WAS_ORDERITEMS DROP COLUMN x;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to drop column on a view source table.");
@@ -1602,7 +1604,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
             // 3.3 alter column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
+                client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);" +
+                        "ALTER TABLE WAS_CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to alter column in a view source table.");
@@ -1641,15 +1644,73 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
         }
 
-        // -- 5 -- Test deleting the data from the source tables.
-        //
-        // For more deterministic debugging, consider doing this:
+        // -- 5 -- Test truncating one or more tables, then explicitly restoring their content.
+        System.out.println("Now testing truncating the join query view source table.");
+        int[] yesAndNo = new int[]{1, 0};
+        int[] never = new int[]{0};
+        // Substitute yesAndNo for never on the next line to test rollback after truncate
+        for (int forceRollback : never) { //*/ : yesAndNo) {
+            for (int truncateTable1 : yesAndNo) {
+                for (int truncateTable2 : yesAndNo) {
+                    // 'never' reduces combinations of truncate operations.
+                    // Substitute yesAndNo for test overkill
+                    for (int truncateTable3 : never) { //*/ : yesAndNo) {
+                        for (int truncateTable4 : never) { //*/ : yesAndNo) {
+                            // truncateSourceTable verifies the short-term effects
+                            // of truncation and restoration within the transaction.
+                            truncateSourceTables(client, forceRollback,
+                                    truncateTable1,
+                                    truncateTable2,
+                                    truncateTable3,
+                                    truncateTable4);
+                            // Verify the correctness outside the transaction.
+                            verifyViewOnJoinQueryResult(client);
+                        }
+                    }
+                }
+            }
+        }
+
+
+        // -- 6 -- Test deleting the data from the source tables.
+        // For more deterministic debugging, consider this instead of shuffle:
         // Collections.reverse(dataList1);
         Collections.shuffle(dataList1);
         System.out.println("Now testing deleting data from the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
             deleteRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
+        }
+    }
+
+    private void truncateSourceTables(Client client, int rollback,
+            int truncateTable1, int truncateTable2, int truncateTable3,
+            int truncateTable4) {
+        try {
+            try {
+                VoltTable vt = client.callProcedure("TruncateTables", rollback,
+                        truncateTable1,
+                        truncateTable2,
+                        truncateTable3,
+                        truncateTable4).getResults()[0];
+                assertEquals("TruncateTables was expected to roll back", 0, rollback);
+                String result = " UNEXPECTED EMPTY RETURN FROM TruncateTables ";
+                if (vt.advanceRow()) {
+                    result = vt.getString(0);
+                }
+                if ( ! "".equals(result)) {
+                    fail("TruncateTables detected an unexpected difference: " + result);
+                }
+            }
+            catch (ProcCallException vae) {
+                if ( ! vae.getMessage().contains("Rolling back as requested")) {
+                    throw vae;
+                }
+                assertEquals("TruncateTables was not requested to roll back", 1, rollback);
+            }
+        }
+        catch (Exception other) {
+            fail("The call to TruncateTables unexpectedly threw: " + other);
         }
     }
 
@@ -1881,51 +1942,40 @@ public class TestMaterializedViewSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        URL url = AddPerson.class.getResource("matviewsuite-ddl.sql");
-        url.getPath();
-
-        String schemaPath = url.getPath();
-
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestMaterializedViewSuite.class);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        //VoltServerConfig config = new LocalSingleProcessServer("matview-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);
-        VoltServerConfig config = new LocalCluster("matview-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
-        //project.setBackendTarget(BackendTarget.NATIVE_EE_IPC);
+
+        URL url = AddPerson.class.getResource("matviewsuite-ddl.sql");
+        String schemaPath = url.getPath();
         project.addSchema(schemaPath);
 
         project.addProcedures(PROCEDURES);
-        // build the jarfile
-        boolean success = config.compile(project);
-        assertTrue(success);
 
+        /////////////////////////////////////////////////////////////
+        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
+        /////////////////////////////////////////////////////////////
+        LocalCluster config = new LocalCluster("matview-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        // build the jarfile
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
-
         config = new LocalCluster("matview-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
         // CONFIG #3: 3-node k=1 cluster
         /////////////////////////////////////////////////////////////
         config = new LocalCluster("matview-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
+        assertTrue(config.compile(project));
         builder.addServerConfig(config);
 
         return builder;
