@@ -1387,13 +1387,30 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         System.out.println("Testing single-source-table truncates");
 
-        // change to yesAndNo to purposely exercise transaction rollback
+        // change yesAndNo to never to bypass the tests for transaction rollback
         for (int forceAbort : yesAndNo) {
-            for (int repeats = 1; repeats < /*3*/1; ++repeats) {
+            // Try different numbers of truncates in the same XA.
+            for (int repeats = 1; repeats <= 3; ++repeats) {
+                // Try variations with the same number of truncates
+                // but different mixes of re-population in between.
                 for (int restores = 1; restores < repeats; ++restores) {
-                    results = client.callProcedure("TruncatePeople",
-                            forceAbort, repeats, restores).getResults();
-                    System.out.println("SURVIVED " + repeats + "." + restores);
+                    try {
+                        try {
+                            results = client.callProcedure("TruncatePeople",
+                                    forceAbort, repeats, restores).getResults();
+                            assertEquals("TruncatePeople was expected to roll back", 0, forceAbort);
+                        }
+                        catch (ProcCallException vae) {
+                            if ( ! vae.getMessage().contains("Rolling back as requested")) {
+                                throw vae;
+                            }
+                            assertEquals("TruncatePeople was not requested to roll back", 1, forceAbort);
+                        }
+                    }
+                    catch (Exception other) {
+                        fail("The call to TruncatePeople unexpectedly threw: " + other);
+                    }
+                    /* enable to debug */  System.out.println("SURVIVED TruncatePeople." + repeats + "." + restores);
                     validateHardCodedStatusQuo(client);
                 }
             }
@@ -1674,14 +1691,17 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
         }
 
-        // -- 5 -- Test truncating one or more tables, then explicitly restoring their content.
+        // -- 5 -- Test truncating one or more tables,
+        // then explicitly restoring their content.
         System.out.println("Now testing truncating the join query view source table.");
-        // Substitute yesAndNo for never on the next line to test rollback after truncate
-        for (int forceRollback : /**-/ never) { //*/ yesAndNo) {
-            for (int truncateTable1 : /**-/ never) { //*/ yesAndNo) {
-                for (int truncateTable2 : /**-/ never) { //*/ yesAndNo) {
-                    // 'never' reduces combinations of truncate operations.
-                    // Substitute yesAndNo for test overkill
+        // Temporarily substitute never for yesAndNo on the next line if you
+        // want to bypass testing of rollback after truncate.
+        for (int forceRollback : /*default:*/ yesAndNo) { //alt:*/ never) {
+            for (int truncateTable1 : yesAndNo) {
+                // Each use of 'never' reduces by half the tried
+                // combinations of truncate operations.
+                for (int truncateTable2 : /*default:*/ yesAndNo) { //alt:*/ never) {
+                    // Substitute yesAndNo below for test overkill
                     for (int truncateTable3 : /**/ never) { //*/ yesAndNo) {
                         for (int truncateTable4 : /**/ never) { //*/ yesAndNo) {
                             // truncateSourceTable verifies the short-term effects

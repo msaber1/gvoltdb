@@ -22,33 +22,56 @@
 #include "common/types.h"
 #include "storage/persistenttable.h"
 
+// Enable to debug.
+//#define INSERT_ACTION_DEBUG_DUMP(stage) debugDump(stage)
+#ifndef INSERT_ACTION_DEBUG_DUMP
+#define INSERT_ACTION_DEBUG_DUMP(stage)
+#endif
+
+
 namespace voltdb {
 
 
 class PersistentTableUndoInsertAction: public voltdb::UndoAction {
 public:
+    // Initialize with a table surgeon to get its private access to
+    // the PersistentTable without an added friend declaration.
     inline PersistentTableUndoInsertAction(char* insertedTuple,
-                                           voltdb::PersistentTableSurgeon *table)
-        : m_tuple(insertedTuple), m_table(table)
-    { }
+                                           PersistentTableSurgeon *tableSurgeon)
+        : m_tuple(insertedTuple)
+        , m_tableSurgeon(tableSurgeon)
+    {
+        INSERT_ACTION_DEBUG_DUMP("ctor ");
+    }
 
-    virtual ~PersistentTableUndoInsertAction() { }
+    virtual ~PersistentTableUndoInsertAction() {
+    }
 
     /*
      * Undo whatever this undo action was created to undo
      */
     virtual void undo() {
-        m_table->deleteTupleForUndo(m_tuple);
+        INSERT_ACTION_DEBUG_DUMP("undo ");
+        m_tableSurgeon->deleteTupleForUndo(m_tuple);
     }
 
     /*
      * Release any resources held by the undo action. It will not need
      * to be undone in the future.
      */
-    void release() { }
+    void release() {
+        INSERT_ACTION_DEBUG_DUMP("rels ");
+    }
 private:
+    void debugDump(const char* stage) const {
+        std::cout << "DEBUG:InsAct " << stage << (void*)&(m_tableSurgeon->getTable())
+                  << " currenttuples: " << m_tableSurgeon->getTable().activeTupleCount()
+                  << ' ' << m_tableSurgeon->getTable().name()
+                  << std::endl;
+    }
+
     char* m_tuple;
-    PersistentTableSurgeon *m_table;
+    PersistentTableSurgeon *m_tableSurgeon;
 };
 
 }

@@ -96,6 +96,11 @@ class Table {
   public:
     virtual ~Table();
 
+// enable to debug
+//#define DEBUG_DUMP_REFCOUNT(stage) debugDumpRefcount(stage)
+#ifndef DEBUG_DUMP_REFCOUNT
+#define DEBUG_DUMP_REFCOUNT(stage)
+#endif
     /*
      * Table lifespan can be managed by a reference count. The
      * reference is trivial to maintain since it is only accessed by
@@ -112,8 +117,15 @@ class Table {
     void decrementRefcount() {
         m_refcount -= 1;
         if (m_refcount == 0) {
+            DEBUG_DUMP_REFCOUNT("final ")
             delete this;
         }
+    }
+
+    void debugDumpRefcount(const char* stage) const {
+        std::cout << "DEBUG:table " << stage << (const void*)this
+                  << ' ' << name() << " tuples:" << activeTupleCount()
+                  << std::endl;
     }
 
     // ------------------------------------------------------------------

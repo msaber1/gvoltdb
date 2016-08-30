@@ -134,7 +134,7 @@ public class TruncateMatViewDataMP extends VoltProcedure {
         voltQueueSQL(validateview15); // ("SELECT COUNT(*) FROM VENG6511expLR;");
         voltQueueSQL(validateview16); // ("SELECT COUNT(*) FROM VENG6511C;");
         voltQueueSQL(validateview17); // ("SELECT COUNT(*) FROM ORDER_COUNT_NOPCOL;");
-        voltQueueSQL(validateview18); // ("SELECT * FROM ORDER_COUNT_GLOBAL;");
+        voltQueueSQL(validateview18); // ("SELECT CNT FROM ORDER_COUNT_GLOBAL;");
         voltQueueSQL(validateview19); // ("SELECT COUNT(*) FROM ORDER_DETAIL_NOPCOL;");
         voltQueueSQL(validateview20); // ("SELECT COUNT(*) FROM ORDER_DETAIL_WITHPCOL;");
         voltQueueSQL(validateview21); // ("SELECT COUNT(*) FROM ORDER2016;");
