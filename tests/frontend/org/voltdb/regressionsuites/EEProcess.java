@@ -73,6 +73,7 @@ public class EEProcess {
         args.add("--show-reachable=yes");
         args.add("--num-callers=32");
         args.add("--error-exitcode=-1");
+        args.add("--suppressions=tests/ee/test_utils/vdbsuppressions.supp");
         /*
          * VOLTDBIPC_PATH is set as part of the regression suites and ant
          * check In that scenario junit will handle logging of Valgrind

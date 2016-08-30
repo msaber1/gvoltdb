@@ -56,7 +56,7 @@ public class TruncateTables extends VoltProcedure {
     public final SQLStmt validatebase3 = new SQLStmt("SELECT COUNT(*) FROM ORDERITEMS;");
     public final SQLStmt validatebase4 = new SQLStmt("SELECT COUNT(*) FROM PRODUCTS;");
 
-    public final SQLStmt validateview1 = new SQLStmt("SELECT * FROM ORDER_COUNT_GLOBAL;");
+    public final SQLStmt validateview1 = new SQLStmt("SELECT CNT FROM ORDER_COUNT_GLOBAL;");
 
     public final SQLStmt renewbase1 = new SQLStmt("INSERT INTO CUSTOMERS SELECT * FROM WAS_CUSTOMERS ORDER BY CUSTOMER_ID;");
     public final SQLStmt renewbase2 = new SQLStmt("INSERT INTO ORDERS SELECT * FROM WAS_ORDERS ORDER BY ORDER_ID;");
@@ -68,76 +68,84 @@ public class TruncateTables extends VoltProcedure {
             int truncateTable2,
             int truncateTable3,
             int truncateTable4) {
-        boolean atLeastOneTruncation = false;
+        try {
+            System.out.println("Running TruncateTables." + rollback + "." +
+                    truncateTable1 + "." + truncateTable2 + "." + truncateTable3 + "." + truncateTable4);
+                boolean atLeastOneTruncation = false;
 
-        voltQueueSQL(captureview1);
-        VoltTable beforeView1 = voltExecuteSQL()[0];
+                voltQueueSQL(captureview1);
+                VoltTable beforeView1 = voltExecuteSQL()[0];
 
-        if (truncateTable1 != 0) {
-            atLeastOneTruncation = true;
-            voltQueueSQL(clearcache1);
-            voltQueueSQL(cachebase1);
-            voltQueueSQL(truncatebase1); // ("TRUNCATE TABLE CUSTOMERS;");
+                if (truncateTable1 != 0) {
+                    atLeastOneTruncation = true;
+                    voltQueueSQL(clearcache1);
+                    voltQueueSQL(cachebase1);
+                    voltQueueSQL(truncatebase1); // ("TRUNCATE TABLE CUSTOMERS;");
+                }
+                if (truncateTable2 != 0) {
+                    atLeastOneTruncation = true;
+                    voltQueueSQL(clearcache2);
+                    voltQueueSQL(cachebase2);
+                    voltQueueSQL(truncatebase2); // ("TRUNCATE TABLE ORDERS;");
+                }
+                if (truncateTable3 != 0) {
+                    atLeastOneTruncation = true;
+                    voltQueueSQL(clearcache3);
+                    voltQueueSQL(cachebase3);
+                    voltQueueSQL(truncatebase3); // ("TRUNCATE TABLE ORDERITEMS;");
+                }
+                if (truncateTable4 != 0) {
+                    atLeastOneTruncation = true;
+                    voltQueueSQL(clearcache4);
+                    voltQueueSQL(cachebase4);
+                    voltQueueSQL(truncatebase4); // ("TRUNCATE TABLE PRODUCTS;");
+                }
+
+                if (! atLeastOneTruncation) {
+                    if (rollback != 0) {
+                        throw new VoltAbortException("Rolling back as requested.");
+                    }
+                    // There's nothing to do. The queue is empty.
+                    return wrapResult(""); // success
+                }
+
+                queueTruncationChecks(
+                        truncateTable1,
+                        truncateTable2,
+                        truncateTable3,
+                        truncateTable4);
+
+                VoltTable[] results = voltExecuteSQL();
+
+                VoltTable deleted = results[results.length-1];
+                if (deleted.asScalarLong() != 0) {
+                    System.out.println(
+                            "DEBUG Truncate failed to delete all view rows, leaving: " +
+                                    deleted.asScalarLong());
+                }
+
+                renewBases(
+                        truncateTable1,
+                        truncateTable2,
+                        truncateTable3,
+                        truncateTable4);
+
+                voltQueueSQL(captureview1);
+                VoltTable afterView1 = voltExecuteSQL()[0];
+
+                String diff = compareTables(beforeView1, afterView1);
+
+                if (rollback != 0) {
+                    throw new VoltAbortException("Rolling back as requested.");
+                }
+                VoltTable result = wrapResult(diff);
+                System.out.println("TruncateTables normal exit.");
+                return result;
         }
-        if (truncateTable2 != 0) {
-            atLeastOneTruncation = true;
-            voltQueueSQL(clearcache2);
-            voltQueueSQL(cachebase2);
-            voltQueueSQL(truncatebase2); // ("TRUNCATE TABLE ORDERS;");
+        catch(Throwable t) {
+            System.out.println("TruncateTables abnormal exit after: " + t);
+            throw t;
         }
-        if (truncateTable3 != 0) {
-            atLeastOneTruncation = true;
-            voltQueueSQL(clearcache3);
-            voltQueueSQL(cachebase3);
-            voltQueueSQL(truncatebase3); // ("TRUNCATE TABLE ORDERITEMS;");
-        }
-        if (truncateTable4 != 0) {
-            atLeastOneTruncation = true;
-            voltQueueSQL(clearcache4);
-            voltQueueSQL(cachebase4);
-            voltQueueSQL(truncatebase4); // ("TRUNCATE TABLE PRODUCTS;");
-        }
-
-        if (! atLeastOneTruncation) {
-            if (rollback != 0) {
-                throw new VoltAbortException("Rolling back as requested.");
-            }
-            // There's nothing to do. The queue is empty.
-            return wrapResult(""); // success
-        }
-
-        queueTruncationChecks(
-                truncateTable1,
-                truncateTable2,
-                truncateTable3,
-                truncateTable4);
-
-        VoltTable[] results = voltExecuteSQL();
-
-        VoltTable deleted = results[results.length-1];
-        if (deleted.asScalarLong() != 0) {
-            System.out.println(
-                    "DEBUG Truncate failed to delete all view rows, leaving: " +
-                            deleted.asScalarLong());
-        }
-
-        renewBases(
-                truncateTable1,
-                truncateTable2,
-                truncateTable3,
-                truncateTable4);
-
-        voltQueueSQL(captureview1);
-        VoltTable afterView1 = voltExecuteSQL()[0];
-
-        String diff = compareTables(beforeView1, afterView1);
-
-        if (rollback != 0) {
-            throw new VoltAbortException("Rolling back as requested.");
-        }
-
-        VoltTable result = wrapResult(diff);
-        return result;
     }
 
     private VoltTable wrapResult(String diff) {

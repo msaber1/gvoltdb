@@ -49,11 +49,11 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.Eng798Insert;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncatePeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateTables;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
 import com.google_voltpatches.common.collect.Lists;
-
 
 public class TestMaterializedViewSuite extends RegressionSuite {
 
@@ -66,7 +66,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     static final Class<?>[] PROCEDURES = {
         AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
         SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class,
-        Eng798Insert.class, TruncateMatViewDataMP.class, TruncateTables.class
+        Eng798Insert.class, TruncateMatViewDataMP.class,
+        TruncateTables.class, TruncatePeople.class
     };
 
     // For comparing tables with FLOAT columns
@@ -1382,9 +1383,36 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         results = client.callProcedure("DeletePerson", 1, 1L, NORMALLY).getResults();
         results = client.callProcedure("DeletePerson", 2, 5L, NORMALLY).getResults();
 
-        results = client.callProcedure("@AdHoc", "SELECT * FROM MATPEOPLE2").getResults();
+        validateHardCodedStatusQuo(client);
+
+        System.out.println("Testing single-source-table truncates");
+
+        // change to yesAndNo to purposely exercise transaction rollback
+        for (int forceAbort : yesAndNo) {
+            for (int repeats = 1; repeats < /*3*/1; ++repeats) {
+                for (int restores = 1; restores < repeats; ++restores) {
+                    results = client.callProcedure("TruncatePeople",
+                            forceAbort, repeats, restores).getResults();
+                    System.out.println("SURVIVED " + repeats + "." + restores);
+                    validateHardCodedStatusQuo(client);
+                }
+            }
+        }
+    }
+
+    /**
+     * @param client
+     * @throws ProcCallException
+     * @throws IOException
+     * @throws NoConnectionsException
+     */
+    private void validateHardCodedStatusQuo(Client client)
+            throws NoConnectionsException, IOException, ProcCallException {
+        VoltTable[] results = client.callProcedure("@AdHoc",
+                "SELECT * FROM MATPEOPLE2").getResults();
         assert(results != null);
         assertEquals(1, results.length);
+        VoltTable t;
         t = results[0];
         assertEquals(2, t.getRowCount());
         System.out.println(t.toString());
@@ -1396,7 +1424,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(2, t.getLong(2));
         assertEquals(0, (int)(t.getDouble(3)));
         assertEquals(10, t.getLong(4));
-
     }
 
     private void insertRow(Client client, Object... parameters) throws IOException, ProcCallException
@@ -1463,6 +1490,9 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         tresult = client.callProcedure("PROC_QTYPERPRODUCT").getResults()[0];
         assertTablesAreEqual(prefix + "QTYPERPRODUCT: ", tresult, vresult, EPSILON);
     }
+
+    static private int[] yesAndNo = new int[]{1, 0};
+    static private int[] never = new int[]{0};
 
     public void testViewOnJoinQuery() throws IOException, ProcCallException
     {
@@ -1646,16 +1676,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         // -- 5 -- Test truncating one or more tables, then explicitly restoring their content.
         System.out.println("Now testing truncating the join query view source table.");
-        int[] yesAndNo = new int[]{1, 0};
-        int[] never = new int[]{0};
         // Substitute yesAndNo for never on the next line to test rollback after truncate
-        for (int forceRollback : never) { //*/ : yesAndNo) {
-            for (int truncateTable1 : yesAndNo) {
-                for (int truncateTable2 : yesAndNo) {
+        for (int forceRollback : /**-/ never) { //*/ yesAndNo) {
+            for (int truncateTable1 : /**-/ never) { //*/ yesAndNo) {
+                for (int truncateTable2 : /**-/ never) { //*/ yesAndNo) {
                     // 'never' reduces combinations of truncate operations.
                     // Substitute yesAndNo for test overkill
-                    for (int truncateTable3 : never) { //*/ : yesAndNo) {
-                        for (int truncateTable4 : never) { //*/ : yesAndNo) {
+                    for (int truncateTable3 : /**/ never) { //*/ yesAndNo) {
+                        for (int truncateTable4 : /**/ never) { //*/ yesAndNo) {
                             // truncateSourceTable verifies the short-term effects
                             // of truncation and restoration within the transaction.
                             truncateSourceTables(client, forceRollback,
@@ -1671,13 +1699,12 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             }
         }
 
-
         // -- 6 -- Test deleting the data from the source tables.
         // For more deterministic debugging, consider this instead of shuffle:
         // Collections.reverse(dataList1);
         Collections.shuffle(dataList1);
         System.out.println("Now testing deleting data from the join query view source table.");
-        for (int i=0; i<dataList1.size(); i++) {
+        for (int i = 0; i < dataList1.size(); i++) {
             deleteRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
         }
@@ -1959,11 +1986,13 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         // CONFIG #1: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
         LocalCluster config = new LocalCluster("matview-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        /* simplifying override */ config = new LocalCluster("matview-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         // build the jarfile
         assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
+        /*
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
@@ -1977,7 +2006,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         config = new LocalCluster("matview-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
         builder.addServerConfig(config);
-
+        */
         return builder;
     }
 }
