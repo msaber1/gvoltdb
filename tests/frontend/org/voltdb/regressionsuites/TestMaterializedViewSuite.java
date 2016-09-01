@@ -276,7 +276,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         runAndVerifyENG6511(client, "DELETE FROM ENG6511 WHERE d1=2 AND d2=5 AND v1 IS NOT NULL;");
     }
 
-    public void NOTESTSinglePartition() throws IOException, ProcCallException
+    public void testSinglePartition() throws IOException, ProcCallException
     {
         subtestInsertSinglePartition();
         subtestDeleteSinglePartition();
@@ -430,7 +430,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assert(results != null);
         assertEquals(1, results.length);
         assertEquals(2, results[0].getRowCount());
-        System.out.println(results[0].toString());
+        //* enable to debug */  System.out.println(results[0]);
         VoltTableRow r1 = results[0].fetchRow(0);
         VoltTableRow r2 = results[0].fetchRow(1);
         assertEquals(31L, r1.getLong(0));
@@ -525,7 +525,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(4, t.getLong(2));
         assertEquals(900, (int)(t.getDouble(3)));
@@ -538,7 +538,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(3, t.getLong(2));
         assertEquals(900, (int)(t.getDouble(3)));
@@ -551,7 +551,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(3, t.getLong(2));
         assertEquals(200, (int)(t.getDouble(3)));
@@ -564,7 +564,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(3, t.getLong(2));
         assertEquals(0, (int)(t.getDouble(3)));
@@ -577,7 +577,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(2, t.getLong(2));
         assertEquals(0, (int)(t.getDouble(3)));
@@ -614,7 +614,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(2, t.getLong(2));
         assertEquals(5, t.getLong(3));
@@ -626,7 +626,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(1, t.getLong(2));
         assertEquals(3, t.getLong(3));
@@ -638,7 +638,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(1, t.getLong(2));
         assertEquals(9, t.getLong(3));
@@ -667,7 +667,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(4, t.getLong(2));
         assertEquals(900, (int)(t.getDouble(3)));
@@ -680,7 +680,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(3, t.getLong(2));
         assertEquals(900, (int)(t.getDouble(3)));
@@ -693,7 +693,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(3, t.getLong(2));
         assertEquals(200, (int)(t.getDouble(3)));
@@ -706,7 +706,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(3, t.getLong(2));
         assertEquals(0, (int)(t.getDouble(3)));
@@ -719,7 +719,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(2, t.getLong(2));
         assertEquals(0, (int)(t.getDouble(3)));
@@ -748,7 +748,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(2, t.getLong(2));
         assertEquals(5, t.getLong(3));
@@ -760,7 +760,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(2, t.getLong(2));
         assertEquals(5, t.getLong(3));
@@ -768,14 +768,14 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         results = client.callProcedure("DEPT_PEOPLE.update", 4L, 1, 31L, 200, 9, 4L).getResults();
 
         results = client.callProcedure("@AdHoc", "SELECT * FROM DEPT_PEOPLE;").getResults();
-        System.out.println(results[0].toString());
+        //* enable to debug */  System.out.println(results[0]);
 
         results = client.callProcedure("@AdHoc", "SELECT * FROM DEPT_AGE_FILTER_MATVIEW").getResults();
         assert(results != null);
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(1, t.getLong(2));
         assertEquals(3, t.getLong(3));
@@ -787,7 +787,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(2, t.getLong(2));
         assertEquals(9, t.getLong(3));
@@ -827,7 +827,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(5, t.getLong(2));
         assertEquals(900, (int)(t.getDouble(3)));
@@ -840,7 +840,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(4, t.getLong(2));
         assertEquals(900, (int)(t.getDouble(3)));
@@ -853,7 +853,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(1, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(4, t.getLong(2));
         assertEquals(200, (int)(t.getDouble(3)));
@@ -940,7 +940,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertAggNoGroupBy(client, "MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX", "4", "0.0", "10");
     }
 
-    public void NOTESTMPAndRegressions() throws IOException, ProcCallException
+    public void testMPAndRegressions() throws IOException, ProcCallException
     {
         subtestMultiPartitionSimple();
         subtestInsertReplicated();
@@ -950,11 +950,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         subtestMinMaxMultiPartition();
         subtestENG7872MP();
         subtestENG6511(true);
-    }
-
-    public void testFor6_6() throws IOException, ProcCallException
-    {
-        subtestMinMaxMultiPartition();
     }
 
     private void subtestMultiPartitionSimple() throws IOException, ProcCallException
@@ -1219,7 +1214,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 "SELECT team, total, finish FROM V_TEAM_TIMES " +
                 "ORDER BY total DESC, 0-SINCE_EPOCH(MILLISECOND, finish) DESC").getResults();
             assertEquals(1, results.length);
-            System.out.println(results[0]);
+            //* enable to debug */  System.out.println(results[0]);
             assertEquals(9, results[0].getRowCount());
             results[0].advanceRow();
             assertEquals("Boston", results[0].getString(0));
@@ -1247,13 +1242,13 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         results = client.callProcedure("@AdHoc",
                 "SELECT count(*) FROM V_TEAM_MEMBERSHIP where team > 'Cambridge' order by total").getResults();
         assertEquals(1, results.length);
-        System.out.println(results[0]);
+        //* enable to debug */  System.out.println(results[0]);
         assertEquals(2L, results[0].asScalarLong());
 
         results = client.callProcedure("@AdHoc",
                 "SELECT count(*) FROM V_TEAM_MEMBERSHIP where total > 3 ").getResults();
         assertEquals(1, results.length);
-        System.out.println(results[0]);
+        //* enable to debug */  System.out.println(results[0]);
         assertEquals(2L, results[0].asScalarLong());
 
 
@@ -1261,7 +1256,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         results = client.callProcedure("@AdHoc",
                 "SELECT team, finish FROM V_TEAM_TIMES ORDER BY finish DESC limit 3").getResults();
         assertEquals(1, results.length);
-        System.out.println(results[0]);
+        //* enable to debug */  System.out.println(results[0]);
         assertEquals(3, results[0].getRowCount());
         results[0].advanceRow();
         assertEquals("Lexington", results[0].getString(0));
@@ -1312,7 +1307,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(2, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(4, t.getLong(2));
         assertEquals(900, (int)(t.getDouble(3)));
@@ -1336,7 +1331,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(2, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(3, t.getLong(2));
         assertEquals(900, (int)(t.getDouble(3)));
@@ -1360,7 +1355,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(2, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(3, t.getLong(2));
         assertEquals(200, (int)(t.getDouble(3)));
@@ -1384,7 +1379,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, results.length);
         t = results[0];
         assertEquals(2, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(3, t.getLong(2));
         assertEquals(0, (int)(t.getDouble(3)));
@@ -1404,7 +1399,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         // Make sure the stored proc behaves correctly even if we
         // purposely abort it.
         // forceAbort = 1 for "yes" is the more interesting case.
-        for (int forceAbort : never) {
+        for (int forceAbort : yesAndNo) {
             // Try one or more truncates on the same view source table
             // within the stored proc.
             for (int repeats = 1; repeats <= 3; ++repeats) {
@@ -1435,7 +1430,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                     catch (Exception other) {
                         fail("The call to TruncatePeople unexpectedly threw: " + other);
                     }
-                    /* enable to debug */  System.out.println("SURVIVED TruncatePeople." + repeats + "." + restores);
+                    //* enable to debug */  System.out.println("SURVIVED TruncatePeople." + repeats + "." + restores);
                     validateHardCodedStatusQuo(client);
                 }
             }
@@ -1457,7 +1452,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         VoltTable t;
         t = results[0];
         assertEquals(2, t.getRowCount());
-        System.out.println(t.toString());
+        //* enable to debug */  System.out.println(t);
         t.advanceRow();
         assertEquals(2, t.getLong(2));
         assertEquals(0, (int)(t.getDouble(3)));
@@ -1783,7 +1778,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
     }
 
-    public void NOTESTEng11024() throws Exception {
+    public void testEng11024() throws Exception {
         // Regression test for ENG-11024, found by sqlcoverage
         Client client = getClient();
 
@@ -1809,7 +1804,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertEquals(1, vt.asScalarLong());
     }
 
-    public void NOTESTUpdateAndMinMax() throws Exception {
+    public void testUpdateAndMinMax() throws Exception {
         Client client = getClient();
 
         //        CREATE TABLE P2_ENG_11024 (
@@ -1878,7 +1873,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             {-4, 2, -12}}, vt);
     }
 
-    public void NOTESTEng11043() throws Exception {
+    public void testEng11043() throws Exception {
         Client client = getClient();
 
         client.callProcedure("@AdHoc", "INSERT INTO P1_ENG_11024 VALUES (-1, null, null, null);");
@@ -1941,7 +1936,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertTablesAreEqual(prefix + "v27", vtExpected, vtActual, EPSILON);
     }
 
-    public void NOTESTEng11047() throws Exception {
+    public void testEng11047() throws Exception {
         Client client = getClient();
 
         ClientResponse cr;
@@ -2025,16 +2020,15 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         project.addProcedures(PROCEDURES);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
+        // CONFIG #1: 2 Local Sites/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
         LocalCluster config = new LocalCluster("matview-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        /* simplifying override */ config = new LocalCluster("matview-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        //* simplifying override */ config = new LocalCluster("matview-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         // build the jarfile
         assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
-        /*
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
@@ -2048,7 +2042,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         config = new LocalCluster("matview-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         assertTrue(config.compile(project));
         builder.addServerConfig(config);
-        */
+
         return builder;
     }
 }

@@ -592,7 +592,7 @@ static void migrateChangedTuples(catalog::Table const &catalogTable,
             }
 
             // insert into the new table
-            newTable->insertPersistentTuple(tupleToInsert, false);
+            newTable->insertPersistentTuple(tupleToInsert, false, false);
 
             // delete from the old table
             existingTable->deleteTupleForSchemaChange(scannedTuple);

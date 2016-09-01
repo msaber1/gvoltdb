@@ -54,7 +54,8 @@ public:
     // Create a MaterializedViewHandler based on the catalog info and install it to the view table.
     MaterializedViewHandler(PersistentTable *targetTable,
                             catalog::MaterializedViewHandlerInfo *mvHandlerInfo,
-                            VoltDBEngine *engine);
+                            VoltDBEngine *engine,
+                            bool needsCatchUp, bool catchUpFallible);
     ~MaterializedViewHandler();
     // We maintain the source table list here to register / de-register the view handler on the source tables.
     void addSourceTable(PersistentTable *sourceTable);
@@ -69,6 +70,11 @@ public:
      */
     bool isDirty() { return m_dirty; }
     void pollute() { m_dirty = true; }
+
+    // If the view is pending truncate table release, mark it as inactive.
+    bool isInactive() { return m_inactive; }
+    void setInactive(bool inactive) { m_inactive = inactive; }
+
     // handleTupleInsert and handleTupleDelete are event handlers.
     // They are called when a source table has data being inserted / deleted.
     // The update operation is considered as a sequence of delete and insert operation.
@@ -91,6 +97,7 @@ private:
     int m_aggColumnCount;
     std::vector<ExpressionType> m_aggTypes;
     bool m_dirty;
+    bool m_inactive;
     // Both the existingTuple and the updatedTuple have the same schema of the view table.
     // The difference is the updatedTuple has its own storage, it's a standalone tuple.
     // existingTuple is used to search in the view table for the row with designated group-by columns.
@@ -117,16 +124,16 @@ private:
     // This is called to catch up with the existing data in the source tables.
     // It is useful when the view is created after the some data was inserted into the
     // source table(s).
-    void catchUpWithExistingData();
+    void catchUpWithExistingData(bool fallible);
     // Find in the view table (m_destTable) for the row that has the same group-by keys as
     // the deltaTuple.
     // The function will return a boolean value indicating if a matching row is found.
     // If a matching row is found, we can access its content from m_existingTuple.
-    bool findExistingTuple(const TableTuple &deltaTuple);
+    bool findExistingTuple(const TableTuple& deltaTuple);
     // Merge the deltaTuple with the existingTuple on an insert / delete context and
     // the resultant tuple is stored in m_updatedTuple.
-    void mergeTupleForInsert(const TableTuple &deltaTuple);
-    void mergeTupleForDelete(const TableTuple &deltaTuple);
+    void mergeTupleForInsert(const TableTuple& deltaTuple, const NValue& deltaCount);
+    void mergeTupleForDelete(const TableTuple& deltaTuple, const NValue& newCount);
     // Find a fallback min/max value for the designated column.
     // Please note that the minMaxColumnIndex is used to locate the correct query plan to execute.
     NValue fallbackMinMaxColumn(int columnIndex, int minMaxColumnIndex);

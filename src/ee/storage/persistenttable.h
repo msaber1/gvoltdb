@@ -315,7 +315,7 @@ public:
     // ------------------------------------------------------------------
     void deleteTupleForSchemaChange(TableTuple &target);
 
-    void insertPersistentTuple(TableTuple &source, bool fallible, bool ignoreTupleLimit=false);
+    void insertPersistentTuple(TableTuple &source, bool fallible, bool ignoreTupleLimit);
 
     /// This is not used in any production code path -- it is a convenient wrapper used by tests.
     bool updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues) {
@@ -466,7 +466,7 @@ public:
 
     virtual int64_t validatePartitioning(TheHashinator *hashinator, int32_t partitionId);
 
-    void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
+    void truncateTableUndo(VoltDBEngine* engine, TableCatalogDelegate* tcd, PersistentTable* originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
     PersistentTable * getPreTruncateTable() const { return m_preTruncateTable; }
@@ -606,7 +606,7 @@ private:
     // occurs. In case of exception, target tuple should be released, but the
     // source tuple's memory should still be retained until the exception is
     // handled.
-    void insertTupleCommon(TableTuple &source, TableTuple &target, bool fallible, bool shouldDRStream = true);
+    void insertTupleCommon(TableTuple& source, TableTuple& target, bool fallible, bool shouldDRStream);
     void insertTupleForUndo(char *tuple);
     void updateTupleForUndo(char* targetTupleToUpdate,
                             char* sourceTupleWithNewValues,
@@ -659,7 +659,7 @@ private:
     void polluteViews();
     // Insert the source tuple into this table's delta table.
     // If there is no delta table affiliated with this table, then take no action.
-    void insertTupleIntoDeltaTable(TableTuple &source, bool fallible);
+    void insertTupleIntoDeltaTable(TableTuple& source);
 
     // CONSTRAINTS
     std::vector<bool> m_allowNulls;

@@ -49,18 +49,18 @@ public class TruncatePeople extends VoltProcedure {
 
     public VoltTable run(int rollback, int repeats, int restores) {
         try {
-            System.out.println("IN TruncatePeople." + rollback + "." + repeats + "." + restores);
+            //* enable to debug */  System.out.println("IN TruncatePeople." + rollback + "." + repeats + "." + restores);
             voltQueueSQL(captureview1);
             voltQueueSQL(captureview2);
             VoltTable[] beforeViews = voltExecuteSQL();
             throwVoltAbortExceptionIf("Initial empty view is not a representative test.",
                     ! beforeViews[0].advanceRow(), null, beforeViews[0]);
-            System.out.println("IN TruncatePeople captured");
+            //* enable to debug */  System.out.println("IN TruncatePeople captured");
 
             voltQueueSQL(clearcache1);
             voltQueueSQL(cachebase1);
             voltExecuteSQL();
-            System.out.println("IN TruncatePeople cached");
+            //* enable to debug */  System.out.println("IN TruncatePeople cached");
 
             VoltTable[] afterViews = null;
 
@@ -77,29 +77,29 @@ public class TruncatePeople extends VoltProcedure {
                     voltQueueSQL(captureview1);
                     voltQueueSQL(captureview2);
                     afterViews = voltExecuteSQL();
-                    System.out.println("IN TruncatePeople captured expecting renewed");
+                    //* enable to debug */  System.out.println("IN TruncatePeople captured expecting renewed");
                     validateSame(beforeViews[0], afterViews[0]);
                     validateSame(beforeViews[1], afterViews[1]);
-                    System.out.println("IN TruncatePeople confirmed renewed");
+                    //* enable to debug */  System.out.println("IN TruncatePeople confirmed renewed");
                 }
                 else {
                     voltQueueSQL(captureview1);
                     voltQueueSQL(captureview2);
                     afterViews = voltExecuteSQL();
-                    System.out.println("IN TruncatePeople captured expecting empty");
+                    //* enable to debug */  System.out.println("IN TruncatePeople captured expecting empty");
                     validatePurged(afterViews);
-                    System.out.println("IN TruncatePeople confirmed empty");
+                    //* enable to debug */  System.out.println("IN TruncatePeople confirmed empty");
                 }
             }
 
             throwVoltAbortExceptionIf("Rolling back as requested.",
                     rollback != 0, null, null);
 
-            System.out.println("IN TruncatePeople exiting normally");
+            //* enable to debug */  System.out.println("IN TruncatePeople exiting normally");
             return afterViews[0];
         }
         catch(Throwable t) {
-            System.out.println("IN TruncatePeople exiting abnormally");
+            //* enable to debug */  System.out.println("IN TruncatePeople exiting abnormally");
             throw t;
         }
     }

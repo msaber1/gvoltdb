@@ -21,6 +21,12 @@
 #include "common/types.h"
 #include "storage/persistenttable.h"
 
+// Enable to debug.
+//#define TRUNCATE_ACTION_DEBUG_DUMP(stage) debugDump(stage)
+#ifndef TRUNCATE_ACTION_DEBUG_DUMP
+#define TRUNCATE_ACTION_DEBUG_DUMP(stage)
+#endif
+
 namespace voltdb {
 
 class PersistentTableUndoTruncateTableAction: public UndoAction {
@@ -28,7 +34,9 @@ public:
     inline PersistentTableUndoTruncateTableAction(VoltDBEngine * engine, TableCatalogDelegate * tcd,
             PersistentTable *originalTable, PersistentTable *emptyTable)
     :  m_engine(engine), m_tcd(tcd), m_originalTable(originalTable), m_emptyTable(emptyTable)
-    {}
+    {
+        TRUNCATE_ACTION_DEBUG_DUMP("ctor ");
+    }
 
 private:
     virtual ~PersistentTableUndoTruncateTableAction() {}
@@ -39,7 +47,8 @@ private:
      *
      */
     virtual void undo() {
-        m_emptyTable->truncateTableForUndo(m_engine, m_tcd, m_originalTable);
+        TRUNCATE_ACTION_DEBUG_DUMP("undo ");
+        m_emptyTable->truncateTableUndo(m_engine, m_tcd, m_originalTable);
     }
 
     /*
@@ -53,10 +62,21 @@ private:
         //The reason is that truncateTableRelease is called directly when a binary log
         //truncate record is being applied and it must do all the work and not leave
         //something undone because it didn't go through this undo action
+        TRUNCATE_ACTION_DEBUG_DUMP("rels ");
         m_emptyTable->truncateTableRelease(m_originalTable);
     }
 
 private:
+
+    void debugDump(const char* stage) const {
+        std::cout << "DEBUG:TrcAct " << stage << (const void*)m_originalTable
+                  << ' ' << (const void*)m_emptyTable
+                  << " undoabletuples: " << m_originalTable->activeTupleCount()
+                  << " currenttuples: " << m_emptyTable->activeTupleCount()
+                  << ' ' << m_emptyTable->name()
+                  << std::endl;
+    }
+
     VoltDBEngine * m_engine;
     TableCatalogDelegate * m_tcd;
     PersistentTable *m_originalTable;

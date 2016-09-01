@@ -181,7 +181,7 @@ void MaterializedViewTriggerForInsert::processTupleInsert(const TableTuple &newT
             }
             m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
         }
-        m_target->insertPersistentTuple(m_updatedTuple, fallible);
+        m_target->insertPersistentTuple(m_updatedTuple, fallible, true);
     }
 }
 
@@ -335,17 +335,18 @@ void MaterializedViewTriggerForInsert::initializeTupleHavingNoGroupBy(bool falli
     // COUNT(*) column will be zero.
     m_updatedTuple.setNValue((int)m_groupByColumnCount, ValueFactory::getBigIntValue(0));
     int aggOffset = (int)m_groupByColumnCount + 1;
+    auto schema = m_updatedTuple.getSchema();
     NValue newValue;
     for (int aggIndex = 0; aggIndex < m_aggColumnCount; aggIndex++) {
         if (m_aggTypes[aggIndex] == EXPRESSION_TYPE_AGGREGATE_COUNT) {
             newValue = ValueFactory::getBigIntValue(0);
         }
         else {
-            newValue = NValue::getNullValue(m_updatedTuple.getSchema()->columnType(aggOffset+aggIndex));
+            newValue = NValue::getNullValue(schema->columnType(aggOffset+aggIndex));
         }
         m_updatedTuple.setNValue(aggOffset+aggIndex, newValue);
     }
-    m_target->insertPersistentTuple(m_updatedTuple, fallible);
+    m_target->insertPersistentTuple(m_updatedTuple, fallible, true);
 }
 
 bool MaterializedViewTriggerForInsert::findExistingTuple(const TableTuple &tuple) {

@@ -125,7 +125,7 @@ void MaterializedViewTriggerForWrite::setupMinMaxRecalculation(const catalog::Ca
          *        we should also go with the plan.)
          * Things will get different when we add join table materialzied view or CUBE view.
          */
-        vector<AbstractExecutor*> executorList = execVec->getExecutorList();
+        auto executorList = execVec->getExecutorList();
         AbstractPlanNode* apn = executorList[0]->getPlanNode();
         bool usePlanForAgg = false;
         if (apn->getPlanNodeType() == PLAN_NODE_TYPE_INDEXSCAN) {
@@ -360,7 +360,7 @@ NValue MaterializedViewTriggerForWrite::findFallbackValueUsingPlan(const TableTu
     backups[colindex] = params[colindex];
     params[colindex] = oldValue;
     // executing the stored plan.
-    vector<AbstractExecutor*> executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
+    auto executorList = m_fallbackExecutorVectors[minMaxAggIdx]->getExecutorList();
     Table *tbl = context->executeExecutors(executorList, 0);
     assert(tbl);
     // get the fallback value from the returned table.
