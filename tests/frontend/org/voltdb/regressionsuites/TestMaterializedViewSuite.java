@@ -50,10 +50,10 @@ import org.voltdb_testprocs.regressionsuites.matviewprocs.OverflowTest;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.SelectAllPeople;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateMatViewDataMP;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncatePeople;
+import org.voltdb_testprocs.regressionsuites.matviewprocs.TruncateTables;
 import org.voltdb_testprocs.regressionsuites.matviewprocs.UpdatePerson;
 
 import com.google_voltpatches.common.collect.Lists;
-
 
 public class TestMaterializedViewSuite extends RegressionSuite {
 
@@ -62,12 +62,15 @@ public class TestMaterializedViewSuite extends RegressionSuite {
     private static final int SABOTAGE = 2;
     private static final int NORMALLY = 0;
 
+    private static final int[] yesAndNo = new int[]{1, 0};
+    private static final int[] never = new int[]{0};
+
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
         AddPerson.class, DeletePerson.class, UpdatePerson.class, AggAges.class,
         SelectAllPeople.class, AggThings.class, AddThing.class, OverflowTest.class,
-        Eng798Insert.class, TruncateMatViewDataMP.class
-        , TruncatePeople.class
+        Eng798Insert.class, TruncateMatViewDataMP.class,
+        TruncateTables.class, TruncatePeople.class
     };
 
     // For comparing tables with FLOAT columns
@@ -94,10 +97,16 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
         int nStatement = 0;
         for (VoltTable countTable : results) {
+            try {
+                long count = countTable.asScalarLong();
+                assertEquals("COUNT statement " + nStatement + "/" +
+                results.length + " should have found no undeleted rows.", 0, count);
+            }
+            catch (Exception exc) {
+                System.out.println("validation query " + nStatement + " got a bad result: " + exc);
+                throw exc;
+            }
             ++nStatement;
-            long count = countTable.asScalarLong();
-            assertEquals("COUNT statement " + nStatement + "/" +
-            results.length + " should have found no undeleted rows.", 0, count);
         }
     }
 
@@ -1392,12 +1401,10 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         System.out.println("Testing single-source-table truncates");
 
-        int[] yesAndNo = new int[]{1, 0};
-
         // Make sure the stored proc behaves correctly even if we
         // purposely abort it.
         // forceAbort = 1 for "yes" is the more interesting case.
-        for (int forceAbort : yesAndNo) {
+        for (int forceAbort : never) {
             // Try one or more truncates on the same view source table
             // within the stored proc.
             for (int repeats = 1; repeats <= 3; ++repeats) {
@@ -1416,19 +1423,19 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                         try {
                             results = client.callProcedure("TruncatePeople",
                                     forceAbort, repeats, restores).getResults();
-                            assertEquals("TruncateTables was expected to roll back", 0, forceAbort);
+                            assertEquals("TruncatePeople was expected to roll back", 0, forceAbort);
                         }
                         catch (ProcCallException vae) {
                             if ( ! vae.getMessage().contains("Rolling back as requested")) {
                                 throw vae;
                             }
-                            assertEquals("TruncateTables was not requested to roll back", 1, forceAbort);
+                            assertEquals("TruncatePeople was not requested to roll back", 1, forceAbort);
                         }
                     }
                     catch (Exception other) {
-                        fail("The call to TruncateTables unexpectedly threw: " + other);
+                        fail("The call to TruncatePeople unexpectedly threw: " + other);
                     }
-                    System.out.println("SURVIVED TruncatePeople(" + repeats + ", " + restores + ")");
+                    /* enable to debug */  System.out.println("SURVIVED TruncatePeople." + repeats + "." + restores);
                     validateHardCodedStatusQuo(client);
                 }
             }
@@ -1526,7 +1533,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         assertTablesAreEqual(prefix + "QTYPERPRODUCT: ", tresult, vresult, EPSILON);
     }
 
-    public void NOTESTViewOnJoinQuery() throws IOException, ProcCallException
+    public void testViewOnJoinQuery() throws IOException, ProcCallException
     {
         Client client = getClient();
         truncateBeforeTest(client);
@@ -1610,7 +1617,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
 
         // -- 1 -- Test updating the data in the source tables.
         // There are two lists of data, we first insert the data in the first list
-        // to the corresponding source tables, then update each row with the data
+        // into the corresponding source tables, then update each row with the data
         // from the second data list.
         System.out.println("Now testing updating the join query view source table.");
         for (int i=0; i<dataList1.size(); i++) {
@@ -1621,18 +1628,16 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             updateRow(client, dataList1.get(i), dataList2.get(i));
             verifyViewOnJoinQueryResult(client);
         }
-        truncateBeforeTest(client);
-
-        // Merge two sub-lists for the following tests.
-        dataList1.addAll(dataList2);
 
         // -- 2 -- Test inserting the data into the source tables.
         // We do a shuffle here and in the delete test. But I do believe we still
         // have the full coverage of all the cases because we are inserting and deleting
         // all the rows. The cases updating values of all kinds of aggregations will be
         // tested in one row or another.
-        //
-        // For more deterministic debugging, consider doing this:
+        truncateBeforeTest(client);
+        // Merge two sub-lists for the following tests.
+        dataList1.addAll(dataList2);
+        // For more deterministic debugging, consider this instead of shuffle:
         // Collections.reverse(dataList1);
         Collections.shuffle(dataList1);
         System.out.println("Now testing inserting data to the join query view source table.");
@@ -1650,7 +1655,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             System.out.println("Now testing altering the source table of a view.");
             // 3.1 add column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;");
+                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS ADD COLUMN x FLOAT;" +
+                        "ALTER TABLE WAS_ORDERITEMS ADD COLUMN x FLOAT;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to add column to a view source table.");
@@ -1658,7 +1664,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
             // 3.2 drop column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;");
+                client.callProcedure("@AdHoc", "ALTER TABLE ORDERITEMS DROP COLUMN x;" +
+                        "ALTER TABLE WAS_ORDERITEMS DROP COLUMN x;");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to drop column on a view source table.");
@@ -1666,7 +1673,8 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
             // 3.3 alter column
             try {
-                client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
+                client.callProcedure("@AdHoc", "ALTER TABLE CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);" +
+                        "ALTER TABLE WAS_CUSTOMERS ALTER COLUMN ADDRESS VARCHAR(100);");
             } catch (ProcCallException pce) {
                 pce.printStackTrace();
                 fail("Should be able to alter column in a view source table.");
@@ -1705,15 +1713,73 @@ public class TestMaterializedViewSuite extends RegressionSuite {
             verifyViewOnJoinQueryResult(client);
         }
 
-        // -- 5 -- Test deleting the data from the source tables.
-        //
-        // For more deterministic debugging, consider doing this:
+        // -- 5 -- Test truncating one or more tables,
+        // then explicitly restoring their content.
+        System.out.println("Now testing truncating the join query view source table.");
+        // Temporarily substitute never for yesAndNo on the next line if you
+        // want to bypass testing of rollback after truncate.
+        for (int forceRollback : /*default:*/ yesAndNo) { //alt:*/ never) {
+            for (int truncateTable1 : yesAndNo) {
+                // Each use of 'never' reduces by half the tried
+                // combinations of truncate operations.
+                for (int truncateTable2 : /*default:*/ yesAndNo) { //alt:*/ never) {
+                    // Substitute yesAndNo below for test overkill
+                    for (int truncateTable3 : /**/ never) { //*/ yesAndNo) {
+                        for (int truncateTable4 : /**/ never) { //*/ yesAndNo) {
+                            // truncateSourceTable verifies the short-term effects
+                            // of truncation and restoration within the transaction.
+                            truncateSourceTables(client, forceRollback,
+                                    truncateTable1,
+                                    truncateTable2,
+                                    truncateTable3,
+                                    truncateTable4);
+                            // Verify the correctness outside the transaction.
+                            verifyViewOnJoinQueryResult(client);
+                        }
+                    }
+                }
+            }
+        }
+
+        // -- 6 -- Test deleting the data from the source tables.
+        // For more deterministic debugging, consider this instead of shuffle:
         // Collections.reverse(dataList1);
         Collections.shuffle(dataList1);
         System.out.println("Now testing deleting data from the join query view source table.");
-        for (int i=0; i<dataList1.size(); i++) {
+        for (int i = 0; i < dataList1.size(); i++) {
             deleteRow(client, dataList1.get(i));
             verifyViewOnJoinQueryResult(client);
+        }
+    }
+
+    private void truncateSourceTables(Client client, int rollback,
+            int truncateTable1, int truncateTable2, int truncateTable3,
+            int truncateTable4) {
+        try {
+            try {
+                VoltTable vt = client.callProcedure("TruncateTables", rollback,
+                        truncateTable1,
+                        truncateTable2,
+                        truncateTable3,
+                        truncateTable4).getResults()[0];
+                assertEquals("TruncateTables was expected to roll back", 0, rollback);
+                String result = " UNEXPECTED EMPTY RETURN FROM TruncateTables ";
+                if (vt.advanceRow()) {
+                    result = vt.getString(0);
+                }
+                if ( ! "".equals(result)) {
+                    fail("TruncateTables detected an unexpected difference: " + result);
+                }
+            }
+            catch (ProcCallException vae) {
+                if ( ! vae.getMessage().contains("Rolling back as requested")) {
+                    throw vae;
+                }
+                assertEquals("TruncateTables was not requested to roll back", 1, rollback);
+            }
+        }
+        catch (Exception other) {
+            fail("The call to TruncateTables unexpectedly threw: " + other);
         }
     }
 
@@ -1945,54 +2011,44 @@ public class TestMaterializedViewSuite extends RegressionSuite {
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
-        URL url = AddPerson.class.getResource("matviewsuite-ddl.sql");
-        url.getPath();
-
-        String schemaPath = url.getPath();
-
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestMaterializedViewSuite.class);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        //VoltServerConfig config = new LocalSingleProcessServer("matview-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);
-        VoltServerConfig config = new LocalCluster("matview-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        /* OVERRRIDE FOR NOW */ config = new LocalCluster("matview-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.setUseDDLSchema(true);
-        //project.setBackendTarget(BackendTarget.NATIVE_EE_IPC);
+
+        URL url = AddPerson.class.getResource("matviewsuite-ddl.sql");
+        String schemaPath = url.getPath();
         project.addSchema(schemaPath);
 
         project.addProcedures(PROCEDURES);
-        // build the jarfile
-        boolean success = config.compile(project);
-        assertTrue(success);
 
+        /////////////////////////////////////////////////////////////
+        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
+        /////////////////////////////////////////////////////////////
+        LocalCluster config = new LocalCluster("matview-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        /* simplifying override */ config = new LocalCluster("matview-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        // build the jarfile
+        assertTrue(config.compile(project));
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
-//        /////////////////////////////////////////////////////////////
-//        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
-//        /////////////////////////////////////////////////////////////
-//
-//        config = new LocalCluster("matview-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
-//
-//        /////////////////////////////////////////////////////////////
-//        // CONFIG #3: 3-node k=1 cluster
-//        /////////////////////////////////////////////////////////////
-//        config = new LocalCluster("matview-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-//        success = config.compile(project);
-//        assertTrue(success);
-//        builder.addServerConfig(config);
+        /*
+        /////////////////////////////////////////////////////////////
+        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("matview-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        assertTrue(config.compile(project));
+        builder.addServerConfig(config);
 
+        /////////////////////////////////////////////////////////////
+        // CONFIG #3: 3-node k=1 cluster
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("matview-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        assertTrue(config.compile(project));
+        builder.addServerConfig(config);
+        */
         return builder;
     }
 }

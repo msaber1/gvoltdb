@@ -92,7 +92,8 @@ public class TruncatePeople extends VoltProcedure {
                 }
             }
 
-            throwVoltAbortExceptionIf("Rolling back as requested.", rollback != 0, null, null);
+            throwVoltAbortExceptionIf("Rolling back as requested.",
+                    rollback != 0, null, null);
 
             System.out.println("IN TruncatePeople exiting normally");
             return afterViews[0];
@@ -105,7 +106,8 @@ public class TruncatePeople extends VoltProcedure {
 
     private void validatePurged(VoltTable[] afterViews) {
         for (VoltTable viewContent : afterViews) {
-            throwVoltAbortExceptionIf("view should reflect 0 rows", viewContent.advanceRow(), null, viewContent);
+            throwVoltAbortExceptionIf("view should reflect 0 rows",
+                    viewContent.advanceRow(), null, viewContent);
         }
     }
 
@@ -127,34 +129,36 @@ public class TruncatePeople extends VoltProcedure {
                 String columnName = actualRows.getColumnName(j);
                 String colPrefix = "row " + ii + ": column: " + columnName + ": ";
 
-                VoltType actualTy = actualRows.getColumnType(j);
-                VoltType expectedTy = expectedRows.getColumnType(j);
-                throwVoltAbortExceptionIf(colPrefix + "type mismatch", expectedTy != actualTy,
-                        expectedRows, actualRows);
+                VoltType actualType = actualRows.getColumnType(j);
+                VoltType expectedType = expectedRows.getColumnType(j);
+                throwVoltAbortExceptionIf(colPrefix + "type mismatch",
+                        expectedType != actualType, expectedRows, actualRows);
 
-                Object expectedObj = expectedRows.get(j,  expectedTy);
-                Object actualObj = actualRows.get(j,  actualTy);
+                Object expectedObj = expectedRows.get(j,  expectedType);
+                Object actualObj = actualRows.get(j,  actualType);
                 boolean expectedNull = expectedRows.wasNull();
                 boolean actualNull = actualRows.wasNull();
-                throwVoltAbortExceptionIf(colPrefix + "null/not null mismatch", expectedNull != actualNull,
-                        expectedRows, actualRows);
+                throwVoltAbortExceptionIf(colPrefix + "null/not null mismatch",
+                        expectedNull != actualNull, expectedRows, actualRows);
 
-                if (expectedTy != VoltType.FLOAT) {
-                    if (!expectedNull) {
-                        String message = colPrefix + "values not equal: expected: " + expectedObj + ", actual: " + actualObj;
-                        throwVoltAbortExceptionIf(message, ! expectedObj.toString().equals(actualObj.toString()),
-                                expectedRows, actualRows);
-                    }
+                if (expectedNull) {
+                    continue;
                 }
+                if (expectedType == VoltType.FLOAT) {
+                    //TODO: inject epsilon comparison logic here rather
+                    // than assuming that FLOAT is a don't care case.
+                    continue;
+                }
+                String message = colPrefix + "values not equal: expected: " + expectedObj + ", actual: " + actualObj;
+                throwVoltAbortExceptionIf(message,
+                        ! expectedObj.toString().equals(actualObj.toString()), expectedRows, actualRows);
             }
-
             ii++;
         }
     }
 
-
-
-    private void throwVoltAbortExceptionIf(String label, boolean condition, VoltTable expectedRows, VoltTable actualRows) {
+    private void throwVoltAbortExceptionIf(String label, boolean condition,
+            VoltTable expectedRows, VoltTable actualRows) {
         if (condition) {
             System.out.println("IN TruncatePeople throwing: " + label);
             if (expectedRows != null) {
