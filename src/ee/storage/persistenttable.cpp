@@ -463,6 +463,16 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
         deleteAllTuples(true, fallible);
         return;
     }
+    // For source table of join-based MAT view don't optimize, needs more work - ENG-11XXX.
+    if ( ! m_viewHandlers.empty()) {
+        /* // enable to debug
+        std::cout << "DEBUG: truncating joined source table (retail fallible?) "
+                  << activeTupleCount()
+                  << " tuples in " << name() << std::endl;
+        // */
+        deleteAllTuples(true, fallible);
+        return;
+    }
 
     TableCatalogDelegate * tcd = engine->getTableDelegate(m_name);
     assert(tcd);
