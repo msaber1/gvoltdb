@@ -143,21 +143,23 @@ public class TruncateMatViewDataMP extends VoltProcedure {
         voltQueueSQL(validateview24); // ("SELECT NUM FROM MATPEOPLE_CONDITIONAL_COUNT_SUM;");
         voltQueueSQL(validateview25); // ("SELECT NUM FROM MATPEOPLE_CONDITIONAL_COUNT_MIN_MAX;");
         result = voltExecuteSQL(true);
-        //*/
         int ii = 0;
         for (VoltTable undeleted : result) {
+            ++ii;
             try {
                 long found = undeleted.asScalarLong();
                 if (found != 0) {
-                    System.out.println("DEBUG Validated truncate statement with check  " + ii + " and got: " + found);
+                    System.out.println("DEBUG: In TruncateMatViewDataMP.java," +
+                            " validated truncate statements with check  " + ii +
+                            " and got: " + found + " undeleted tuples.");
                 }
             }
             catch (Exception exc) {
-                System.out.println("DEBUG Validated truncate statement with check " + ii + " and got: " + exc);
+                System.out.println("DEBUG: In TruncateMatViewDataMP.java, " +
+                        "validated truncate statements with check " + ii +
+                        " and got: " + exc);
             }
-            ++ii;
         }
-        //*/
         return result;
     }
 }

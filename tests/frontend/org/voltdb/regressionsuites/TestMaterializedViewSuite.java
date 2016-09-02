@@ -97,6 +97,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         }
         int nStatement = 0;
         for (VoltTable countTable : results) {
+            ++nStatement;
             try {
                 long count = countTable.asScalarLong();
                 assertEquals("COUNT statement " + nStatement + "/" +
@@ -106,7 +107,6 @@ public class TestMaterializedViewSuite extends RegressionSuite {
                 System.out.println("validation query " + nStatement + " got a bad result: " + exc);
                 throw exc;
             }
-            ++nStatement;
         }
     }
 
@@ -2023,7 +2023,7 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         // CONFIG #1: 2 Local Sites/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
         LocalCluster config = new LocalCluster("matview-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        //* simplifying override */ config = new LocalCluster("matview-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        //* enable for simplified config */ config = new LocalCluster("matview-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         // build the jarfile
         assertTrue(config.compile(project));
         // add this config to the set of tests to run
