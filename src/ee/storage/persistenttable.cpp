@@ -443,12 +443,14 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     // v6.6.
     if ( ! m_viewHandlers.empty()) {
         /* // enable to debug
-        std::cout << "DEBUG: truncating source of join view table (retail) "
+        std::cout << "DEBUG: truncating source of join view table (EXPERIMENTALLY NOT retail) "
                   << activeTupleCount()
                   << " tuples in " << name() << std::endl;
         // */
+        /* // EXPERIMENTALLY FALL THROUGH
         deleteAllTuples(true, fallible);
         return;
+        // */ // END OF EXPERIMENT...
     }
 
     // If the table has only one tuple-storage block, it may be better to truncate
@@ -547,7 +549,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
                                     mvHandlerInfo,
                                     engine,
                                     populateInitialTuple,
-                                    true);
+                                    fallible);
         viewHandler->setInactive(true);
     }
 
