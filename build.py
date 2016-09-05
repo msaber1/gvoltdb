@@ -281,9 +281,9 @@ CTX.INPUT['executors'] = """
  receiveexecutor.cpp
  sendexecutor.cpp
  seqscanexecutor.cpp
+ setopexecutor.cpp
  tablecountexecutor.cpp
  tuplescanexecutor.cpp
- unionexecutor.cpp
  updateexecutor.cpp
 """
 
@@ -327,8 +327,8 @@ CTX.INPUT['plannodes'] = """
  SchemaColumn.cpp
  sendnode.cpp
  seqscannode.cpp
+ setopnode.cpp
  tuplescannode.cpp
- unionnode.cpp
  updatenode.cpp
 """
 
