@@ -57,7 +57,7 @@ SOFTWARE.
  * @version 2010-03-11
  */
 public class JSONWriter {
-    private static final int maxdepth = 20;
+    private static final int MAXDEPTH = 20;
 
     /**
      * The comma flag determines if a comma should be output before the next
@@ -78,7 +78,7 @@ public class JSONWriter {
     /**
      * The object/array stack.
      */
-    private JSONObject stack[];
+    private final JSONObject[] stack = new JSONObject[MAXDEPTH];
 
     /**
      * The stack top index. A value of 0 indicates that the stack is empty.
@@ -88,7 +88,7 @@ public class JSONWriter {
     /**
      * The writer that will receive the output.
      */
-    protected Writer writer;
+    protected final Writer writer;
 
     /**
      * Make a fresh JSONWriter. It can be used to build one JSON text.
@@ -96,7 +96,6 @@ public class JSONWriter {
     public JSONWriter(Writer w) {
         this.comma = false;
         this.mode = 'i';
-        this.stack = new JSONObject[maxdepth];
         this.top = 0;
         this.writer = w;
     }
@@ -163,7 +162,8 @@ public class JSONWriter {
         this.pop(m);
         try {
             this.writer.write(c);
-        } catch (IOException e) {
+        }
+        catch (IOException e) {
             throw new JSONException(e);
         }
         this.comma = true;
@@ -268,7 +268,7 @@ public class JSONWriter {
      * @throws JSONException If nesting is too deep.
      */
     private void push(JSONObject jo) throws JSONException {
-        if (this.top >= maxdepth) {
+        if (this.top >= MAXDEPTH) {
             throw new JSONException("Nesting too deep.");
         }
         this.stack[this.top] = jo;
