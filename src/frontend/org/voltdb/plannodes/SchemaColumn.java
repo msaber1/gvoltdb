@@ -31,10 +31,10 @@ import org.voltdb.expressions.TupleValueExpression;
  */
 public class SchemaColumn
 {
-    public enum Members {
-        COLUMN_NAME,
-        EXPRESSION,
-    }
+    private static class Members {
+        private static final String COLUMN_NAME = "COLUMN_NAME";
+        private static final String EXPRESSION = "EXPRESSION";
+    };
 
     private String m_tableName;
     private String m_tableAlias;
@@ -304,17 +304,20 @@ public class SchemaColumn
         // a result set that has all the aliases that may have been specified
         // by the user (thanks to chains of setOutputTable(getInputTable))
         if (finalOutput) {
-            if (getColumnAlias() != null && !getColumnAlias().equals(""))
-            {
-                stringer.key(Members.COLUMN_NAME.name()).value(getColumnAlias());
+            String columnName = getColumnAlias();
+            if (columnName != null && !columnName.equals("")) {
+                stringer.keySymbolValuePair(Members.COLUMN_NAME, columnName);
             }
-            else if (getColumnName() != null) {
-                stringer.key(Members.COLUMN_NAME.name()).value(getColumnName());
+            else {
+                columnName = getColumnName();
+                if (columnName != null) {
+                    stringer.keySymbolValuePair(Members.COLUMN_NAME, columnName);
+                }
             }
         }
 
         if (m_expression != null) {
-            stringer.key(Members.EXPRESSION.name());
+            stringer.key(Members.EXPRESSION);
             stringer.object();
             m_expression.toJSONString(stringer);
             stringer.endObject();
@@ -330,11 +333,11 @@ public class SchemaColumn
         String columnName = null;
         String columnAlias = null;
         AbstractExpression expression = null;
-        if( !jobj.isNull( Members.COLUMN_NAME.name() ) ){
-            columnName = jobj.getString( Members.COLUMN_NAME.name() );
+        if( !jobj.isNull(Members.COLUMN_NAME) ){
+            columnName = jobj.getString(Members.COLUMN_NAME);
         }
-        expression = AbstractExpression.fromJSONChild(jobj, Members.EXPRESSION.name());
-        return new SchemaColumn( tableName, tableAlias, columnName, columnAlias, expression );
+        expression = AbstractExpression.fromJSONChild(jobj, Members.EXPRESSION);
+        return new SchemaColumn(tableName, tableAlias, columnName, columnAlias, expression );
     }
 
     /**

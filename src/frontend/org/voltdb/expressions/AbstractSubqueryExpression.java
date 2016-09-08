@@ -170,11 +170,10 @@ public abstract class AbstractSubqueryExpression extends AbstractExpression {
 
     @Override
     protected void loadFromJSONObject(JSONObject obj) throws JSONException {
-        super.loadFromJSONObject(obj);
         m_subqueryId = obj.getInt(Members.SUBQUERY_ID.name());
         m_subqueryNodeId = obj.getInt(Members.SUBQUERY_ROOT_NODE_ID.name());
-        if (obj.has(AbstractExpression.Members.VALUE_TYPE.name())) {
-            m_valueType = VoltType.get((byte) obj.getInt(AbstractExpression.Members.VALUE_TYPE.name()));
+        if (obj.has(AbstractExpression.Members.VALUE_TYPE)) {
+            m_valueType = VoltType.get((byte) obj.getInt(AbstractExpression.Members.VALUE_TYPE));
             m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
         }
         if (obj.has(Members.PARAM_IDX.name())) {

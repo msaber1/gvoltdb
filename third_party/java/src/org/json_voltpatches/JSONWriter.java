@@ -110,22 +110,26 @@ public class JSONWriter {
         if (s == null) {
             throw new JSONException("Null pointer");
         }
-        if (this.mode == 'o' || this.mode == 'a') {
-            try {
-                if (this.comma && this.mode == 'a') {
-                    this.writer.write(',');
-                }
-                this.writer.write(s);
-            } catch (IOException e) {
-                throw new JSONException(e);
-            }
+        try {
             if (this.mode == 'o') {
                 this.mode = 'k';
             }
-            this.comma = true;
-            return this;
+            else if (this.mode == 'a') {
+                if (this.comma) {
+                    this.writer.write(',');
+                }
+            }
+            else {
+                throw new JSONException("Value out of sequence.");
+            }
+
+            this.writer.write(s);
         }
-        throw new JSONException("Value out of sequence.");
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+        this.comma = true;
+        return this;
     }
 
     /**
@@ -139,8 +143,23 @@ public class JSONWriter {
      */
     public JSONWriter array() throws JSONException {
         if (this.mode == 'i' || this.mode == 'o' || this.mode == 'a') {
-            this.push(null);
-            this.append("[");
+            // Push an array scope.
+            if (this.top >= MAXDEPTH) {
+                throw new JSONException("Nesting too deep.");
+            }
+            this.stack[this.top++] = null;
+            try {
+                if (this.comma) {
+                    this.writer.write(",[");
+                }
+                else {
+                    this.writer.write('[');
+                }
+            }
+            catch (IOException e) {
+                throw new JSONException(e);
+            }
+            this.mode = 'a';
             this.comma = false;
             return this;
         }
@@ -159,14 +178,23 @@ public class JSONWriter {
             throw new JSONException(m == 'a' ? "Misplaced endArray." :
                     "Misplaced endObject.");
         }
-        this.pop(m);
+        // Pop an array or object scope.
+        if (this.top <= 0) {
+            throw new JSONException("Nesting error.");
+        }
+        char x = this.stack[--this.top] == null ? 'a' : 'k';
+        if (x != m) {
+            throw new JSONException("Nesting error.");
+        }
+        this.mode = this.top == 0 ? 'd' : this.stack[this.top - 1] == null ? 'a' : 'k';
+        this.comma = true;
+
         try {
             this.writer.write(c);
         }
         catch (IOException e) {
             throw new JSONException(e);
         }
-        this.comma = true;
         return this;
     }
 
@@ -208,8 +236,9 @@ public class JSONWriter {
                 if (this.comma) {
                     this.writer.write(',');
                 }
-                this.writer.write(JSONObject.quote(s));
-                this.writer.write(':');
+                this.writer.write('"');
+                this.writer.write(JSONObject.quotable(s));
+                this.writer.write("\":");
                 this.comma = false;
                 this.mode = 'o';
                 return this;
@@ -231,12 +260,24 @@ public class JSONWriter {
      * outermost array or object).
      */
     public JSONWriter object() throws JSONException {
-        if (this.mode == 'i') {
-            this.mode = 'o';
-        }
-        if (this.mode == 'o' || this.mode == 'a') {
-            this.append("{");
-            this.push(new JSONObject());
+        if (this.mode == 'i' || this.mode == 'o' || this.mode == 'a') {
+            // push an object scope
+            if (this.top >= MAXDEPTH) {
+                throw new JSONException("Nesting too deep.");
+            }
+            this.stack[this.top++] = new JSONObject();
+            try {
+                if (this.comma) {
+                    this.writer.write(",{");
+                }
+                else {
+                    this.writer.write('{');
+                }
+            }
+            catch (IOException e) {
+                throw new JSONException(e);
+            }
+            this.mode = 'k';
             this.comma = false;
             return this;
         }
@@ -320,4 +361,81 @@ public class JSONWriter {
     public JSONWriter value(Object o) throws JSONException {
         return this.append(JSONObject.valueToString(o));
     }
+
+    /*
+     * An optimized replacement of key and value calls for the common case of
+     * a symbol key -- new to the current JSON Object, and with no special
+     * characters, so it never needs escaping
+     *  -- and a string value -- that may be null or contain escaped characters.
+     * If the key is not new, this call simply overwrites the previous value
+     * for the key without throwing the usual duplicate key error.
+     * @param key a simple string with no escape characters
+     * @param value a general string value that may HAVE escaped characters
+     * @return this
+     * @throws JSONException If the key is null or arrives out of sequence,
+     *                       or there is an IOException.
+     */
+    private JSONWriter keySymbolValueEscapedStringPair(String key, String escapedValue) throws JSONException {
+        if (key == null) {
+            throw new JSONException("Null key.");
+        }
+        if (this.mode != 'k') {
+            throw new JSONException("Misplaced key.");
+        }
+        try {
+            stack[top - 1].put(key, true);
+            if (this.comma) {
+                this.writer.write(',');
+            }
+            this.writer.write('"');
+            this.writer.write(key);
+            this.writer.write("\":\"");
+            this.writer.write(escapedValue);
+            this.writer.write('"');
+            this.comma = true;
+            return this;
+        }
+        catch (IOException e) {
+            throw new JSONException(e);
+        }
+    }
+
+    /*
+     * An optimized replacement of key and value calls for the common case of
+     * a symbol key -- new to the current JSON Object, and with no special
+     * characters, so it never needs escaping
+     *  -- and a string value -- that may be null or need escaping.
+     * If the key is not new, this call simply overwrites the previous value
+     * for the key without throwing the usual duplicate key error.
+     * @param key a simple string with no escape characters
+     * @param value a general non-null string value that may need escape characters
+     * @return this
+     * @throws JSONException If the key is null or arrives out of sequence,
+     *                       or there is an IOException.
+     */
+    public JSONWriter keySymbolValuePair(String key, String value) throws JSONException {
+        return keySymbolValueEscapedStringPair(key, JSONObject.quotable(value));
+    }
+
+    /*
+     * An optimized replacement of key and value calls for the common case of
+     * a symbol key -- new to the current JSON Object, and with no special
+     * characters, so it never needs escaping
+     *  -- and a string value -- that may be null or need escaping.
+     * If the key is not new, this call simply overwrites the previous value
+     * for the key without throwing the usual duplicate key error.
+     * @param key a simple string with no escape characters
+     * @param value a general string value that may need escape characters
+     * @return this
+     * @throws JSONException If the key is null or arrives out of sequence,
+     *                       or there is an IOException.
+     */
+    public JSONWriter keySymbolValuePair(String key, long value) throws JSONException {
+        return keySymbolValueEscapedStringPair(key, Long.toString(value));
+    }
+
+    public JSONWriter keySymbolValuePair(String key, boolean value) throws JSONException {
+        return keySymbolValueEscapedStringPair(key, Boolean.toString(value));
+    }
+
 }

@@ -961,7 +961,10 @@ public class JSONObject {
      * @throws JSONException If the key is null.
      */
     public JSONObject put(String key, boolean value) throws JSONException {
-        put(key, value ? Boolean.TRUE : Boolean.FALSE);
+        if (key == null) {
+            throw new JSONException("Null key.");
+        }
+        this.map.put(key, value ? Boolean.TRUE : Boolean.FALSE);
         return this;
     }
 
@@ -1099,28 +1102,58 @@ public class JSONObject {
     }
 
 
-    /**
-     * Produce a string in double quotes with backslash sequences in all the
-     * right places. A backslash will be inserted within </, allowing JSON
-     * text to be delivered in HTML. In JSON text, a string cannot contain a
-     * control character or an unescaped quote or backslash.
-     * @param string A String
-     * @return  A String correctly formatted for insertion in a JSON text.
-     */
-    public static String quote(String string) {
-        if (string == null || string.length() == 0) {
-            return "\"\"";
-        }
-
-        char         b;
+    public static String quotable(String string) {
+        assert string != null;
+        char         b = 0;
         char         c = 0;
         int          i;
         int          len = string.length();
-        StringBuffer sb = new StringBuffer(len + 4);
-        String       t;
 
-        sb.append('"');
-        for (i = 0; i < len; i += 1) {
+        // Optimize for the common cases where string contains only
+        // simple text characters or at least a long initial run of
+        // simple test characters.
+        for (i = 0; i < len; ++i) {
+            b = c;
+            c = string.charAt(i);
+            if (c < ' ' || (c >= '\u0080' && c < '\u00a0') ||
+                    (c >= '\u2000' && c < '\u2100')) {
+                break;
+            }
+            if (c == '/') {
+                if (b == '<') {
+                    break;
+                }
+                continue;
+            }
+            switch (c) {
+            default:
+                continue;
+            case '\\':
+            case '"':
+            case '\b':
+            case '\t':
+            case '\n':
+            case '\f':
+            case '\r':
+            }
+            break;
+        }
+
+        if (i == len) {
+            // a string of all simple characters can be
+            // written as is.
+            return string;
+        }
+
+        StringBuilder sb = new StringBuilder(len + 2);
+
+        if (i > 0) {
+            // a non-zero prefix of simple characters can be
+            // appended in bulk.
+            sb.append(string.substring(0, i));
+        }
+        c = b;
+        for (; i < len; ++i) {
             b = c;
             c = string.charAt(i);
             switch (c) {
@@ -1153,9 +1186,117 @@ public class JSONObject {
             default:
                 if (c < ' ' || (c >= '\u0080' && c < '\u00a0') ||
                                (c >= '\u2000' && c < '\u2100')) {
-                    t = "000" + Integer.toHexString(c);
+                    String t = "000" + Integer.toHexString(c);
                     sb.append("\\u" + t.substring(t.length() - 4));
-                } else {
+                }
+                else {
+                    sb.append(c);
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Produce a string in double quotes with backslash sequences in all the
+     * right places. A backslash will be inserted within </, allowing JSON
+     * text to be delivered in HTML. In JSON text, a string cannot contain a
+     * control character or an unescaped quote or backslash.
+     * @param string A String
+     * @return  A String correctly formatted for insertion in a JSON text.
+     */
+    public static String quote(String string) {
+        if (string == null || string.length() == 0) {
+            return "\"\"";
+        }
+
+        char         b = 0;
+        char         c = 0;
+        int          i;
+        int          len = string.length();
+
+        // Optimize for the common cases where string contains only
+        // simple text characters or at least a long initial run of
+        // simple test characters.
+        for (i = 0; i < len; ++i) {
+            b = c;
+            c = string.charAt(i);
+            if (c < ' ' || (c >= '\u0080' && c < '\u00a0') ||
+                    (c >= '\u2000' && c < '\u2100')) {
+                break;
+            }
+            if (c == '/') {
+                if (b == '<') {
+                    break;
+                }
+                continue;
+            }
+            switch (c) {
+            default:
+                continue;
+            case '\\':
+            case '"':
+            case '\b':
+            case '\t':
+            case '\n':
+            case '\f':
+            case '\r':
+            }
+            break;
+        }
+
+        StringBuilder sb = new StringBuilder(len + 4);
+        sb.append('"');
+
+        if (i == len) {
+            // a string of all simple characters can be
+            // appended in bulk.
+            return sb.append(string).append('"').toString();
+        }
+
+        if (i > 0) {
+            // a non-zero prefix of simple characters can be
+            // appended in bulk.
+            sb.append(string.substring(0, i));
+        }
+        c = b;
+        for (; i < len; ++i) {
+            b = c;
+            c = string.charAt(i);
+            switch (c) {
+            case '\\':
+            case '"':
+                sb.append('\\');
+                sb.append(c);
+                break;
+            case '/':
+                if (b == '<') {
+                    sb.append('\\');
+                }
+                sb.append(c);
+                break;
+            case '\b':
+                sb.append("\\b");
+                break;
+            case '\t':
+                sb.append("\\t");
+                break;
+            case '\n':
+                sb.append("\\n");
+                break;
+            case '\f':
+                sb.append("\\f");
+                break;
+            case '\r':
+                sb.append("\\r");
+                break;
+            default:
+                if (c < ' ' || (c >= '\u0080' && c < '\u00a0') ||
+                               (c >= '\u2000' && c < '\u2100')) {
+                    String t = "000" + Integer.toHexString(c);
+                    sb.append("\\u" + t.substring(t.length() - 4));
+                }
+                else {
                     sb.append(c);
                 }
             }
@@ -1310,17 +1451,19 @@ public class JSONObject {
     @Override
     public String toString() {
         try {
-            Iterator<String> keys = keys();
-            StringBuffer sb = new StringBuffer("{");
-
-            while (keys.hasNext()) {
-                if (sb.length() > 1) {
-                    sb.append(',');
-                }
-                Object o = keys.next();
-                sb.append(quote(o.toString()));
-                sb.append(':');
-                sb.append(valueToString(this.map.get(o)));
+            if (this.map.isEmpty()) {
+                return "{}";
+            }
+            StringBuffer sb = new StringBuffer();
+            // This prefix value applies to the first key only
+            String keyprefix = "{\"";
+            for (String key : this.map.keySet()) {
+                sb.append(keyprefix);
+                sb.append(quotable(key));
+                sb.append("\":");
+                sb.append(valueToString(this.map.get(key)));
+                // This prefix value applies to all subsequent keys
+                keyprefix = ",\"";
             }
             sb.append('}');
             return sb.toString();
@@ -1362,43 +1505,37 @@ public class JSONObject {
      * @throws JSONException If the object contains an invalid number.
      */
     String toString(int indentFactor, int indent) throws JSONException {
-        int j;
         int n = length();
         if (n == 0) {
             return "{}";
         }
-        Iterator<String> keys = sortedKeys();
-        StringBuffer sb = new StringBuffer("{");
-        int          newindent = indent + indentFactor;
-        Object       o;
+        Set<Entry<String, Object> > entries = this.map.entrySet();
         if (n == 1) {
-            o = keys.next();
-            sb.append(quote(o.toString()));
-            sb.append(": ");
-            sb.append(valueToString(this.map.get(o), indentFactor,
-                    indent));
-        } else {
-            while (keys.hasNext()) {
-                o = keys.next();
-                if (sb.length() > 1) {
-                    sb.append(",\n");
-                } else {
-                    sb.append('\n');
-                }
-                for (j = 0; j < newindent; j += 1) {
-                    sb.append(' ');
-                }
-                sb.append(quote(o.toString()));
-                sb.append(": ");
-                sb.append(valueToString(this.map.get(o), indentFactor,
-                        newindent));
+            Entry<String, Object> entry = entries.iterator().next();
+            return "{\"" + entry.getKey() + "\": " +
+                    valueToString(entry.getValue(), indentFactor, indent) +
+                    "}";
+        }
+
+        StringBuffer sb = new StringBuffer();
+        int newindent = indent + indentFactor;
+        // This prefix value applies to the first key only
+        String keyprefix = "{\n";
+        for (String key : sortedKeySet()) {
+            sb.append(keyprefix);
+            for (int j = 0; j < newindent; j += 1) {
+                sb.append(' ');
             }
-            if (sb.length() > 1) {
-                sb.append('\n');
-                for (j = 0; j < indent; j += 1) {
-                    sb.append(' ');
-                }
-            }
+            sb.append('"');
+            sb.append(quotable(key));
+            sb.append("\": ");
+            sb.append(valueToString(this.map.get(key), indentFactor, newindent));
+            // This prefix value applies to all subsequent keys
+            keyprefix = ",\n";
+        }
+        sb.append('\n');
+        for (int j = 0; j < indent; j += 1) {
+            sb.append(' ');
         }
         sb.append('}');
         return sb.toString();
@@ -1580,18 +1717,17 @@ public class JSONObject {
       */
      public Writer write(Writer writer) throws JSONException {
         try {
-            boolean  b = false;
-            Iterator<String> keys = keys();
-            writer.write('{');
-
-            while (keys.hasNext()) {
-                if (b) {
-                    writer.write(',');
-                }
-                Object k = keys.next();
-                writer.write(quote(k.toString()));
-                writer.write(':');
-                Object v = this.map.get(k);
+            if (this.map.isEmpty()) {
+                writer.write("{}");
+                return writer;
+            }
+            // This prefix value applies to the first key only
+            String keyprefix = "{\"";
+            for (Entry<String, Object> entry : this.map.entrySet()) {
+                writer.write(keyprefix);
+                writer.write(quotable(entry.getKey()));
+                writer.write("\":");
+                Object v = entry.getValue();
                 if (v instanceof JSONObject) {
                     ((JSONObject)v).write(writer);
                 }
@@ -1601,7 +1737,8 @@ public class JSONObject {
                 else {
                     writer.write(valueToString(v));
                 }
-                b = true;
+                // This prefix value applies to all subsequent keys
+                keyprefix = ",\"";
             }
             writer.write('}');
             return writer;
