@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.ExecutionException;
@@ -224,6 +225,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
     };
 
+    // example zkPath string: /db/iv2masters/1
     private static int getPartitionIdFromZKPath(String zkPath)
     {
         return Integer.valueOf(zkPath.split("/")[zkPath.split("/").length - 1]);
@@ -294,5 +296,22 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         if (m_cb != null) {
             m_cb.run(m_publicCache);
         }
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("LeaderCache, root node:").append(m_rootNode).append("\n");
+        sb.append("last children: ");
+        for (String child: m_lastChildren) {
+            sb.append(child).append(" ");
+        }
+        sb.append("\n");
+        sb.append("public cache: partition id -> HSId\n");
+        for (Entry<Integer, Long> entry: m_publicCache.entrySet()) {
+            sb.append("             ").append(entry.getKey()).append(" -> ").append(entry.getValue()).append("\n");
+        }
+
+        return sb.toString();
     }
 }

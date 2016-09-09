@@ -92,9 +92,10 @@ public class Cartographer extends StatsSource
             stringer.endObject();
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], stringer.toString().getBytes("UTF-8"));
             int hostId = m_hostMessenger.getHostId();
-            m_hostMessenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
-                        HostMessenger.CLIENT_INTERFACE_SITE_ID),
-                    bpm);
+            hostLog.error("sendLeaderChangeNotify:m_hostMessenger hostid:" + hostId);
+//            m_hostMessenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
+//                        HostMessenger.CLIENT_INTERFACE_SITE_ID),
+//                    bpm);
         }
         catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to propogate leader promotion to client interface.", true, e);
@@ -123,14 +124,20 @@ public class Cartographer extends StatsSource
             Map<Long, Integer> hsIdToPart = new HashMap<Long, Integer>();
             for (Entry<Integer, Long> e : cache.entrySet()) {
                 hsIdToPart.put(e.getValue(), e.getKey());
+                hostLog.error("Cache partition :" + e.getKey() + " -> (hsid) " + e.getValue());
             }
             Set<Long> newMasters = new HashSet<Long>();
             newMasters.addAll(cache.values());
             // we want to see items which are present in the new map but not in the old,
             // these are newly promoted SPIs
+            for (Long val : m_currentSPMasters) {
+                hostLog.error("current sp hsid masters :"  + val);
+            }
+
             newMasters.removeAll(m_currentSPMasters);
             // send the messages indicating promotion from here for each new master
             for (long newMaster : newMasters) {
+                hostLog.error("new sp hsid masters :"  + newMaster);
                 sendLeaderChangeNotify(newMaster, hsIdToPart.get(newMaster));
             }
 
@@ -209,7 +216,7 @@ public class Cartographer extends StatsSource
             sites.add(leader);
         }
         else {
-            leader = m_iv2Masters.pointInTimeCache().get((Integer)rowKey);
+            leader = m_iv2Masters.pointInTimeCache().get(rowKey);
             sites.addAll(getReplicasForPartition((Integer)rowKey));
         }
 
