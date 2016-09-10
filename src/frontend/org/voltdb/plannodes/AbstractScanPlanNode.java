@@ -451,7 +451,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 stringer.key(Members.PREDICATE_FALSE.name()).value("TRUE");
             }
             stringer.key(Members.PREDICATE.name());
-            stringer.value(m_predicate);
+            stringer.object(m_predicate);
         }
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);

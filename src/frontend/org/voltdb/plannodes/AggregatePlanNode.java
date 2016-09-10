@@ -465,10 +465,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
 
         if (m_prePredicate != null) {
-            stringer.key(Members.PRE_PREDICATE.name()).value(m_prePredicate);
+            stringer.key(Members.PRE_PREDICATE.name()).object(m_prePredicate);
         }
         if (m_postPredicate != null) {
-            stringer.key(Members.POST_PREDICATE.name()).value(m_postPredicate);
+            stringer.key(Members.POST_PREDICATE.name()).object(m_postPredicate);
         }
     }
 

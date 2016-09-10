@@ -308,7 +308,7 @@ public class ClientResponseImpl implements ClientResponse, JSONString {
             js.key(JSON_RESULTS_KEY);
             js.array();
             for (VoltTable o : results) {
-                js.value(o);
+                js.object(o);
             }
             js.endArray();
 

@@ -382,7 +382,7 @@ public class StoredProcedureInvocation implements JSONString {
             js.value(procName);
             if (!procName.startsWith("@ApplyBinaryLog")) {
                 js.key("parameters");
-                js.value(params.get());
+                js.object(params.get());
             }
             js.endObject();
         }

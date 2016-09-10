@@ -220,7 +220,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 js.key(DEAD_HOST_TIMEOUT).value(deadHostTimeout);
                 js.key(BACKWARDS_TIME_FORGIVENESS_WINDOW).value(backwardsTimeForgivenessWindow);
                 js.key(NETWORK_THREADS).value(networkThreads);
-                js.key(ACCEPTOR).value(acceptor);
+                js.key(ACCEPTOR).object(acceptor);
                 js.endObject();
 
                 return js.toString();

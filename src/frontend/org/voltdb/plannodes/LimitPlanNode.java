@@ -120,7 +120,7 @@ public class LimitPlanNode extends AbstractPlanNode {
         stringer.key(Members.LIMIT.name()).value(m_limit);
         stringer.key(Members.OFFSET_PARAM_IDX.name()).value(m_offsetParameterId);
         stringer.key(Members.LIMIT_PARAM_IDX.name()).value(m_limitParameterId);
-        stringer.key(Members.LIMIT_EXPRESSION.name()).value(m_limitExpression);
+        stringer.key(Members.LIMIT_EXPRESSION.name()).object(m_limitExpression);
     }
 
     public void setLimitParameterIndex(long limitParameterId) {
