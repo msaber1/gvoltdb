@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -37,7 +36,6 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
@@ -131,7 +129,6 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     }
 
     public void putByBalanceSPI(int partitionId, long HSId) throws KeeperException, InterruptedException {
-        hostLog.error(" =====================SPI===================== change for partition " + partitionId);
         String hsidStr = ZKUtil.suffixHSIdsWithMetaInfo(HSId);
         try {
             m_zk.create(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
