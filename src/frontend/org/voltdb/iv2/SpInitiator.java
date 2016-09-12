@@ -17,6 +17,7 @@
 
 package org.voltdb.iv2;
 
+import java.util.Map.Entry;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
@@ -57,16 +58,24 @@ public class SpInitiator extends BaseInitiator implements Promotable
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache)
+        public void run(ImmutableMap<Integer, Long> cache, ImmutableMap<Integer, Boolean> state)
         {
-            for (Long HSId : cache.values()) {
-                if (HSId == getInitiatorHSId()) {
-                    if (!m_promoted) {
-                        acceptPromotion();
-                        m_promoted = true;
-                    }
-                    break;
+            for (Entry<Integer, Long> entry: cache.entrySet()) {
+                Integer partitionId = entry.getKey();
+                Long HSId = entry.getValue();
+                if (HSId != getInitiatorHSId()) {
+                    continue;
                 }
+                Boolean isBalanceSPI = state.get(partitionId);
+                if (isBalanceSPI != null && isBalanceSPI) {
+                    continue;
+                }
+                if (!m_promoted) {
+                    acceptPromotion();
+                    m_promoted = true;
+                }
+                break;
+
             }
         }
     };

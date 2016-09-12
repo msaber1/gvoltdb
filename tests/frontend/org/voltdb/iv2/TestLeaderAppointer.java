@@ -72,7 +72,7 @@ public class TestLeaderAppointer extends ZKTestBase {
     LeaderCache.Callback m_changeCallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache) {
+        public void run(ImmutableMap<Integer, Long> cache, ImmutableMap<Integer, Boolean> state) {
             m_newAppointee.set(true);
         }
     };

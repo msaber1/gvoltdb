@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -36,6 +37,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ByteArrayCallback;
@@ -49,7 +51,6 @@ import com.google_voltpatches.common.util.concurrent.ListeningExecutorService;
  * children. The children data objects must be JSONObjects.
  */
 public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
-
     //
     // API
     //
@@ -60,7 +61,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
      */
     public abstract static class Callback
     {
-        abstract public void run(ImmutableMap<Integer, Long> cache);
+        abstract public void run(ImmutableMap<Integer, Long> cache, ImmutableMap<Integer, Boolean> state);
     }
 
     /** Instantiate a LeaderCache of parent rootNode. The rootNode must exist. */
@@ -129,6 +130,20 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
     }
 
+    public void putByBalanceSPI(int partitionId, long HSId) throws KeeperException, InterruptedException {
+        hostLog.error(" =====================SPI===================== change for partition " + partitionId);
+        String hsidStr = ZKUtil.suffixHSIdsWithMetaInfo(HSId);
+        try {
+            m_zk.create(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
+                    hsidStr.getBytes(Charsets.UTF_8),
+                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        }
+        catch (KeeperException.NodeExistsException e) {
+            m_zk.setData(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
+                    hsidStr.getBytes(Charsets.UTF_8), -1);
+        }
+    }
+
     //
     // Implementation
     //
@@ -149,6 +164,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     // the cache exposed to the public. Start empty. Love it.
     private volatile ImmutableMap<Integer, Long> m_publicCache = ImmutableMap.of();
 
+    private volatile ImmutableMap<Integer, Boolean> m_stateChange = ImmutableMap.of();
     // parent (root node) sees new or deleted child
     private class ParentEvent implements Runnable {
         private final WatchedEvent m_event;
@@ -259,19 +275,25 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
 
         HashMap<Integer, Long> cache = new HashMap<Integer, Long>();
+        HashMap<Integer, Boolean> stateChange = new HashMap<Integer, Boolean>();
         for (ByteArrayCallback callback : callbacks) {
             try {
                 byte payload[] = callback.getData();
-                long HSId = Long.valueOf(new String(payload, "UTF-8"));
-                cache.put(getPartitionIdFromZKPath(callback.getPath()), HSId);
+                String data = new String(payload, "UTF-8");
+                long HSId = ZKUtil.getHSId(data);
+                boolean isBalanceSpi = ZKUtil.isHSIdFromBalanceSPI(data);
+                Integer partitionId = getPartitionIdFromZKPath(callback.getPath());
+                cache.put(partitionId, HSId);
+                stateChange.put(partitionId, isBalanceSpi);
             } catch (KeeperException.NoNodeException e) {
                 // child may have been deleted between the parent trigger and getData.
             }
         }
 
         m_publicCache = ImmutableMap.copyOf(cache);
+        m_stateChange = ImmutableMap.copyOf(stateChange);
         if (m_cb != null) {
-            m_cb.run(m_publicCache);
+            m_cb.run(m_publicCache, m_stateChange);
         }
     }
 
@@ -281,20 +303,29 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
      */
     private void processChildEvent(WatchedEvent event) throws Exception {
         HashMap<Integer, Long> cacheCopy = new HashMap<Integer, Long>(m_publicCache);
+        HashMap<Integer, Boolean> stateChange = new HashMap<Integer, Boolean>();
         ByteArrayCallback cb = new ByteArrayCallback();
         m_zk.getData(event.getPath(), m_childWatch, cb, null);
         try {
             // cb.getData() and cb.getPath() throw KeeperException
             byte payload[] = cb.getData();
-            long HSId = Long.valueOf(new String(payload, "UTF-8"));
-            cacheCopy.put(getPartitionIdFromZKPath(cb.getPath()), HSId);
+            String data = new String(payload, "UTF-8");
+            long HSId = ZKUtil.getHSId(data);
+            boolean isBalanceSpi = ZKUtil.isHSIdFromBalanceSPI(data);
+
+            Integer partitionId = getPartitionIdFromZKPath(cb.getPath());
+            cacheCopy.put(partitionId, HSId);
+            stateChange.put(partitionId, isBalanceSpi);
         } catch (KeeperException.NoNodeException e) {
             // rtb: I think result's path is the same as cb.getPath()?
-            cacheCopy.remove(getPartitionIdFromZKPath(event.getPath()));
+            Integer partitionId = getPartitionIdFromZKPath(event.getPath());
+            cacheCopy.remove(partitionId);
+            stateChange.remove(partitionId);
         }
         m_publicCache = ImmutableMap.copyOf(cacheCopy);
+        m_stateChange = ImmutableMap.copyOf(stateChange);
         if (m_cb != null) {
-            m_cb.run(m_publicCache);
+            m_cb.run(m_publicCache, m_stateChange);
         }
     }
 
@@ -302,14 +333,10 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("LeaderCache, root node:").append(m_rootNode).append("\n");
-        sb.append("last children: ");
-        for (String child: m_lastChildren) {
-            sb.append(child).append(" ");
-        }
-        sb.append("\n");
-        sb.append("public cache: partition id -> HSId\n");
+        sb.append("public cache: partition id -> HSId -> isBalanceSPI\n");
         for (Entry<Integer, Long> entry: m_publicCache.entrySet()) {
-            sb.append("             ").append(entry.getKey()).append(" -> ").append(entry.getValue()).append("\n");
+            sb.append("             ").append(entry.getKey()).append(" -> ").append(entry.getValue())
+            .append("\n");
         }
 
         return sb.toString();

@@ -214,7 +214,7 @@ public class LeaderAppointer implements Promotable
     LeaderCache.Callback m_masterCallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache) {
+        public void run(ImmutableMap<Integer, Long> cache, ImmutableMap<Integer, Boolean> state) {
             Set<Long> currentLeaders = new HashSet<Long>(cache.values());
             tmLog.debug("Updated leaders: " + currentLeaders);
             if (m_state.get() == AppointerState.CLUSTER_START) {

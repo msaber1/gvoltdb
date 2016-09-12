@@ -17,24 +17,20 @@
 
 package org.voltdb.iv2;
 
-import java.lang.InterruptedException;
-
-import java.util.*;
-
+import java.util.ArrayList;
+import java.util.List;
+import java.util.SortedSet;
 import java.util.concurrent.ExecutionException;
 
-import com.google_voltpatches.common.base.Supplier;
-import com.google_voltpatches.common.collect.ImmutableSortedSet;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
+import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import com.google_voltpatches.common.collect.ImmutableSortedSet;
 
 public class MpTerm implements Term
 {
@@ -57,7 +53,7 @@ public class MpTerm implements Term
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<Integer, Long> cache)
+        public void run(ImmutableMap<Integer, Long> cache, ImmutableMap<Integer, Boolean> state)
         {
             ImmutableSortedSet.Builder<Long> builder = ImmutableSortedSet.naturalOrder();
             for (Long HSId : cache.values()) {

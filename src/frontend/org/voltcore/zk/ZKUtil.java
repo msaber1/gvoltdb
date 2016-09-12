@@ -84,6 +84,22 @@ public class ZKUtil {
         return path;
     }
 
+    private static final String SPI_HSID_SUFFIX = "_BALANCED";
+    public static String suffixHSIdsWithMetaInfo(Long HSId) {
+        return Long.toString(HSId) + SPI_HSID_SUFFIX;
+    }
+
+    public static long getHSId(String hsid) {
+        if (isHSIdFromBalanceSPI(hsid)) {
+            return Long.parseLong(hsid.substring(0, hsid.length() - SPI_HSID_SUFFIX.length()));
+        }
+        return Long.parseLong(hsid);
+    }
+
+    public static boolean isHSIdFromBalanceSPI(String hsid) {
+        return hsid.endsWith(SPI_HSID_SUFFIX);
+    }
+
     public static File getUploadAsTempFile( ZooKeeper zk, String path, String prefix) throws Exception {
         byte data[] = retrieveChunksAsBytes(zk, path, prefix, false).getFirst();
         File tempFile = File.createTempFile("foo", "bar");
