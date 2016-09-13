@@ -124,6 +124,7 @@ PersistentTable::PersistentTable(int partitionColumn, const char * signature, bo
     m_failedCompactionCount(0),
     m_invisibleTuplesPendingDeleteCount(0),
     m_surgeon(*this),
+    m_preSwapTable(NULL),
     m_isMaterialized(isMaterialized),
     m_drEnabled(drEnabled),
     m_noAvailableUniqueIndex(false),
@@ -143,7 +144,6 @@ PersistentTable::PersistentTable(int partitionColumn, const char * signature, bo
         m_blocksPendingSnapshotLoad.push_back(TBBucketPtr(new TBBucket()));
     }
 
-    m_preTruncateTable = NULL;
     ::memcpy(&m_signature, signature, 20);
 }
 
@@ -325,7 +325,7 @@ void PersistentTable::truncateTableForUndo(VoltDBEngine * engine, TableCatalogDe
 
     if (originalTable->m_tableStreamer != NULL) {
         // Elastic Index may complete when undo Truncate
-        unsetPreTruncateTable();
+        unsetPreSwapTable();
     }
 
     std::vector<MaterializedViewTriggerForWrite*> views = originalTable->views();
@@ -360,7 +360,7 @@ void PersistentTable::truncateTableRelease(PersistentTable *originalTable) {
 
         originalTable->m_tableStreamer->cloneForTruncatedTable(m_surgeon);
 
-        unsetPreTruncateTable();
+        unsetPreSwapTable();
     }
 
     if (originalTable->m_viewHandlers.size() == 0) {
@@ -469,7 +469,7 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     if (m_tableStreamer != NULL && m_tableStreamer->hasStreamType(TABLE_STREAM_ELASTIC_INDEX)) {
         // There is an Elastic Index work going on and it should continue access the old table.
         // Add one reference count to keep the original table.
-        emptyTable->setPreTruncateTable(this);
+        emptyTable->setPreSwapTable(this);
     }
 
     if (m_viewHandlers.size() == 0) {
@@ -550,6 +550,36 @@ void PersistentTable::truncateTable(VoltDBEngine* engine, bool fallible) {
     }
 }
 
+
+void PersistentTable::swapTable(PersistentTable* otherTable,
+            VoltDBEngine* engine,
+            std::vector<std::string> const& indexesToSwap,
+            std::vector<std::string> const& otherIndexesToSwap,
+            std::vector<std::string> const& indexesToUpdate,
+            std::vector<std::string> const& otherIndexesToUpdate,
+            std::vector<std::string> const& viewsToSwap,
+            std::vector<std::string> const& otherViewsToSwap,
+            std::vector<std::string> const& viewsToUpdate,
+            std::vector<std::string> const& otherViewsToUpdate) {
+    if (isPersistentTableEmpty() && otherTable->isPersistentTableEmpty()) {
+        return;
+    }
+    auto tcd1 = engine->getTableDelegate(m_name);
+    tcd1->setTable(otherTable);
+    auto tcd2 = engine->getTableDelegate(otherTable->m_name);
+    tcd2->setTable(this);
+
+    auto preSwapTable1 = currentPreSwapTable();
+    auto preSwapTable2 = otherTable->currentPreSwapTable();
+    m_preSwapTable = preSwapTable2;
+    otherTable->m_preSwapTable = preSwapTable1;
+    auto streamer1 = m_tableStreamer;
+    auto streamer2 = otherTable->m_tableStreamer;
+    m_tableStreamer = streamer2;
+    otherTable->m_tableStreamer = streamer1;
+
+    //TODO: Deal with index and view mapping or recalc.
+}
 
 void setSearchKeyFromTuple(TableTuple &source) {
     keyTuple.setNValue(0, source.getNValue(1));

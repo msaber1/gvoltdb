@@ -256,7 +256,19 @@ public:
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool, bool fallible = true);
 
-    virtual void truncateTable(VoltDBEngine* engine, bool fallible = true);
+    void truncateTable(VoltDBEngine* engine, bool fallible = true);
+
+    void swapTable(PersistentTable* otherTable,
+                   VoltDBEngine* engine,
+                   std::vector<std::string> const& indexesToSwap,
+                   std::vector<std::string> const& otherIndexesToSwap,
+                   std::vector<std::string> const& indexesToUpdate,
+                   std::vector<std::string> const& otherIndexesToUpdate,
+                   std::vector<std::string> const& viewsToSwap,
+                   std::vector<std::string> const& otherViewsToSwap,
+                   std::vector<std::string> const& viewsToUpdate,
+                   std::vector<std::string> const& otherViewsToUpdate);
+
     // The fallible flag is used to denote a change to a persistent table
     // which is part of a long transaction that has been vetted and can
     // never fail (e.g. violate a constraint).
@@ -469,32 +481,23 @@ public:
     void truncateTableForUndo(VoltDBEngine * engine, TableCatalogDelegate * tcd, PersistentTable *originalTable);
     void truncateTableRelease(PersistentTable *originalTable);
 
-    PersistentTable * getPreTruncateTable() const { return m_preTruncateTable; }
-
-    PersistentTable * currentPreTruncateTable() {
-        if (m_preTruncateTable != NULL) {
-            return m_preTruncateTable;
+    PersistentTable* currentPreSwapTable() {
+        if (m_preSwapTable != NULL) {
+            return m_preSwapTable;
         }
         return this;
     }
 
-    void setPreTruncateTable(PersistentTable * tb) {
-        if (tb->getPreTruncateTable() != NULL) {
-            m_preTruncateTable = tb->getPreTruncateTable();
-        } else {
-            m_preTruncateTable= tb;
-        }
-
-        if (m_preTruncateTable != NULL) {
-            m_preTruncateTable->incrementRefcount();
-        }
+    void setPreSwapTable(PersistentTable * tb) {
+        m_preSwapTable = (tb->m_preSwapTable == NULL) ?
+            tb : tb->m_preSwapTable;
+        m_preSwapTable->incrementRefcount();
     }
 
-    void unsetPreTruncateTable() {
-        PersistentTable * prev = this->m_preTruncateTable;
-        if (prev != NULL) {
-            this->m_preTruncateTable = NULL;
-            prev->decrementRefcount();
+    void unsetPreSwapTable() {
+        if (m_preSwapTable != NULL) {
+            m_preSwapTable->decrementRefcount();
+            m_preSwapTable = NULL;
         }
     }
 
@@ -709,8 +712,8 @@ private:
     // Surgeon passed to classes requiring "deep" access to avoid excessive friendship.
     PersistentTableSurgeon m_surgeon;
 
-    // The original table from the first truncated table
-    PersistentTable * m_preTruncateTable;
+    // The original table prior to any swaps or truncates in the current transaction.
+    PersistentTable * m_preSwapTable;
 
     //Is this a materialized view?
     bool m_isMaterialized;

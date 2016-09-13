@@ -269,7 +269,8 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
 
     if (obj.hasKey("INLINE_NODES")) {
         PlannerDomValue inlineNodesValue = obj.valueForKey("INLINE_NODES");
-        for (int i = 0; i < inlineNodesValue.arrayLen(); i++) {
+        int len = inlineNodesValue.arrayLen();
+        for (int i = 0; i < len; ++i) {
             PlannerDomValue inlineNodeObj = inlineNodesValue.valueAtIndex(i);
             AbstractPlanNode *newNode = AbstractPlanNode::fromJSONObject(inlineNodeObj);
 
@@ -285,7 +286,8 @@ AbstractPlanNode* AbstractPlanNode::fromJSONObject(PlannerDomValue obj)
     // Output schema are optional -- when they can be determined by a child's copy.
     if (obj.hasKey("OUTPUT_SCHEMA")) {
         PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA");
-        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+        int len = outputSchemaArray.arrayLen();
+        for (int i = 0; i < len; ++i) {
             PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
             SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
             node->m_outputSchema.push_back(outputColumn);
@@ -321,8 +323,22 @@ void AbstractPlanNode::loadIntArrayFromJSONObject(const char* label,
 {
     if (obj.hasNonNullKey(label)) {
         PlannerDomValue intArray = obj.valueForKey(label);
-        for (int i = 0; i < intArray.arrayLen(); i++) {
+        int len = intArray.arrayLen();
+        for (int i = 0; i < len; ++i) {
             result.push_back(intArray.valueAtIndex(i).asInt());
+        }
+    }
+}
+
+void AbstractPlanNode::loadStringArrayFromJSONObject(const char* label,
+                                                     PlannerDomValue obj,
+                                                     std::vector<std::string>& result)
+{
+    if (obj.hasNonNullKey(label)) {
+        PlannerDomValue stringArray = obj.valueForKey(label);
+        int len = stringArray.arrayLen();
+        for (int i = 0; i < len; ++i) {
+            result.push_back(stringArray.valueAtIndex(i).asStr());
         }
     }
 }
@@ -407,7 +423,8 @@ void AbstractPlanNode::OwningExpressionVector::loadExpressionArrayFromJSONObject
         return;
     }
     PlannerDomValue arrayObj = obj.valueForKey(label);
-    for (int i = 0; i < arrayObj.arrayLen(); i++) {
+    int len = arrayObj.arrayLen();
+    for (int i = 0; i < len; ++i) {
         AbstractExpression *expr = AbstractExpression::buildExpressionTree(arrayObj.valueAtIndex(i));
         push_back(expr);
     }
@@ -418,7 +435,8 @@ void AbstractPlanNode::loadSortListFromJSONObject(PlannerDomValue obj,
                                                       std::vector<SortDirectionType>   *sortDirs) {
     PlannerDomValue sortColumnsArray = obj.valueForKey("SORT_COLUMNS");
 
-    for (int i = 0; i < sortColumnsArray.arrayLen(); i++) {
+    int len = sortColumnsArray.arrayLen();
+    for (int i = 0; i < len; ++i) {
         PlannerDomValue sortColumn = sortColumnsArray.valueAtIndex(i);
         bool hasDirection = (sortDirs == NULL), hasExpression = (sortExprs == NULL);
 
