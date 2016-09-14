@@ -23,6 +23,8 @@ import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -30,7 +32,9 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltZK;
+import org.voltdb.messaging.BalanceSPIMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -38,9 +42,9 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RepairLogTruncationMessage;
 
 import com.google_voltpatches.common.base.Supplier;
-import org.voltdb.messaging.RepairLogTruncationMessage;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -295,6 +299,38 @@ public class InitiatorMailbox implements Mailbox
         else if (message instanceof RepairLogTruncationMessage) {
             m_repairLog.deliver(message);
             return;
+        }
+        else if (message instanceof BalanceSPIMessage) {
+        	BalanceSPIMessage msg = (BalanceSPIMessage) message;
+
+        	VoltDBInterface voltInstance = VoltDB.instance();
+        	HostMessenger messenger = voltInstance.getHostMessenger();
+        	ZooKeeper zk = messenger.getZK();
+
+        	tmLog.error(VoltZK.debugLeadersInfo(zk));
+
+        	tmLog.error("start to change appointee...pid: " + msg.getParititionId() + ",  hsid:" + msg.getNewLeaderHSId());
+
+        	LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
+        	try {
+        		leaderAppointee.start(true);
+        		leaderAppointee.put(msg.getParititionId(), msg.getNewLeaderHSId());
+        	} catch (InterruptedException e) {
+        		e.printStackTrace();
+        	} catch (ExecutionException e) {
+        		e.printStackTrace();
+        	} catch (KeeperException e) {
+        		e.printStackTrace();
+        	} finally {
+        		try {
+        			leaderAppointee.shutdown();
+        		} catch (InterruptedException e) {
+        		}
+        	}
+
+        	tmLog.error(VoltZK.debugLeadersInfo(zk));
+
+        	return;
         }
         m_repairLog.deliver(message);
         if (canDeliver) {

@@ -23,44 +23,48 @@ import java.nio.ByteBuffer;
 import org.voltcore.messaging.VoltMessage;
 
 /**
- * Sent from SPIs to replicas when transactions fully commits on all replicas.
+ * Sent from SPIs to one replica when @BalanceSPI is called.
  */
-public class RepairLogTruncationMessage extends VoltMessage {
+public class BalanceSPIMessage extends VoltMessage {
+	protected int m_partitionId;
+	protected long m_newLeaderHSId;
 
-    protected long m_handle;
+    public BalanceSPIMessage() {}
 
-    public RepairLogTruncationMessage() {}
-
-    public RepairLogTruncationMessage(long handle)
-    {
-        this.m_handle = handle;
+    public BalanceSPIMessage(int pid, long hsid) {
+    	m_partitionId = pid;
+    	m_newLeaderHSId = hsid;
     }
 
-    public long getHandle()
-    {
-        return m_handle;
+    public int getParititionId() {
+    	return m_partitionId;
     }
+
+    public long getNewLeaderHSId() {
+    	return m_newLeaderHSId;
+    }
+
 
     @Override
     public int getSerializedSize()
     {
-        return super.getSerializedSize() + 8;
+        return super.getSerializedSize() + 4 + 8;
     }
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException
     {
-        m_handle = buf.getLong();
-
+    	m_partitionId = buf.getInt();
+    	m_newLeaderHSId = buf.getLong();
         assert(buf.capacity() == buf.position());
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-        buf.put(VoltDbMessageFactory.IV2_REPAIR_LOG_TRUNCATION);
-        buf.putLong(m_handle);
-
+        buf.put(VoltDbMessageFactory.BalanceSPI_ID);
+        buf.putInt(m_partitionId);
+        buf.putLong(m_newLeaderHSId);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }

@@ -129,7 +129,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
     }
 
     public void putByBalanceSPI(int partitionId, long HSId) throws KeeperException, InterruptedException {
-        String hsidStr = ZKUtil.suffixHSIdsWithMetaInfo(HSId);
+        String hsidStr = ZKUtil.suffixHSIdsWithBalanceInfo(HSId);
         try {
             m_zk.create(ZKUtil.joinZKPath(m_rootNode, Integer.toString(partitionId)),
                     hsidStr.getBytes(Charsets.UTF_8),

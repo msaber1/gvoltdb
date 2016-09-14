@@ -81,6 +81,18 @@ final public class TxnEgo {
         return new TxnEgo(SEQUENCE_ZERO, partitionId);
     }
 
+    public static boolean isValidSequence(long txnId) {
+    	long sequence = getSequence(txnId);
+    	if (sequence < SEQUENCE_ZERO || sequence > SEQUENCE_MAX_VALUE) {
+    		return false;
+    	}
+    	return true;
+    }
+
+    public static long getSequenceZeroTxnId(long partitionId) {
+    	return (SEQUENCE_ZERO << PARTITIONID_BITS) | partitionId;
+    }
+
     /**
      * Make the next sequence-valued TxnEgo
      */

@@ -74,6 +74,7 @@ class GlobalServiceElector implements LeaderNoticeHandler
         hostLog.info("Host " + m_hostId + " promoted to be the global service provider");
         m_isLeader = true;
         for (Promotable service : m_services) {
+        	hostLog.info("Promotable service: " + service);
             try {
                 service.acceptPromotion();
             }

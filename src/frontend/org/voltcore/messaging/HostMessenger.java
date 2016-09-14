@@ -524,6 +524,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
+    private final void updateForeignHost(int hostId) {
+
+    }
+
     public synchronized void prepareForShutdown()
     {
         m_shuttingDown = true;

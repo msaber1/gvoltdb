@@ -76,7 +76,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     final protected SiteTaskerQueue m_tasks;
     protected Mailbox m_mailbox;
     protected boolean m_isLeader = false;
-    private TxnEgo m_txnEgo;
+    protected TxnEgo m_txnEgo;
     final protected int m_partitionId;
 
     // helper class to put command log work in order

@@ -23,6 +23,7 @@ import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
@@ -60,16 +61,14 @@ public class SpInitiator extends BaseInitiator implements Promotable
         @Override
         public void run(ImmutableMap<Integer, Long> cache, ImmutableMap<Integer, Boolean> state)
         {
+        	VoltLogger log = new VoltLogger("SpInitiator");
             for (Entry<Integer, Long> entry: cache.entrySet()) {
                 Integer partitionId = entry.getKey();
                 Long HSId = entry.getValue();
                 if (HSId != getInitiatorHSId()) {
                     continue;
                 }
-                Boolean isBalanceSPI = state.get(partitionId);
-                if (isBalanceSPI != null && isBalanceSPI) {
-                    continue;
-                }
+
                 if (!m_promoted) {
                     acceptPromotion();
                     m_promoted = true;
@@ -141,6 +140,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void acceptPromotion()
     {
         try {
+            tmLog.error("SpInitiator running with acceptPromotion...");
 
             long startTime = System.currentTimeMillis();
             Boolean success = false;

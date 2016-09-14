@@ -44,9 +44,9 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="HOST">
+    <logger name="HOST">
         <level value="INFO"/>
-    </logger -->
+    </logger>
 
     <!-- logger name="NETWORK">
         <level value="INFO"/>
@@ -84,9 +84,9 @@
         <level value="INFO"/>
     </logger>
 
-    <!-- logger name="REJOIN">
+    <logger name="REJOIN">
         <level value="INFO"/>
-    </logger -->
+    </logger>
 
 	<!-- logger name="JOIN">
 		<level value="INFO"/>

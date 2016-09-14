@@ -53,7 +53,7 @@ public class LeaderElector {
     private Set<String> knownChildren = null;
 
     private volatile String leader = null;
-    private volatile boolean isLeader = false;
+    private volatile boolean isLeader = false;  // a flag only used in Tests
     private final ExecutorService es;
     private final AtomicBoolean m_done = new AtomicBoolean(false);
 

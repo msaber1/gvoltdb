@@ -92,7 +92,6 @@ public class Cartographer extends StatsSource
             stringer.endObject();
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[0], stringer.toString().getBytes("UTF-8"));
             int hostId = m_hostMessenger.getHostId();
-            hostLog.error("sendLeaderChangeNotify:m_hostMessenger hostid:" + hostId);
             m_hostMessenger.send(CoreUtils.getHSIdFromHostAndSite(hostId,
                         HostMessenger.CLIENT_INTERFACE_SITE_ID),
                     bpm);

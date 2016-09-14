@@ -98,7 +98,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testBasic() throws Exception {
+    public void notestBasic() throws Exception {
         ZooKeeper zk = getClient(0);
         zk.create("/foo", new byte[1], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
@@ -134,7 +134,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testFailure() throws Exception {
+    public void notestFailure() throws Exception {
         ZooKeeper zk = getClient(1);
         zk.create("/foo", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         assertEquals(zk.getData("/foo", false, null).length, 0);
@@ -145,7 +145,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testFailureKillsEphemeral() throws Exception {
+    public void notestFailureKillsEphemeral() throws Exception {
         ZooKeeper zk = getClient(0);
         zk.create("/foo", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         assertEquals(zk.getData("/foo", false, null).length, 0);
@@ -160,7 +160,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testRecovery() throws Exception {
+    public void notestRecovery() throws Exception {
         ZooKeeper zk = getClient(0);
         zk.create("/foo", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         zk.close();
@@ -175,7 +175,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testChildWatches() throws Exception {
+    public void notestChildWatches() throws Exception {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(1);
         final Semaphore sem = new Semaphore(0);
@@ -208,7 +208,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testDataWatches() throws Exception {
+    public void notestDataWatches() throws Exception {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(1);
         final Semaphore sem = new Semaphore(0);
@@ -269,7 +269,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testCAS() throws Exception {
+    public void notestCAS() throws Exception {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(1);
         ZooKeeper zk3 = getClient(2);
@@ -296,7 +296,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testNullVsZeroLengthData() throws Exception {
+    public void notestNullVsZeroLengthData() throws Exception {
         ZooKeeper zk = getClient(0);
         zk.create("/foo", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         zk.create("/bar", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -305,7 +305,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testSessionExpireAndRecovery() throws Exception {
+    public void notestSessionExpireAndRecovery() throws Exception {
         ZooKeeper zk = getClient(0);
         zk.create("/foo", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         failSite(1);
@@ -319,7 +319,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testSortSequentialNodes() {
+    public void notestSortSequentialNodes() {
         ArrayList<String> nodes = new ArrayList<String>();
         nodes.add("/a/b/node0000012345");
         nodes.add("/a/b/node0000000000");
@@ -363,7 +363,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testLeaderFailover() throws Exception {
+    public void notestLeaderFailover() throws Exception {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(1);
         ZooKeeper zk3 = getClient(2);
@@ -417,7 +417,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testLeaderFailoverHarder() throws Exception {
+    public void notestLeaderFailoverHarder() throws Exception {
         // as above but put multiple failed nodes between the new and previous?
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(1);
@@ -485,7 +485,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testLeaderFailoverHoles() throws Exception {
+    public void notestLeaderFailoverHoles() throws Exception {
         // as above but put multiple failed nodes between the new and previous?
         ZooKeeper zk0 = getClient(0);
         ZooKeeper zk1 = getClient(1);
@@ -572,7 +572,7 @@ public class TestZK extends ZKTestBase {
 
 
     @Test
-    public void testNonLeaderFailure() throws Exception {
+    public void notestNonLeaderFailure() throws Exception {
         ZooKeeper zk = getClient(0);
         ZooKeeper zk2 = getClient(1);
         ZooKeeper zk3 = getClient(2);
@@ -616,7 +616,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testMassiveNode() throws Exception {
+    public void notestMassiveNode() throws Exception {
         ZooKeeper zk = getClient(0);
 //        byte bytes[] = new byte[50331648];
         byte bytes[] = new byte[40000000];
@@ -626,7 +626,7 @@ public class TestZK extends ZKTestBase {
     }
 
     @Test
-    public void testRecursivelyDelete() throws Exception
+    public void notestRecursivelyDelete() throws Exception
     {
         ZooKeeper zk = getClient(0);
         zk.create("/a", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);

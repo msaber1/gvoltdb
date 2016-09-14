@@ -100,10 +100,10 @@ import org.voltdb.utils.CompressionService;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MinimumRatioMaintainer;
 
+import vanilla.java.affinity.impl.PosixJNAAffinity;
+
 import com.google_voltpatches.common.base.Charsets;
 import com.google_voltpatches.common.base.Preconditions;
-
-import vanilla.java.affinity.impl.PosixJNAAffinity;
 
 public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
@@ -791,6 +791,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         {
             String errmsg = "Site: " + org.voltcore.utils.CoreUtils.hsIdToString(m_siteId) +
                 " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
+            t.printStackTrace();
+            hostLog.error(t.getMessage());
             VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
 

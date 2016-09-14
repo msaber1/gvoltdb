@@ -31,6 +31,7 @@ import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -46,10 +47,13 @@ import org.voltdb.SnapshotCompletionInterest;
 import org.voltdb.SnapshotCompletionMonitor;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.iv2.SiteTasker.SiteTaskerRunnable;
+import org.voltdb.messaging.BalanceSPIMessage;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
@@ -415,7 +419,11 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     }
 
     private long getMaxTaskedSpHandle() {
-        return m_pendingTasks.getMaxTaskedSpHandle();
+        long spHandle = m_pendingTasks.getMaxTaskedSpHandle();
+        if (TxnEgo.isValidSequence(spHandle)) {
+        	spHandle = TxnEgo.getSequenceZeroTxnId(m_partitionId);
+        }
+        return spHandle;
     }
 
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
@@ -430,6 +438,25 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         final String procedureName = message.getStoredProcedureName();
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
+        tmLog.error(message);
+        if ("@BalanceSPI".equals(procedureName)) {
+        	// this is a @BalanceSPI system procedure that will reset the max transaction id on new leader
+        	tmLog.error("Get @BalanceSPI invocation...");
+
+        	final Object[] params = message.getParameters();
+        	int pid = (int)(params[1]);
+        	long newLeaderHSId = (long)(params[2]);
+
+        	BalanceSPIMessage balanceSpiMsg = new BalanceSPIMessage(pid, newLeaderHSId);
+
+        	m_mailbox.send(newLeaderHSId, balanceSpiMsg);
+        }
+
+        VoltDBInterface voltInstance = VoltDB.instance();
+    	HostMessenger messenger = voltInstance.getHostMessenger();
+    	ZooKeeper zk = messenger.getZK();
+    	tmLog.error(VoltZK.debugLeadersInfo(zk));
+
         Iv2InitiateTaskMessage msg = message;
         if (m_isLeader || message.isReadOnly()) {
             /*

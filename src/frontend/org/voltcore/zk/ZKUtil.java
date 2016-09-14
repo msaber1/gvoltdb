@@ -85,7 +85,7 @@ public class ZKUtil {
     }
 
     private static final String SPI_HSID_SUFFIX = "_BALANCED";
-    public static String suffixHSIdsWithMetaInfo(Long HSId) {
+    public static String suffixHSIdsWithBalanceInfo(Long HSId) {
         return Long.toString(HSId) + SPI_HSID_SUFFIX;
     }
 
