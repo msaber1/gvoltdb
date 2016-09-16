@@ -68,12 +68,12 @@ public class SpInitiator extends BaseInitiator implements Promotable
         {
             VoltLogger log = new VoltLogger("SpInitiator");
             if (cache != null) {
-                log.error("[SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
-                log.error("[SpInitiator] cache values: " + Arrays.toString(cache.values().toArray()));
+                log.warn("[SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
+                log.warn("[SpInitiator] cache values: " + Arrays.toString(cache.values().toArray()));
             }
             if (state != null) {
-                log.error("[SpInitiator] state keys: " + Arrays.toString(state.keySet().toArray()));
-                log.error("[SpInitiator] state values: " + Arrays.toString(state.values().toArray()));
+                log.warn("[SpInitiator] state keys: " + Arrays.toString(state.keySet().toArray()));
+                log.warn("[SpInitiator] state values: " + Arrays.toString(state.values().toArray()));
             }
 
             for (Entry<Integer, Long> entry: cache.entrySet()) {
@@ -160,7 +160,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void acceptPromotion()
     {
         try {
-            tmLog.error("[SpInitiator:acceptPromotion()]...");
+            tmLog.debug("[SpInitiator:acceptPromotion()]...");
 
             long startTime = System.currentTimeMillis();
             Boolean success = false;
@@ -202,7 +202,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
                         List<Long> survivors = new ArrayList<Long>(m_term.getInterestingHSIds().get());
                         survivors.remove(m_initiatorMailbox.getHSId());
 
-                        tmLog.error("[m_initiatorMailbox:AcceptPromotion] repair survivors to change original leader state:" +
+                        tmLog.debug("[m_initiatorMailbox:AcceptPromotion] repair survivors to change original leader state:" +
                                 Arrays.toString(survivors.toArray()));
 
                         BalanceSPIRepairSurvivorsMessage msg = new BalanceSPIRepairSurvivorsMessage();

@@ -426,9 +426,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
     private long getMaxTaskedSpHandle() {
         long spHandle = m_pendingTasks.getMaxTaskedSpHandle();
-        if (TxnEgo.isValidSequence(spHandle)) {
-            spHandle = TxnEgo.getSequenceZeroTxnId(m_partitionId);
-        }
         return spHandle;
     }
 
@@ -445,7 +442,7 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
         long newSpHandle;
         long uniqueId = Long.MIN_VALUE;
 
-        tmLog.warn("[SpScheduler:handleIv2InitiateTaskMessage]" + message);
+//        tmLog.warn("[SpScheduler:handleIv2InitiateTaskMessage]" + message);
         if ("@BalanceSPI".equals(procedureName)) {
             // this is a @BalanceSPI system procedure that will reset the max transaction id on new leader
             tmLog.warn("Get @BalanceSPI invocation...");
@@ -456,11 +453,6 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
 
             BalanceSPIMessage balanceSpiMsg = new BalanceSPIMessage(pid, newLeaderHSId);
             m_mailbox.send(newLeaderHSId, balanceSpiMsg);
-
-//          VoltDBInterface voltInstance = VoltDB.instance();
-//          HostMessenger messenger = voltInstance.getHostMessenger();
-//          ZooKeeper zk = messenger.getZK();
-//          tmLog.error(VoltZK.debugLeadersInfo(zk));
         }
 
         Iv2InitiateTaskMessage msg = message;

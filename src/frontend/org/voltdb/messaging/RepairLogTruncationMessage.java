@@ -17,10 +17,10 @@
 
 package org.voltdb.messaging;
 
+import org.voltcore.messaging.VoltMessage;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
-
-import org.voltcore.messaging.VoltMessage;
 
 /**
  * Sent from SPIs to replicas when transactions fully commits on all replicas.

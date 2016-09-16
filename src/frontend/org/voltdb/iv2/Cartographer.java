@@ -126,6 +126,8 @@ public class Cartographer extends StatsSource
             }
             Set<Long> newMasters = new HashSet<Long>();
             newMasters.addAll(cache.values());
+            // we want to see items which are present in the new map but not in the old,
+            // these are newly promoted SPIs
             newMasters.removeAll(m_currentSPMasters);
             // send the messages indicating promotion from here for each new master
             for (long newMaster : newMasters) {

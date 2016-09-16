@@ -205,7 +205,4 @@ public class SysProcFragmentId
     public static final long PF_updateSettingsBarrierAggregate = 301;
     public static final long PF_updateSettings = 302;
     public static final long PF_updateSettingsAggregate = 303;
-
-    // @BalanceSPInitiator
-    public static final long PF_BalanceSPI = 26;
 }

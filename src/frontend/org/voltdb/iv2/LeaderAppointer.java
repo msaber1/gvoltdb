@@ -310,7 +310,7 @@ public class LeaderAppointer implements Promotable
         m_iv2appointees.start(true);
         m_iv2masters.start(true);
         ImmutableMap<Integer, Long> appointees = m_iv2appointees.pointInTimeCache();
-        tmLog.error("appointees.toString(): " + appointees.toString());
+        tmLog.debug("appointees.toString(): " + appointees.toString());
         // Figure out what conditions we assumed leadership under.
         if (appointees.size() == 0)
         {

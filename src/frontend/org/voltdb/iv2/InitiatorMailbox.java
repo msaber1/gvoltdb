@@ -103,7 +103,7 @@ public class InitiatorMailbox implements Mailbox
 
     synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
         RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId);
-        hostLog.error("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
+        hostLog.debug("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
                 m_partitionId + ", survivors: " + Arrays.toString(survivors.get().toArray()));
         setRepairAlgoInternal(ra);
         return ra;
@@ -311,8 +311,8 @@ public class InitiatorMailbox implements Mailbox
             HostMessenger messenger = voltInstance.getHostMessenger();
             ZooKeeper zk = messenger.getZK();
 
-            tmLog.error(VoltZK.debugLeadersInfo(zk));
-            tmLog.error("[InitiatorMailbox.deliverInternal] start to change appointee...pid:" +
+            tmLog.debug(VoltZK.debugLeadersInfo(zk));
+            tmLog.debug("[InitiatorMailbox.deliverInternal] start to change appointee...pid:" +
                     msg.getParititionId() + ",hsid:" + msg.getNewLeaderHSId());
 
             LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
@@ -410,7 +410,7 @@ public class InitiatorMailbox implements Mailbox
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
                 req.isMPIRequest());
 
-        tmLog.error(""
+        tmLog.debug(""
             + CoreUtils.hsIdToString(getHSId())
             + " handling repair log request id " + req.getRequestId()
             + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ");

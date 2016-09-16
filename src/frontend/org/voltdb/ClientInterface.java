@@ -1790,18 +1790,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         for (Map.Entry<Long, ClientInterfaceHandleManager> e : m_cihm.entrySet()) {
             // The internal CI adapters report negative connection ids and
             // aren't included in public stats.
-            if (e.getKey() <= 0) {
-                continue;
-            }
-            ClientInterfaceHandleManager cihm = e.getValue();
-            long adminMode = cihm.isAdmin ? 1 : 0;
-            long readWait = cihm.connection.readStream().dataAvailable();
-            long writeWait = cihm.connection.writeStream().getOutstandingMessageCount();
-            long outstandingTxns = cihm.getOutstandingTxns();
-            client_stats.put(
-                    e.getKey(), new Pair<String, long[]>(
-                            cihm.connection.getHostnameOrIP(),
+            if (e.getKey() > 0) {
+                long adminMode = e.getValue().isAdmin ? 1 : 0;
+                long readWait = e.getValue().connection.readStream().dataAvailable();
+                long writeWait = e.getValue().connection.writeStream().getOutstandingMessageCount();
+                long outstandingTxns = e.getValue().getOutstandingTxns();
+                client_stats.put(
+                        e.getKey(), new Pair<String, long[]>(
+                            e.getValue().connection.getHostnameOrIP(),
                             new long[] {adminMode, readWait, writeWait, outstandingTxns}));
+            }
         }
         return client_stats;
     }

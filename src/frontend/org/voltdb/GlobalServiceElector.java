@@ -71,10 +71,10 @@ class GlobalServiceElector implements LeaderNoticeHandler
     @Override
     synchronized public void becomeLeader()
     {
-        hostLog.warn("[GlobalServiceElector:becomeLeader()] Host " + m_hostId + " promoted to be the global service provider");
+        hostLog.info("[GlobalServiceElector:becomeLeader()] Host " + m_hostId + " promoted to be the global service provider");
         m_isLeader = true;
         for (Promotable service : m_services) {
-            hostLog.warn("[GlobalServiceElector:becomeLeader()] Promotable service: " + service);
+            hostLog.debug("[GlobalServiceElector:becomeLeader()] Promotable service: " + service);
             try {
                 service.acceptPromotion();
             }
