@@ -321,10 +321,13 @@ public class ExportManager
      * @param partitionId
      */
     synchronized public void acceptMastership(int partitionId) {
-        Preconditions.checkArgument(
-                m_masterOfPartitions.add(partitionId),
-                "can't acquire mastership twice for partition id: " + partitionId
-                );
+//        Preconditions.checkArgument(
+//                m_masterOfPartitions.add(partitionId),
+//                "can't acquire mastership twice for partition id: " + partitionId
+//                );
+        if (! m_masterOfPartitions.add(partitionId)) {
+            return;
+        }
         exportLog.info("ExportManager accepting mastership for partition " + partitionId);
         /*
          * Only the first generation will have a processor which

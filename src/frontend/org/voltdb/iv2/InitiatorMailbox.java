@@ -336,7 +336,7 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
         else if (message instanceof BalanceSPIRepairSurvivorsMessage) {
-            hostLog.error("[InitiatorMailbox:deliverInternal] receive BalanceSPIRepairSurvivorsMessage,"
+            hostLog.warn("[InitiatorMailbox:deliverInternal] receive BalanceSPIRepairSurvivorsMessage,"
                     + " current is_leader:" + m_scheduler.isLeader());
             m_scheduler.setLeaderState(false);
             return;

@@ -28,6 +28,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -57,7 +58,6 @@ import com.google_voltpatches.common.collect.ImmutableMap;
 public class SpInitiator extends BaseInitiator implements Promotable
 {
     final private LeaderCache m_leaderCache;
-    private boolean m_promoted = false;
     private boolean m_isBalanceSPIPromoted = false;
     private final TickProducer m_tickProducer;
 
@@ -66,14 +66,16 @@ public class SpInitiator extends BaseInitiator implements Promotable
         @Override
         public void run(ImmutableMap<Integer, Long> cache, ImmutableMap<Integer, Boolean> state)
         {
+            String hsidStr = CoreUtils.hsIdToString(m_initiatorMailbox.getHSId());
+
             VoltLogger log = new VoltLogger("SpInitiator");
             if (cache != null) {
-                log.warn("[SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
-                log.warn("[SpInitiator] cache values: " + Arrays.toString(cache.values().toArray()));
+                log.warn(hsidStr + " [SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
+                log.warn(hsidStr + " [SpInitiator] cache values: " + Arrays.toString(cache.values().toArray()));
             }
             if (state != null) {
-                log.warn("[SpInitiator] state keys: " + Arrays.toString(state.keySet().toArray()));
-                log.warn("[SpInitiator] state values: " + Arrays.toString(state.values().toArray()));
+                log.warn(hsidStr + " [SpInitiator] state keys: " + Arrays.toString(state.keySet().toArray()));
+                log.warn(hsidStr + " [SpInitiator] state values: " + Arrays.toString(state.values().toArray()));
             }
 
             for (Entry<Integer, Long> entry: cache.entrySet()) {
@@ -88,11 +90,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
                 } else {
                     m_isBalanceSPIPromoted = false;
                 }
+                log.warn(hsidStr + " [SpInitiator] m_isBalanceSPIPromoted: " + m_isBalanceSPIPromoted);
 
-                if (!m_promoted) {
-                    acceptPromotion();
-                    m_promoted = true;
-                }
+                acceptPromotion();
                 break;
 
             }
