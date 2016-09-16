@@ -37,6 +37,7 @@ import org.openqa.selenium.WebElement
 class SqlQueryPage extends VoltDBManagementCenterPage {
     static content = {
         // Tables, Streams, Views & Stored Procedures elements
+        refreshButton   { $('.refreshBtn') }
         tabArea     { $('#tabMain') }
         tabControls { tabArea.find('.tabs') }
         tablesTab   { tabControls.find("a[href='#tab1']") }
@@ -60,6 +61,7 @@ class SqlQueryPage extends VoltDBManagementCenterPage {
         queryInput  { $('#querybox-1') }
         runButton   { $('#runBTn-1') }
         clearButton { $('#clearQuery-1') }
+        saveButton  { $('#querySaveBtn-1') }
         qrFormatDropDown    { $('#exportType-1') }
         qrfddOptions    { qrFormatDropDown.find('option') }
         qrfddSelected   { qrFormatDropDown.find('option', selected: "selected") }
