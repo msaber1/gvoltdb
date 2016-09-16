@@ -72,13 +72,13 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="IV2TRACE">
+    <logger name="IV2TRACE">
         <level value="TRACE"/>
-    </logger -->
+    </logger>
 
-    <!-- logger name="IV2QUEUETRACE">
+    <logger name="IV2QUEUETRACE">
         <level value="TRACE"/>
-    </logger -->
+    </logger>
 
     <logger name="TM">
         <level value="INFO"/>
@@ -88,9 +88,9 @@
         <level value="INFO"/>
     </logger>
 
-	<!-- logger name="JOIN">
+	<logger name="JOIN">
 		<level value="INFO"/>
-	</logger -->
+	</logger>
 
     <!-- logger name="SNAPSHOT">
         <level value="INFO"/>

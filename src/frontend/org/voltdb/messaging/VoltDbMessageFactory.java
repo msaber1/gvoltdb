@@ -48,6 +48,7 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte SNAPSHOT_CHECK_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 22;
     final public static byte IV2_REPAIR_LOG_TRUNCATION = VOLTCORE_MESSAGE_ID_MAX + 23;
     final public static byte BalanceSPI_ID = VOLTCORE_MESSAGE_ID_MAX + 24;
+    final public static byte BalanceSPI_REPAIR_SURVIVORS_ID = VOLTCORE_MESSAGE_ID_MAX + 25;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -132,6 +133,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case BalanceSPI_ID:
             message = new BalanceSPIMessage();
+            break;
+        case BalanceSPI_REPAIR_SURVIVORS_ID:
+            message = new BalanceSPIRepairSurvivorsMessage();
             break;
         default:
             message = null;

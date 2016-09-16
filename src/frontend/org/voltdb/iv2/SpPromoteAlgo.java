@@ -144,7 +144,7 @@ public class SpPromoteAlgo implements RepairAlgo
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
 
-        tmLog.info(m_whoami + "found (including self) " + m_survivors.size()
+        tmLog.error(m_whoami + "found (including self) " + m_survivors.size()
                  + " surviving replicas to repair. "
                  + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest =
@@ -159,7 +159,7 @@ public class SpPromoteAlgo implements RepairAlgo
         if (message instanceof Iv2RepairLogResponseMessage) {
             Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
             if (response.getRequestId() != m_requestId) {
-                tmLog.debug(m_whoami + "rejecting stale repair response."
+                tmLog.error(m_whoami + "rejecting stale repair response."
                           + " Current request id is: " + m_requestId
                           + " Received response for request id: " + response.getRequestId());
                 return;

@@ -144,6 +144,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_isLeader = isLeader;
     }
 
+    public boolean isLeader() {
+        return m_isLeader;
+    }
+
     public SiteTaskerQueue getQueue()
     {
         return m_tasks;

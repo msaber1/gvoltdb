@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -35,6 +36,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.BalanceSPIMessage;
+import org.voltdb.messaging.BalanceSPIRepairSurvivorsMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -101,6 +103,8 @@ public class InitiatorMailbox implements Mailbox
 
     synchronized public RepairAlgo constructRepairAlgo(Supplier<List<Long>> survivors, String whoami) {
         RepairAlgo ra = new SpPromoteAlgo( survivors.get(), this, whoami, m_partitionId);
+        hostLog.error("[InitiatorMailbox:constructRepairAlgo] whoami: " + whoami + ", partitionId: " +
+                m_partitionId + ", survivors: " + Arrays.toString(survivors.get().toArray()));
         setRepairAlgoInternal(ra);
         return ra;
     }
@@ -301,37 +305,44 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
         else if (message instanceof BalanceSPIMessage) {
-        	BalanceSPIMessage msg = (BalanceSPIMessage) message;
+            BalanceSPIMessage msg = (BalanceSPIMessage) message;
 
-        	VoltDBInterface voltInstance = VoltDB.instance();
-        	HostMessenger messenger = voltInstance.getHostMessenger();
-        	ZooKeeper zk = messenger.getZK();
+            VoltDBInterface voltInstance = VoltDB.instance();
+            HostMessenger messenger = voltInstance.getHostMessenger();
+            ZooKeeper zk = messenger.getZK();
 
-        	tmLog.error(VoltZK.debugLeadersInfo(zk));
+            tmLog.error(VoltZK.debugLeadersInfo(zk));
+            tmLog.error("[InitiatorMailbox.deliverInternal] start to change appointee...pid:" +
+                    msg.getParititionId() + ",hsid:" + msg.getNewLeaderHSId());
 
-        	tmLog.error("start to change appointee...pid: " + msg.getParititionId() + ",  hsid:" + msg.getNewLeaderHSId());
+            LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
+            try {
+                leaderAppointee.start(true);
+                leaderAppointee.putByBalanceSPI(msg.getParititionId(), msg.getNewLeaderHSId());
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (ExecutionException e) {
+                e.printStackTrace();
+            } catch (KeeperException e) {
+                e.printStackTrace();
+            } finally {
+                try {
+                    leaderAppointee.shutdown();
+                } catch (InterruptedException e) {
+                }
+            }
 
-        	LeaderCache leaderAppointee = new LeaderCache(zk, VoltZK.iv2appointees);
-        	try {
-        		leaderAppointee.start(true);
-        		leaderAppointee.put(msg.getParititionId(), msg.getNewLeaderHSId());
-        	} catch (InterruptedException e) {
-        		e.printStackTrace();
-        	} catch (ExecutionException e) {
-        		e.printStackTrace();
-        	} catch (KeeperException e) {
-        		e.printStackTrace();
-        	} finally {
-        		try {
-        			leaderAppointee.shutdown();
-        		} catch (InterruptedException e) {
-        		}
-        	}
+            tmLog.error(VoltZK.debugLeadersInfo(zk));
 
-        	tmLog.error(VoltZK.debugLeadersInfo(zk));
-
-        	return;
+            return;
         }
+        else if (message instanceof BalanceSPIRepairSurvivorsMessage) {
+            hostLog.error("[InitiatorMailbox:deliverInternal] receive BalanceSPIRepairSurvivorsMessage,"
+                    + " current is_leader:" + m_scheduler.isLeader());
+            m_scheduler.setLeaderState(false);
+            return;
+        }
+
         m_repairLog.deliver(message);
         if (canDeliver) {
             m_scheduler.deliver(message);
@@ -399,7 +410,7 @@ public class InitiatorMailbox implements Mailbox
         List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
                 req.isMPIRequest());
 
-        tmLog.debug(""
+        tmLog.error(""
             + CoreUtils.hsIdToString(getHSId())
             + " handling repair log request id " + req.getRequestId()
             + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ");

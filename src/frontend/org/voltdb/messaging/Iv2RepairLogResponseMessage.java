@@ -45,7 +45,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     // The original task that is must be replicated for
     // repair. Note: if the destination repair log is
     // empty, a repair log response message is returned
-    // that has sequence = 0; ofTotal = 0 and a null
+    // that has sequence = 0; ofTotal = 1 and a null
     // payload (because the requester must know that the
     // log request was processed and that no logs exist.)
     private VoltMessage m_payload = null;

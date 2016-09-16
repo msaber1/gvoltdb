@@ -399,7 +399,7 @@ public class LeaderAppointer implements Promotable
 
                 //Skip processing the partition if it was cleaned up by a babysitter that was previously
                 //instantiated
-            	int partId = master.getKey();
+                int partId = master.getKey();
                 if (m_removedPartitionsAtPromotionTime.contains(partId)) {
                     tmLog.info("During promotion partition " + master.getKey() + " was cleaned up. Skipping.");
                     continue;

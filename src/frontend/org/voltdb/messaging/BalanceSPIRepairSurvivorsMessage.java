@@ -25,46 +25,26 @@ import org.voltcore.messaging.VoltMessage;
 /**
  * Sent from SPIs to one replica when @BalanceSPI is called.
  */
-public class BalanceSPIMessage extends VoltMessage {
-    protected int m_partitionId;
-    protected long m_newLeaderHSId;
+public class BalanceSPIRepairSurvivorsMessage extends VoltMessage {
 
-    public BalanceSPIMessage() {}
-
-    public BalanceSPIMessage(int pid, long hsid) {
-        m_partitionId = pid;
-        m_newLeaderHSId = hsid;
-    }
-
-    public int getParititionId() {
-        return m_partitionId;
-    }
-
-    public long getNewLeaderHSId() {
-        return m_newLeaderHSId;
-    }
-
+    public BalanceSPIRepairSurvivorsMessage() {}
 
     @Override
     public int getSerializedSize()
     {
-        return super.getSerializedSize() + 4 + 8;
+        return super.getSerializedSize();
     }
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException
     {
-        m_partitionId = buf.getInt();
-        m_newLeaderHSId = buf.getLong();
         assert(buf.capacity() == buf.position());
     }
 
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-        buf.put(VoltDbMessageFactory.BalanceSPI_ID);
-        buf.putInt(m_partitionId);
-        buf.putLong(m_newLeaderHSId);
+        buf.put(VoltDbMessageFactory.BalanceSPI_REPAIR_SURVIVORS_ID);
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }

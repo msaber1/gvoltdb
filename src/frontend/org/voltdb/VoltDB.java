@@ -930,11 +930,11 @@ public class VoltDB {
      * human readable stack traces for all java threads in the current process.
      */
     public static void dropStackTrace(String message) {
-//        if (VoltDB.isThisATest()) {
-//            VoltLogger log = new VoltLogger("HOST");
-//            log.warn("Declining to drop a stack trace during a junit test.");
-//            return;
-//        }
+        if (VoltDB.isThisATest()) {
+            VoltLogger log = new VoltLogger("HOST");
+            log.warn("Declining to drop a stack trace during a junit test.");
+            return;
+        }
         SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd-HH:mm:ss.SSSZ");
         String dateString = sdf.format(new Date());
         CatalogContext catalogContext = VoltDB.instance().getCatalogContext();

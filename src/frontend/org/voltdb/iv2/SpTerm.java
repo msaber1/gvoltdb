@@ -54,7 +54,7 @@ public class SpTerm implements Term
         {
             // remove the leader; convert to hsids; deal with the replica change.
             List<Long> replicas = VoltZK.childrenToReplicaHSIds(children);
-            tmLog.debug(m_whoami
+            tmLog.warn(m_whoami
                       + "replica change handler updating replica list to: "
                       + CoreUtils.hsIdCollectionToString(replicas));
 

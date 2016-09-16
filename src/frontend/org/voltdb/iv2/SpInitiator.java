@@ -17,6 +17,9 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Map.Entry;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
@@ -42,6 +45,7 @@ import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
+import org.voltdb.messaging.BalanceSPIRepairSurvivorsMessage;
 
 import com.google_voltpatches.common.collect.ImmutableMap;
 
@@ -54,6 +58,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
 {
     final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
+    private boolean m_isBalanceSPIPromoted = false;
     private final TickProducer m_tickProducer;
 
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
@@ -61,12 +66,27 @@ public class SpInitiator extends BaseInitiator implements Promotable
         @Override
         public void run(ImmutableMap<Integer, Long> cache, ImmutableMap<Integer, Boolean> state)
         {
-        	VoltLogger log = new VoltLogger("SpInitiator");
+            VoltLogger log = new VoltLogger("SpInitiator");
+            if (cache != null) {
+                log.error("[SpInitiator] cache keys: " + Arrays.toString(cache.keySet().toArray()));
+                log.error("[SpInitiator] cache values: " + Arrays.toString(cache.values().toArray()));
+            }
+            if (state != null) {
+                log.error("[SpInitiator] state keys: " + Arrays.toString(state.keySet().toArray()));
+                log.error("[SpInitiator] state values: " + Arrays.toString(state.values().toArray()));
+            }
+
             for (Entry<Integer, Long> entry: cache.entrySet()) {
                 Integer partitionId = entry.getKey();
                 Long HSId = entry.getValue();
                 if (HSId != getInitiatorHSId()) {
                     continue;
+                }
+
+                if (state != null && state.containsKey(partitionId) && state.get(partitionId)) {
+                    m_isBalanceSPIPromoted = true;
+                } else {
+                    m_isBalanceSPIPromoted = false;
                 }
 
                 if (!m_promoted) {
@@ -140,7 +160,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     public void acceptPromotion()
     {
         try {
-            tmLog.error("SpInitiator running with acceptPromotion...");
+            tmLog.error("[SpInitiator:acceptPromotion()]...");
 
             long startTime = System.currentTimeMillis();
             Boolean success = false;
@@ -178,6 +198,16 @@ public class SpInitiator extends BaseInitiator implements Promotable
                     tmLog.info(m_whoami
                              + "finished leader promotion. Took "
                              + (System.currentTimeMillis() - startTime) + " ms.");
+                    if (m_isBalanceSPIPromoted) {
+                        List<Long> survivors = new ArrayList<Long>(m_term.getInterestingHSIds().get());
+                        survivors.remove(m_initiatorMailbox.getHSId());
+
+                        tmLog.error("[m_initiatorMailbox:AcceptPromotion] repair survivors to change original leader state:" +
+                                Arrays.toString(survivors.toArray()));
+
+                        BalanceSPIRepairSurvivorsMessage msg = new BalanceSPIRepairSurvivorsMessage();
+                        m_initiatorMailbox.send(com.google_voltpatches.common.primitives.Longs.toArray(survivors), msg);
+                    }
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
