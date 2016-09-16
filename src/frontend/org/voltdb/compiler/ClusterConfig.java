@@ -612,6 +612,19 @@ public class ClusterConfig
         return topo;
     }
 
+    void checkConfiguration(Map<Integer, String> buddyGroups, int optimalBuddyGroups, boolean override) {
+        int userSepcifiedBuddyGroups = (int)buddyGroups.values().stream().distinct().count();
+        if (userSepcifiedBuddyGroups == 1 && !override) {
+            hostLog.warn("This cluster has only 1 buddy group. Putting all nodes into the same buddy "
+                    + "group will not increase cluster availability.");
+        }
+
+        if (userSepcifiedBuddyGroups > 1 && userSepcifiedBuddyGroups < optimalBuddyGroups) {
+            hostLog.warn("The number of buddy group is less than optimal number (" + optimalBuddyGroups
+                    + "), higher cluster availability can be achieved by increasing buddy group counts.");
+        }
+    }
+
     JSONObject buddyPlacementStrategy(
             Map<Integer, ExtensibleGroupTag> hostGroups,
             Multimap<Integer, Long> partitionReplicas,
@@ -620,96 +633,117 @@ public class ClusterConfig
             int partitionCount,
             int sitesPerHost) throws JSONException {
         Map<Integer, String> buddyGroups = Maps.newHashMap();
-
         for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
             buddyGroups.put(e.getKey(), e.getValue().m_buddyGroup);
         }
-//        Multimap<String, Integer> hostIdToBuddyGroups = HashMultimap.create();
-//        for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
-//            hostIdToBuddyGroups.put(e.getValue().m_buddyGroup, e.getKey());
-//        }
+        boolean allDefault = buddyGroups.values().stream().allMatch(n -> n.equalsIgnoreCase("0"));
+        int optimalBuddyGroups = hostCount / (m_replicationFactor + 1);
+
+        // Print warning to non-optimal configurations
+        checkConfiguration(buddyGroups, optimalBuddyGroups, allDefault);
 
         Map<String, Set<Integer>> buddyGroupToHostIds = Maps.newHashMap();
-        for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
-            if (!buddyGroupToHostIds.containsKey(e.getValue().m_buddyGroup)) {
-                buddyGroupToHostIds.put(e.getValue().m_buddyGroup, Sets.newTreeSet());
+        List<String> groups = Lists.newArrayList();
+        if (allDefault) {
+            // Override with optimal buddy grouping
+            for (int groupId = 0; groupId < optimalBuddyGroups; groupId++) {
+                groups.add("buddy" + groupId);
             }
-            Set<Integer> hostIds = buddyGroupToHostIds.get(e.getValue().m_buddyGroup);
-            hostIds.add(e.getKey());
+            Iterator<String> iter = groups.iterator();
+            for (int hostId = 0; hostId < hostCount; hostId++) {
+                if (!iter.hasNext()) {
+                    iter = groups.iterator();
+                }
+                String groupTag = iter.next();
+                if (!buddyGroupToHostIds.containsKey(groupTag)) {
+                    buddyGroupToHostIds.put(groupTag, Sets.newTreeSet());
+                }
+                Set<Integer> hostIds = buddyGroupToHostIds.get(groupTag);
+                hostIds.add(hostId);
+            }
+        } else {
+            for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
+                groups.add(e.getValue().m_buddyGroup);
+                if (!buddyGroupToHostIds.containsKey(e.getValue().m_buddyGroup)) {
+                    buddyGroupToHostIds.put(e.getValue().m_buddyGroup, Sets.newTreeSet());
+                }
+                Set<Integer> hostIds = buddyGroupToHostIds.get(e.getValue().m_buddyGroup);
+                hostIds.add(e.getKey());
+            }
         }
-        String[] groups = buddyGroupToHostIds.keySet().toArray(new String[0]);
+
+        // Additional minimum node number check
+        boolean nodesRequirement = buddyGroupToHostIds.values().stream().anyMatch(n -> n.size() < (m_replicationFactor + 1));
+        if (nodesRequirement) {
+            throw new RuntimeException("Current grouping cannot meet the minimum buddy nodes requirement."
+                    + " Try to reduce the number of buddy groups.");
+        }
 
         int numOfBuddyGroup = buddyGroupToHostIds.keySet().size();
-        if (numOfBuddyGroup > 1) {
-            // buddy groups is more than one
 
-            // do some validation here
-            // a) nodes in one buddy group can't all belong to the same RA group, if RA groups is more than one.
-            // b) so buddy groups and RA groups must have intersections, if both of them are more than one.
-            //    Inside each intersection, the sites each intersection contains must be more than the number
-            //    of partitions that assigns to this buddy group, otherwise there is no way to guarantee
-            //    whole cluster can survive a rack-level failure. (If the sites each intersection contains is
-            //    less than the assigned partition for involved buddy group, think about it, if the rack where
-            //    the intersection set resides survives, involved buddy group will not have enough partitions.
-            // c) the idea behind buddy group is to divide a cluster into N buddy groups, each group has its
-            //    own set of non-overlapping partitions, so if this is a K-safety cluster (K = x e.g.), each
-            //    buddy group can tolerate up to x node(s) failure, compare to the original placement algorithm
-            //    that whole cluster can tolerate up to x node(s) failure.
+        // do some validation here
+        // a) nodes in one buddy group can't all belong to the same RA group, if RA groups is more than one.
+        // b) so buddy groups and RA groups must have intersections, if both of them are more than one.
+        //    Inside each intersection, the sites each intersection contains must be more than the number
+        //    of partitions that assigns to this buddy group, otherwise there is no way to guarantee
+        //    whole cluster can survive a rack-level failure. (If the sites each intersection contains is
+        //    less than the assigned partition for involved buddy group, think about it, if the rack where
+        //    the intersection set resides survives, involved buddy group will not have enough partitions.
+        // c) the idea behind buddy group is to divide a cluster into N buddy groups, each group has its
+        //    own set of non-overlapping partitions, so if this is a K-safety cluster (K = x e.g.), each
+        //    buddy group can tolerate up to x node(s) failure, compare to the original placement algorithm
+        //    that whole cluster can tolerate up to x node(s) failure.
 
-            // let's first write the case that only buddy groups exists.
+        // let's first write the case that only buddy groups exists.
 
-            // Make sure each buddy group can tolerate up to K+1 nodes loss.
-            if (hostCount / numOfBuddyGroup < m_replicationFactor + 1 ) {
-                throw new RuntimeException("Current grouping cannot meet the minimum buddy nodes requirement."
-                        + " Try to reduce the number of buddy groups.");
+        // Make sure each buddy group can tolerate up to K+1 nodes loss.
+        if (hostCount / numOfBuddyGroup < m_replicationFactor + 1 ) {
+            throw new RuntimeException("Current grouping cannot meet the minimum buddy nodes requirement."
+                    + " Try to reduce the number of buddy groups.");
+        }
+        // assign partitions per buddy group
+        List<Partition> allPartitions = new ArrayList<Partition>();
+        int start = 0;
+        for (String tag : groups) {
+            int total = hostGroups.keySet().size();
+            int groupNodes = buddyGroupToHostIds.get(tag).size();
+            List<Partition> partitions = new ArrayList<Partition>();
+            int end = start + (partitionCount * groupNodes) / total;
+            for (int counter = start; counter < end; counter++) {
+                partitions.add(new Partition(counter, getReplicationFactor() + 1));
             }
-            // assign partitions per buddy group
-            List<Partition> allPartitions = new ArrayList<Partition>();
-            int start = 0;
-            for (int ii = 0; ii < numOfBuddyGroup; ii++) {
-                int total = hostGroups.keySet().size();
-                int groupNodes = buddyGroupToHostIds.get(groups[ii]).size();
-                List<Partition> partitions = new ArrayList<Partition>();
-                int end = start + (partitionCount * groupNodes) / total;
-                for (int counter = start; counter < end; counter++) {
-                    partitions.add(new Partition(counter, getReplicationFactor() + 1));
-                }
-                allPartitions.addAll(partitions);
-                Map<Integer, ExtensibleGroupTag> buddyHosts = Maps.newHashMap();
-                for (Integer hostId : buddyGroupToHostIds.get(groups[ii])) {
-                    buddyHosts.put(hostId, new ExtensibleGroupTag("0", groups[ii]));
-                }
-                groupAwarePlacementStrategy(buddyHosts, partitionReplicas, partitionMasters, partitions, sitesPerHost);
-                start = end;
+            allPartitions.addAll(partitions);
+            Map<Integer, ExtensibleGroupTag> buddyHosts = Maps.newHashMap();
+            for (Integer hostId : buddyGroupToHostIds.get(tag)) {
+                buddyHosts.put(hostId, new ExtensibleGroupTag("0", tag));
             }
-
-            JSONStringer stringer = new JSONStringer();
-            stringer.object();
-            stringer.key("hostcount").value(m_hostCount);
-            stringer.key("kfactor").value(getReplicationFactor());
-            stringer.key("sites_per_host").value(sitesPerHost);
-            stringer.key("partitions").array();
-            for (Partition p : allPartitions)
-            {
-                stringer.object();
-                stringer.key("partition_id").value(p.m_partitionId);
-                stringer.key("master").value(p.m_master.m_hostId);
-                stringer.key("replicas").array();
-                for (Node n : p.m_replicas) {
-                    stringer.value(n.m_hostId);
-                }
-                stringer.value(p.m_master.m_hostId);
-                stringer.endArray();
-                stringer.endObject();
-            }
-            stringer.endArray();
-            stringer.endObject();
-
-            return new JSONObject(stringer.toString());
+            groupAwarePlacementStrategy(buddyHosts, partitionReplicas, partitionMasters, partitions, sitesPerHost);
+            start = end;
         }
 
+        JSONStringer stringer = new JSONStringer();
+        stringer.object();
+        stringer.key("hostcount").value(m_hostCount);
+        stringer.key("kfactor").value(getReplicationFactor());
+        stringer.key("sites_per_host").value(sitesPerHost);
+        stringer.key("partitions").array();
+        for (Partition p : allPartitions)
+        {
+            stringer.object();
+            stringer.key("partition_id").value(p.m_partitionId);
+            stringer.key("master").value(p.m_master.m_hostId);
+            stringer.key("replicas").array();
+            for (Node n : p.m_replicas) {
+                stringer.value(n.m_hostId);
+            }
+            stringer.value(p.m_master.m_hostId);
+            stringer.endArray();
+            stringer.endObject();
+        }
+        stringer.endArray();
+        stringer.endObject();
 
-        return null;
+        return new JSONObject(stringer.toString());
     }
 
     // Distribute mastership of given partitions by round-robining across given nodes.
