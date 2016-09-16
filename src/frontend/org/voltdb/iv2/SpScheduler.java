@@ -448,11 +448,18 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
             tmLog.warn("Get @BalanceSPI invocation...");
 
             final Object[] params = message.getParameters();
-            int pid = Math.toIntExact((long)(params[1]));
-            long newLeaderHSId = (long)(params[2]);
+            try {
+                int pid = Integer.parseInt(params[1].toString());
+                int hostId = Integer.parseInt(params[2].toString());
+                int siteId = Integer.parseInt(params[3].toString());
+                long newLeaderHSId = CoreUtils.getHSIdFromHostAndSite(hostId, siteId);
 
-            BalanceSPIMessage balanceSpiMsg = new BalanceSPIMessage(pid, newLeaderHSId);
-            m_mailbox.send(newLeaderHSId, balanceSpiMsg);
+                BalanceSPIMessage balanceSpiMsg = new BalanceSPIMessage(pid, newLeaderHSId);
+                m_mailbox.send(newLeaderHSId, balanceSpiMsg);
+            } catch(NumberFormatException e) {
+                tmLog.error(e.getMessage());
+                throw e;
+            }
         }
 
         Iv2InitiateTaskMessage msg = message;

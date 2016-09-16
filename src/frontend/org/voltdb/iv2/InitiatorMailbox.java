@@ -331,8 +331,7 @@ public class InitiatorMailbox implements Mailbox
                 } catch (InterruptedException e) {
                 }
             }
-
-            tmLog.error(VoltZK.debugLeadersInfo(zk));
+            tmLog.warn(VoltZK.debugLeadersInfo(zk));
 
             return;
         }
