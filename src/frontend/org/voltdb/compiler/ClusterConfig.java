@@ -510,19 +510,6 @@ public class ClusterConfig
         }
 
         /**
-         * Get top level group
-         *
-         * @return the name of top level group
-         */
-//        public String topLevel() {
-//            if (m_root.m_children.isEmpty()) {
-//                return null;
-//            } else {
-//                return m_root.m_children.keySet();
-//            }
-//        }
-
-        /**
          * Parse the group into components. A group is represented by dot
          * seperated subgroups. A subgroup is just a string. For example,
          * "rack1.server1" is a valid group with two subgroups, "192.168.0.1" is
@@ -625,17 +612,13 @@ public class ClusterConfig
         }
     }
 
-    JSONObject buddyPlacementStrategy(
-            Map<Integer, ExtensibleGroupTag> hostGroups,
+    JSONObject buddyPlacement(
+            Map<Integer, String> buddyGroups,
             Multimap<Integer, Long> partitionReplicas,
             Map<Integer, Long> partitionMasters,
             int hostCount,
             int partitionCount,
             int sitesPerHost) throws JSONException {
-        Map<Integer, String> buddyGroups = Maps.newHashMap();
-        for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
-            buddyGroups.put(e.getKey(), e.getValue().m_buddyGroup);
-        }
         boolean allDefault = buddyGroups.values().stream().allMatch(n -> n.equalsIgnoreCase("0"));
         int optimalBuddyGroups = hostCount / (m_replicationFactor + 1);
 
@@ -662,50 +645,30 @@ public class ClusterConfig
                 hostIds.add(hostId);
             }
         } else {
-            for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
-                groups.add(e.getValue().m_buddyGroup);
-                if (!buddyGroupToHostIds.containsKey(e.getValue().m_buddyGroup)) {
-                    buddyGroupToHostIds.put(e.getValue().m_buddyGroup, Sets.newTreeSet());
+            for (Map.Entry<Integer, String> e : buddyGroups.entrySet()) {
+                groups.add(e.getValue());
+                if (!buddyGroupToHostIds.containsKey(e.getValue())) {
+                    buddyGroupToHostIds.put(e.getValue(), Sets.newTreeSet());
                 }
-                Set<Integer> hostIds = buddyGroupToHostIds.get(e.getValue().m_buddyGroup);
+                Set<Integer> hostIds = buddyGroupToHostIds.get(e.getValue());
                 hostIds.add(e.getKey());
             }
         }
 
-        // Additional minimum node number check
-        boolean nodesRequirement = buddyGroupToHostIds.values().stream().anyMatch(n -> n.size() < (m_replicationFactor + 1));
-        if (nodesRequirement) {
-            throw new RuntimeException("Current grouping cannot meet the minimum buddy nodes requirement."
+        // Additional minimum nodes check
+        boolean meetNodesRequirement = buddyGroupToHostIds.values().stream().allMatch(
+                n -> n.size() >= (m_replicationFactor + 1)
+                );
+        if (!meetNodesRequirement && !allDefault) {
+            hostLog.warn("Current grouping cannot meet the minimum buddy nodes requirement."
                     + " Try to reduce the number of buddy groups.");
         }
 
-        int numOfBuddyGroup = buddyGroupToHostIds.keySet().size();
-
-        // do some validation here
-        // a) nodes in one buddy group can't all belong to the same RA group, if RA groups is more than one.
-        // b) so buddy groups and RA groups must have intersections, if both of them are more than one.
-        //    Inside each intersection, the sites each intersection contains must be more than the number
-        //    of partitions that assigns to this buddy group, otherwise there is no way to guarantee
-        //    whole cluster can survive a rack-level failure. (If the sites each intersection contains is
-        //    less than the assigned partition for involved buddy group, think about it, if the rack where
-        //    the intersection set resides survives, involved buddy group will not have enough partitions.
-        // c) the idea behind buddy group is to divide a cluster into N buddy groups, each group has its
-        //    own set of non-overlapping partitions, so if this is a K-safety cluster (K = x e.g.), each
-        //    buddy group can tolerate up to x node(s) failure, compare to the original placement algorithm
-        //    that whole cluster can tolerate up to x node(s) failure.
-
-        // let's first write the case that only buddy groups exists.
-
-        // Make sure each buddy group can tolerate up to K+1 nodes loss.
-        if (hostCount / numOfBuddyGroup < m_replicationFactor + 1 ) {
-            throw new RuntimeException("Current grouping cannot meet the minimum buddy nodes requirement."
-                    + " Try to reduce the number of buddy groups.");
-        }
         // assign partitions per buddy group
         List<Partition> allPartitions = new ArrayList<Partition>();
         int start = 0;
         for (String tag : groups) {
-            int total = hostGroups.keySet().size();
+            int total = buddyGroups.keySet().size();
             int groupNodes = buddyGroupToHostIds.get(tag).size();
             List<Partition> partitions = new ArrayList<Partition>();
             int end = start + (partitionCount * groupNodes) / total;
@@ -713,11 +676,11 @@ public class ClusterConfig
                 partitions.add(new Partition(counter, getReplicationFactor() + 1));
             }
             allPartitions.addAll(partitions);
-            Map<Integer, ExtensibleGroupTag> buddyHosts = Maps.newHashMap();
+            Map<Integer, String> subGroup = Maps.newHashMap();
             for (Integer hostId : buddyGroupToHostIds.get(tag)) {
-                buddyHosts.put(hostId, new ExtensibleGroupTag("0", tag));
+                subGroup.put(hostId, "0");
             }
-            groupAwarePlacementStrategy(buddyHosts, partitionReplicas, partitionMasters, partitions, sitesPerHost);
+            rackAwarePlacement(subGroup, partitionReplicas, partitionMasters, partitions, sitesPerHost);
             start = end;
         }
 
@@ -762,25 +725,6 @@ public class ClusterConfig
         }
     }
 
-    public static void main(String[] args) {
-        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
-        hostGroups.put(0, new ExtensibleGroupTag("0.0", "0"));
-        hostGroups.put(1, new ExtensibleGroupTag("0.0", "0"));
-        hostGroups.put(2, new ExtensibleGroupTag("0.1", "0"));
-        hostGroups.put(3, new ExtensibleGroupTag("0.1", "0"));
-        hostGroups.put(4, new ExtensibleGroupTag("1.0", "0"));
-        hostGroups.put(5, new ExtensibleGroupTag("1.0", "0"));
-        hostGroups.put(6, new ExtensibleGroupTag("1.1", "0"));
-        hostGroups.put(7, new ExtensibleGroupTag("1.1", "0"));
-
-        Map<Integer, String> RAGroups = Maps.newHashMap();
-        for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
-            RAGroups.put(e.getKey(), e.getValue().m_rackAwarenessGroup);
-        }
-        final PhysicalTopology phys = new PhysicalTopology(RAGroups);
-        phys.getAllHosts(new String[]{"0"});
-    }
-
     /**
      * Placement strategy that attempts to distribute replicas across different
      * groups and also involve multiple nodes in replication so that the socket
@@ -790,17 +734,13 @@ public class ClusterConfig
      * 1. Partition master assignment,
      * 2. Group partition replica assignment.
      */
-    JSONObject groupAwarePlacementStrategy(
-            Map<Integer, ExtensibleGroupTag> hostGroups,
+    JSONObject rackAwarePlacement(
+            Map<Integer, String> rackAwareGroups,
             Multimap<Integer, Long> partitionReplicas,
             Map<Integer, Long> partitionMasters,
             List<Partition> partitions,
             int sitesPerHost) throws JSONException {
-        Map<Integer, String> RAGroups = Maps.newHashMap();
-        for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
-            RAGroups.put(e.getKey(), e.getValue().m_rackAwarenessGroup);
-        }
-        final PhysicalTopology phys = new PhysicalTopology(RAGroups);
+        final PhysicalTopology phys = new PhysicalTopology(rackAwareGroups);
         final List<Node> allNodes = MiscUtils.zip(phys.getAllHosts(new String[]{null}));
         final Map<Integer, Node> hostIdToNode = toHostIdNodeMap(allNodes);
 
@@ -1054,6 +994,62 @@ public class ClusterConfig
         return result;
     }
 
+    /**
+     * There are two group aware placement algorithms to choose,
+     * Rack-Aware : round-robining master partitions and placing their replicas to racks other than
+     *              the rack where master resides as far as possible.
+     *              (distance is defined as length between two nodes in the rack group tree hierarchy)
+     *              If this layout is possible, then we may lose up to K(factor) racks without crashing
+     *              the cluster.
+     * Buddy Group: divides cluster into N buddies ( N = hostCount / (K + 1) ), each buddy contains
+     *              a subset of master partitions and their replicas. Each buddy can lose up to K(factor)
+     *              node(s) without crashing the cluster.
+     *              When N = 1, it generates the same layout as rack-aware algorithm with only 1 rack.
+     *
+     * Choose buddy group algorithm if rack-aware groups not being specified, otherwise use rack-aware algorithm.
+     * In case of both of the algorithms not work, always fall back to the original placement strategy.
+     */
+    JSONObject groupAwarePlacementStrategy(
+            Map<Integer, ExtensibleGroupTag> hostGroups,
+            Multimap<Integer, Long> partitionReplicas,
+            Map<Integer, Long> partitionMasters,
+            int hostCount,
+            int partitionCount,
+            int sitesPerHost ) throws JSONException {
+        JSONObject topo;
+        Map<Integer, String> rackAwareGroups = Maps.newHashMap();
+        for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
+            rackAwareGroups.put(e.getKey(), e.getValue().m_rackAwarenessGroup);
+        }
+        boolean useBuddyGrouping = rackAwareGroups.values().stream().allMatch(n -> n.equalsIgnoreCase("0"));
+        try {
+            // use buddy grouping as the default strategy as possible
+            if (useBuddyGrouping) {
+                Map<Integer, String> buddyGroups = Maps.newHashMap();
+                for (Map.Entry<Integer, ExtensibleGroupTag> e : hostGroups.entrySet()) {
+                    buddyGroups.put(e.getKey(), e.getValue().m_buddyGroup);
+                }
+                topo = buddyPlacement(buddyGroups, partitionReplicas, partitionMasters,
+                        hostCount, partitionCount, sitesPerHost);
+            } else {
+                List<Partition> partitions = new ArrayList<Partition>();
+                for (int ii = 0; ii < partitionCount; ii++) {
+                    partitions.add(new Partition(ii, getReplicationFactor() + 1));
+                }
+                topo = rackAwarePlacement(rackAwareGroups, partitionReplicas,
+                        partitionMasters, partitions, sitesPerHost);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            hostLog.error("Unable to use optimal replica placement strategy. " +
+                    "Falling back to a less optimal strategy that may result in worse performance. " +
+                    "Original error was " + e.getMessage());
+            topo = fallbackPlacementStrategy(Lists.newArrayList(hostGroups.keySet()),
+                    hostCount, partitionCount, sitesPerHost);
+        }
+        return topo;
+    }
+
     // Statically build a topology. This only runs at startup;
     // rejoin clones this from an existing server.
     public JSONObject getTopology(Map<Integer, ExtensibleGroupTag> hostGroups,
@@ -1073,25 +1069,8 @@ public class ClusterConfig
             topo = fallbackPlacementStrategy(Lists.newArrayList(hostGroups.keySet()),
                                              hostCount, partitionCount, sitesPerHost);
         } else {
-            try {
-                topo = buddyPlacementStrategy(hostGroups, partitionReplicas, partitionMasters,
-                        hostCount, partitionCount, sitesPerHost);
-            } catch (Exception e) {
-                try {
-                    List<Partition> partitions = new ArrayList<Partition>();
-                    for (int ii = 0; ii < partitionCount; ii++) {
-                        partitions.add(new Partition(ii, getReplicationFactor() + 1));
-                    }
-                    topo = groupAwarePlacementStrategy(hostGroups, partitionReplicas, partitionMasters, partitions, sitesPerHost);
-                } catch (Exception t) {
-                    t.printStackTrace();
-                    hostLog.error("Unable to use optimal replica placement strategy. " +
-                            "Falling back to a less optimal strategy that may result in worse performance. " +
-                            "Original error was " + t.getMessage());
-                    topo = fallbackPlacementStrategy(Lists.newArrayList(hostGroups.keySet()),
-                            hostCount, partitionCount, sitesPerHost);
-                }
-            }
+            topo = groupAwarePlacementStrategy(hostGroups, partitionReplicas,
+                    partitionMasters, hostCount, partitionCount, sitesPerHost);
         }
 
         if (hostLog.isDebugEnabled()) {
