@@ -88,6 +88,7 @@ import com.google_voltpatches.common.base.Throwables;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.util.concurrent.ListenableFuture;
 import com.google_voltpatches.common.util.concurrent.ListenableFutureTask;
+import org.voltdb.utils.VoltTrace;
 
 public final class InvocationDispatcher {
 
@@ -265,7 +266,15 @@ public final class InvocationDispatcher {
                 // Deserialize the client's request and map to a catalog stored procedure
         final CatalogContext catalogContext = m_catalogContext.get();
 
-        Procedure catProc = getProcedureFromName(task.procName, catalogContext);
+        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
+        VoltTrace.add(() -> VoltTrace.meta("process_name", "name", CoreUtils.getHostnameOrAddress()));
+        VoltTrace.add(() -> VoltTrace.meta("thread_name", "name", threadName));
+        VoltTrace.add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(1)));
+        VoltTrace.add(() -> VoltTrace.beginAsync("recvtxn", VoltTrace.Category.CI, task.getClientHandle(),
+                                                 "name", task.getProcName(),
+                                                 "clientHandle", Long.toString(task.getClientHandle())));
+
+        Procedure catProc = getProcedureFromName(task.getProcName(), catalogContext);
 
         if (catProc == null) {
             String errorMessage = "Procedure " + task.procName + " was not found";
@@ -432,8 +441,8 @@ public final class InvocationDispatcher {
         // admin port, otherwise return a failure
         if (("@Pause".equals(task.procName) || "@Resume".equals(task.procName)) && !handler.isAdmin()) {
             return unexpectedFailureResponse(
-                    task.procName + " is not available to this client",
-                    task.clientHandle);
+            task.procName + " is not available to this client",
+            task.clientHandle);
         }
 
         int partition = -1;
@@ -1100,6 +1109,10 @@ public final class InvocationDispatcher {
     private final void dispatchAdHocCommon(StoredProcedureInvocation task,
             InvocationClientHandler handler, Connection ccxn, ExplainMode explainMode,
             String sql, Object[] userParams, Object[] userPartitionKey, AuthSystem.AuthUser user) {
+        VoltTrace.add(() -> VoltTrace.beginAsync("planadhoc", VoltTrace.Category.CI, task.getClientHandle(),
+                                                 "clientHandle", Long.toString(task.getClientHandle()),
+                                                 "sql", sql));
+
         List<String> sqlStatements = SQLLexer.splitStatements(sql);
         String[] stmtsArray = sqlStatements.toArray(new String[sqlStatements.size()]);
 
@@ -1138,6 +1151,9 @@ public final class InvocationDispatcher {
                     if (result instanceof AdHocPlannedStmtBatch) {
                         final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
                         ExplainMode explainMode = plannedStmtBatch.getExplainMode();
+
+                        VoltTrace.add(() -> VoltTrace.endAsync("planadhoc", VoltTrace.Category.CI,
+                                                               plannedStmtBatch.clientHandle));
 
                         // assume all stmts have the same catalog version
                         if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
@@ -1576,6 +1592,14 @@ public final class InvocationDispatcher {
                     handle,
                     connectionId,
                     isForReplay);
+
+        Long finalInitiatorHSId = initiatorHSId;
+        VoltTrace.add(() -> VoltTrace.instantAsync("inittxn", VoltTrace.Category.CI,
+                                                   invocation.getClientHandle(),
+                                                   "clientHandle", Long.toString(invocation.getClientHandle()),
+                                                   "ciHandle", Long.toString(handle),
+                                                   "partition", Integer.toString(partition),
+                                                   "dest", CoreUtils.hsIdToString(finalInitiatorHSId)));
 
         Iv2Trace.logCreateTransaction(workRequest);
         m_mailbox.send(initiatorHSId, workRequest);

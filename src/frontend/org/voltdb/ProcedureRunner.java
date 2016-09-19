@@ -70,6 +70,7 @@ import com.google_voltpatches.common.base.Charsets;
 public class ProcedureRunner {
 
     private static final VoltLogger log = new VoltLogger("HOST");
+    public static final boolean ENABLE_BATCH_TRACE = Boolean.getBoolean("ENABLE_BATCH_TRACE");
     private static final boolean HOST_TRACE_ENABLED;
     static {
         HOST_TRACE_ENABLED = log.isTraceEnabled();
@@ -1631,7 +1632,8 @@ public class ProcedureRunner {
                    m_txnState.txnId,
                    m_txnState.m_spHandle,
                    m_txnState.uniqueId,
-                   m_isReadOnly);
+                   m_isReadOnly,
+                   ENABLE_BATCH_TRACE);
        } catch (Throwable ex) {
            if (! m_isReadOnly) {
                // roll back the current batch and re-throw the EE exception

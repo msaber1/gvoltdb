@@ -193,32 +193,32 @@ public class TestTwoSitePlans extends TestCase {
         ParameterSet params = ParameterSet.fromArrayNoCopy(1L, 1L, 1L);
 
         VoltTable[] results = ee2.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                1,
-                1,
-                0,
-                42,
-                Long.MAX_VALUE);
+        1,
+        new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
+        null,
+        new ParameterSet[] { params },
+        new String[] { selectStmt.getSqltext() },
+        1,
+        1,
+        0,
+        42,
+        Long.MAX_VALUE, false);
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
 
         params = ParameterSet.fromArrayNoCopy(2L, 2L, 2L);
 
         results = ee1.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { insertStmt.getSqltext() },
-                2,
-                2,
-                1,
-                42,
-                Long.MAX_VALUE);
+        1,
+        new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
+        null,
+        new ParameterSet[] { params },
+        new String[] { insertStmt.getSqltext() },
+        2,
+        2,
+        1,
+        42,
+        Long.MAX_VALUE, false);
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
     }
@@ -228,12 +228,12 @@ public class TestTwoSitePlans extends TestCase {
 
         int outDepId = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         VoltTable dependency1 = ee1.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE)[0];
+        1,
+        new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+        null,
+        new ParameterSet[] { params },
+        new String[] { selectStmt.getSqltext() },
+        3, 3, 2, 42, Long.MAX_VALUE, false)[0];
         try {
             System.out.println(dependency1.toString());
         } catch (Exception e) {
@@ -242,12 +242,12 @@ public class TestTwoSitePlans extends TestCase {
         assertTrue(dependency1 != null);
 
         VoltTable dependency2 = ee2.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE)[0];
+        1,
+        new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+        null,
+        new ParameterSet[] { params },
+        new String[] { selectStmt.getSqltext() },
+        3, 3, 2, 42, Long.MAX_VALUE, false)[0];
         try {
             System.out.println(dependency2.toString());
         } catch (Exception e) {
@@ -259,12 +259,12 @@ public class TestTwoSitePlans extends TestCase {
         ee1.stashDependency(outDepId, dependency2);
 
         dependency1 = ee1.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectTopFrag) },
-                new long[] { outDepId },
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE)[0];
+        1,
+        new long[] { CatalogUtil.getUniqueIdForFragment(selectTopFrag) },
+        new long[] { outDepId },
+        new ParameterSet[] { params },
+        new String[] { selectStmt.getSqltext() },
+        3, 3, 2, 42, Long.MAX_VALUE, false)[0];
         try {
             System.out.println("Final Result");
             System.out.println(dependency1.toString());

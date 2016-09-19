@@ -248,6 +248,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     /**
      * @param undoToken Token identifying undo quantum for generated undo info
+     * @param traceOn
      */
     @Override
     protected VoltTable[] coreExecutePlanFragments(
@@ -259,7 +260,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long spHandle,
             final long lastCommittedSpHandle,
             long uniqueId,
-            final long undoToken) throws EEException
+            final long undoToken,
+            final boolean traceOn) throws EEException
     {
         // plan frag zero is invalid
         assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
@@ -317,7 +319,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     spHandle,
                     lastCommittedSpHandle,
                     uniqueId,
-                    undoToken);
+                    undoToken,
+                    traceOn);
 
         try {
             checkErrorCode(errorCode);

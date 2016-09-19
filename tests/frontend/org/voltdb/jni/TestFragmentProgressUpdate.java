@@ -128,12 +128,12 @@ public class TestFragmentProgressUpdate extends TestCase {
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         m_ee.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
+        1,
+        new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+        null,
+        new ParameterSet[] { params },
+        new String[] { selectStmt.getSqltext() },
+        3, 3, 2, 42, Long.MAX_VALUE, false);
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
         assertEquals(1, m_ee.m_callsFromEE);
@@ -181,12 +181,12 @@ public class TestFragmentProgressUpdate extends TestCase {
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         m_ee.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
+        1,
+        new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+        null,
+        new ParameterSet[] { params },
+        new String[] { selectStmt.getSqltext() },
+        3, 3, 2, 42, Long.MAX_VALUE, false);
 
         // Like many fully successful operations, a single row fetch counts as 2 logical row operations,
         // one for locating the row and one for retrieving it.
@@ -217,12 +217,12 @@ public class TestFragmentProgressUpdate extends TestCase {
                 deleteStmt.getSqltext());
         params = ParameterSet.emptyParameterSet();
         m_ee.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(deleteBottomFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { deleteStmt.getSqltext() },
-                3, 3, 2, 42, WRITE_TOKEN);
+        1,
+        new long[] { CatalogUtil.getUniqueIdForFragment(deleteBottomFrag) },
+        null,
+        new ParameterSet[] { params },
+        new String[] { deleteStmt.getSqltext() },
+        3, 3, 2, 42, WRITE_TOKEN, false);
 
         // populate plan cache
         ActivePlanRepository.clear();
@@ -232,12 +232,12 @@ public class TestFragmentProgressUpdate extends TestCase {
                 selectStmt.getSqltext());
         params = ParameterSet.emptyParameterSet();
         m_ee.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, Long.MAX_VALUE);
+        1,
+        new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+        null,
+        new ParameterSet[] { params },
+        new String[] { selectStmt.getSqltext() },
+        3, 3, 2, 42, Long.MAX_VALUE, false);
         assertTrue(m_ee.m_callsFromEE > 2);
         // here the m_lastTuplesAccessed is just the same as threshold, since we start a new fragment
         assertEquals(longOpthreshold, m_ee.m_lastTuplesAccessed);
@@ -287,12 +287,12 @@ public class TestFragmentProgressUpdate extends TestCase {
         ParameterSet params = ParameterSet.emptyParameterSet();
 
         m_ee.executePlanFragments(
-                1,
-                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
-                null,
-                new ParameterSet[] { params },
-                new String[] { selectStmt.getSqltext() },
-                3, 3, 2, 42, READ_ONLY_TOKEN);
+        1,
+        new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+        null,
+        new ParameterSet[] { params },
+        new String[] { selectStmt.getSqltext() },
+        3, 3, 2, 42, READ_ONLY_TOKEN, false);
 
         // If want to see the stats, please uncomment the following line.
         // It is '8 393216 262144' on my machine.
@@ -464,13 +464,13 @@ public class TestFragmentProgressUpdate extends TestCase {
             }
 
             m_ee.executePlanFragments(
-                    numFragsToExecute,
-                    fragIds,
-                    null,
-                    paramSets,
-                    sqlTexts,
-                    3, 3, 2, 42,
-                    readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN);
+            numFragsToExecute,
+            fragIds,
+            null,
+            paramSets,
+            sqlTexts,
+            3, 3, 2, 42,
+            readOnly ? READ_ONLY_TOKEN : WRITE_TOKEN, false);
             if (readOnly && timeout > 0) {
                 // only time out read queries
                 fail();

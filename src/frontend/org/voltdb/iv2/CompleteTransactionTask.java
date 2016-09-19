@@ -29,6 +29,7 @@ import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.rejoin.TaskLog;
+import org.voltdb.utils.VoltTrace;
 
 public class CompleteTransactionTask extends TransactionTask
 {
@@ -52,6 +53,10 @@ public class CompleteTransactionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
+        VoltTrace.add(() -> VoltTrace.beginDuration("execcompletetxn", VoltTrace.Category.SPSITE,
+                                                    "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                                    "partition", Integer.toString(siteConnection.getCorrespondingPartitionId())));
+
         if (!m_txnState.isReadOnly()) {
             // the truncation point token SHOULD be part of m_txn. However, the
             // legacy interaces don't work this way and IV2 hasn't changed this
@@ -78,6 +83,8 @@ public class CompleteTransactionTask extends TransactionTask
             m_txnState.setBeginUndoToken(Site.kInvalidUndoToken);
             hostLog.debug("RESTART: " + this);
         }
+
+        VoltTrace.add(VoltTrace::endDuration);
 
         final CompleteTransactionResponseMessage resp = new CompleteTransactionResponseMessage(m_completeMsg);
         resp.m_sourceHSId = m_initiator.getHSId();

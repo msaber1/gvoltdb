@@ -39,6 +39,8 @@ import org.voltdb.TableStreamType;
 import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.iv2.TxnEgo;
+import org.voltdb.utils.VoltTrace;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
@@ -373,6 +375,17 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
     }
 
+    public void traceLog(boolean isBegin, String name, String args)
+    {
+        if (isBegin) {
+            VoltTrace.add(() -> VoltTrace.beginDuration(name, VoltTrace.Category.EE,
+                                                        "partition", Integer.toString(m_partitionId),
+                                                        "info", args));
+        } else {
+            VoltTrace.add(VoltTrace::endDuration);
+        }
+    }
+
     public long fragmentProgressUpdate(int indexFromFragmentTask,
             int planNodeTypeAsInt,
             long tuplesProcessed,
@@ -564,7 +577,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                             long spHandle,
                                             long lastCommittedSpHandle,
                                             long uniqueId,
-                                            long undoQuantumToken) throws EEException
+                                            long undoQuantumToken,
+                                            boolean traceOn) throws EEException
     {
         try {
             // For now, re-transform undoQuantumToken to readOnly. Redundancy work in site.executePlanFragments()
@@ -575,8 +589,19 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             m_logDuration = INITIAL_LOG_DURATION;
             m_sqlTexts = sqlTexts;
 
+            if (traceOn) {
+                VoltTrace.add(() -> VoltTrace.beginDuration("execplanfragment", VoltTrace.Category.SPSITE,
+                                                            "txnId", TxnEgo.txnIdToString(txnId),
+                                                            "partition", Integer.toString(m_partitionId)));
+            }
+
             VoltTable[] results = coreExecutePlanFragments(numFragmentIds, planFragmentIds, inputDepIds,
-                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken);
+                    parameterSets, txnId, spHandle, lastCommittedSpHandle, uniqueId, undoQuantumToken, traceOn);
+
+            if (traceOn) {
+                VoltTrace.add(VoltTrace::endDuration);
+            }
+
             m_plannerStats.updateEECacheStats(m_eeCacheSize, numFragmentIds - m_cacheMisses,
                     m_cacheMisses, m_partitionId);
             return results;
@@ -599,7 +624,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
                                                             long spHandle,
                                                             long lastCommittedSpHandle,
                                                             long uniqueId,
-                                                            long undoQuantumToken) throws EEException;
+                                                            long undoQuantumToken,
+                                                            boolean traceOn) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
     public abstract VoltTable serializeTable(int tableId) throws EEException;
@@ -849,7 +875,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long spHandle,
             long lastCommittedSpHandle,
             long uniqueId,
-            long undoToken);
+            long undoToken,
+            boolean traceOn);
 
     /**
      * Serialize the result temporary table.

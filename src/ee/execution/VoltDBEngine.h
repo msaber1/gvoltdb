@@ -159,7 +159,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                  int64_t spHandle,
                                  int64_t lastCommittedSpHandle,
                                  int64_t uniqueId,
-                                 int64_t undoToken);
+                                 int64_t undoToken,
+                                 bool traceOn);
 
         int getUsedParamcnt() const { return m_usedParamcnt; }
 
@@ -452,7 +453,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
                                 int64_t lastCommittedSpHandle,
                                 int64_t uniqueId,
                                 bool first,
-                                bool last);
+                                bool last,
+                                bool traceOn);
 
         /**
          * Set up the vector of executors for a given fragment id.

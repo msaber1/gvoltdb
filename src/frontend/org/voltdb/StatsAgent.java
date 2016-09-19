@@ -29,6 +29,7 @@ import org.voltdb.client.ClientResponse;
 import com.google_voltpatches.common.base.Supplier;
 import com.google_voltpatches.common.base.Suppliers;
 import com.google_voltpatches.common.collect.ImmutableMap;
+import org.voltdb.utils.VoltTrace;
 
 /**
  * Agent responsible for collecting stats on this host.
@@ -378,6 +379,17 @@ public class StatsAgent extends OpsAgent
             break;
         case CPU:
             stats = collectStats(StatsSelector.CPU, interval);
+            break;
+        case TRACE:
+            stats = collectStats(StatsSelector.TRACE, false);
+            break;
+        case TRACEON:
+            VoltTrace.startTracer(VoltDB.instance().getVoltDBRootPath(), this);
+            stats = new VoltTable[] {new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.BIGINT))};
+            break;
+        case TRACEOFF:
+            VoltTrace.closeAllAndShutdown(false, 0);
+            stats = new VoltTable[] {new VoltTable(new VoltTable.ColumnInfo("STATUS", VoltType.BIGINT))};
             break;
         case IOSTATS:
             stats = collectStats(StatsSelector.IOSTATS, interval);

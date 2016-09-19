@@ -38,6 +38,7 @@ import org.voltdb.rejoin.TaskLog;
 import org.voltdb.utils.LogKeys;
 
 import com.google_voltpatches.common.collect.Maps;
+import org.voltdb.utils.VoltTrace;
 
 /**
  * Implements the Multi-partition procedure ProcedureTask.
@@ -102,6 +103,12 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        final String threadName = Thread.currentThread().getName(); // Thread name has to be materialized here
+        VoltTrace.add(() -> VoltTrace.meta("thread_name", "name", threadName));
+        VoltTrace.add(() -> VoltTrace.meta("thread_sort_index", "sort_index", Integer.toString(1000)));
+        VoltTrace.add(() -> VoltTrace.beginDuration("mpinittask", VoltTrace.Category.MPSITE,
+                                                    "txnId", TxnEgo.txnIdToString(getTxnId())));
+
         hostLog.debug("STARTING: " + this);
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txnState;
@@ -180,6 +187,8 @@ public class MpProcedureTask extends ProcedureTask
             restartTransaction();
             hostLog.debug("RESTART: " + this);
         }
+
+        VoltTrace.add(VoltTrace::endDuration);
     }
 
     @Override
@@ -198,6 +207,12 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     void completeInitiateTask(SiteProcedureConnection siteConnection)
     {
+        VoltTrace.add(() -> VoltTrace.instant("sendcomplete",
+                                              VoltTrace.Category.MPSITE,
+                                              "txnId", TxnEgo.txnIdToString(getTxnId()),
+                                              "commit", Boolean.toString(!m_txnState.needsRollback()),
+                                              "dest", CoreUtils.hsIdCollectionToString(m_initiatorHSIds)));
+
         CompleteTransactionMessage complete = new CompleteTransactionMessage(
                 m_initiator.getHSId(), // who is the "initiator" now??
                 m_initiator.getHSId(),

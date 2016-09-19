@@ -43,10 +43,12 @@ import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltTableUtil;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.collect.Maps;
+import org.voltdb.utils.VoltTrace;
 
 public class MpTransactionState extends TransactionState
 {
@@ -172,6 +174,12 @@ public class MpTransactionState extends TransactionState
             long[] non_local_hsids = new long[m_useHSIds.size()];
             for (int i = 0; i < m_useHSIds.size(); i++) {
                 non_local_hsids[i] = m_useHSIds.get(i);
+
+                int finalI = i;
+                VoltTrace.add(() -> VoltTrace.beginAsync("sendfragment", VoltTrace.Category.MPSITE,
+                                                         MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), non_local_hsids[finalI], txnId),
+                                                         "txnId", TxnEgo.txnIdToString(txnId),
+                                                         "dest", CoreUtils.hsIdToString(non_local_hsids[finalI])));
             }
             // send to all non-local sites
             if (non_local_hsids.length > 0) {
@@ -244,6 +252,9 @@ public class MpTransactionState extends TransactionState
             // cause ProcedureRunner to do the right thing and cause rollback.
             while (!checkDoneReceivingFragResponses()) {
                 FragmentResponseMessage msg = pollForResponses();
+                VoltTrace.add(() -> VoltTrace.endAsync("sendfragment", VoltTrace.Category.MPSITE,
+                                                       MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), msg.m_sourceHSId, txnId),
+                                                       "status", Byte.toString(msg.getStatusCode())));
                 boolean expectedMsg = handleReceivedFragResponse(msg);
                 if (expectedMsg) {
                     // Will roll-back and throw if this message has an exception
@@ -262,11 +273,20 @@ public class MpTransactionState extends TransactionState
         if (!usedNullFragment) {
             borrowmsg.addInputDepMap(m_remoteDepTables);
         }
+        VoltTrace.add(() -> VoltTrace.beginAsync("sendborrow", VoltTrace.Category.MPSITE,
+                                                 MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), m_buddyHSId, txnId),
+                                                 "txnId", TxnEgo.txnIdToString(txnId),
+                                                 "dest", CoreUtils.hsIdToString(m_buddyHSId)));
         m_mbox.send(m_buddyHSId, borrowmsg);
 
         FragmentResponseMessage msg;
         while (true){
             msg = pollForResponses();
+            final FragmentResponseMessage finalMsg = msg;
+            VoltTrace.add(() -> VoltTrace.endAsync("sendborrow", VoltTrace.Category.MPSITE,
+                                                   MiscUtils.hsIdPairTxnIdToString(m_mbox.getHSId(), m_buddyHSId, txnId),
+                                                   "status", Byte.toString(finalMsg.getStatusCode())));
+
             assert(msg.getTableCount() > 0);
             // If this is a restarted TXN, verify that this is not a stale message from a different Dependency
             if (!m_isRestart || (msg.m_sourceHSId == m_buddyHSId &&
