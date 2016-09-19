@@ -12,6 +12,7 @@ DROP TABLE contestants                         IF EXISTS;
 DROP TABLE votes                               IF EXISTS;
 DROP TABLE area_code_state                     IF EXISTS;
 
+
 END_OF_DROP_BATCH
 
 -- Tell sqlcmd to batch the following commands together,
@@ -78,18 +79,6 @@ AS
      FROM votes
  GROUP BY contestant_number
         , state
-;
-
-CREATE VIEW v_votes_by_contestant_number
-(
-    contestant_number
-,   num_votes
-)
-AS
-  SELECT contestant_number
-       , COUNT(*)
-    FROM votes
-GROUP BY contestant_number
 ;
 
 END_OF_BATCH
