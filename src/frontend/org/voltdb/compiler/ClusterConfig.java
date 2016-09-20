@@ -29,6 +29,7 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.stream.Stream;
 
@@ -626,9 +627,9 @@ public class ClusterConfig
         checkConfiguration(buddyGroups, optimalBuddyGroups, allDefault);
 
         Map<String, Set<Integer>> buddyGroupToHostIds = Maps.newHashMap();
-        List<String> groups = Lists.newArrayList();
         if (allDefault) {
             // Override with optimal buddy grouping
+            List<String> groups = Lists.newArrayList();
             for (int groupId = 0; groupId < optimalBuddyGroups; groupId++) {
                 groups.add("buddy" + groupId);
             }
@@ -646,7 +647,6 @@ public class ClusterConfig
             }
         } else {
             for (Map.Entry<Integer, String> e : buddyGroups.entrySet()) {
-                groups.add(e.getValue());
                 if (!buddyGroupToHostIds.containsKey(e.getValue())) {
                     buddyGroupToHostIds.put(e.getValue(), Sets.newTreeSet());
                 }
@@ -667,9 +667,9 @@ public class ClusterConfig
         // assign partitions per buddy group
         List<Partition> allPartitions = new ArrayList<Partition>();
         int start = 0;
-        for (String tag : groups) {
+        for (Entry<String, Set<Integer>> e : buddyGroupToHostIds.entrySet()) {
             int total = buddyGroups.keySet().size();
-            int groupNodes = buddyGroupToHostIds.get(tag).size();
+            int groupNodes = e.getValue().size();
             List<Partition> partitions = new ArrayList<Partition>();
             int end = start + (partitionCount * groupNodes) / total;
             for (int counter = start; counter < end; counter++) {
@@ -677,7 +677,7 @@ public class ClusterConfig
             }
             allPartitions.addAll(partitions);
             Map<Integer, String> subGroup = Maps.newHashMap();
-            for (Integer hostId : buddyGroupToHostIds.get(tag)) {
+            for (Integer hostId : e.getValue()) {
                 subGroup.put(hostId, "0");
             }
             rackAwarePlacement(subGroup, partitionReplicas, partitionMasters, partitions, sitesPerHost);
@@ -707,22 +707,6 @@ public class ClusterConfig
         stringer.endObject();
 
         return new JSONObject(stringer.toString());
-    }
-
-    // Distribute mastership of given partitions by round-robining across given nodes.
-    // This balances the masters among the nodes.
-    void assignMasterParitions(List<Node> nodes, List<Partition> partitions) {
-        Iterator<Node> iter = nodes.iterator();
-        for (Partition p : partitions) {
-            if (!iter.hasNext()) {
-                iter = nodes.iterator();
-                assert iter.hasNext();
-            }
-            // TODO: support rejoin
-            p.m_master = iter.next();
-            p.m_master.m_masterPartitions.add(p);
-            p.decrementNeededReplicas();
-        }
     }
 
     /**

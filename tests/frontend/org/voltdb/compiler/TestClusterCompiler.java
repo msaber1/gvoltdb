@@ -25,6 +25,7 @@ package org.voltdb.compiler;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,6 +37,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.ClusterConfig.ExtensibleGroupTag;
 
+import com.google.common.collect.Lists;
 import com.google_voltpatches.common.collect.HashMultimap;
 import com.google_voltpatches.common.collect.ImmutableMap;
 import com.google_voltpatches.common.collect.Maps;
@@ -468,6 +470,58 @@ public class TestClusterCompiler extends TestCase
         runConfigAndVerifyTopology(hostGroups, 2);
     }
 
+    public void testFourNodesOneGroup() throws JSONException
+    {
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        hostGroups.put(0, new ExtensibleGroupTag("2", "0"));
+        hostGroups.put(1, new ExtensibleGroupTag("2", "0"));
+        hostGroups.put(2, new ExtensibleGroupTag("2", "0"));
+        hostGroups.put(3, new ExtensibleGroupTag("2", "0"));
+        runConfigAndVerifyTopology(hostGroups, 2);
+    }
+
+    public void testBuddyGroupsKfactorOne() throws JSONException {
+        final int Kfactor = 1;
+        final int nodes = 50;
+        for (int hostCount = 2; hostCount <= nodes; hostCount++) {
+            runBuddyGroupPlacement(hostCount, hostCount / (Kfactor + 1), Kfactor);
+        }
+    }
+
+    public void testBuddyGroupsKfactorTwo() throws JSONException {
+        final int Kfactor = 2;
+        final int nodes = 50;
+        for (int hostCount = 3; hostCount <= nodes; hostCount++) {
+            runBuddyGroupPlacement(hostCount, hostCount / (Kfactor + 1), Kfactor);
+        }
+    }
+
+    public void testBuddyGroupsKfactorThree() throws JSONException {
+        final int Kfactor = 3;
+        final int nodes = 50;
+        for (int hostCount = 4; hostCount <= nodes; hostCount++) {
+            runBuddyGroupPlacement(hostCount, hostCount / (Kfactor + 1), Kfactor);
+        }
+    }
+
+    public void runBuddyGroupPlacement(int hostCount, int buddyGroupNum, int Kfactor) throws JSONException {
+        Map<Integer, ExtensibleGroupTag> hostGroups = Maps.newHashMap();
+        // create buddy group tag
+        List<String> groups = Lists.newArrayList();
+        for (int groupId = 0; groupId < buddyGroupNum; groupId++) {
+            groups.add("buddy_" + groupId);
+        }
+        // generate group info
+        Iterator<String> iter = groups.iterator();
+        for (int hostId = 0; hostId < hostCount; hostId++) {
+            if (!iter.hasNext()) {
+                iter = groups.iterator();
+            }
+            hostGroups.put(hostId, new ExtensibleGroupTag("0", iter.next()));
+        }
+        runConfigAndVerifyTopology(hostGroups, Kfactor);
+    }
+
     private static void runConfigAndVerifyTopology(Map<Integer, ExtensibleGroupTag> hostGroups, int kfactor) throws JSONException
     {
         final int maxSites = 20;
@@ -492,21 +546,22 @@ public class TestClusterCompiler extends TestCase
         assertEquals(expectedInvalidConfigs, invalidConfigCount);
     }
 
-    // TODO: add buddy group verification
     private static void verifyTopology(Map<Integer, ExtensibleGroupTag> hostGroups, JSONObject topo) throws JSONException
     {
-        final int hostCount = new ClusterConfig(topo).getHostCount();
-        final int sitesPerHost = new ClusterConfig(topo).getSitesPerHost();
-        final int partitionCount = new ClusterConfig(topo).getPartitionCount();
+        ClusterConfig config = new ClusterConfig(topo);
+        final int hostCount = config.getHostCount();
+        final int sitesPerHost = config.getSitesPerHost();
+        final int partitionCount = config.getPartitionCount();
+        final int Kfactor = config.getReplicationFactor();
         final int minMasterCount = partitionCount / hostCount;
         final int maxMasterCount = minMasterCount + 1;
         final int nodesWithMaxMasterCount = partitionCount % hostCount;
 
         Multimap<Integer, Integer> masterCountToHost = HashMultimap.create();
         Multimap<String, Integer> raGroupHosts = HashMultimap.create();
-        Multimap<String, Integer> buddyGroupHosts = HashMultimap.create();
         Multimap<String, Integer> raGroupPartitions = HashMultimap.create();
-        Multimap<String, Integer> buddyGroupPartitions = HashMultimap.create();
+        Map<String, List<Integer>> buddyGroupPartitions = Maps.newHashMap();
+        Map<String, List<Integer>> buddyGroupMasterPartitions = Maps.newHashMap();
         for (Map.Entry<Integer, ExtensibleGroupTag> entry : hostGroups.entrySet()) {
             final List<Integer> hostPartitions = ClusterConfig.partitionsForHost(topo, entry.getKey());
             final List<Integer> hostMasters = ClusterConfig.partitionsForHost(topo, entry.getKey(), true);
@@ -517,6 +572,15 @@ public class TestClusterCompiler extends TestCase
             masterCountToHost.put(hostMasters.size(), entry.getKey());
             raGroupHosts.put(entry.getValue().m_rackAwarenessGroup, entry.getKey());
             raGroupPartitions.putAll(entry.getValue().m_rackAwarenessGroup, hostPartitions);
+
+            if (buddyGroupPartitions.get(entry.getValue().m_buddyGroup) == null) {
+                buddyGroupPartitions.put(entry.getValue().m_buddyGroup, Lists.newArrayList());
+            }
+            buddyGroupPartitions.get(entry.getValue().m_buddyGroup).addAll(hostPartitions);
+            if (buddyGroupMasterPartitions.get(entry.getValue().m_buddyGroup) == null) {
+                buddyGroupMasterPartitions.put(entry.getValue().m_buddyGroup, Lists.newArrayList());
+            }
+            buddyGroupMasterPartitions.get(entry.getValue().m_buddyGroup).addAll(hostMasters);
         }
 
         // Make sure master partitions are spread out
@@ -529,11 +593,19 @@ public class TestClusterCompiler extends TestCase
             assertEquals(nodesWithMaxMasterCount, masterCountToHost.get(maxMasterCount).size());
         }
 
-        // Each group should have at least one copy of all the partitions
+        // Each rack-aware group should have at least one copy of all the partitions
         for (Map.Entry<String, Collection<Integer>> groupAndPids : raGroupPartitions.asMap().entrySet()) {
             assertEquals(raGroupPartitions.toString(),
                          Math.min(partitionCount, raGroupHosts.get(groupAndPids.getKey()).size() * sitesPerHost),
                          Sets.newHashSet(groupAndPids.getValue()).size());
+        }
+
+        // Every master partition within a buddy group should have K copies
+        for (Map.Entry<String, List<Integer>> groupAndPids : buddyGroupPartitions.entrySet()) {
+            for (Integer masterPid : buddyGroupMasterPartitions.get(groupAndPids.getKey())) {
+                assertEquals(Kfactor + 1,
+                        groupAndPids.getValue().stream().filter(n -> n.equals(masterPid)).count());
+            }
         }
     }
 }
