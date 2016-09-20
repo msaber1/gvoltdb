@@ -694,6 +694,18 @@ public class PersistentBinaryDeque implements BinaryDeque {
         return reader;
     }
 
+    @Override
+    public synchronized void closeCursor(String cursorId) {
+        ReadCursor reader = m_readCursors.remove(cursorId);
+        if (reader != null && reader.m_segment != null) {
+            try {
+                reader.m_segment.getReader(cursorId).close();
+            } catch (IOException e) {
+                // TODO ignore this for now, it is just the segment file failed to be closed
+            }
+        }
+    }
+
     private void persistCursor(String cursorId) throws IOException {
         m_cursorsWriter.writeUTF(cursorId);
         m_cursorsWriter.writeUTF(System.getProperty("line.separator"));
