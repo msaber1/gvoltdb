@@ -212,10 +212,10 @@ public class RepairLog
         }
         else if (msg instanceof DumpMessage) {
             String who = CoreUtils.hsIdToString(m_HSId);
-            tmLog.warn("Repair log dump for site: " + who + ", isLeader: " + m_isLeader);
-            tmLog.warn("" + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
+            tmLog.warn("[Repair log] dump msg for site: " + who + ", isLeader: " + m_isLeader
+                    + ", " + who + ": lastSpHandle: " + m_lastSpHandle + ", lastMpHandle: " + m_lastMpHandle);
             for (Iv2RepairLogResponseMessage il : contents(0l, false)) {
-               tmLog.warn("" + who + ": msg: " + il);
+               tmLog.warn("[Repair log contents]" + who + ": msg: " + il);
             }
         }
         else if (msg instanceof RepairLogTruncationMessage) {
