@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Iterator;
 
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
@@ -65,9 +66,9 @@ public class BufferedReadLog
         @Override
         public String toString() {
             if (m_initiateMsg != null) {
-                return "Item: Init";
+                return "Item: " + m_initiateMsg.toString();
             }
-            return "Item: Frag";
+            return "Item: " + m_fragmentMsg.toString();
         }
     }
 
@@ -99,7 +100,6 @@ public class BufferedReadLog
 
     public void releaseBufferedReads(Mailbox mailbox, long spHandle)
     {
-
         Deque<Item> deq = m_bufferedReads;
         Item item = null;
         while ((item = deq.peek()) != null) {
@@ -112,5 +112,16 @@ public class BufferedReadLog
                 break;
             }
         }
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("BufferedReadLog contents:");
+        Iterator<Item> itr = m_bufferedReads.iterator();
+        for(int i = 0; itr.hasNext(); i++)  {
+            sb.append("           ").append(i).append(":").append(itr.next().toString()).append("\n");
+        }
+        return sb.toString();
     }
 }

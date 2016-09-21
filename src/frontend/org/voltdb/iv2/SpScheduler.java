@@ -1271,8 +1271,13 @@ public class SpScheduler extends Scheduler implements SnapshotCompletionInterest
     {
         m_replaySequencer.dump(m_mailbox.getHSId());
         tmLog.info(String.format("%s: %s", CoreUtils.hsIdToString(m_mailbox.getHSId()), m_pendingTasks));
+
+        if (m_defaultConsistencyReadLevel == ReadLevel.SAFE) {
+            m_bufferedReadLog.releaseBufferedReads(m_mailbox, m_repairLogTruncationHandle);
+        }
         hostLog.warn("[SpScheduler] current truncation handle: " + m_repairLogTruncationHandle
-                + " (" + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + ")");
+                + " (" + TxnEgo.txnIdToString(m_repairLogTruncationHandle) + ")"
+                + (m_defaultConsistencyReadLevel == Consistency.ReadLevel.SAFE ? m_bufferedReadLog.toString() : ""));
     }
 
     public void setConsistentReadLevelForTestOnly(ReadLevel readLevel) {
