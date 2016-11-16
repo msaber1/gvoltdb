@@ -457,6 +457,10 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_PARTITIONBY: {
         return "PARTITIONBY";
     }
+    //msaber: handling vertex scan node
+    case PLAN_NODE_TYPE_VERTEXSCAN: {
+            return "VERTEXSCAN";
+    }
     } // END OF SWITCH
     return "UNDEFINED";
 }

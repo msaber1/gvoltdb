@@ -108,6 +108,8 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_PARTITIONBY: return new PartitionByExecutor(engine, abstract_node);
+    //msaber: will be changed later
+    case PLAN_NODE_TYPE_VERTEXSCAN: return new SeqScanExecutor(engine, abstract_node);
     // default: Don't provide a default, let the compiler enforce complete coverage.
     }
     VOLT_ERROR("Undefined plan node type %d", (int) type);

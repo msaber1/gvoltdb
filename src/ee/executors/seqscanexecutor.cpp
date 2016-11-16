@@ -245,6 +245,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 }
 
 void SeqScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple) {
+	//tuple.setNValue(0, NValue()); //added by msaber
     if (m_aggExec != NULL) {
         m_aggExec->p_execute_tuple(tuple);
         return;

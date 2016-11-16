@@ -209,6 +209,10 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         case (voltdb::PLAN_NODE_TYPE_PARTITIONBY):
             ret = new voltdb::PartitionByPlanNode();
             break;
+        //msaber
+        case (voltdb::PLAN_NODE_TYPE_VERTEXSCAN):
+            ret = new voltdb::SeqScanPlanNode();
+            break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }
 
