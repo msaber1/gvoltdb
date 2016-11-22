@@ -99,6 +99,7 @@
 #include <sstream>
 #include <locale>
 #include <typeinfo>
+#include <string>
 
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
@@ -168,6 +169,8 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
       m_currExecutorVec(NULL),
       m_tuplesModifiedStack()
 {
+	LogManager::GLog("VoltDBEngine", "Constructor", 171,
+			"init VoltDBEngine");
 }
 
 bool
@@ -182,6 +185,9 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                          bool createDrReplicatedStream,
                          int32_t compactionThreshold)
 {
+	std::stringstream params;
+	params << "clusterIndex = " << clusterIndex << ", siteId = " << siteId;
+	LogManager::GLog("VoltDBEngine", "initialize", 187, params.str());
     m_clusterIndex = clusterIndex;
     m_siteId = siteId;
     m_partitionId = partitionId;
@@ -291,11 +297,15 @@ VoltDBEngine::~VoltDBEngine() {
 // OBJECT ACCESS FUNCTIONS
 // ------------------------------------------------------------------
 catalog::Catalog *VoltDBEngine::getCatalog() const {
+	LogManager::GLog("VoltDBEngine", "getCatalog", 302, "getting catalog");
     return (m_catalog.get());
 }
 
 Table* VoltDBEngine::getTable(int32_t tableId) const
 {
+	std::stringstream params;
+	params << "tableId = " << tableId;
+	LogManager::GLog("VoltDBEngine", "getTable", 308, params.str());
     // Caller responsible for checking null return value.
     return findInMapOrNull(tableId, m_tables);
 }
@@ -373,6 +383,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
                                        int64_t uniqueId,
                                        int64_t undoToken)
 {
+
     // count failures
     int failures = 0;
 

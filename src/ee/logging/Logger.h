@@ -30,7 +30,6 @@ namespace voltdb {
 class Logger {
     friend class LogManager;
 public:
-
     /**
      * Constructor that initializes with logging at OFF and caches a reference to a log proxy where log statements
      * will be forwarded to.
