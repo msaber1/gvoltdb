@@ -1,0 +1,24 @@
+#ifndef GRAPHVIEWFACTORY_H
+#define GRAPHVIEWFACTORY_H
+
+#include "GraphView.h"
+#include "Edge.h"
+#include "Vertex.h"
+#include <string>
+
+namespace voltdb {
+
+class GraphViewFactory
+{
+public:
+	GraphViewFactory(void);
+	~GraphViewFactory(void);
+
+	static GraphView* createGraphView(string graphViewName, bool isDirected);
+	static void loadGraph(GraphView* vw, vector<Vertex* > vertexes, vector<Edge* > edges);
+	static void printGraphView(GraphView* gview);
+};
+
+}
+
+#endif

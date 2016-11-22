@@ -385,6 +385,15 @@ CTX.INPUT['logging'] = """
  LogManager.cpp
 """
 
+CTX.INPUT['graph'] = """
+ TableTuple.cpp
+ GraphElement.cpp
+ Edge.cpp
+ Vertex.cpp
+ GraphView.cpp
+ GraphViewFactory.cpp
+"""
+
 # specify the third party input
 
 CTX.THIRD_PARTY_INPUT['jsoncpp'] = """
