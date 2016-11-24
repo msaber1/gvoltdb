@@ -65,6 +65,7 @@ bool TupleScanExecutor::p_init(AbstractPlanNode* abstract_node,
 }
 
 bool TupleScanExecutor::p_execute(const NValueArray &params) {
+	LogManager::GLog("TupleScanExecutor", "p_execute", 68, "tuple scan executor");
     TupleScanPlanNode* node = static_cast<TupleScanPlanNode*>(m_abstractNode);
     assert(node == dynamic_cast<TupleScanPlanNode*>(m_abstractNode));
     Table* output_table = node->getOutputTable();

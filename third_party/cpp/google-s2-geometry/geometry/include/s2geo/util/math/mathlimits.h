@@ -199,11 +199,11 @@ DECL_UNSIGNED_INT_LIMITS(unsigned long long int)
 #else // On older platforms isnan and isinf are in the global namespace
       // note that clang comes here too since it sets its "gcc version" to 4.2.1
 #define DECL_FP_LIMIT_FUNCS \
-  static bool IsFinite(const Type x) { return !isinf(x)  &&  !isnan(x); } \
-  static bool IsNaN(const Type x) { return isnan(x); } \
-  static bool IsInf(const Type x) { return isinf(x); } \
-  static bool IsPosInf(const Type x) { return isinf(x)  &&  x > 0; } \
-  static bool IsNegInf(const Type x) { return isinf(x)  &&  x < 0; }
+  static bool IsFinite(const Type x) { return !std::isinf(x)  &&  !std::isnan(x); } \
+  static bool IsNaN(const Type x) { return std::isnan(x); } \
+  static bool IsInf(const Type x) { return std::isinf(x); } \
+  static bool IsPosInf(const Type x) { return std::isinf(x)  &&  x > 0; } \
+  static bool IsNegInf(const Type x) { return std::isinf(x)  &&  x < 0; }
 #endif
 
 /// We can't put floating-point constant values in the header here because

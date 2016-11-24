@@ -392,6 +392,7 @@ CTX.INPUT['graph'] = """
  Vertex.cpp
  GraphView.cpp
  GraphViewFactory.cpp
+ GraphViewCatalogDelegate.cpp
 """
 
 # specify the third party input

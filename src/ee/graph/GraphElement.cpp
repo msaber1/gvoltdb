@@ -1,10 +1,7 @@
 #include "GraphElement.h"
+#include "common/tabletuple.h"
 
 namespace voltdb {
-
-GraphElement::GraphElement(void)
-{
-}
 
 GraphElement::GraphElement(int id, TableTuple* t, GraphView* graphView, bool remote)
 {
@@ -12,6 +9,14 @@ GraphElement::GraphElement(int id, TableTuple* t, GraphView* graphView, bool rem
 	this->m_tuple = t;
 	this->m_gview = graphView;
 	this->m_isRemote = remote;
+}
+
+GraphElement::GraphElement(void)
+{
+	this->m_id = -1;
+	this->m_tuple = NULL;
+	this->m_gview = NULL;
+	this->m_isRemote = false;
 }
 
 
@@ -31,7 +36,7 @@ int GraphElement::getId()
 	return this->m_id;
 }
 
-void GraphElement::setTuple(TableTuple* t) 
+void GraphElement::setTuple(TableTuple* t)
 {
 	this->m_tuple = t;
 }

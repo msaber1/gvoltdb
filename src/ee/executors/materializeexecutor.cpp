@@ -59,6 +59,8 @@ namespace voltdb {
 bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
                                  TempTableLimits* limits)
 {
+
+	LogManager::GLog("MaterializeExecutor", "p_init", 62, "plan: " + abstractNode->debug(" MySpacer "));
     VOLT_TRACE("init Materialize Executor");
 
     node = dynamic_cast<MaterializePlanNode*>(abstractNode);
@@ -96,6 +98,7 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
 }
 
 bool MaterializeExecutor::p_execute(const NValueArray &params) {
+	LogManager::GLog("MaterializeExecutor", "p_execute", 100, "params: " + params.debug());
     assert (node == dynamic_cast<MaterializePlanNode*>(m_abstractNode));
     assert(node);
     assert (!node->isInline()); // inline projection's execute() should not be called

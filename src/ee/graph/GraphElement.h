@@ -1,14 +1,23 @@
 #ifndef GRAPHELEMENT_H
 #define GRAPHELEMENT_H
 
-//#include "common/tabletuple.h"
-#include "TableTuple.h"
+/*
+#include <cstdlib>
+#include <sstream>
+#include <cassert>
+#include "common/tabletuple.h"
+#include "common/common.h"
+#include "common/debuglog.h"
+#include "common/FatalException.hpp"
+*/
+//#include "TableTuple.h"
 #include "GraphView.h"
 
 #ifndef NDEBUG
 //#include "debuglog.h"
 #endif /* !define(NDEBUG) */
 namespace voltdb {
+class TableTuple;
 class GraphElement
 {
 protected:

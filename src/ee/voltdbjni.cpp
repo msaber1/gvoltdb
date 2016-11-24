@@ -218,6 +218,8 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
     JNITopend *topend = NULL;
     VoltDBEngine *engine = NULL;
     try {
+
+    	LogManager::GLog("VoltDBJNI", "ExecutionEngine_nativeCreate", 222, "init topend for JNITopend and engine to VoltDBEngine");
         topend = new JNITopend(env, java_ee);
         engine = new VoltDBEngine( topend, JNILogProxy::getJNILogProxy(env, vm));
     } catch (const FatalException &e) {

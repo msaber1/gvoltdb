@@ -30,6 +30,7 @@
 #include "cluster.h"
 #include "common/SerializableEEException.h"
 #include "common/MiscUtil.h"
+#include "logging/LogManager.h"
 
 using namespace voltdb;
 using namespace catalog;
@@ -128,6 +129,11 @@ static void parse(const string &stmt,
     // cout << "Ref: " << ref << endl;
     // cout << "A: " << coll << endl;
     // cout << "B: " << child << endl;
+
+    std::stringstream params;
+    params << "stmt = " << stmt << ", command = " << command << ", ref = "
+        		<< ref << ", coll = " << coll << ", child " << child;
+    voltdb::LogManager::GLog("Catalog", "parse", 135, params.str());
 }
 
 /*

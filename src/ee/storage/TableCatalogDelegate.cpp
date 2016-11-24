@@ -275,6 +275,7 @@ Table *TableCatalogDelegate::constructTableFromCatalog(catalog::Database const &
                                                        catalog::Table const &catalogTable,
                                                        int tableAllocationTargetSize)
 {
+	LogManager::GLog("TableCatalogDelegate", "constructTableFromCatalog", 278, "tableName = " + catalogTable.name());
     // Create a persistent table for this table in our catalog
     int32_t table_id = catalogTable.relativeIndex();
 
