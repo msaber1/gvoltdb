@@ -48,11 +48,14 @@ public class HSQLDDLInfo {
      * TABLE, INDEX or VIEW
      */
     public static enum Noun {
-        TABLE, INDEX, VIEW, STREAM;
+        TABLE, INDEX, GRAPH, VIEW, STREAM;
 
         public static Noun get(String name) {
             if (name.equalsIgnoreCase("TABLE")) {
                 return TABLE;
+            }
+            else if (name.equalsIgnoreCase("GRAPH")) {
+                return GRAPH;
             }
             else if (name.equalsIgnoreCase("INDEX")) {
                 return INDEX;

@@ -60,6 +60,7 @@ public class SchemaObjectSet {
 
             case SchemaObject.VIEW :
             case SchemaObject.TABLE :
+            case SchemaObject.GRAPHVIEW :
             case SchemaObject.SEQUENCE :
             case SchemaObject.CHARSET :
             case SchemaObject.DOMAIN :
@@ -85,6 +86,7 @@ public class SchemaObjectSet {
 
             case SchemaObject.VIEW :
             case SchemaObject.TABLE :
+            case SchemaObject.GRAPHVIEW :
             case SchemaObject.SEQUENCE :
             case SchemaObject.CHARSET :
             case SchemaObject.DOMAIN :
@@ -114,6 +116,7 @@ public class SchemaObjectSet {
 
             case SchemaObject.VIEW :
             case SchemaObject.TABLE :
+            case SchemaObject.GRAPHVIEW :
             case SchemaObject.SEQUENCE :
             case SchemaObject.CHARSET :
             case SchemaObject.DOMAIN :
@@ -211,6 +214,7 @@ public class SchemaObjectSet {
 
             case SchemaObject.VIEW :
             case SchemaObject.TABLE :
+            case SchemaObject.GRAPHVIEW :
             case SchemaObject.SEQUENCE :
             case SchemaObject.CHARSET :
             case SchemaObject.COLLATION :
@@ -255,6 +259,7 @@ public class SchemaObjectSet {
 
             case SchemaObject.VIEW :
             case SchemaObject.TABLE :
+            case SchemaObject.GRAPHVIEW :
             case SchemaObject.SEQUENCE :
             case SchemaObject.CHARSET :
             case SchemaObject.DOMAIN :
@@ -284,6 +289,7 @@ public class SchemaObjectSet {
 
             case SchemaObject.VIEW :
             case SchemaObject.TABLE :
+            case SchemaObject.GRAPHVIEW :
             case SchemaObject.SEQUENCE :
             case SchemaObject.CHARSET :
             case SchemaObject.DOMAIN :
@@ -315,6 +321,9 @@ public class SchemaObjectSet {
             case SchemaObject.TABLE :
                 return Tokens.T_TABLE;
 
+            case SchemaObject.GRAPHVIEW :
+            	return Tokens.T_GRAPH;
+                
             case SchemaObject.SEQUENCE :
                 return Tokens.T_SEQUENCE;
 

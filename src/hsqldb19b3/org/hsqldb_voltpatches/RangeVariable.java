@@ -40,6 +40,7 @@ import org.hsqldb_voltpatches.lib.HashMappedList;
 import org.hsqldb_voltpatches.lib.HashSet;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
+import org.hsqldb_voltpatches.lib.OrderedIntHashSet;
 import org.hsqldb_voltpatches.navigator.RangeIterator;
 import org.hsqldb_voltpatches.navigator.RowIterator;
 import org.hsqldb_voltpatches.persist.PersistentStore;
@@ -59,6 +60,13 @@ final class RangeVariable {
 
     //
     final Table            rangeTable;
+    // GVoltDB extension
+    final GraphView        rangeGraph;
+    final boolean          isGraph;
+    final boolean          isVertexes;
+    final boolean          isEdges;
+    final boolean          isPaths;
+    //
     final SimpleName       tableAlias;
     private OrderedHashSet columnAliases;
     private SimpleName[]   columnAliasNames;
@@ -103,10 +111,16 @@ final class RangeVariable {
         this.variables   = variables;
         this.isVariable  = isVariable;
         rangeTable       = null;
+        rangeGraph       = null;
+        isGraph          = false;
         tableAlias       = null;
         emptyData        = null;
         columnsInGroupBy = null;
         usedColumns      = null;
+        isVertexes       = false;
+        isEdges          = false;
+        isPaths          = false;
+        
     }
 
     RangeVariable(Table table, SimpleName alias, OrderedHashSet columnList,
@@ -120,10 +134,68 @@ final class RangeVariable {
         columnsInGroupBy = rangeTable.getNewColumnCheckList();
         usedColumns      = rangeTable.getNewColumnCheckList();
         rangeIndex       = rangeTable.getPrimaryIndex();
+        isGraph          = false;
+        rangeGraph       = null;
+        isVertexes       = false;
+        isEdges          = false;
+        isPaths          = false;
 
         compileContext.registerRangeVariable(this);
     }
 
+    RangeVariable(GraphView graph, int type, SimpleName alias, OrderedHashSet columnList,
+            SimpleName[] columnNameList, CompileContext compileContext) {
+
+      isGraph          = true;
+      
+      if (type == Tokens.VERTEXES) { 
+    	  isVertexes = true;
+      	  isEdges = false;
+          isPaths = false;
+      }
+      else if (type == Tokens.EDGES) {
+    	  isVertexes = false;
+      	  isEdges = true;
+          isPaths = false;
+      }
+      else if (type == Tokens.PATHS) {
+    	  isVertexes = false;
+      	  isEdges = false;
+          isPaths = true;
+      }
+      else {
+    	  isVertexes = false;
+      	  isEdges = false;
+          isPaths = false;
+      }
+      
+	  rangeGraph       = graph;
+	  
+	  rangeTable       = null;
+	  tableAlias       = alias;
+	  columnAliases    = columnList;
+	  columnAliasNames = columnNameList;
+      emptyData        = null; //rangeGraph.getEmptyRowData();
+      if (isVertexes) {
+    	  columnsInGroupBy = new boolean[rangeGraph.getVertexPropCount()];
+    	  usedColumns      = new boolean[rangeGraph.getVertexPropCount()];
+      }
+      else if (isEdges) {
+          columnsInGroupBy = new boolean[rangeGraph.getEdgePropCount()];
+          usedColumns      = new boolean[rangeGraph.getEdgePropCount()];    	  
+      }
+      else if (isPaths) {
+          columnsInGroupBy = new boolean[rangeGraph.getPathPropCount()];
+          usedColumns      = new boolean[rangeGraph.getPathPropCount()];
+      } else { 
+          columnsInGroupBy = null;
+          usedColumns      = null;
+      }
+      rangeIndex       = null;//rangeGraph.getPrimaryIndex();
+	
+	  compileContext.registerRangeVariable(this);
+	}
+    
 /*
     RangeVariable(Table table, String alias, OrderedHashSet columnList,
                   Index index, CompileContext compileContext) {
@@ -149,8 +221,23 @@ final class RangeVariable {
         rangeIndex       = rangeTable.getPrimaryIndex();
         rangePosition    = range.rangePosition;
         level            = range.level;
+        isGraph          = false;
+  	    rangeGraph       = null;
+        isVertexes       = false;
+        isEdges          = false;
+        isPaths          = false;
     }
 
+    Index getIndexForColumns(OrderedIntHashSet set) {
+    	
+    	if (isGraph) {
+    		System.out.println("RangeVariable.getIndexForColumns: Indexs for a graph are not supported.");
+    		return null;
+    	} else {
+    		return rangeTable.getIndexForColumns(set);
+    	}
+    }
+    
     void setJoinType(boolean isLeft, boolean isRight) {
         isLeftJoin  = isLeft;
         isRightJoin = isRight;
@@ -184,6 +271,10 @@ final class RangeVariable {
         return rangeTable;
     }
 
+    GraphView getGraph() {
+        return rangeGraph;
+    }
+    
     public OrderedHashSet getColumnNames() {
 
         if (columnNames == null) {
@@ -276,10 +367,47 @@ final class RangeVariable {
         } else if (columnAliases != null) {
             return columnAliases.getIndex(columnName);
         } else {
-            return rangeTable.findColumn(columnName);
+            if (isGraph && isVertexes)
+            	return rangeGraph.findVertexProp(columnName);
+            else if (isGraph && isEdges)
+            	return rangeGraph.findEdgeProp(columnName);
+            else if (isGraph && isPaths) {
+            	System.out.println("RangeVariable.findColumn() 347 column = " + columnName);
+                return rangeGraph.findPathProp(columnName);
+            }
+            else 
+            	return rangeTable.findColumn(columnName);
         }
     }
 
+    // TODO merge with findColumn(String tableName, String columnName)
+    public int findColumn(String tableName, String objectName, String columnName) {
+        if (namedJoinColumnExpressions != null
+                && tableName == null
+                && namedJoinColumnExpressions.containsKey(columnName)) {
+            return -1;
+        }
+
+        if (variables != null) {
+            return variables.getIndex(columnName);
+        } else if (columnAliases != null) {
+            return columnAliases.getIndex(columnName);
+        } else {
+        	if (objectName == Tokens.getKeyword(Tokens.EDGES))
+        		return rangeGraph.findEdgeProp(columnName);
+        	else if (objectName.equals(Tokens.getKeyword(Tokens.VERTEXES)) ||
+        			 objectName.equals(Tokens.getKeyword(Tokens.STARTVERTEX)) ||
+        			 objectName.equals(Tokens.getKeyword(Tokens.ENDVERTEX))
+        			) 
+        		return rangeGraph.findVertexProp(columnName);
+        	else if (objectName == Tokens.getKeyword(Tokens.PATHS))
+        		return rangeGraph.findPathProp(columnName);
+        	else  
+            	return rangeTable.findColumn(columnName);
+        }
+    }
+    
+    
     ColumnSchema getColumn(String columnName) {
 
         int index = findColumn(columnName);
@@ -293,6 +421,13 @@ final class RangeVariable {
         if (variables != null) {
             return (ColumnSchema) variables.get(i);
         } else {
+            if (isGraph && isVertexes) 
+            	return rangeGraph.getVertexProp(i);
+            else if (isGraph && isEdges)
+            	return rangeGraph.getEdgeProp(i);
+            else if (isGraph && isPaths)
+            	return rangeGraph.getPathProp(i);
+            	
             return rangeTable.getColumn(i);
         }
     }
@@ -323,21 +458,39 @@ final class RangeVariable {
             return true;
         }
 
+        String tablename;
+        String schemaname;
+        if (isGraph) { // GVoltDB extension
+        	tablename = rangeGraph.GraphName.name;
+        	schemaname = rangeGraph.GraphName.schema.name;
+        }
+        else {
+        	tablename = rangeTable.tableName.name;
+        	schemaname = rangeTable.tableName.schema.name;
+        }
+        
+        org.voltdb.VLog.GLog("RangeVariable", "resolvesTableName", 3935, 
+    		    " e.columnName = " + e.columnName
+        	  +	" e.tableName = "+e.tableName + " tablename = "+tablename
+    		  + " tableAlias.name = "+tableAlias.name
+    		  + " e.schema = "+ e.schema + " schemaname = " + schemaname
+    		  );
+        
         if (e.schema == null) {
             if (tableAlias == null) {
-                if (e.tableName.equals(rangeTable.tableName.name)) {
+                if (e.tableName.equals(tablename)) {
                     return true;
                 }
             } else if (e.tableName.equals(tableAlias.name)) {
                 return true;
             }
         } else {
-            if (e.tableName.equals(rangeTable.tableName.name)
-                    && e.schema.equals(rangeTable.tableName.schema.name)) {
+            if (e.tableName.equals(tablename)
+                    && e.schema.equals(schemaname)) {
                 return true;
             }
         }
-
+	        
         return false;
     }
 
@@ -398,11 +551,37 @@ final class RangeVariable {
                 }
             }
         }
-
-        addTableColumns(exprList, exprList.size(), namedJoinColumns);
+        
+        if (!isGraph)
+        	addTableColumns(exprList, exprList.size(), namedJoinColumns);
+        // TODO Should we do it?
+        else addGraphVertProps(exprList, exprList.size(), namedJoinColumns);
     }
 
-    /**
+    private int addGraphVertProps(HsqlArrayList expList, int position, HashSet exclude) {
+
+        GraphView graph = getGraph();
+        int   count = graph.getVertexPropCount();
+
+        for (int i = 0; i < count; i++) {
+            ColumnSchema column = graph.getVertexProp(i);
+            String columnName = columnAliases == null ? column.getName().name
+                                                      : (String) columnAliases
+                                                          .get(i);
+
+            if (exclude != null && exclude.contains(columnName)) {
+                continue;
+            }
+
+            Expression e = new ExpressionColumn(this, column, i);
+
+            expList.add(position++, e);
+        }
+
+        return position;
+	}
+
+	/**
      * Add all columns to a list of expressions
      */
     int addTableColumns(HsqlArrayList expList, int position, HashSet exclude) {
@@ -1299,6 +1478,100 @@ final class RangeVariable {
         return scan;
     }
 
+    /**
+     * VoltDB added method to get a non-catalog-dependent
+     * representation of this HSQLDB object.
+     * @param session The current Session object may be needed to resolve
+     * some names.
+     * @return XML, correctly indented, representing this object.
+     * @throws HSQLParseException
+     */
+    VoltXMLElement voltGetGraphRangeVariableXML(Session session)
+    throws org.hsqldb_voltpatches.HSQLInterface.HSQLParseException
+    {
+        Index        index;
+        Index        primaryIndex;
+
+        index        = rangeIndex;
+        primaryIndex = null;//rangeTable.getPrimaryIndex();
+
+        // get the index for this scan (/filter)
+        // note: ignored if scan is full table scan
+        if (index == null)
+            index = primaryIndex;
+
+        // output open tag
+        VoltXMLElement scan;
+        if (isVertexes) 
+        	scan = new VoltXMLElement("vertexscan");
+        else if (isEdges)
+        	scan = new VoltXMLElement("edgescan");
+        else scan = new VoltXMLElement("graphscan");
+
+        scan.attributes.put("graph", rangeGraph.getName().name.toUpperCase());
+
+        if (tableAlias != null && !rangeGraph.getName().name.equals(tableAlias)) {
+            scan.attributes.put("tablealias", tableAlias.name.toUpperCase());
+        }
+
+        // note if this is an outer join
+        if (isLeftJoin && isRightJoin) {
+            scan.attributes.put("jointype", "full");
+        } else if (isLeftJoin) {
+            scan.attributes.put("jointype", "left");
+        } else if (isRightJoin) {
+            scan.attributes.put("jointype", "right");
+        } else {
+            scan.attributes.put("jointype", "inner");
+        }
+
+        /*
+        Expression joinCond = null;
+        Expression whereCond = null;
+        // if isJoinIndex and indexCondition are set then indexCondition is join condition
+        // else if indexCondition is set then it is where condition
+        if (isJoinIndex == true) {
+            joinCond = indexCondition;
+            if (indexEndCondition != null) {
+            	joinCond = makeConjunction(joinCond, indexEndCondition);
+            }
+            // then go to the nonIndexJoinCondition
+            if (nonIndexJoinCondition != null) {
+            	joinCond = makeConjunction(joinCond, nonIndexJoinCondition);
+            }
+            // then go to the nonIndexWhereCondition
+            whereCond = nonIndexWhereCondition;
+        } else {
+            joinCond = nonIndexJoinCondition;
+
+            whereCond = indexCondition;
+            if (indexEndCondition != null) {
+            	whereCond = makeConjunction(whereCond, indexEndCondition);
+            }
+            // then go to the nonIndexWhereCondition
+            if (nonIndexWhereCondition != null) {
+            	whereCond = makeConjunction(whereCond, nonIndexWhereCondition);
+            }
+
+        }
+        if (joinCond != null) {
+            joinCond = joinCond.eliminateDuplicates(session);
+            VoltXMLElement joinCondEl = new VoltXMLElement("joincond");
+            joinCondEl.children.add(joinCond.voltGetXML(session));
+            scan.children.add(joinCondEl);
+        }
+
+        if (whereCond != null) {
+            whereCond = whereCond.eliminateDuplicates(session);
+            VoltXMLElement whereCondEl = new VoltXMLElement("wherecond");
+            whereCondEl.children.add(whereCond.voltGetXML(session));
+            scan.children.add(whereCondEl);
+        }
+        */
+        
+        return scan;
+    }
+    
     /* (non-Javadoc)
      * @see java.lang.Object#toString()
      */

@@ -72,9 +72,11 @@ public class SQLLexer extends SQLPatternFactory
         }
     };
 
+    // tkuznets 10/03/16
     private final static ObjectToken[] OBJECT_TOKENS = {
         // Rename-able objects
         new ObjectToken("table", true),
+        new ObjectToken("graph", true),
         new ObjectToken("stream", true),
         new ObjectToken("column", true),
         new ObjectToken("index", true),
@@ -85,7 +87,7 @@ public class SQLLexer extends SQLPatternFactory
     };
 
     private final static String[] MODIFIER_TOKENS = {
-        "assumeunique", "unique"
+        "assumeunique", "unique", "directed", "undirected"
     };
 
     static final char BLOCK_DELIMITER_CHAR = '#';
@@ -115,10 +117,12 @@ public class SQLLexer extends SQLPatternFactory
     private static CheckedPattern[] BLACKLISTS = null;
 
     // Extracts the table or stream name for DDL batch conflicting command checks.
+    // tkuznets 10/03/16
     private static final Pattern PAT_TABLE_DDL_PREAMBLE =
         SPF.statementLeader(
             SPF.capture(SPF.tokenAlternatives("create", "drop")),   // DDL commands we're looking for
-            SPF.tokenAlternatives("table", "stream"),               // target is table or stream
+            SPF.tokenAlternatives("table", "stream", "graph"),               // target is table or stream
+            //SPF.optional(SPF.capture(SPF.tokenAlternatives("view"))),   // for "GRAPH VIEW" statement
             SPF.capture(SPF.databaseObjectName())                   // table name (captured)
         ).compile("PAT_TABLE_DDL_PREAMBLE");
 

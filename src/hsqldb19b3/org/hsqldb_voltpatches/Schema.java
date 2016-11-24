@@ -46,6 +46,7 @@ public final class Schema implements SchemaObject {
     SchemaObjectSet constraintLookup;
     SchemaObjectSet indexLookup;
     SchemaObjectSet tableLookup;
+    SchemaObjectSet graphviewLookup; // GVoltDB extension
     SchemaObjectSet sequenceLookup;
     SchemaObjectSet typeLookup;
     SchemaObjectSet charsetLookup;
@@ -54,6 +55,7 @@ public final class Schema implements SchemaObject {
     SchemaObjectSet functionLookup;
     SchemaObjectSet assertionLookup;
     HashMappedList  tableList;
+    HashMappedList  graphviewList;  // GVoltDB extension
     HashMappedList  sequenceList;
     Grantee         owner;
 
@@ -64,6 +66,7 @@ public final class Schema implements SchemaObject {
         indexLookup      = new SchemaObjectSet(SchemaObject.INDEX);
         constraintLookup = new SchemaObjectSet(SchemaObject.CONSTRAINT);
         tableLookup      = new SchemaObjectSet(SchemaObject.TABLE);
+        graphviewLookup  = new SchemaObjectSet(SchemaObject.GRAPHVIEW); // GVoltDB extension
         sequenceLookup   = new SchemaObjectSet(SchemaObject.SEQUENCE);
         typeLookup       = new SchemaObjectSet(SchemaObject.TYPE);
         charsetLookup    = new SchemaObjectSet(SchemaObject.CHARSET);
@@ -72,6 +75,7 @@ public final class Schema implements SchemaObject {
         functionLookup   = new SchemaObjectSet(SchemaObject.FUNCTION);
         assertionLookup  = new SchemaObjectSet(SchemaObject.ASSERTION);
         tableList        = (HashMappedList) tableLookup.map;
+        graphviewList    = (HashMappedList) graphviewLookup.map;
         sequenceList     = (HashMappedList) sequenceLookup.map;
         this.owner       = owner;
         name.owner       = owner;
@@ -160,6 +164,10 @@ public final class Schema implements SchemaObject {
         subList = tableLookup.getSQL(resolved, unresolved);
 
         list.addAll(subList);
+        
+        subList = graphviewLookup.getSQL(resolved, unresolved);
+
+        list.addAll(subList);
 
         subList = functionLookup.getSQL(resolved, unresolved);
 
@@ -220,7 +228,7 @@ public final class Schema implements SchemaObject {
     }
 
     boolean isEmpty() {
-        return sequenceList.isEmpty() && tableList.isEmpty();
+        return sequenceList.isEmpty() && tableList.isEmpty() && graphviewList.isEmpty();
     }
 
     Iterator schemaObjectIterator(int type) {
@@ -233,6 +241,9 @@ public final class Schema implements SchemaObject {
             case SchemaObject.TABLE :
             case SchemaObject.VIEW :
                 return tableLookup.map.values().iterator();
+                
+            case SchemaObject.GRAPHVIEW :
+                return graphviewLookup.map.values().iterator();
 
             case SchemaObject.CHARSET :
                 return charsetLookup.map.values().iterator();
@@ -272,6 +283,7 @@ public final class Schema implements SchemaObject {
     void clearStructures() {
 
         tableList.clear();
+        graphviewList.clear();
         sequenceList.clear();
 
         triggerLookup    = null;
@@ -281,6 +293,7 @@ public final class Schema implements SchemaObject {
         functionLookup   = null;
         sequenceLookup   = null;
         tableLookup      = null;
+        graphviewLookup  = null;
         typeLookup       = null;
     }
 }

@@ -138,6 +138,7 @@ public class Tokens {
     static final String        T_DETERMINISTIC     = "DETERMINISTIC";
     static final String        T_DISCONNECT        = "DISCONNECT";
     static final String        T_DISTINCT          = "DISTINCT";
+    static final String        T_DIRECTED          = "DIRECTED";
     public static final String T_DO                = "DO";
     // A VoltDB extension to use FLOAT as the official DOUBLE type name
     public static final String T_DOUBLE            = "FLOAT";
@@ -148,6 +149,7 @@ public class Tokens {
     static final String        T_DROP              = "DROP";
     static final String        T_DYNAMIC           = "DYNAMIC";
     static final String        T_EACH              = "EACH";
+    static final String        T_EDGES             = "EDGES";
     static final String        T_ELEMENT           = "ELEMENT";
     static final String        T_ELSE              = "ELSE";
     static final String        T_ELSEIF            = "ELSEIF";
@@ -178,12 +180,14 @@ public class Tokens {
     public static final String T_GET               = "GET";
     static final String        T_GLOBAL            = "GLOBAL";
     public static final String T_GRANT             = "GRANT";
+    public static final String T_GRAPH             = "GRAPH";
     static final String        T_GROUP             = "GROUP";
     static final String        T_GROUPING          = "GROUPING";
     static final String        T_HANDLER           = "HANDLER";
     static final String        T_HAVING            = "HAVING";
     static final String        T_HOLD              = "HOLD";
     public static final String T_HOUR              = "HOUR";
+    static final String        T_ID                = "ID";
     static final String        T_IDENTITY          = "IDENTITY";
     static final String        T_IF                = "IF";
     static final String        T_IN                = "IN";
@@ -263,6 +267,7 @@ public class Tokens {
     static final String        T_OVERLAY           = "OVERLAY";
     static final String        T_PARAMETER         = "PARAMETER";
     static final String        T_PARTITION         = "PARTITION";
+    static final String        T_PATHS             = "PATHS";
     static final String        T_PERCENT_RANK      = "PERCENT_RANK";
     static final String        T_PERCENTILE_CONT   = "PERCENTILE_CONT";
     static final String        T_PERCENTILE_DISC   = "PERCENTILE_DISC";
@@ -357,6 +362,7 @@ public class Tokens {
     static final String        T_TRUNCATE          = "TRUNCATE";
     static final String        T_UESCAPE           = "UESCAPE";
     static final String        T_UNION             = "UNION";
+    static final String        T_UNDIRECTED        = "UNDIRECTED";
     // A VoltDB extension to support the assume unique index attribute
     static final String        T_ASSUMEUNIQUE      = "ASSUMEUNIQUE";     // For VoltDB
     // End of VoltDB extension
@@ -375,6 +381,7 @@ public class Tokens {
     public static final String T_VARBINARY         = "VARBINARY";
     public static final String T_VARCHAR           = "VARCHAR";
     static final String        T_VARYING           = "VARYING";
+    static final String        T_VERTEXES          = "VERTEXES";
     static final String        T_WHEN              = "WHEN";
     static final String        T_WHENEVER          = "WHENEVER";
     static final String        T_WHERE             = "WHERE";
@@ -651,6 +658,7 @@ public class Tokens {
     static final String        T_DEFRAG              = "DEFRAG";
     static final String        T_EXPLAIN             = "EXPLAIN";
     static final String        T_EVENT               = "EVENT";
+    static final String        T_ENDVERTEX           = "ENDVERTEX";
     static final String        T_FILE                = "FILE";
     static final String        T_FILES               = "FILES";
     static final String        T_FOLD                = "FOLD";
@@ -693,13 +701,14 @@ public class Tokens {
     static final String        T_PROPERTY            = "PROPERTY";
     static final String        T_QUEUE               = "QUEUE";
     static final String        T_READONLY            = "READONLY";
-    static final String T_REFERENTIAL_INTEGRITY      = "REFERENTIAL_INTEGRITY";
+    static final String        T_REFERENTIAL_INTEGRITY      = "REFERENTIAL_INTEGRITY";
     static final String        T_RENAME              = "RENAME";
     static final String        T_RESTRICT            = "RESTRICT";
     static final String        T_SCRIPT              = "SCRIPT";
     static final String        T_SCRIPTFORMAT        = "SCRIPTFORMAT";
     static final String        T_BLOCKING            = "BLOCKING";
     static final String        T_SHUTDOWN            = "SHUTDOWN";
+    static final String        T_STARTVERTEX         = "STARTVERTEX";
     static final String        T_SQL_TSI_DAY         = "SQL_TSI_DAY";
     static final String        T_SQL_TSI_FRAC_SECOND = "SQL_TSI_FRAC_SECOND";
     static final String        T_SQL_TSI_HOUR        = "SQL_TSI_HOUR";
@@ -1602,6 +1611,17 @@ public class Tokens {
     public static final int WEEKOFYEAR                 = 740; // for compliant with MySQL
     public static final int WEEKDAY                    = 741; // for compliant with MySQL
     // End of VoltDB extension
+    // A GVoltDB extension to support Graphs // tkuznets 10/05/16
+    public static final int GRAPH                      = 742;
+    public static final int VERTEXES                   = 743;
+    public static final int EDGES                      = 744;
+    public static final int DIRECTED                   = 745;
+    public static final int UNDIRECTED                 = 746;
+    public static final int ID                         = 747;
+    public static final int PATHS                      = 748;
+    public static final int ENDVERTEX                  = 749;
+    public static final int STARTVERTEX                = 750;
+    
 
     //
     public static final int X_UNKNOWN_TOKEN = -1;
@@ -1706,15 +1726,18 @@ public class Tokens {
         reservedKeys.put(Tokens.T_DETERMINISTIC, DETERMINISTIC);
         reservedKeys.put(Tokens.T_DISCONNECT, DISCONNECT);
         reservedKeys.put(Tokens.T_DISTINCT, DISTINCT);
+        reservedKeys.put(Tokens.T_DIRECTED, DIRECTED);
         reservedKeys.put(Tokens.T_DOUBLE, DOUBLE);
         reservedKeys.put(Tokens.T_DROP, DROP);
         reservedKeys.put(Tokens.T_DYNAMIC, DYNAMIC);
         reservedKeys.put(Tokens.T_EACH, EACH);
+        reservedKeys.put(Tokens.T_EDGES, EDGES);
         reservedKeys.put(Tokens.T_ELEMENT, ELEMENT);
         reservedKeys.put(Tokens.T_ELSE, ELSE);
         reservedKeys.put(Tokens.T_ELSEIF, ELSEIF);
         reservedKeys.put(Tokens.T_END, END);
         reservedKeys.put(Tokens.T_END_EXEC, END_EXEC);
+        reservedKeys.put(Tokens.T_ENDVERTEX, ENDVERTEX);
         reservedKeys.put(Tokens.T_ESCAPE, ESCAPE);
         reservedKeys.put(Tokens.T_EVERY, EVERY);
         reservedKeys.put(Tokens.T_EXCEPT, EXCEPT);
@@ -1741,12 +1764,14 @@ public class Tokens {
         reservedKeys.put(Tokens.T_GET, GET);
         reservedKeys.put(Tokens.T_GLOBAL, GLOBAL);
         reservedKeys.put(Tokens.T_GRANT, GRANT);
+        reservedKeys.put(Tokens.T_GRAPH, GRAPH);
         reservedKeys.put(Tokens.T_GROUP, GROUP);
         reservedKeys.put(Tokens.T_GROUPING, GROUPING);
         reservedKeys.put(Tokens.T_HANDLER, HANDLER);
         reservedKeys.put(Tokens.T_HAVING, HAVING);
         reservedKeys.put(Tokens.T_HOLD, HOLD);
         reservedKeys.put(Tokens.T_HOUR, HOUR);
+        reservedKeys.put(Tokens.T_ID, ID);
         reservedKeys.put(Tokens.T_IDENTITY, IDENTITY);
         reservedKeys.put(Tokens.T_IF, IF);
         reservedKeys.put(Tokens.T_IN, IN);
@@ -1825,6 +1850,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_OVERLAY, OVERLAY);
         reservedKeys.put(Tokens.T_PARAMETER, PARAMETER);
         reservedKeys.put(Tokens.T_PARTITION, PARTITION);
+        reservedKeys.put(Tokens.T_PATHS, PATHS);
         reservedKeys.put(Tokens.T_PERCENT_RANK, PERCENT_RANK);
         reservedKeys.put(Tokens.T_PERCENTILE_CONT, PERCENTILE_CONT);
         reservedKeys.put(Tokens.T_PERCENTILE_DISC, PERCENTILE_DISC);
@@ -1889,6 +1915,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_SQRT, SQRT);
         reservedKeys.put(Tokens.T_STACKED, STACKED);
         reservedKeys.put(Tokens.T_START, START);
+        reservedKeys.put(Tokens.T_STARTVERTEX, STARTVERTEX);
         reservedKeys.put(Tokens.T_STATIC, STATIC);
         reservedKeys.put(Tokens.T_STDDEV_POP, STDDEV_POP);
         reservedKeys.put(Tokens.T_STDDEV_SAMP, STDDEV_SAMP);
@@ -1921,9 +1948,10 @@ public class Tokens {
         reservedKeys.put(Tokens.T_TRUE, TRUE);
         reservedKeys.put(Tokens.T_TRUNCATE, TRUNCATE);
         reservedKeys.put(Tokens.T_UESCAPE, UESCAPE);
+        reservedKeys.put(Tokens.T_UNDIRECTED, UNDIRECTED);
         reservedKeys.put(Tokens.T_UNDO, UNDO);
         reservedKeys.put(Tokens.T_UNION, UNION);
-        reservedKeys.put(Tokens.T_UNIQUE, UNIQUE);
+        reservedKeys.put(Tokens.T_UNIQUE, UNIQUE);        
         // A VoltDB extension to support the assume unique index attribute
         reservedKeys.put(Tokens.T_ASSUMEUNIQUE, ASSUMEUNIQUE);    // For VoltDB
         // End of VoltDB extension
@@ -1941,6 +1969,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_VARBINARY, VARBINARY);
         reservedKeys.put(Tokens.T_VARCHAR, VARCHAR);
         reservedKeys.put(Tokens.T_VARYING, VARYING);
+        reservedKeys.put(Tokens.T_VERTEXES, VERTEXES);
         reservedKeys.put(Tokens.T_WHEN, WHEN);
         reservedKeys.put(Tokens.T_WHENEVER, WHENEVER);
         reservedKeys.put(Tokens.T_WHERE, WHERE);
@@ -1999,7 +2028,7 @@ public class Tokens {
         commandSet.put(T_DATABASE, DATABASE);
         commandSet.put(T_DEFAULTS, DEFAULTS);
         commandSet.put(T_DEFRAG, DEFRAG);
-        commandSet.put(T_DESC, DESC);
+        commandSet.put(T_DESC, DESC);        
         commandSet.put(T_DOMAIN, DOMAIN);
         commandSet.put(T_EXCLUDING, EXCLUDING);
         commandSet.put(T_EXPLAIN, EXPLAIN);

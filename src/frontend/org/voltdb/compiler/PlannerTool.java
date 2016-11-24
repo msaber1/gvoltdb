@@ -269,11 +269,13 @@ public class PlannerTool {
                     partitioning = plan.getStatementPartitioning();
                 }
             }
+            
             catch (Exception e) {
                 /*
                  * Don't log PlanningErrorExceptions or HSQLParseExceptions, as
                  * they are at least somewhat expected.
                  */
+            	
                 String loggedMsg = "";
                 if (!((e instanceof PlanningErrorException) || (e instanceof HSQLParseException))) {
                     logException(e, "Error compiling query");
@@ -281,7 +283,9 @@ public class PlannerTool {
                 }
                 throw new RuntimeException("Error compiling query: " + e.toString() + loggedMsg,
                                            e);
+                
             }
+           
 
             if (plan == null) {
                 throw new RuntimeException("Null plan received in PlannerTool.planSql");
