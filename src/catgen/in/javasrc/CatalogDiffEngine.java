@@ -379,7 +379,9 @@ public class CatalogDiffEngine {
         {
             return null;
         }
-
+        else if (suspect instanceof GraphView) {
+        	return null;
+        }
         else if (suspect instanceof Table) {
             Table tbl = (Table)suspect;
             if (   ChangeType.ADDITION == changeType

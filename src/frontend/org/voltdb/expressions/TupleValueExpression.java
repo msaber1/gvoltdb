@@ -22,6 +22,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.GraphView;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.plannodes.NodeSchema;
@@ -41,6 +42,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected int m_columnIndex = -1;
     protected String m_tableName = null;
     protected String m_tableAlias = null;
+    protected String m_tableObject = null;  // GVoltDB extension - Vertexes or Edges for GraphView and null for table
     protected String m_columnName = null;
     protected String m_columnAlias = null;
     protected int m_tableIdx = 0;
@@ -78,6 +80,34 @@ public class TupleValueExpression extends AbstractValueExpression {
         super(ExpressionType.VALUE_TUPLE);
         m_tableName = tableName;
         m_tableAlias = tableAlias;
+        m_tableObject = null;
+        m_columnName = columnName;
+        m_columnAlias = columnAlias;
+        m_columnIndex = columnIndex;
+        m_differentiator = differentiator;
+    }
+    
+    /**
+     * Create a new TupleValueExpression
+     * @param tableName  The name of the table where this column originated,
+     *        if any.  Currently, internally created columns will be assigned
+     *        the table name "VOLT_TEMP_TABLE" for disambiguation.
+     * @param tableAlias  The alias assigned to this table, if any
+     * @param columnName  The name of this column, if any
+     * @param columnAlias  The alias assigned to this column, if any
+     * @param columnIndex. The column index in the table
+     */
+    public TupleValueExpression(String tableName,
+                                String tableAlias,
+                                String tableObject,
+                                String columnName,
+                                String columnAlias,
+                                int columnIndex,
+                                int differentiator) {
+        super(ExpressionType.VALUE_TUPLE);
+        m_tableName = tableName;
+        m_tableAlias = tableAlias;
+        m_tableObject = tableObject;
         m_columnName = columnName;
         m_columnAlias = columnAlias;
         m_columnIndex = columnIndex;
@@ -355,6 +385,25 @@ public class TupleValueExpression extends AbstractValueExpression {
         setTypeSizeBytes(column.getType(), column.getSize(), column.getInbytes());
     }
 
+    public void resolveForGraph(GraphView graph, String type) {
+        assert(graph != null);
+        // It MAY be that for the case in which this function is called (expression indexes), the column's
+        // table name is not specified (and not missed?).
+        // It is possible to "correct" that here by cribbing it from the supplied table (base table for the index)
+        // -- not bothering for now.
+        Column column;
+        
+        if (type == "vertex")
+        	column = graph.getVertexprops().getExact(m_columnName);
+        else column = graph.getEdgeprops().getExact(m_columnName);
+        
+        assert(column != null);
+        m_tableName = graph.getTypeName();
+        m_columnIndex = column.getIndex();
+
+        setTypeSizeBytes(column.getType(), column.getSize(), column.getInbytes());
+    }
+    
     /**
      * Given an input schema, resolve the TVE
      * expressions.
@@ -441,12 +490,12 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     private String chooseTwoNames(String name, String alias) {
-        if (name != null) {
+        if (name != null) {        	
             if (alias != null && !name.equals(alias)) {
                 return String.format("%s(%s)", name, alias);
             } else {
                 return name;
-            }
+            }            
         } else if (alias != null) {
             return String.format ("(%s)", alias);
         } else {
@@ -454,6 +503,24 @@ public class TupleValueExpression extends AbstractValueExpression {
         }
     }
 
+    private String chooseThreeNames(String name, String alias, String object) {
+        if (name != null) {
+    		
+        	String fullname = (object != null)? name+"."+object : name;
+        	
+            if (alias != null && !name.equals(alias)) {
+                return String.format("%s(%s)", fullname, alias);
+            } else {
+                return fullname;
+            }
+            
+        } else if (alias != null) {
+            return String.format ("(%s)", alias);
+        } else {
+            return "<none>";
+        }
+    }
+    
     public final boolean needsDifferentiation() {
         return m_needsDifferentiation;
     }
@@ -466,7 +533,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected String getExpressionNodeNameForToString() {
         return String.format("%s: %s.%s(index:%d, diff'tor:%d)",
                              super.getExpressionNodeNameForToString(),
-                             chooseTwoNames(m_tableName, m_tableAlias),
+                             chooseThreeNames(m_tableName, m_tableAlias, m_tableObject),
                              chooseTwoNames(m_columnName, m_columnAlias),
                              m_columnIndex, m_differentiator);
     }

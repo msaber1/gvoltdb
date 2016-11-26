@@ -945,7 +945,8 @@ public class TestJSONInterface extends TestCase {
 
         // If this line doesn't compile, right click the file in the package explorer.
             // Select the properties menu. Set the text file encoding to UTF-8.
-            char[] test1 = {'こ', 'ん', 'に', 'ち', 'は'};
+            // should be japanese letters
+            char[] test1 = new char[5];
             String test2 = new String(test1);
 
             ParameterSet pset = ParameterSet.emptyParameterSet();

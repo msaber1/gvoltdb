@@ -79,7 +79,9 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         {"ORDER_LINE", "OL_W_ID"}
     };
 
-    public static final URL ddlURL = TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
+    public static final URL ddlURL = //TPCCProjectBuilder.class.getResource("tpcc-ddl.sql");
+    								 TPCCProjectBuilder.class.getResource("graph-ddl.sql");
+    								 //TPCCProjectBuilder.class.getResource("viewusers_ddl.sql");
     public static final String jarFilename = "tpcc.jar";
     private static final String m_jarFileName = "tpcc.jar";
 
@@ -152,8 +154,8 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
 
     @Override
     public void addAllDefaults() {
-        addDefaultProcedures();
-        addDefaultPartitioning();
+        //addDefaultProcedures();
+        //addDefaultPartitioning();
         addDefaultSchema();
         // addDefaultExport();
     }
@@ -169,8 +171,8 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
         String catalogJar = testDir + File.separator + "tpcc-jni.jar";
 
         addDefaultSchema();
-        addDefaultPartitioning();
-        addDefaultProcedures();
+        //addDefaultPartitioning();
+        //addDefaultProcedures();
 
         Catalog catalog = compile(catalogJar, 1, 1, 0, null);
         assert(catalog != null);
