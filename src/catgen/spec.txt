@@ -149,20 +149,6 @@ begin GraphView                              "A graph view in the database"
   string signature                           "Catalog version independent signature of the graph view consisting of name and schema"
 end
 
-begin Vertex                    "A vertex in a graph view"
-  int id                        "ID of vertex"
-  Edge* outEdges                "List of outgoing edges"
-  Edge* inEdges                 "List of ingoing edges"
-  GraphView? parentView         "The reference to the hosting graph view"
-end
-
-begin Edge                      "An edge in a graph view"
-  int id                        "ID of edge"
-  Vertex? from                  "The source vertex of the edge"
-  Vertex? to                    "The destination vertex of the edge"
-  GraphView? parentView         "The reference to the hosting graph view"
-end
-
 begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"
   Statement* fallbackQueryStmts         "Statements to search for mview min/max fallback value"
   Statement* createQuery                "The SELECT statement that defines the view"
