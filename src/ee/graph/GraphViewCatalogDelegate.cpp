@@ -12,6 +12,12 @@
 
 
 #include "GraphView.h"
+#include "GraphViewFactory.h"
+#include "catalog/graphview.h"
+
+#include "catalog/table.h"
+#include "catalog/column.h"
+#include "catalog/columnref.h"
 
 #include <boost/algorithm/string.hpp>
 #include <boost/foreach.hpp>
@@ -40,7 +46,68 @@ GraphView *GraphViewCatalogDelegate::getGraphView() const {
 void GraphViewCatalogDelegate::init(catalog::Database const &catalogDatabase,
 	            catalog::GraphView const &catalogGraphView)
 {
+	m_graphView = constructGraphViewFromCatalog(catalogDatabase,
+	                                        catalogGraphView);
+	if (!m_graphView) {
+	        return;
+	}
 
+	/*
+	evaluateExport(catalogDatabase, catalogTable);
+
+	// configure for stats tables
+	PersistentTable* persistenttable = dynamic_cast<PersistentTable*>(m_table);
+	if (persistenttable) {
+	      persistenttable->configureIndexStats();
+	}
+	*/
+	m_graphView->incrementRefcount();
+}
+
+GraphView *GraphViewCatalogDelegate::GraphViewCatalogDelegate(catalog::Database const &catalogDatabase,
+	                                     catalog::GraphView const &catalogGraphView,
+	                                     int graphViewAllocationTargetSize = 0)
+{
+	LogManager::GLog("GraphViewCatalogDelegate", "GraphViewCatalogDelegate", 65, "graphViewName = " + catalogGraphView.name());
+	// Create a persistent graph view for this table in our catalog
+	int32_t graphView_id = catalogGraphView.relativeIndex();
+	std::stringstream params;
+	params << " graphView_id (relative index) = " << graphView_id;
+	LogManager::GLog("GraphViewCatalogDelegate", "GraphViewCatalogDelegate", 68, params.str());
+
+	// get an array of the vertex column names
+	const int numColumns = static_cast<int>(catalogGraphView.VTable()->columns().size());
+	map<string, catalog::Column*>::const_iterator col_iterator;
+	vector<string> columnNamesVertex(numColumns + 2);
+	int colIndex;
+	for (col_iterator = catalogGraphView.VTable()->columns().begin();
+		 col_iterator != catalogGraphView.VTable()->columns().end();
+		 col_iterator++)
+	{
+		const catalog::Column *catalog_column = col_iterator->second;
+		colIndex = catalog_column->index();
+		columnNamesVertex[colIndex] = catalog_column->name();
+	}
+	columnNamesVertex[++colIndex] = "fanOut";
+	columnNamesVertex[++colIndex] = "fanIn";
+
+
+	// get the schema for the table
+	TupleSchema *schema = createVertexTupleSchema(catalogDatabase, catalogGraphView);
+
+	const string& graphViewName = catalogGraphView.name();
+	int32_t databaseId = catalogDatabase.relativeIndex();
+	SHA1_CTX shaCTX;
+	SHA1Init(&shaCTX);
+	SHA1Update(&shaCTX, reinterpret_cast<const uint8_t *>(catalogGraphView.signature().c_str()), (uint32_t )::strlen(catalogGraphView.signature().c_str()));
+	SHA1Final(reinterpret_cast<unsigned char *>(m_signatureHash), &shaCTX);
+	// Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
+
+
+	GraphView *graphView = GraphViewFactory::createGraphView(catalogGraphView,
+			databaseId, NULL, NULL, m_signatureHash);
+
+	return graphView;
 }
 
 void GraphViewCatalogDelegate::processSchemaChanges(catalog::Database const &catalogDatabase,
@@ -71,7 +138,56 @@ void GraphViewCatalogDelegate::initEdgeTupleWithDefaultValues(Pool* pool,
 TupleSchema *GraphViewCatalogDelegate::createVertexTupleSchema(catalog::Database const &catalogDatabase,
 	                                          catalog::GraphView const &catalogGraphView)
 {
-	return NULL;
+	// Columns:
+	// Column is stored as map<String, Column*> in Catalog. We have to
+	// sort it by Column index to preserve column order.
+	catalog::Table &catalogTable = *catalogGraphView.VTable();
+	const int numColumns = static_cast<int>(catalogTable.columns().size()) + 2;
+	bool needsDRTimestamp = catalogDatabase.isActiveActiveDRed() && catalogTable.isDRed();
+	TupleSchemaBuilder schemaBuilder(numColumns,
+									 needsDRTimestamp ? 1 : 0); // number of hidden columns
+
+	map<string, catalog::Column*>::const_iterator col_iterator;
+	int colIndex;
+	for (col_iterator = catalogTable.columns().begin();
+		 col_iterator != catalogTable.columns().end(); col_iterator++) {
+
+		const catalog::Column *catalog_column = col_iterator->second;
+		colIndex = catalog_column->index();
+		schemaBuilder.setColumnAtIndex(colIndex,
+									   static_cast<ValueType>(catalog_column->type()),
+									   static_cast<int32_t>(catalog_column->size()),
+									   catalog_column->nullable(),
+									   catalog_column->inbytes());
+	}
+
+	//msaber: need to check how the name is set
+
+	schemaBuilder.setColumnAtIndex(++colIndex,
+								   ValueType::VALUE_TYPE_INTEGER,
+								   4,
+								   false,
+								   false); //not in bytes, msaber needs to check this
+	schemaBuilder.setColumnAtIndex(++colIndex,
+									   ValueType::VALUE_TYPE_INTEGER,
+									   4,
+									   false,
+									   false); //not in bytes, msaber needs to check this
+
+	if (needsDRTimestamp) {
+		// Create a hidden timestamp column for a DRed table in an
+		// active-active context.
+		//
+		// Column will be marked as not nullable in TupleSchema,
+		// because we never expect a null value here, but this is not
+		// actually enforced at runtime.
+		schemaBuilder.setHiddenColumnAtIndex(0,
+											 VALUE_TYPE_BIGINT,
+											 8,      // field size in bytes
+											 false); // nulls not allowed
+	}
+
+	return schemaBuilder.build();
 }
 TupleSchema *GraphViewCatalogDelegate::createEdgeTupleSchema(catalog::Database const &catalogDatabase,
 	    									  catalog::GraphView const &catalogGraphView)

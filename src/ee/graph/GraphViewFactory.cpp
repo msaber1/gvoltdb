@@ -13,6 +13,22 @@ GraphView* GraphViewFactory::createGraphView(string graphViewName, bool isDirect
 	return vw;
 }
 
+GraphView* GraphViewFactory::createGraphView(const catalog::GraphView &catalogGraphView,
+           voltdb::CatalogId databaseId, Table* vTable, Table* eTable, char *signature)
+{
+	GraphView* vw = new GraphView();
+	vw->m_name = catalogGraphView.name();
+	vw->m_isDirected = catalogGraphView.isDirected();
+	vw->m_vertexTable = vTable;
+	vw->m_edgeTable = eTable;
+	vw->m_databaseId = databaseId;
+	::memcpy(&(vw->m_signature), signature, 20);
+	return vw;
+}
+
+
+
+
 void GraphViewFactory::loadGraph(GraphView* vw, vector<Vertex* > vertexes, vector<Edge* > edges)
 {
 	int vCount = vertexes.size();

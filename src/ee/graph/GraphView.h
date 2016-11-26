@@ -53,10 +53,14 @@ protected:
 	std::map<int, Edge* > m_edges;
 	Table* m_vertexTable;
 	Table* m_edgeTable;
+	TupleSchema* m_vertexSchema; //will contain fanIn and fanOut as additional attributes
+	TupleSchema* m_edgeSchema; //will contain startVertexId and endVertexId as additional attributes
+	TupleSchema* m_pathSchema; //will contain startVertexId, endVertexId, and cost for now (this should change dynamically per query and should not be placed here at this level)
 	// identity information
 	CatalogId m_databaseId;
 	std::string m_name;
-
+	//SHA-1 of signature string
+	char m_signature[20];
 	//Mohamed: I think all the below ma not be needed as we will just reference the underlying tables
 
 	/*TableTuple m_tempVertexTuple;

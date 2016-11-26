@@ -117,9 +117,13 @@ namespace voltdb {
 
 // These typedefs prevent confusion in the parsing of BOOST_FOREACH.
 typedef std::pair<std::string, TableCatalogDelegate*> LabeledTCD;
+//msaber
+typedef std::pair<std::string, GraphViewCatalogDelegate*> LabeledGVCD;
 typedef std::pair<std::string, catalog::Column*> LabeledColumn;
 typedef std::pair<std::string, catalog::Index*> LabeledIndex;
 typedef std::pair<std::string, catalog::Table*> LabeledTable;
+//msaber
+typedef std::pair<std::string, catalog::GraphView*> LabeledGraphView;
 typedef std::pair<std::string, catalog::MaterializedViewInfo*> LabeledView;
 
 /**
@@ -786,7 +790,7 @@ static bool haveDifferentSchema(catalog::Table *t1, voltdb::PersistentTable *t2)
 bool
 VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 {
-	LogManager::GLog("VoltDBEngine", "processCatalogAdditions", 788, "process catalog additions");
+	LogManager::GLog("VoltDBEngine", "processCatalogAdditions", 788, "process catalog additions (tables first)");
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledTable labeledTable, m_database->tables()) {
         // get the catalog's table object
@@ -1096,6 +1100,84 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
         }
     }
 
+    //handle the graph views
+    LogManager::GLog("VoltDBEngine", "processCatalogAdditions", 1104, "process catalog additions (graph views)");
+	// iterate over all of the graph views in the new catalog
+	BOOST_FOREACH (LabeledGraphView labeledGraphView, m_database->graphViews()) {
+		// get the catalog's table object
+		catalog::GraphView *catalogGraphView = labeledGraphView.second;
+		// get the delegate for the table... add the table if it's null
+		GraphViewCatalogDelegate* gcd = findInMapOrNull(catalogGraphView->path(), m_graphViewCatalogDelegates);
+		if (!gcd) {
+			VOLT_TRACE("add a completely new graph view or rebuild an empty graph view...");
+
+			//////////////////////////////////////////
+			// add a completely new graph view
+			//////////////////////////////////////////
+			LogManager::GLog("VoltDBEngine", "processCatalogAdditions", 1117, "adding a completely new graph view for " + catalogGraphView->name());
+			gcd = new GraphViewCatalogDelegate(catalogGraphView->signature(),
+										   m_compactionThreshold);
+			// use the delegate to init the table and create indexes n' stuff
+			gcd->init(*m_database, *catalogGraphView);
+			m_catalogDelegates[catalogTable->path()] = tcd;
+			Table* table = tcd->getTable();
+			m_delegatesByName[table->name()] = tcd;
+
+			// set export info on the new table
+			StreamedTable *streamedtable = tcd->getStreamedTable();
+			if (streamedtable) {
+				streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
+				m_exportingTables[catalogTable->signature()] = streamedtable;
+
+				std::vector<catalog::MaterializedViewInfo*> survivingInfos;
+				std::vector<MaterializedViewTriggerForStreamInsert*> survivingViews;
+				std::vector<MaterializedViewTriggerForStreamInsert*> obsoleteViews;
+
+				const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
+
+				MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(streamedtable->views(),
+						views.begin(), views.end(),
+						survivingInfos, survivingViews, obsoleteViews);
+
+				for (int ii = 0; ii < survivingInfos.size(); ++ii) {
+					catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
+					PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
+					// Use the now-current definiton of the target table, to be updated later, if needed.
+					TableCatalogDelegate* targetDelegate =
+						dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
+																			m_delegatesByName));
+					PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
+					if (targetDelegate) {
+						PersistentTable* newTargetTable =
+							dynamic_cast<PersistentTable*>(targetDelegate->getTable());
+						if (newTargetTable) {
+							targetTable = newTargetTable;
+						}
+					}
+					// This guards its targetTable from accidental deletion with a refcount bump.
+					MaterializedViewTriggerForStreamInsert::build(streamedtable, targetTable, currInfo);
+					obsoleteViews.push_back(survivingViews[ii]);
+				}
+
+				BOOST_FOREACH (MaterializedViewTriggerForStreamInsert* toDrop, obsoleteViews) {
+					streamedtable->dropMaterializedView(toDrop);
+				}
+
+			}
+		}
+		else {
+
+			PersistentTable *persistentTable = tcd->getPersistentTable();
+
+			//
+			// Same schema, but TUPLE_LIMIT may change.
+			// Because there is no table rebuilt work next, no special need to take care of
+			// the new tuple limit.
+			//
+			persistentTable->setTupleLimit(catalogTable->tuplelimit());
+		}
+	}
+
     // new plan fragments are handled differently.
     return true;
 }
@@ -1111,7 +1193,7 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
 {
 	std::stringstream params;
 	//params << "catalogPayload = " << catalogPayload;
-	params << "catalogPayload = " << "ommited my msaber for simplicty";
+	params << "catalogPayload = " << "ommited my msaber for simplicity";
 	LogManager::GLog("VoltDBEngine", "updateCatalog", 1113, params.str());
     // clean up execution plans when the tables underneath might change
     if (m_plans) {
@@ -1146,9 +1228,15 @@ VoltDBEngine::updateCatalog(const int64_t timestamp, const std::string &catalogP
         VOLT_ERROR("Error processing catalog additions.");
         return false;
     }
+
     LogManager::GLog("VoltDBEngine", "updateCatalog", 1148, "just before calling VoltDBEngine.rebuildTableCollections()");
     rebuildTableCollections();
     LogManager::GLog("VoltDBEngine", "updateCatalog", 1151, "just after calling VoltDBEngine.rebuildTableCollections()");
+
+    //msaber: do similar call to re/build the graph views
+    LogManager::GLog("VoltDBEngine", "updateCatalog", 1155, "just before calling VoltDBEngine.rebuildGraphViewCollections()");
+    rebuildGraphViewCollections();
+    LogManager::GLog("VoltDBEngine", "updateCatalog", 1157, "just after calling VoltDBEngine.rebuildGraphViewCollections()");
 
     initMaterializedViewsAndLimitDeletePlans();
 
@@ -1227,6 +1315,71 @@ void VoltDBEngine::rebuildTableCollections()
             continue;
         }
         Table* localTable = tcd->getTable();
+        LogManager::GLog("VoltDBEngine", "rebuildTableCollections", 1128, "tableName = " + localTable->name());
+        assert(localTable);
+        if (!localTable) {
+            VOLT_ERROR("DEBUG-NULL");//:%s", cd.first.c_str());
+            std::cout << "DEBUG-NULL:" << cd.first << std::endl;
+            continue;
+        }
+        assert(m_database);
+        catalog::Table *catTable = m_database->tables().get(localTable->name());
+        int32_t relativeIndexOfTable = catTable->relativeIndex();
+        m_tables[relativeIndexOfTable] = localTable;
+        m_tablesByName[tcd->getTable()->name()] = localTable;
+
+        TableStats* stats;
+        PersistentTable* persistentTable = tcd->getPersistentTable();
+        if (persistentTable) {
+            stats = persistentTable->getTableStats();
+            if (!tcd->materialized()) {
+                int64_t hash = *reinterpret_cast<const int64_t*>(tcd->signatureHash());
+                m_tablesBySignatureHash[hash] = persistentTable;
+            }
+
+            // add all of the indexes to the stats source
+            const std::vector<TableIndex*>& tindexes = persistentTable->allIndexes();
+            BOOST_FOREACH (TableIndex *index, tindexes) {
+                getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
+                                                      relativeIndexOfTable,
+                                                      index->getIndexStats());
+            }
+        }
+        else {
+            stats = tcd->getStreamedTable()->getTableStats();
+        }
+        getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
+                                              relativeIndexOfTable,
+                                              stats);
+
+    }
+    resetDRConflictStreamedTables();
+}
+
+
+void VoltDBEngine::rebuildGraphViewCollections()
+{
+    // 1. See header comments explaining m_snapshottingTables.
+    // 2. Don't clear m_exportTables. They are still exporting, even if deleted.
+    // 3. Clear everything else.
+    //m_tables.clear();
+	m_graphViews.clear();
+    //m_tablesByName.clear();
+	m_graphViewsByName.clear();
+    //m_tablesBySignatureHash.clear();
+
+    // need to re-map all the table ids / indexes
+    //getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
+    //getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
+
+    // walk the table delegates and update local table collections
+    BOOST_FOREACH (LabeledGVCD cd, m_graphViewCatalogDelegates) {
+        GraphViewCatalogDelegate *gcd = cd.second;
+        assert(gcd);
+        if (!gcd) {
+            continue;
+        }
+        GraphView* localTable = gcd->getGraphView();
         LogManager::GLog("VoltDBEngine", "rebuildTableCollections", 1128, "tableName = " + localTable->name());
         assert(localTable);
         if (!localTable) {

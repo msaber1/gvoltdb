@@ -402,6 +402,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         void rebuildTableCollections();
 
+        //msaber: added to build the graph view collections
+        void rebuildGraphViewCollections();
+
         int64_t tempTableMemoryLimit() const {
             return m_tempTableMemoryLimit;
         }
@@ -491,14 +494,28 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         /*
          * Catalog delegates hashed by path.
          */
+        //msaber: key is the table path
         std::map<std::string, TableCatalogDelegate*> m_catalogDelegates;
+        //msaber: key is the table name
         std::map<std::string, TableCatalogDelegate*> m_delegatesByName;
+
+        //msaber: adding the corresponding collections for the graph views
+        //key is the graph view path
+        std::map<std::string, GraphViewCatalogDelegate*> m_graphViewCatalogDelegates;
+        //key is the graph view name
+        std::map<std::string, GraphViewCatalogDelegate*> m_graphViewDelegatesByName;
 
         // map catalog table id to table pointers
         std::map<CatalogId, Table*> m_tables;
 
+        //msaber: map catalog graphview id to graphview pointers
+        std::map<CatalogId, GraphView*> m_graphViews;
+
         // map catalog table name to table pointers
         std::map<std::string, Table*> m_tablesByName;
+
+        //msaber: map catalog graphview name to graphview pointers
+        std::map<std::string, GraphView*> m_graphViewsByName;
 
         /*
          * Map of catalog table ids to snapshotting tables.

@@ -15,6 +15,8 @@ public:
 	~GraphViewFactory(void);
 
 	static GraphView* createGraphView(string graphViewName, bool isDirected);
+	static GraphView* createGraphView(const catalog::GraphView &catalogGraphView,
+	           voltdb::CatalogId databaseId, Table* vTable, Table* eTable, char *signature);
 	static void loadGraph(GraphView* vw, vector<Vertex* > vertexes, vector<Edge* > edges);
 	static void printGraphView(GraphView* gview);
 };
