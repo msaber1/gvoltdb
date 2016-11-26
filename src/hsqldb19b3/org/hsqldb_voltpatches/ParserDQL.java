@@ -3932,8 +3932,8 @@ public class ParserDQL extends ParserBase {
         String  prefix         = token.namePrefix;
         String  prePrefix      = token.namePrePrefix;
 
-        org.voltdb.VLog.GLog("ParserDQL", "readColumnOrFunctionExpression", 3935, 
-    			"prePrefix = "+prePrefix + " prefix = "+prefix + " name = "+name);
+        //org.voltdb.VLog.GLog("ParserDQL", "readColumnOrFunctionExpression", 3935, 
+    	//		"prePrefix = "+prePrefix + " prefix = "+prefix + " name = "+name);
         
         if (isUndelimitedSimpleName()) {
             // A VoltDB extension to augment the standard sql function set.
@@ -4009,8 +4009,8 @@ public class ParserDQL extends ParserBase {
         		column = new ExpressionColumn(prePrefix, prefix, name);
         	}
         	
-        	org.voltdb.VLog.GLog("ParserDQL", "readColumnOrFunctionExpression", 4012, 
-        			"column = " + column.getColumnName() + " object " + ((ExpressionColumn)column).getObjectName());
+        	//org.voltdb.VLog.GLog("ParserDQL", "readColumnOrFunctionExpression", 4012, 
+        	//		"column = " + column.getColumnName() + " object " + ((ExpressionColumn)column).getObjectName());
         	
             return column;
         }        

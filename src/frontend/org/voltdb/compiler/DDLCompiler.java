@@ -55,8 +55,6 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
 import org.voltdb.catalog.GraphView;
-import org.voltdb.catalog.Vertex;
-import org.voltdb.catalog.Edge;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Statement;
@@ -1377,8 +1375,8 @@ public class DDLCompiler {
         //* enable to debug */ System.out.println("DEBUG: " + m_schema);
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
 
-        org.voltdb.VLog.GLog("DDLCompiler", "compileToCatalog", 1378, 
-    			"m_fullDDL =  " + m_fullDDL);
+        //org.voltdb.VLog.GLog("DDLCompiler", "compileToCatalog", 1378, 
+    	//		"m_fullDDL =  " + m_fullDDL);
         
         // build the local catalog from the xml catalog
         for (VoltXMLElement node : m_schema.children) {
@@ -1698,8 +1696,8 @@ public class DDLCompiler {
 
         String name = node.attributes.get("name");
 
-        org.voltdb.VLog.GLog("DDLCompiler", "addTableToCatalog", 1699, 
-    			"table =  " + name);
+        //org.voltdb.VLog.GLog("DDLCompiler", "addTableToCatalog", 1699, 
+    	//		"table =  " + name);
         
         // create a table node in the catalog
         Table table = db.getTables().add(name);
@@ -1855,8 +1853,8 @@ public class DDLCompiler {
      */
     private void processGraphPropMaterializer(Database db, Table table, String query, List<Column> destColumnArray) throws VoltCompilerException {
 		
-        org.voltdb.VLog.GLog("DDLCompiler", "processGraphPropMaterializer", 1858, 
-    			"query = "+ query);
+        //org.voltdb.VLog.GLog("DDLCompiler", "processGraphPropMaterializer", 1858, 
+    	//		"query = "+ query);
     	
         // get the xml for the query
         VoltXMLElement xmlquery = null;
@@ -1882,17 +1880,17 @@ public class DDLCompiler {
 	        TupleValueExpression col = (TupleValueExpression)stmt.m_displayColumns.get(i).expression;
 	        Column destColumn = destColumnArray.get(i);
 	    	if (col != null) {
-	            org.voltdb.VLog.GLog("DDLCompiler", "processGraphPropMaterializer", 1885, 
-	            		"table =  " + table.getTypeName() +", column = " + col.getColumnName());
+	            //org.voltdb.VLog.GLog("DDLCompiler", "processGraphPropMaterializer", 1885, 
+	            //		"table =  " + table.getTypeName() +", column = " + col.getColumnName());
 	    		assert(col.getTableName().equalsIgnoreCase(table.getTypeName()));
 	            String srcColName = col.getColumnName();
 	            Column srcColumn = table.getColumns().getIgnoreCase(srcColName);
 	            destColumn.setMatviewsource(srcColumn);
 	        }
-	    	else {
-	            org.voltdb.VLog.GLog("DDLCompiler", "processGraphPropMaterializer", 1893, 
-	            		"table =  " + table.getTypeName() +", column = null");
-	    	}
+	    	//else {
+	            //org.voltdb.VLog.GLog("DDLCompiler", "processGraphPropMaterializer", 1893, 
+	            //		"table =  " + table.getTypeName() +", column = null");
+	    	//}
         }
 
 	}
@@ -1907,8 +1905,8 @@ public class DDLCompiler {
 
         String name = node.attributes.get("name");
 
-        org.voltdb.VLog.GLog("DDLCompiler", "addGraphToCatalog", 1857, 
-    			"graph =  " + name);
+        //org.voltdb.VLog.GLog("DDLCompiler", "addGraphToCatalog", 1857, 
+    	//		"graph =  " + name);
         
         // create a table node in the catalog
         GraphView graph = db.getGraphviews().add(name);

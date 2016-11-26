@@ -308,8 +308,8 @@ public class MaterializedViewProcessor {
             Table destTable = entry.getKey();
             String query = entry.getValue();
 
-            org.voltdb.VLog.GLog("MaterializedViewProcessor", "startProcessing", 309, 
-        			"table =  " + destTable.getTypeName() +", query = " + query);
+            //org.voltdb.VLog.GLog("MaterializedViewProcessor", "startProcessing", 309, 
+        	//		"table =  " + destTable.getTypeName() +", query = " + query);
             
             // get the xml for the query
             VoltXMLElement xmlquery = null;
@@ -798,8 +798,8 @@ public class MaterializedViewProcessor {
                                                       ExpressionType type, TupleValueExpression colExpr) {
 
     	if (colExpr != null) {
-        	org.voltdb.VLog.GLog("MaterializedViewProcessor", "processMaterializedViewColumn", 798, 
-        			"table =  " + srcTable.getTypeName() +", column = " + colExpr.getColumnName());
+        	//org.voltdb.VLog.GLog("MaterializedViewProcessor", "processMaterializedViewColumn", 798, 
+        	//		"table =  " + srcTable.getTypeName() +", column = " + colExpr.getColumnName());
     		assert(colExpr.getTableName().equalsIgnoreCase(srcTable.getTypeName()));
             String srcColName = colExpr.getColumnName();
             Column srcColumn = srcTable.getColumns().getIgnoreCase(srcColName);
@@ -865,8 +865,8 @@ public class MaterializedViewProcessor {
                                                     MaterializedViewHandlerInfo mvHandlerInfo)
                                                     throws VoltCompilerException {
         
-    	org.voltdb.VLog.GLog("MaterializedViewProcessor", "compileCreateQueryAndUpdateCatalog", 864, 
-    			"query =  " + query);
+    	//org.voltdb.VLog.GLog("MaterializedViewProcessor", "compileCreateQueryAndUpdateCatalog", 864, 
+    	//		"query =  " + query);
     	
     	DatabaseEstimates estimates = new DatabaseEstimates();
         // Here we are compiling the query twice:

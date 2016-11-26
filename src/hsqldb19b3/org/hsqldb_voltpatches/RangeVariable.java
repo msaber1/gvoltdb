@@ -469,12 +469,12 @@ final class RangeVariable {
         	schemaname = rangeTable.tableName.schema.name;
         }
         
-        org.voltdb.VLog.GLog("RangeVariable", "resolvesTableName", 3935, 
-    		    " e.columnName = " + e.columnName
-        	  +	" e.tableName = "+e.tableName + " tablename = "+tablename
-    		  + " tableAlias.name = "+tableAlias.name
-    		  + " e.schema = "+ e.schema + " schemaname = " + schemaname
-    		  );
+        //org.voltdb.VLog.GLog("RangeVariable", "resolvesTableName", 3935, 
+    	//	    " e.columnName = " + e.columnName
+        //	  +	" e.tableName = "+e.tableName + " tablename = "+tablename
+    	//	  + " tableAlias.name = "+tableAlias.name
+    	//	  + " e.schema = "+ e.schema + " schemaname = " + schemaname
+    	//	  );
         
         if (e.schema == null) {
             if (tableAlias == null) {

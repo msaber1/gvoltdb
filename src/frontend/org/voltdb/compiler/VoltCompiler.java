@@ -1183,8 +1183,8 @@ public class VoltCompiler {
         ddlcompiler.loadAutogenExportTableSchema(db, previousDBIfAny, whichProcs);
 
         ddlcompiler.compileToCatalog(db);
-        org.voltdb.VLog.GLog("VoltCompiler", "compileDatabase.compileToCatalog", 1186, 
-    			"db =  " + db);
+        //org.voltdb.VLog.GLog("VoltCompiler", "compileDatabase.compileToCatalog", 1186, 
+    	//		"db =  " + db);
 
         // add database estimates info
         addDatabaseEstimatesInfo(m_estimates, db);

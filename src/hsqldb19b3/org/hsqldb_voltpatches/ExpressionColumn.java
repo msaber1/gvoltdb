@@ -176,8 +176,8 @@ public class ExpressionColumn extends Expression {
             alias = rangeVariable.getColumnAliasName(index);
         }
         
-        org.voltdb.VLog.GLog("ExpressionColumn", "setAttributesAsColumn", 179, 
-        		"column = " + columnName+" index = "+columnIndex);
+        //org.voltdb.VLog.GLog("ExpressionColumn", "setAttributesAsColumn", 179, 
+        //		"column = " + columnName+" index = "+columnIndex);
         
         rangeVariable.addColumn(columnIndex);
     }

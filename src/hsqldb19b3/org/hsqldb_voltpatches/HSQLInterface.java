@@ -205,8 +205,8 @@ public class HSQLInterface {
         }
 
         runDDLCommand(ddl);
-        org.voltdb.VLog.GLog("HSQLInterface", "runDDLCommandAndDiff.runDDLCommand", 208, 
-    			"ddl =  " + ddl);
+        //org.voltdb.VLog.GLog("HSQLInterface", "runDDLCommandAndDiff.runDDLCommand", 208, 
+    	//		"ddl =  " + ddl);
 
         // If we expect to fail, but the statement above didn't bail...
         // (Shouldn't get here ever I think)
