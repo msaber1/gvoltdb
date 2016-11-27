@@ -1458,45 +1458,48 @@ public class ParserDQL extends ParserBase {
             hasAs = true;
         }
 
-        if (isNonCoreReservedIdentifier()) {
-            boolean limit = token.tokenType == Tokens.LIMIT
-                            || token.tokenType == Tokens.OFFSET;
-            int position = getPosition();
-
-            alias = HsqlNameManager.getSimpleName(token.tokenString,
-                                                  isDelimitedIdentifier());
-
-            read();
-
-            if (token.tokenType == Tokens.OPENBRACKET) {
-                columnNameQuoted = new BitMap(32);
-                columnList       = readColumnNames(columnNameQuoted, false);
-            } else if (!hasAs && limit) {
-                if (token.tokenType == Tokens.QUESTION
-                        || token.tokenType == Tokens.X_VALUE) {
-                    alias = null;
-
-                    rewind(position);
-                }
-            }
-        }
-
-        if (columnList != null) {
-            if (table.getColumnCount() != columnList.size()) {
-                throw Error.error(ErrorCode.X_42593);
-            }
-
-            columnNameList = new SimpleName[columnList.size()];
-
-            for (int i = 0; i < columnList.size(); i++) {
-                SimpleName name =
-                    HsqlNameManager.getSimpleName((String) columnList.get(i),
-                                                  columnNameQuoted.isSet(i));
-
-                columnNameList[i] = name;
-            }
-        }
-
+        if (token.tokenType != Tokens.EDGES) {
+        
+	        if (isNonCoreReservedIdentifier()) {
+	            boolean limit = token.tokenType == Tokens.LIMIT
+	                            || token.tokenType == Tokens.OFFSET;
+	            int position = getPosition();
+	
+	            alias = HsqlNameManager.getSimpleName(token.tokenString,
+	                                                  isDelimitedIdentifier());
+	
+	            read();
+	
+	            if (token.tokenType == Tokens.OPENBRACKET) {
+	                columnNameQuoted = new BitMap(32);
+	                columnList       = readColumnNames(columnNameQuoted, false);
+	            } else if (!hasAs && limit) {
+	                if (token.tokenType == Tokens.QUESTION
+	                        || token.tokenType == Tokens.X_VALUE) {
+	                    alias = null;
+	
+	                    rewind(position);
+	                }
+	            }
+	        }
+	
+	        if (columnList != null) {
+	            if (table.getColumnCount() != columnList.size()) {
+	                throw Error.error(ErrorCode.X_42593);
+	            }
+	
+	            columnNameList = new SimpleName[columnList.size()];
+	
+	            for (int i = 0; i < columnList.size(); i++) {
+	                SimpleName name =
+	                    HsqlNameManager.getSimpleName((String) columnList.get(i),
+	                                                  columnNameQuoted.isSet(i));
+	
+	                columnNameList[i] = name;
+	            }
+	        }
+    	}
+    
         RangeVariable range;
         if (isGraph)
         	range = new RangeVariable(graph, graphtype, alias, columnList,
