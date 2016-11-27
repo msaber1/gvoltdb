@@ -78,6 +78,7 @@ namespace catalog {
 class Catalog;
 class Database;
 class Table;
+class GraphView;
 }
 
 namespace voltdb {
@@ -91,7 +92,9 @@ class PersistentTable;
 class RecoveryProtoMsg;
 class StreamedTable;
 class Table;
+class GraphView;
 class TableCatalogDelegate;
+class GraphViewCatalogDelegate;
 class TempTableLimits;
 class Topend;
 class TheHashinator;
@@ -133,6 +136,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         TableCatalogDelegate* getTableDelegate(const std::string& name) const;
         catalog::Database* getDatabase() const { return m_database; }
         catalog::Table* getCatalogTable(const std::string& name) const;
+        //msaber
+        catalog::GraphView* getCatalogGraphView(const std::string& name) const;
         bool getIsActiveActiveDREnabled() const { return m_isActiveActiveDREnabled; }
         StreamedTable* getPartitionedDRConflictStreamedTable() const { return m_drPartitionedConflictStreamedTable; }
         StreamedTable* getReplicatedDRConflictStreamedTable() const { return m_drReplicatedConflictStreamedTable; }

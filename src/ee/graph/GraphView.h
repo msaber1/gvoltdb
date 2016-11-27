@@ -43,7 +43,7 @@ public:
 	void addEdge(int id, Edge* edge);
 	int numOfVertexes();
 	int numOfEdges();
-	string getName();
+	string name();
 	bool isDirected();
 
 	friend class GraphViewFactory;

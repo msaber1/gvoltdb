@@ -37,7 +37,7 @@ int GraphView::numOfEdges()
 	return this->m_edges.size();
 }
 
-string GraphView::getName()
+string GraphView::name()
 {
 	return m_name;
 }

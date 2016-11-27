@@ -1,4 +1,7 @@
 #include "GraphViewFactory.h"
+#include "catalog/graphview.h"
+#include "GraphView.h"
+#include "logging/LogManager.h"
 #include <iostream>
 
 using namespace std;
@@ -57,7 +60,7 @@ void GraphViewFactory::loadGraph(GraphView* vw, vector<Vertex* > vertexes, vecto
 
 void GraphViewFactory::printGraphView(GraphView* gview)
 {
-	cout << "Name: " << gview->getName() << endl;
+	cout << "Name: " << gview->name() << endl;
 	int vCount, eCount;
 	vCount = gview->numOfVertexes();
 	eCount = gview->numOfEdges();

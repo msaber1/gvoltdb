@@ -14,6 +14,9 @@
 #include "GraphView.h"
 #include "GraphViewFactory.h"
 #include "catalog/graphview.h"
+#include "sha1/sha1.h"
+#include "logging/LogManager.h"
+#include "common/TupleSchemaBuilder.h"
 
 #include "catalog/table.h"
 #include "catalog/column.h"
@@ -44,10 +47,10 @@ GraphView *GraphViewCatalogDelegate::getGraphView() const {
 }
 
 void GraphViewCatalogDelegate::init(catalog::Database const &catalogDatabase,
-	            catalog::GraphView const &catalogGraphView)
+	            catalog::GraphView const &catalogGraphView, Table* vTable, Table* eTable)
 {
 	m_graphView = constructGraphViewFromCatalog(catalogDatabase,
-	                                        catalogGraphView);
+	                                        catalogGraphView, vTable, eTable);
 	if (!m_graphView) {
 	        return;
 	}
@@ -64,11 +67,11 @@ void GraphViewCatalogDelegate::init(catalog::Database const &catalogDatabase,
 	m_graphView->incrementRefcount();
 }
 
-GraphView *GraphViewCatalogDelegate::GraphViewCatalogDelegate(catalog::Database const &catalogDatabase,
+GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Database const &catalogDatabase,
 	                                     catalog::GraphView const &catalogGraphView,
-	                                     int graphViewAllocationTargetSize = 0)
+	                                     Table* vTable, Table* eTable)
 {
-	LogManager::GLog("GraphViewCatalogDelegate", "GraphViewCatalogDelegate", 65, "graphViewName = " + catalogGraphView.name());
+	LogManager::GLog("GraphViewCatalogDelegate", "constructGraphViewFromCatalog", 71, "graphViewName = " + catalogGraphView.name());
 	// Create a persistent graph view for this table in our catalog
 	int32_t graphView_id = catalogGraphView.relativeIndex();
 	std::stringstream params;
@@ -79,7 +82,7 @@ GraphView *GraphViewCatalogDelegate::GraphViewCatalogDelegate(catalog::Database 
 	const int numColumns = static_cast<int>(catalogGraphView.VTable()->columns().size());
 	map<string, catalog::Column*>::const_iterator col_iterator;
 	vector<string> columnNamesVertex(numColumns + 2);
-	int colIndex;
+	int colIndex = 0;
 	for (col_iterator = catalogGraphView.VTable()->columns().begin();
 		 col_iterator != catalogGraphView.VTable()->columns().end();
 		 col_iterator++)
@@ -93,9 +96,9 @@ GraphView *GraphViewCatalogDelegate::GraphViewCatalogDelegate(catalog::Database 
 
 
 	// get the schema for the table
-	TupleSchema *schema = createVertexTupleSchema(catalogDatabase, catalogGraphView);
+	//TupleSchema *schema = createVertexTupleSchema(catalogDatabase, catalogGraphView);
 
-	const string& graphViewName = catalogGraphView.name();
+	//const string& graphViewName = catalogGraphView.name();
 	int32_t databaseId = catalogDatabase.relativeIndex();
 	SHA1_CTX shaCTX;
 	SHA1Init(&shaCTX);
@@ -103,9 +106,8 @@ GraphView *GraphViewCatalogDelegate::GraphViewCatalogDelegate(catalog::Database 
 	SHA1Final(reinterpret_cast<unsigned char *>(m_signatureHash), &shaCTX);
 	// Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
 
-
 	GraphView *graphView = GraphViewFactory::createGraphView(catalogGraphView,
-			databaseId, NULL, NULL, m_signatureHash);
+			databaseId, vTable, eTable, m_signatureHash);
 
 	return graphView;
 }
@@ -141,16 +143,16 @@ TupleSchema *GraphViewCatalogDelegate::createVertexTupleSchema(catalog::Database
 	// Columns:
 	// Column is stored as map<String, Column*> in Catalog. We have to
 	// sort it by Column index to preserve column order.
-	catalog::Table &catalogTable = *catalogGraphView.VTable();
-	const int numColumns = static_cast<int>(catalogTable.columns().size()) + 2;
-	bool needsDRTimestamp = catalogDatabase.isActiveActiveDRed() && catalogTable.isDRed();
+	const catalog::Table *catalogTable = catalogGraphView.VTable();
+	const int numColumns = static_cast<int>(catalogTable->columns().size()) + 2;
+	bool needsDRTimestamp = catalogDatabase.isActiveActiveDRed() && catalogTable->isDRed();
 	TupleSchemaBuilder schemaBuilder(numColumns,
 									 needsDRTimestamp ? 1 : 0); // number of hidden columns
 
 	map<string, catalog::Column*>::const_iterator col_iterator;
-	int colIndex;
-	for (col_iterator = catalogTable.columns().begin();
-		 col_iterator != catalogTable.columns().end(); col_iterator++) {
+	int colIndex = 0;
+	for (col_iterator = catalogTable->columns().begin();
+		 col_iterator != catalogTable->columns().end(); col_iterator++) {
 
 		const catalog::Column *catalog_column = col_iterator->second;
 		colIndex = catalog_column->index();

@@ -1,12 +1,18 @@
 #ifndef GRAPHVIEWFACTORY_H
 #define GRAPHVIEWFACTORY_H
 
-#include "GraphView.h"
+//#include "GraphView.h"
 #include "Edge.h"
 #include "Vertex.h"
 #include <string>
 
+namespace catalog {
+class GraphView;
+}
+
 namespace voltdb {
+
+class GraphView;
 
 class GraphViewFactory
 {

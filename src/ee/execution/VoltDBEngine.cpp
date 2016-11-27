@@ -59,6 +59,7 @@
 #include "catalog/planfragment.h"
 #include "catalog/statement.h"
 #include "catalog/table.h"
+#include "catalog/graphview.h"
 #include "common/ElasticHashinator.h"
 #include "common/executorcontext.hpp"
 #include "common/FailureInjection.h"
@@ -76,10 +77,12 @@
 #include "plannodes/plannodefragment.h"
 #include "storage/tablefactory.h"
 #include "storage/persistenttable.h"
+#include "graph/GraphView.h"
 #include "storage/streamedtable.h"
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/TableCatalogDelegate.hpp"
+#include "graph/GraphViewCatalogDelegate.h"
 #include "storage/CompatibleDRTupleStream.h"
 #include "storage/DRTupleStream.h"
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
@@ -105,6 +108,7 @@ ENABLE_BOOST_FOREACH_ON_CONST_MAP(Column);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Index);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(MaterializedViewInfo);
 ENABLE_BOOST_FOREACH_ON_CONST_MAP(Table);
+ENABLE_BOOST_FOREACH_ON_CONST_MAP(GraphView); //msaber
 
 static const size_t PLAN_CACHE_SIZE = 1000;
 // how many initial tuples to scan before calling into java
@@ -332,6 +336,17 @@ catalog::Table* VoltDBEngine::getCatalogTable(const std::string& name) const {
         catalog::Table *catalogTable = labeledTable.second;
         if (catalogTable->name() == name) {
             return catalogTable;
+        }
+    }
+    return NULL;
+}
+
+catalog::GraphView* VoltDBEngine::getCatalogGraphView(const std::string& name) const {
+    // iterate over all of the tables in the new catalog
+    BOOST_FOREACH (LabeledGraphView labeledTable, m_database->graphViews()) {
+        catalog::GraphView *catalogGraphView = labeledTable.second;
+        if (catalogGraphView->name() == name) {
+            return catalogGraphView;
         }
     }
     return NULL;
@@ -1118,63 +1133,29 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 			gcd = new GraphViewCatalogDelegate(catalogGraphView->signature(),
 										   m_compactionThreshold);
 			// use the delegate to init the table and create indexes n' stuff
-			gcd->init(*m_database, *catalogGraphView);
-			m_catalogDelegates[catalogTable->path()] = tcd;
-			Table* table = tcd->getTable();
-			m_delegatesByName[table->name()] = tcd;
-
-			// set export info on the new table
-			StreamedTable *streamedtable = tcd->getStreamedTable();
-			if (streamedtable) {
-				streamedtable->setSignatureAndGeneration(catalogTable->signature(), timestamp);
-				m_exportingTables[catalogTable->signature()] = streamedtable;
-
-				std::vector<catalog::MaterializedViewInfo*> survivingInfos;
-				std::vector<MaterializedViewTriggerForStreamInsert*> survivingViews;
-				std::vector<MaterializedViewTriggerForStreamInsert*> obsoleteViews;
-
-				const catalog::CatalogMap<catalog::MaterializedViewInfo> & views = catalogTable->views();
-
-				MaterializedViewTriggerForStreamInsert::segregateMaterializedViews(streamedtable->views(),
-						views.begin(), views.end(),
-						survivingInfos, survivingViews, obsoleteViews);
-
-				for (int ii = 0; ii < survivingInfos.size(); ++ii) {
-					catalog::MaterializedViewInfo * currInfo = survivingInfos[ii];
-					PersistentTable* oldTargetTable = survivingViews[ii]->targetTable();
-					// Use the now-current definiton of the target table, to be updated later, if needed.
-					TableCatalogDelegate* targetDelegate =
-						dynamic_cast<TableCatalogDelegate*>(findInMapOrNull(oldTargetTable->name(),
-																			m_delegatesByName));
-					PersistentTable* targetTable = oldTargetTable; // fallback value if not (yet) redefined.
-					if (targetDelegate) {
-						PersistentTable* newTargetTable =
-							dynamic_cast<PersistentTable*>(targetDelegate->getTable());
-						if (newTargetTable) {
-							targetTable = newTargetTable;
-						}
-					}
-					// This guards its targetTable from accidental deletion with a refcount bump.
-					MaterializedViewTriggerForStreamInsert::build(streamedtable, targetTable, currInfo);
-					obsoleteViews.push_back(survivingViews[ii]);
-				}
-
-				BOOST_FOREACH (MaterializedViewTriggerForStreamInsert* toDrop, obsoleteViews) {
-					streamedtable->dropMaterializedView(toDrop);
-				}
-
+			Table* vTable = findInMapOrNull(catalogGraphView->VTable()->path(), m_catalogDelegates)->getTable();
+			Table* eTable = findInMapOrNull(catalogGraphView->ETable()->path(), m_catalogDelegates)->getTable();
+			if (vTable == NULL || eTable == NULL)
+			{
+				LogManager::GLog("VoltDBEngine", "processCatalogAdditions", 1125, "unable to get vTable or eTable or both");
+				continue;
 			}
+			LogManager::GLog("VoltDBEngine", "processCatalogAdditions", 1128, "before calling gcd.init");
+			gcd->init(*m_database, *catalogGraphView, vTable, eTable);
+			m_graphViewCatalogDelegates[catalogGraphView->path()] = gcd;
+			GraphView* graphView = gcd->getGraphView();
+			m_graphViewDelegatesByName[graphView->name()] = gcd;
 		}
 		else {
-
-			PersistentTable *persistentTable = tcd->getPersistentTable();
+			//msaber: nothing to do here for now
+			//GraphView *graphView = gcd->getGraphView();
 
 			//
 			// Same schema, but TUPLE_LIMIT may change.
 			// Because there is no table rebuilt work next, no special need to take care of
 			// the new tuple limit.
 			//
-			persistentTable->setTupleLimit(catalogTable->tuplelimit());
+			//persistentTable->setTupleLimit(catalogTable->tuplelimit());
 		}
 	}
 
@@ -1379,44 +1360,21 @@ void VoltDBEngine::rebuildGraphViewCollections()
         if (!gcd) {
             continue;
         }
-        GraphView* localTable = gcd->getGraphView();
-        LogManager::GLog("VoltDBEngine", "rebuildTableCollections", 1128, "tableName = " + localTable->name());
-        assert(localTable);
-        if (!localTable) {
+        GraphView* localGraphView = gcd->getGraphView();
+        LogManager::GLog("VoltDBEngine", "rebuildTableCollections", 1128, "tableName = " + localGraphView->name());
+        assert(localGraphView);
+        if (!localGraphView) {
             VOLT_ERROR("DEBUG-NULL");//:%s", cd.first.c_str());
             std::cout << "DEBUG-NULL:" << cd.first << std::endl;
             continue;
         }
         assert(m_database);
-        catalog::Table *catTable = m_database->tables().get(localTable->name());
-        int32_t relativeIndexOfTable = catTable->relativeIndex();
-        m_tables[relativeIndexOfTable] = localTable;
-        m_tablesByName[tcd->getTable()->name()] = localTable;
+        catalog::GraphView *catGraphView = m_database->graphViews().get(localGraphView->name());
+        int32_t relativeIndexOfGraphView = catGraphView->relativeIndex();
+        m_graphViews[relativeIndexOfGraphView] = localGraphView;
+        m_graphViewsByName[gcd->getGraphView()->name()] = localGraphView;
 
-        TableStats* stats;
-        PersistentTable* persistentTable = tcd->getPersistentTable();
-        if (persistentTable) {
-            stats = persistentTable->getTableStats();
-            if (!tcd->materialized()) {
-                int64_t hash = *reinterpret_cast<const int64_t*>(tcd->signatureHash());
-                m_tablesBySignatureHash[hash] = persistentTable;
-            }
-
-            // add all of the indexes to the stats source
-            const std::vector<TableIndex*>& tindexes = persistentTable->allIndexes();
-            BOOST_FOREACH (TableIndex *index, tindexes) {
-                getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_INDEX,
-                                                      relativeIndexOfTable,
-                                                      index->getIndexStats());
-            }
-        }
-        else {
-            stats = tcd->getStreamedTable()->getTableStats();
-        }
-        getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
-                                              relativeIndexOfTable,
-                                              stats);
-
+       //stats should be handled here later
     }
     resetDRConflictStreamedTables();
 }
