@@ -333,6 +333,10 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const
     table->serializeTo(out);
 }
 
+int64_t VoltDBEngine::getSiteId() {
+    return m_siteId;
+}
+
 // ------------------------------------------------------------------
 // EXECUTION FUNCTIONS
 // ------------------------------------------------------------------
@@ -563,6 +567,13 @@ bool VoltDBEngine::send(Table* dependency) {
 
 int VoltDBEngine::loadNextDependency(Table* destination) {
     return m_topend->loadNextDependency(m_currentInputDepId, &m_stringPool, destination);
+}
+
+// -------------------------------------------------
+// Request Data Functions
+// -------------------------------------------------
+int VoltDBEngine::invokeRequestData(Table* destination, long destinationHsId) {
+    return m_topend->invokeRequestData(destination, &m_stringPool, destinationHsId);
 }
 
 // -------------------------------------------------

@@ -61,6 +61,8 @@ public:
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
+    int invokeRequestData(Table* destination, Pool *stringPool, long destinationHsId);
+
 private:
     JNIEnv *m_jniEnv;
 
@@ -79,9 +81,11 @@ private:
     jmethodID m_pushDRBufferMID;
     jmethodID m_reportDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
+    jmethodID m_requestDataMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_encoderClass;
+    jclass m_javaExecutionEngineClass;
 };
 
 }
