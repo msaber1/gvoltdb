@@ -79,6 +79,8 @@ class Topend {
     /** Calls the java method in org.voltdb.utils.Encoder */
     virtual std::string decodeBase64AndDecompress(const std::string& buffer) = 0;
 
+    virtual int invokeRequestData(Table* destination, Pool *stringPool, long destinationHsId) = 0;
+
     virtual ~Topend()
     {
     }
@@ -117,6 +119,8 @@ public:
     void fallbackToEEAllocatedBuffer(char *buffer, size_t length);
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
+
+    int invokeRequestData(Table* destination, Pool *stringPool, long destinationHsId);
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;

@@ -17,11 +17,13 @@
 
 package org.voltdb.iv2;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Semaphore;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -30,6 +32,9 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
@@ -38,9 +43,14 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RepairLogTruncationMessage;
+import org.voltdb.messaging.RequestDataMessage;
+import org.voltdb.messaging.RequestDataResponseMessage;
 
 import com.google_voltpatches.common.base.Supplier;
-import org.voltdb.messaging.RepairLogTruncationMessage;
+
+
+
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -70,12 +80,41 @@ public class InitiatorMailbox implements Mailbox
     private long m_hsId;
     private RepairAlgo m_algo;
 
+    private Semaphore m_sem;
+    private boolean m_ready;
+    private byte[] output;
+
+    ArrayList<VoltTable> m_requestData = new ArrayList<VoltTable>();
+
     /*
      * Hacky global map of initiator mailboxes to support assertions
      * that verify the locking is kosher
      */
     public static final CopyOnWriteArrayList<InitiatorMailbox> m_allInitiatorMailboxes
                                                                          = new CopyOnWriteArrayList<InitiatorMailbox>();
+
+    // the cluster node that requested for data is blocked until data arrives
+    public void waitSem() throws InterruptedException {
+        m_sem.acquire();
+    }
+
+    // the cluster node that requested for data is ready to retrieve data
+    public void signalSem() {
+        m_sem.release();
+    }
+
+    // returns the semaphore of this cluster node
+    public void setReady() {
+        m_ready = true;
+    }
+
+    public ArrayList<VoltTable> getRequestData() {
+        return m_requestData;
+    }
+
+    public void setRequestData(ArrayList<VoltTable> tables) {
+        m_requestData = tables;
+    }
 
     synchronized public void setLeaderState(long maxSeenTxnId)
     {
@@ -141,6 +180,9 @@ public class InitiatorMailbox implements Mailbox
         m_messenger = messenger;
         m_repairLog = repairLog;
         m_joinProducer = joinProducer;
+
+        m_sem = new Semaphore(0);
+        m_ready = false;
 
         m_masterLeaderCache = new LeaderCache(m_messenger.getZK(), VoltZK.iv2masters);
         try {
@@ -296,6 +338,18 @@ public class InitiatorMailbox implements Mailbox
             m_repairLog.deliver(message);
             return;
         }
+        else if (message instanceof RequestDataMessage) {
+            handleRequestDataMessage((RequestDataMessage)message);
+            return;
+        }
+        else if (message instanceof RequestDataResponseMessage) {
+            if (m_ready) {
+                return;
+            }
+
+            handleRequestDataResponseMessage((RequestDataResponseMessage)message);
+            return;
+        }
         m_repairLog.deliver(message);
         if (canDeliver) {
             m_scheduler.deliver(message);
@@ -354,6 +408,92 @@ public class InitiatorMailbox implements Mailbox
     public void setHSId(long hsId)
     {
         this.m_hsId = hsId;
+    }
+
+    /*
+     * Handles RequestDataMessage
+     */
+    public void handleRequestDataMessage(RequestDataMessage message)
+    {
+        // if the message is sent from node 0 to node 1,
+        // send the message from node 1 to node 2
+        //    CoreUtils.getSiteIdFromHSId(hsId)
+        if ((message.getDestinationSiteId()>>32) == 1) {
+            RequestDataMessage send =
+                new RequestDataMessage(message.getDestinationSiteId(), (2L<<32), message);
+
+            send.setRequestDestinations(message.getRequestDestinations());
+
+            send.pushRequestDestination(message.getDestinationSiteId());
+
+            send.setSender(message.getSender());
+
+            send(send.getDestinationSiteId(), send);
+
+//System.out.println("Init: request data from:"
+        //+ (message.getInitiatorHSId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
+            return;
+        }
+
+        RequestDataResponseMessage response =
+            new RequestDataResponseMessage(message, message.getInitiatorHSId());
+
+        response.setRequestDestinations(message.getRequestDestinations());
+
+        response.setSender(message.getSender());
+
+        send(response.getDestinationSiteId(), response);
+
+//System.out.println("Init: request data from:"
+        //+ (message.getInitiatorHSId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
+    }
+
+    /*
+     * Handles RequestDataResponseMessage
+     */
+    public void handleRequestDataResponseMessage(RequestDataResponseMessage message)
+    {
+        // if the messages need to return sequentially,
+        // then pop the destination Id and send the response message to the destination
+        if (message.getRequestDestinations().size() >= 1) {
+            RequestDataResponseMessage response =
+                new RequestDataResponseMessage(message.getRequestDestination(), message.popRequestDestination(), message);
+
+            //    set response destination
+            response.setRequestDestinations(message.getRequestDestinations());
+
+            //    add data to the message
+            ArrayList<VoltTable> oldTables = message.getRequestDatas();
+
+            for (int i=0; i<oldTables.size(); i++) {
+                response.pushRequestData(oldTables.get(i));
+            }
+
+            VoltTable table = new VoltTable(
+                    new VoltTable.ColumnInfo("name",VoltType.STRING),
+                    new VoltTable.ColumnInfo("age",VoltType.INTEGER));
+
+            table.addRow(new Object[] {"James", (25 + (response.getDestinationSiteId()>>32))});
+
+            response.pushRequestData(table);
+
+            response.setSender(message.getSender());
+
+            send(response.getDestinationSiteId(), response);
+
+            if (message.getRequestDestinations().isEmpty()) {
+            	InitiatorMailbox sender = message.getSender();
+            	sender.setRequestData(response.getRequestDatas());
+            	sender.setReady();
+            	sender.signalSem();
+            }
+
+
+//System.out.println("Init: request data response from:"
+        //+ (message.getExecutorSiteId()>>32) + " to: " + (response.getDestinationSiteId()>>32));
+
+            return;
+        }
     }
 
     /** Produce the repair log. This is idempotent. */
@@ -429,5 +569,67 @@ public class InitiatorMailbox implements Mailbox
     public void notifyOfSnapshotNonce(String nonce, long snapshotSpHandle) {
         if (m_joinProducer == null) return;
         m_joinProducer.notifyOfSnapshotNonce(nonce, snapshotSpHandle);
+    }
+
+    /**
+     * Returns requested data from other from other cluster nodes.
+     * @param destinationId Host id of the node that holds the data
+     * @return VoltTable serialized in bytes
+     */
+    public byte[] requestData(long destinationId) throws InterruptedException {
+        output = null;
+
+        long src = m_hsId;
+        long dest = destinationId << 32;
+
+        //    create message
+        RequestDataMessage req = new RequestDataMessage(src,dest,482934<<32,547089402<<32,false,false);
+
+        //    set returning destination
+        ArrayList<Long> destList = new ArrayList<Long>();
+        destList.add(src);
+        req.setRequestDestinations(destList);
+
+        req.setSender(this);
+
+        //    send message
+        send(req.getDestinationSiteId(), req);
+
+//System.out.println("sending");
+
+        m_sem.acquire();
+
+//System.out.println("waiting for final message");
+
+        if (m_requestData.size() == 0)
+            return output;
+
+        VoltTable outTable = new VoltTable(m_requestData.get(0).getTableSchema());
+
+        for (int i=0; i<m_requestData.size(); i++) {
+            VoltTable table = m_requestData.get(i);
+
+            for (int j=0; j<table.getRowCount(); j++) {
+                VoltTableRow row = table.fetchRow(j);
+                outTable.add(row);
+            }
+        }
+
+//System.out.println(outTable.toFormattedString());
+
+        ByteBuffer bb = outTable.getBuffer();
+        ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
+        bb.rewind();
+        clone.put(bb);
+        bb.rewind();
+        clone.flip();
+
+        byte[] ba = clone.array();
+        int length = ba.length;
+
+        output = new byte[length];
+        System.arraycopy(ba, 0, output, 0, ba.length);
+
+        return output;
     }
 }
