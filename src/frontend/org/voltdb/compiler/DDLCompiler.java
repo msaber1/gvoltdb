@@ -54,6 +54,7 @@ import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
+import org.voltdb.catalog.GraphView;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Statement;
@@ -74,8 +75,10 @@ import org.voltdb.parser.HSQLLexer;
 import org.voltdb.parser.SQLLexer;
 import org.voltdb.parser.SQLParser;
 import org.voltdb.planner.AbstractParsedStmt;
+import org.voltdb.planner.ParsedColInfo;
 import org.voltdb.planner.ParsedSelectStmt;
 import org.voltdb.types.ConstraintType;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexType;
 import org.voltdb.utils.BuildDirectoryUtils;
 import org.voltdb.utils.CatalogSchemaTools;
@@ -122,6 +125,7 @@ public class DDLCompiler {
     private final ClassMatcher m_classMatcher = new ClassMatcher();
 
     private final HashMap<Table, String> m_matViewMap = new HashMap<>();
+    private final HashMap<GraphView, String> m_graphViewMap = new HashMap<>();
 
     /** A cache of the XML used to do validation on LIMIT DELETE statements
      * Preserved here to avoid having to re-parse for planning */
@@ -162,6 +166,18 @@ public class DDLCompiler {
         {DR_TUPLE_COLUMN_NAME, "VARCHAR(1048576 BYTES)"},
     };
 
+    public void PrintCatalog() {
+    	/*
+    	try {
+    		System.out.println("DDLCompiler.PrintCatalog 171: ");
+			System.out.println(m_hsql.getXMLFromCatalog());
+		} catch (HSQLParseException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		*/
+    }
+    
     private static class DDLStatement {
         public DDLStatement() { }
         String statement = "";
@@ -1359,16 +1375,23 @@ public class DDLCompiler {
         //* enable to debug */ System.out.println("DEBUG: " + m_schema);
         BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", m_schema.toString(), true);
 
+        //org.voltdb.VLog.GLog("DDLCompiler", "compileToCatalog", 1378, 
+    	//		"m_fullDDL =  " + m_fullDDL);
+        
         // build the local catalog from the xml catalog
         for (VoltXMLElement node : m_schema.children) {
             if (node.name.equals("table")) {
                 addTableToCatalog(db, node);
+            }
+            if (node.name.equals("graph")) {
+                addGraphToCatalog(db, node);
             }
         }
 
         fillTrackerFromXML();
         handlePartitions(db);
         m_mvProcessor.startProcessing(db, m_matViewMap, getExportTableNames());
+        //m_mvProcessor.startProcessing(db, m_graphViewMap);
     }
 
     // Fill the table stuff in VoltDDLElementTracker from the VoltXMLElement tree at the end when
@@ -1673,6 +1696,9 @@ public class DDLCompiler {
 
         String name = node.attributes.get("name");
 
+        //org.voltdb.VLog.GLog("DDLCompiler", "addTableToCatalog", 1699, 
+    	//		"table =  " + name);
+        
         // create a table node in the catalog
         Table table = db.getTables().add(name);
         // set max value before return for view table
@@ -1821,6 +1847,324 @@ public class DDLCompiler {
         }
     }
 
+    /**
+     * Add materialized info to the catalog for the graph
+     * @throws VoltCompilerException
+     */
+    private void processGraphPropMaterializer(Database db, Table table, String query, List<Column> destColumnArray) throws VoltCompilerException {
+		
+        //org.voltdb.VLog.GLog("DDLCompiler", "processGraphPropMaterializer", 1858, 
+    	//		"query = "+ query);
+    	
+        // get the xml for the query
+        VoltXMLElement xmlquery = null;
+        try {
+            xmlquery = m_hsql.getXMLCompiledStatement(query);
+        }
+        catch (HSQLParseException e) {
+            e.printStackTrace();
+        }
+        assert(xmlquery != null);
+
+        // parse the xml like any other sql statement
+        ParsedSelectStmt stmt = null;
+        try {
+            stmt = (ParsedSelectStmt) AbstractParsedStmt.parse(query, xmlquery, null, db, null);
+        }
+        catch (Exception e) {
+            throw m_compiler.new VoltCompilerException(e.getMessage());
+        }
+        assert(stmt != null);
+        
+        for (int i = 0; i < stmt.m_displayColumns.size(); i++) {
+	        TupleValueExpression col = (TupleValueExpression)stmt.m_displayColumns.get(i).expression;
+	        Column destColumn = destColumnArray.get(i);
+	    	if (col != null) {
+	            //org.voltdb.VLog.GLog("DDLCompiler", "processGraphPropMaterializer", 1885, 
+	            //		"table =  " + table.getTypeName() +", column = " + col.getColumnName());
+	    		assert(col.getTableName().equalsIgnoreCase(table.getTypeName()));
+	            String srcColName = col.getColumnName();
+	            Column srcColumn = table.getColumns().getIgnoreCase(srcColName);
+	            destColumn.setMatviewsource(srcColumn);
+	        }
+	    	//else {
+	            //org.voltdb.VLog.GLog("DDLCompiler", "processGraphPropMaterializer", 1893, 
+	            //		"table =  " + table.getTypeName() +", column = null");
+	    	//}
+        }
+
+	}
+    
+    private void addGraphToCatalog(Database db, VoltXMLElement node)
+            throws VoltCompilerException {
+        assert node.name.equals("graph");
+
+        // Construct table-specific maps
+        HashMap<String, Column> columnMap = new HashMap<String, Column>();
+        HashMap<String, Index> indexMap = new HashMap<String, Index>();
+
+        String name = node.attributes.get("name");
+
+        //org.voltdb.VLog.GLog("DDLCompiler", "addGraphToCatalog", 1857, 
+    	//		"graph =  " + name);
+        
+        // create a table node in the catalog
+        GraphView graph = db.getGraphviews().add(name);
+        
+        String vtablename = node.attributes.get("Vtable");
+        String etablename = node.attributes.get("Etable");
+        assert(vtablename != null);
+        assert(etablename != null);
+        
+        Table Vtable = db.getTables().get(vtablename);
+        Table Etable = db.getTables().get(etablename);
+        graph.setVtable(Vtable);
+        graph.setEtable(Etable);
+        
+        String Vquery  = node.attributes.get("Vquery");
+        String Equery  = node.attributes.get("Equery");
+        assert(Vquery != null);
+        assert(Equery != null);
+        
+        boolean isdirected = Boolean.getBoolean((node.attributes.get("isdirected")));
+        
+        graph.setIsdirected(isdirected);
+        
+        // add the original DDL to the table (or null if it's not there)
+        TableAnnotation annotation = new TableAnnotation();
+        graph.setAnnotation(annotation);
+
+        // all tables start replicated
+        // if a partition is found in the project file later,
+        //  then this is reversed
+        graph.setIsreplicated(true);
+
+        // map of index replacements for later constraint fixup
+        Map<String, String> indexReplacementMap = new TreeMap<String, String>();
+
+        // Need the columnTypes sorted by column index.
+        SortedMap<Integer, VoltType> columnTypes = new TreeMap<Integer, VoltType>();
+        
+        for (VoltXMLElement subNode : node.children) {
+        	if (subNode.name.equals("vertex")) {
+                int colIndex = 0;
+                for (VoltXMLElement columnNode : subNode.children) {
+                    if (columnNode.name.equals("column")) {
+                        addPropertyToCatalog(graph, columnNode, columnTypes,
+                                columnMap, m_compiler, "vertex");
+                        colIndex++;
+                    }
+                }
+		        // TODO Add graph indexes
+        	}
+        	if (subNode.name.equals("edge")) {
+                int colIndex = 0;
+                for (VoltXMLElement columnNode : subNode.children) {
+                    if (columnNode.name.equals("column")) {
+                    	addPropertyToCatalog(graph, columnNode, columnTypes,
+                                columnMap, m_compiler, "edge");
+                        colIndex++;
+                    }
+                }
+		        // TODO Add graph indexes
+		    }
+		}
+        
+        // Set materializer for properties
+        List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(graph.getVertexprops(), "index");
+        processGraphPropMaterializer(db, Vtable, Vquery, destColumnArray);
+        destColumnArray = CatalogUtil.getSortedCatalogItems(graph.getEdgeprops(), "index");
+        processGraphPropMaterializer(db, Etable, Equery, destColumnArray);
+        destColumnArray = null;
+        
+        graph.setSignature(CatalogUtil.getSignatureForTable(name, columnTypes));
+
+        /*
+         * Validate that each variable-length column is below the max value length,
+         * and that the maximum size for the row is below the max row length.
+         */
+        int maxRowSize = 0;
+        for (Column c : columnMap.values()) {
+            VoltType t = VoltType.get((byte)c.getType());
+            if (t == VoltType.STRING && (! c.getInbytes())) {
+                // A VARCHAR column whose size is defined in characters.
+
+                if (c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER > VoltType.MAX_VALUE_LENGTH) {
+                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
+                            " specifies a maximum size of " + c.getSize() + " characters" +
+                            " but the maximum supported size is " +
+                            VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH / MAX_BYTES_PER_UTF8_CHARACTER) +
+                            " characters or " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH) + " bytes");
+                }
+                maxRowSize += 4 + c.getSize() * MAX_BYTES_PER_UTF8_CHARACTER;
+            }
+            else if (t.isVariableLength()) {
+                // A VARCHAR(<n> bytes) column, VARBINARY or GEOGRAPHY column.
+
+                if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
+                    throw m_compiler.new VoltCompilerException("Column " + name + "." + c.getName() +
+                            " specifies a maximum size of " + c.getSize() + " bytes" +
+                            " but the maximum supported size is " + VoltType.humanReadableSize(VoltType.MAX_VALUE_LENGTH));
+                }
+                maxRowSize += 4 + c.getSize();
+            }
+            else {
+                maxRowSize += t.getLengthInBytesForFixedTypes();
+            }
+        }
+
+        if (maxRowSize > MAX_ROW_SIZE) {
+            throw m_compiler.new VoltCompilerException("Error: Table " + name + " has a maximum row size of " + maxRowSize +
+                    " but the maximum supported row size is " + MAX_ROW_SIZE);
+        }
+    }
+    
+
+	private static void addPropertyToCatalog(GraphView graph,
+            VoltXMLElement node,
+            SortedMap<Integer, VoltType> columnTypes,
+            Map<String, Column> columnMap,
+            VoltCompiler compiler,
+            String proptype) throws VoltCompilerException
+    {
+        assert node.name.equals("column");
+
+        String name = node.attributes.get("name");
+        String typename = node.attributes.get("valuetype");
+        String nullable = node.attributes.get("nullable");
+        String sizeString = node.attributes.get("size");
+        int index = Integer.valueOf(node.attributes.get("index"));
+        String defaultvalue = null;
+        String defaulttype = null;
+
+        int defaultFuncID = -1;
+        
+     // Default Value
+        for (VoltXMLElement child : node.children) {
+            if (child.name.equals("default")) {
+                for (VoltXMLElement inner_child : child.children) {
+                    // Value
+                    if (inner_child.name.equals("value")) {
+                        assert(defaulttype == null); // There should be only one default value/type.
+                        defaultvalue = inner_child.attributes.get("value");
+                        defaulttype = inner_child.attributes.get("valuetype");
+                        assert(defaulttype != null);
+                    } else if (inner_child.name.equals("function")) {
+                        assert(defaulttype == null); // There should be only one default value/type.
+                        defaultFuncID = Integer.parseInt(inner_child.attributes.get("function_id"));
+                        defaultvalue = inner_child.attributes.get("name");
+                        defaulttype = inner_child.attributes.get("valuetype");
+                        assert(defaulttype != null);
+                    }
+                }
+            }
+        }
+        if (defaulttype != null) {
+            // fyi: Historically, VoltType class initialization errors get reported on this line (?).
+            defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
+        }
+
+        // replace newlines in default values
+        if (defaultvalue != null) {
+            defaultvalue = defaultvalue.replace('\n', ' ');
+            defaultvalue = defaultvalue.replace('\r', ' ');
+        }
+
+        // fyi: Historically, VoltType class initialization errors get reported on this line (?).
+        VoltType type = VoltType.typeFromString(typename);
+        columnTypes.put(index, type);
+        if (defaultFuncID == -1) {
+            if (defaultvalue != null && (type == VoltType.DECIMAL || type == VoltType.NUMERIC)) {
+                // Until we support deserializing scientific notation in the EE, we'll
+                // coerce default values to plain notation here.  See ENG-952 for more info.
+                BigDecimal temp = new BigDecimal(defaultvalue);
+                defaultvalue = temp.toPlainString();
+            }
+        } else {
+            // Concat function name and function id, format: NAME:ID
+            // Used by PlanAssembler:getNextInsertPlan().
+            defaultvalue = defaultvalue + ":" + String.valueOf(defaultFuncID);
+        }
+
+        Column column;
+        
+        if (proptype == "vertex") {
+        	column = graph.getVertexprops().add(name);
+        }
+        else { 
+        	column = graph.getEdgeprops().add(name);
+        }
+        
+        // need to set other column data here (default, nullable, etc)
+        column.setName(name);
+        column.setIndex(index);
+        column.setType(type.getValue());
+        column.setNullable(Boolean.valueOf(nullable));
+        int size = type.getMaxLengthInBytes();
+
+        boolean inBytes = false;
+        if (node.attributes.containsKey("bytes")) {
+            inBytes = Boolean.valueOf(node.attributes.get("bytes"));
+        }
+
+        // Determine the length of columns with a variable-length type
+        if (type.isVariableLength()) {
+            int userSpecifiedSize = 0;
+            if (sizeString != null) {
+                userSpecifiedSize = Integer.parseInt(sizeString);
+            }
+
+            if (userSpecifiedSize == 0) {
+                // So size specified in the column definition.  Either:
+                // - the user-specified size is zero (unclear how this would happen---
+                //   if someone types VARCHAR(0) HSQL will complain)
+                // - or the sizeString was null, meaning that the size specifier was
+                //   omitted.
+                // Choose an appropriate default for the type.
+                size = type.defaultLengthForVariableLengthType();
+            }
+            else {
+                if (userSpecifiedSize < 0 || (inBytes && userSpecifiedSize > VoltType.MAX_VALUE_LENGTH)) {
+                    String msg = type.toSQLString() + " column " + name +
+                            " in table " + graph.getTypeName() + " has unsupported length " + sizeString;
+                    throw compiler.new VoltCompilerException(msg);
+                }
+
+                if (!inBytes && type == VoltType.STRING) {
+                    if (userSpecifiedSize > VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS) {
+                        String msg = String.format("The size of VARCHAR column %s in table %s greater than %d " +
+                                "will be enforced as byte counts rather than UTF8 character counts. " +
+                                "To eliminate this warning, specify \"VARCHAR(%d BYTES)\"",
+                                name, graph.getTypeName(),
+                                VoltType.MAX_VALUE_LENGTH_IN_CHARACTERS, userSpecifiedSize);
+                        compiler.addWarn(msg);
+                        inBytes = true;
+                    }
+                }
+
+                if (userSpecifiedSize < type.getMinLengthInBytes()) {
+                    String msg = type.toSQLString() + " column " + name +
+                            " in table " + graph.getTypeName() + " has length of " + sizeString
+                            + " which is shorter than " + type.getMinLengthInBytes() + ", "
+                            + "the minimum allowed length for the type.";
+                    throw compiler.new VoltCompilerException(msg);
+                }
+
+
+                size = userSpecifiedSize;
+            }
+        }
+
+        column.setInbytes(inBytes);
+        column.setSize(size);
+
+        column.setDefaultvalue(defaultvalue);
+        if (defaulttype != null)
+            column.setDefaulttype(Integer.parseInt(defaulttype));
+
+        columnMap.put(name, column);
+    }
+    
     private static void addColumnToCatalog(Table table,
                             VoltXMLElement node,
                             SortedMap<Integer, VoltType> columnTypes,
@@ -1957,6 +2301,8 @@ public class DDLCompiler {
         columnMap.put(name, column);
     }
 
+
+    
     /**
      * Return true if the two indexes are identical with a different name.
      */

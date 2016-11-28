@@ -35,6 +35,7 @@ import org.voltdb.catalog.Column;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.GraphView;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.IndexRef;
 import org.voltdb.catalog.MaterializedViewHandlerInfo;
@@ -77,6 +78,221 @@ public class MaterializedViewProcessor {
     }
 
     /**
+     * Add select vertices and edges from source tables statements info to the catalog for the graphs.
+     * @throws VoltCompilerException
+     */
+    /*
+    public void startProcessing(Database db, HashMap<GraphView, String> graphViewMap)
+            throws VoltCompilerException {
+        HashSet <String> viewTableNames = new HashSet<>();
+        for (Entry<GraphView, String> entry : graphViewMap.entrySet()) {
+            viewTableNames.add(entry.getKey().getTypeName());
+        }
+
+        for (Entry<GraphView, String> entry : graphViewMap.entrySet()) {
+            GraphView destGraph = entry.getKey();
+            String[] selects = entry.getValue().split(";");
+            String selectVertices = selects[0];
+            String selectEdges = selects[1];
+
+            // get the xml for the query
+            VoltXMLElement xmlquery = null;
+            try {
+                xmlquery = m_hsql.getXMLCompiledStatement(selectVertices);
+            }
+            catch (HSQLParseException e) {
+                e.printStackTrace();
+            }
+            assert(xmlquery != null);
+
+            // parse the xml like any other sql statement
+            ParsedSelectStmt stmt = null;
+            try {
+                stmt = (ParsedSelectStmt) AbstractParsedStmt.parse(selectVertices, xmlquery, null, db, null);
+            }
+            catch (Exception e) {
+                throw m_compiler.new VoltCompilerException(e.getMessage());
+            }
+            assert(stmt != null);
+
+            String viewName = destGraph.getTypeName();
+            // throw an error if the view isn't within voltdb's limited world view
+            checkViewMeetsSpec(viewName, stmt);
+
+            List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destGraph.getColumns(), "index");
+            List<AbstractExpression> groupbyExprs = null;
+            if (stmt.hasComplexGroupby()) {
+                groupbyExprs = new ArrayList<>();
+                for (ParsedColInfo col: stmt.m_groupByColumns) {
+                    groupbyExprs.add(col.expression);
+                }
+            }
+
+            // Generate query XMLs for min/max recalculation (ENG-8641)
+            boolean isMultiTableView = stmt.m_tableList.size() > 1;
+            MatViewFallbackQueryXMLGenerator xmlGen = new MatViewFallbackQueryXMLGenerator(xmlquery, stmt.m_groupByColumns, stmt.m_displayColumns, isMultiTableView);
+            List<VoltXMLElement> fallbackQueryXMLs = xmlGen.getFallbackQueryXMLs();
+
+            // create an index and constraint for the table
+            // After ENG-7872 is fixed if there is no group by column then we will not create any
+            // index or constraint in order to avoid error and crash.
+            if (stmt.m_groupByColumns.size() != 0) {
+                Index pkIndex = destTable.getIndexes().add(HSQLInterface.AUTO_GEN_MATVIEW_IDX);
+                pkIndex.setType(IndexType.BALANCED_TREE.getValue());
+                pkIndex.setUnique(true);
+                // add the group by columns from the src table
+                // assume index 1 throuh #grpByCols + 1 are the cols
+                for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
+                    ColumnRef c = pkIndex.getColumns().add(String.valueOf(i));
+                    c.setColumn(destColumnArray.get(i));
+                    c.setIndex(i);
+                }
+                Constraint pkConstraint = destTable.getConstraints().add(HSQLInterface.AUTO_GEN_MATVIEW_CONST);
+                pkConstraint.setType(ConstraintType.PRIMARY_KEY.getValue());
+                pkConstraint.setIndex(pkIndex);
+            }
+
+            
+                // Materialized view on single table
+                // create the materializedviewinfo catalog node for the source table
+                Table srcTable = stmt.m_tableList.get(0);
+                MaterializedViewInfo matviewinfo = srcTable.getViews().add(viewName);
+                matviewinfo.setDest(destTable);
+
+                AbstractExpression where = stmt.getSingleTableFilterExpression();
+                if (where != null) {
+                    String hex = Encoder.hexEncode(where.toJSONString());
+                    matviewinfo.setPredicate(hex);
+                }
+                else {
+                    matviewinfo.setPredicate("");
+                }
+
+                List<Column> srcColumnArray = CatalogUtil.getSortedCatalogItems(srcTable.getColumns(), "index");
+                if (stmt.hasComplexGroupby()) {
+                    // Parse group by expressions to json string
+                    String groupbyExprsJson = null;
+                    try {
+                        groupbyExprsJson = DDLCompiler.convertToJSONArray(groupbyExprs);
+                    } catch (JSONException e) {
+                        throw m_compiler.new VoltCompilerException ("Unexpected error serializing non-column " +
+                                "expressions for group by expressions: " + e.toString());
+                    }
+                    matviewinfo.setGroupbyexpressionsjson(groupbyExprsJson);
+                }
+                else {
+                    // add the group by columns from the src table
+                    for (int i = 0; i < stmt.m_groupByColumns.size(); i++) {
+                        ParsedColInfo gbcol = stmt.m_groupByColumns.get(i);
+                        Column srcCol = srcColumnArray.get(gbcol.index);
+                        ColumnRef cref = matviewinfo.getGroupbycols().add(srcCol.getTypeName());
+                        // groupByColumns is iterating in order of groups. Store that grouping order
+                        // in the column ref index. When the catalog is serialized, it will, naturally,
+                        // scramble this order like a two year playing dominos, presenting the data
+                        // in a meaningless sequence.
+                        cref.setIndex(i);           // the column offset in the view's grouping order
+                        cref.setColumn(srcCol);     // the source column from the base (non-view) table
+
+                        // parse out the group by columns into the dest table
+                        ParsedColInfo col = stmt.m_displayColumns.get(i);
+                        Column destColumn = destColumnArray.get(i);
+                        processMaterializedViewColumn(srcTable, destColumn,
+                                ExpressionType.VALUE_TUPLE, (TupleValueExpression)col.expression);
+                    }
+                }
+
+                // Set up COUNT(*) column
+                ParsedColInfo countCol = stmt.m_displayColumns.get(stmt.m_groupByColumns.size());
+                assert(countCol.expression.getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR);
+                assert(countCol.expression.getLeft() == null);
+                processMaterializedViewColumn(srcTable,
+                        destColumnArray.get(stmt.m_groupByColumns.size()),
+                        ExpressionType.AGGREGATE_COUNT_STAR, null);
+
+                // prepare info for aggregation columns.
+                List<AbstractExpression> aggregationExprs = new ArrayList<>();
+                boolean hasAggregationExprs = false;
+                ArrayList<AbstractExpression> minMaxAggs = new ArrayList<>();
+                for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                    ParsedColInfo col = stmt.m_displayColumns.get(i);
+                    AbstractExpression aggExpr = col.expression.getLeft();
+                    if (aggExpr.getExpressionType() != ExpressionType.VALUE_TUPLE) {
+                        hasAggregationExprs = true;
+                    }
+                    aggregationExprs.add(aggExpr);
+                    if (col.expression.getExpressionType() ==  ExpressionType.AGGREGATE_MIN ||
+                            col.expression.getExpressionType() == ExpressionType.AGGREGATE_MAX) {
+                        minMaxAggs.add(aggExpr);
+                    }
+                }
+
+                compileFallbackQueriesAndUpdateCatalog(db, query, fallbackQueryXMLs, matviewinfo);
+
+                // set Aggregation Expressions.
+                if (hasAggregationExprs) {
+                    String aggregationExprsJson = null;
+                    try {
+                        aggregationExprsJson = DDLCompiler.convertToJSONArray(aggregationExprs);
+                    } catch (JSONException e) {
+                        throw m_compiler.new VoltCompilerException ("Unexpected error serializing non-column " +
+                                "expressions for aggregation expressions: " + e.toString());
+                    }
+                    matviewinfo.setAggregationexpressionsjson(aggregationExprsJson);
+                }
+
+                // Find index for each min/max aggCol/aggExpr (ENG-6511 and ENG-8512)
+                for (Integer i=0; i<minMaxAggs.size(); ++i) {
+                    Index found = findBestMatchIndexForMatviewMinOrMax(matviewinfo, srcTable, groupbyExprs, minMaxAggs.get(i));
+                    IndexRef refFound = matviewinfo.getIndexforminmax().add(i.toString());
+                    if (found != null) {
+                        refFound.setName(found.getTypeName());
+                    } else {
+                        refFound.setName("");
+                    }
+                }
+
+                // This is to fix the data type mismatch of the COUNT(*) column (and potentially other columns).
+                // The COUNT(*) should return a BIGINT column, whereas we found here the COUNT(*) was assigned a INTEGER column.
+                for (int i=0; i<=stmt.m_groupByColumns.size(); i++) {
+                    ParsedColInfo col = stmt.m_displayColumns.get(i);
+                    Column destColumn = destColumnArray.get(i);
+                    setTypeAttributesForColumn(destColumn, col.expression);
+                }
+
+                // parse out the aggregation columns into the dest table
+                for (int i = stmt.m_groupByColumns.size() + 1; i < stmt.m_displayColumns.size(); i++) {
+                    ParsedColInfo col = stmt.m_displayColumns.get(i);
+                    Column destColumn = destColumnArray.get(i);
+
+                    AbstractExpression colExpr = col.expression.getLeft();
+                    TupleValueExpression tve = null;
+                    if (colExpr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+                        tve = (TupleValueExpression)colExpr;
+                    }
+                    processMaterializedViewColumn(srcTable, destColumn,
+                            col.expression.getExpressionType(), tve);
+
+                    setTypeAttributesForColumn(destColumn, col.expression);
+                }
+
+                if (srcTable.getPartitioncolumn() != null) {
+                    // Set the partitioning of destination tables of associated views.
+                    // If a view's source table is replicated, then a full scan of the
+                    // associated view is single-sited. If the source is partitioned,
+                    // a full scan of the view must be distributed, unless it is filtered
+                    // by the original table's partitioning key, which, to be filtered,
+                    // must also be a GROUP BY key.
+                    destTable.setIsreplicated(false);
+                    setGroupedTablePartitionColumn(matviewinfo, srcTable.getPartitioncolumn());
+                }
+            
+        }
+    }
+    */
+    
+    
+    
+    /**
      * Add materialized view info to the catalog for the tables that are
      * materialized views.
      * @throws VoltCompilerException
@@ -92,10 +308,15 @@ public class MaterializedViewProcessor {
             Table destTable = entry.getKey();
             String query = entry.getValue();
 
+            //org.voltdb.VLog.GLog("MaterializedViewProcessor", "startProcessing", 309, 
+        	//		"table =  " + destTable.getTypeName() +", query = " + query);
+            
             // get the xml for the query
             VoltXMLElement xmlquery = null;
             try {
                 xmlquery = m_hsql.getXMLCompiledStatement(query);
+                //org.voltdb.VLog.GLog("MaterializedViewProcessor", "startProcessing.getXMLCompiledStatement", 313, 
+            	//		"xmlquery =  " + xmlquery);
             }
             catch (HSQLParseException e) {
                 e.printStackTrace();
@@ -377,7 +598,7 @@ public class MaterializedViewProcessor {
             } // end if single table view materialized view.
         }
     }
-
+    
     private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn)
             throws VoltCompilerException {
         // A view of a replicated table is replicated.
@@ -576,8 +797,10 @@ public class MaterializedViewProcessor {
     private static void processMaterializedViewColumn(Table srcTable, Column destColumn,
                                                       ExpressionType type, TupleValueExpression colExpr) {
 
-        if (colExpr != null) {
-            assert(colExpr.getTableName().equalsIgnoreCase(srcTable.getTypeName()));
+    	if (colExpr != null) {
+        	//org.voltdb.VLog.GLog("MaterializedViewProcessor", "processMaterializedViewColumn", 798, 
+        	//		"table =  " + srcTable.getTypeName() +", column = " + colExpr.getColumnName());
+    		assert(colExpr.getTableName().equalsIgnoreCase(srcTable.getTypeName()));
             String srcColName = colExpr.getColumnName();
             Column srcColumn = srcTable.getColumns().getIgnoreCase(srcColName);
             destColumn.setMatviewsource(srcColumn);
@@ -641,7 +864,11 @@ public class MaterializedViewProcessor {
                                                     VoltXMLElement xmlquery,
                                                     MaterializedViewHandlerInfo mvHandlerInfo)
                                                     throws VoltCompilerException {
-        DatabaseEstimates estimates = new DatabaseEstimates();
+        
+    	//org.voltdb.VLog.GLog("MaterializedViewProcessor", "compileCreateQueryAndUpdateCatalog", 864, 
+    	//		"query =  " + query);
+    	
+    	DatabaseEstimates estimates = new DatabaseEstimates();
         // Here we are compiling the query twice:
         //   In the first round, we will use inferPartitioning.
         // The purpose is to use the planner to check if the join query is plannable.

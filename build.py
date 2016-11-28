@@ -218,6 +218,7 @@ CTX.INPUT['catalog'] = """
  statement.cpp
  table.cpp
  tableref.cpp
+ graphview.cpp
 """
 
 CTX.INPUT['structures'] = """

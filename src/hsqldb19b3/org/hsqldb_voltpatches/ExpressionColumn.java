@@ -58,6 +58,7 @@ public class ExpressionColumn extends Expression {
     String        tableName;
     String        columnName;
     RangeVariable rangeVariable;
+    String        objectName;
 
     //
     NumberSequence sequence;
@@ -73,6 +74,17 @@ public class ExpressionColumn extends Expression {
         columnName  = column;
     }
 
+    /**
+     * Creates a OpCodes.COLUMN expression
+     */
+    ExpressionColumn(String schema, String table, String object, String column) {
+        super(OpTypes.COLUMN);
+        this.schema = schema;
+        tableName   = table;
+        columnName  = column;
+        objectName  = object;
+    }
+    
     ExpressionColumn(ColumnSchema column) {
         super(OpTypes.COLUMN);
         columnName = column.getName().name;
@@ -150,12 +162,23 @@ public class ExpressionColumn extends Expression {
         }
 
         columnName  = column.getName().name;
-        Table table = range.getTable();
-        tableName   = table.getName().name;
-        schema      = table.getSchemaName().name;
+        
+        if (range.isGraph) {
+	        GraphView graph = range.getGraph();
+	        tableName   = graph.getName().name;
+	        schema      = graph.getSchemaName().name;
+        } else {
+	        Table table = range.getTable();
+	        tableName   = table.getName().name;
+	        schema      = table.getSchemaName().name;
+        }
         if (alias == null && rangeVariable.hasColumnAliases()) {
             alias = rangeVariable.getColumnAliasName(index);
         }
+        
+        //org.voltdb.VLog.GLog("ExpressionColumn", "setAttributesAsColumn", 179, 
+        //		"column = " + columnName+" index = "+columnIndex);
+        
         rangeVariable.addColumn(columnIndex);
     }
 
@@ -283,6 +306,10 @@ public class ExpressionColumn extends Expression {
         return column;
     }
 
+    String getObjectName() {
+        return objectName;
+    }
+    
     String getSchemaName() {
         return schema;
     }
@@ -544,7 +571,12 @@ public class ExpressionColumn extends Expression {
             return null;
         }
 
-        int colIndex = rangeVar.findColumn(tableName, columnName);
+        int colIndex;        
+        if (objectName != null) {
+        	colIndex = rangeVar.findColumn(tableName, objectName, columnName);
+        }
+        else colIndex = rangeVar.findColumn(tableName, columnName);
+        
         if (colIndex == -1) {
             return null;
         }
@@ -1294,6 +1326,13 @@ public class ExpressionColumn extends Expression {
                 exp.attributes.put("table", tableName.toUpperCase());
             }
         }
+        
+        if (rangeVariable != null && rangeVariable.isVertexes)
+        	exp.attributes.put("properytype", "vertex");
+        else if (rangeVariable != null && rangeVariable.isEdges)
+        	exp.attributes.put("properytype", "edge");
+        else exp.attributes.put("properytype", "column");
+        
         exp.attributes.put("column", columnName.toUpperCase());
         if ((alias == null) || (getAlias().length() == 0)) {
             exp.attributes.put("alias", columnName.toUpperCase());

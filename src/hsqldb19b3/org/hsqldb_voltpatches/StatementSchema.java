@@ -133,6 +133,7 @@ public class StatementSchema extends Statement {
             case StatementTypes.DROP_INDEX :
             case StatementTypes.DROP_CONSTRAINT :
             case StatementTypes.DROP_COLUMN :
+            case StatementTypes.DROP_GRAPHVIEW :
                 group = StatementTypes.X_SQL_SCHEMA_MANIPULATION;
                 break;
 
@@ -209,7 +210,12 @@ public class StatementSchema extends Statement {
                 group = StatementTypes.X_SQL_SCHEMA_DEFINITION;
                 order = 5;
                 break;
-
+            // GVoltDB extension
+            case StatementTypes.CREATE_GRAPHVIEW :
+                group = StatementTypes.X_SQL_SCHEMA_DEFINITION;
+                order = 6;
+                break;
+            // GVoltDB 
             case StatementTypes.CREATE_USER :
                 group = StatementTypes.X_SQL_SCHEMA_DEFINITION;
                 order = 1;
@@ -437,6 +443,7 @@ public class StatementSchema extends Statement {
             case StatementTypes.DROP_CAST :
             case StatementTypes.DROP_ORDERING :
             case StatementTypes.DROP_VIEW :
+            case StatementTypes.DROP_GRAPHVIEW : // GVoltDB extension
             case StatementTypes.DROP_INDEX :
             case StatementTypes.DROP_CONSTRAINT : {
                 try {
@@ -537,6 +544,10 @@ public class StatementSchema extends Statement {
                         case StatementTypes.DROP_TABLE :
                         case StatementTypes.DROP_VIEW :
                             dropTable(session, name, cascade);
+                            break;
+                            
+                        case StatementTypes.DROP_GRAPHVIEW :
+                            dropGraph(session, name, cascade);
                             break;
 
                         case StatementTypes.DROP_TRANSFORM :
@@ -820,6 +831,20 @@ public class StatementSchema extends Statement {
                     return Result.newErrorResult(e, sql);
                 }
             }
+            // GVoltDB graph extension  
+            case StatementTypes.CREATE_GRAPHVIEW : {
+	            GraphView graph = (GraphView) arguments[0];
+	
+	            try {
+                    setOrCheckObjectName(session, null, graph.getName(), true);
+                } catch (HsqlException e) {
+                    return Result.newErrorResult(e, sql);
+                }
+	            
+	            session.database.schemaManager.checkSchemaObjectNotExists(graph.getName());
+	            session.database.schemaManager.addSchemaObject(graph);
+	            break;
+            }
             case StatementTypes.CREATE_TABLE : {
                 Table         table              = (Table) arguments[0];
                 HsqlArrayList tempConstraints = (HsqlArrayList) arguments[1];
@@ -996,7 +1021,16 @@ public class StatementSchema extends Statement {
         return Result.updateZeroResult;
     }
 
-    private void dropType(Session session, HsqlName name, boolean cascade) {
+    private void dropGraph(Session session, HsqlName name, boolean cascade) {
+
+        GraphView graph = session.database.schemaManager.findUserGraph(session,
+            name.name, name.schema.name);
+
+        session.database.schemaManager.dropGraph(session, graph,
+                cascade);
+	}
+
+	private void dropType(Session session, HsqlName name, boolean cascade) {
 
         checkSchemaUpdateAuthorisation(session, name.schema);
 

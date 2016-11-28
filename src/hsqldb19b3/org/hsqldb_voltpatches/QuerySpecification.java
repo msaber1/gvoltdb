@@ -74,6 +74,11 @@ public class QuerySpecification extends QueryExpression {
     public boolean        isDistinctSelect;
     public boolean        isAggregated;
     public boolean        isGrouped;
+    // GVoltDB extension
+    //public boolean        isGraphSelect;
+    //public boolean        isVertexSelect;
+    //public boolean        isEdgeSelect;
+    //
     private HashSet       groupColumnNames;
     RangeVariable[]       rangeVariables;
     private HsqlArrayList rangeVariableList;
@@ -1789,14 +1794,22 @@ public class QuerySpecification extends QueryExpression {
         if (rangeVariables.length != 1) {
             return;
         }
-
+        
         RangeVariable rangeVar  = rangeVariables[0];
-        Table         table     = rangeVar.getTable();
+        
+        // TODO Should we update/insert into graph?
+        if (rangeVar.isGraph) {
+        	isInsertable = false;
+            isUpdatable  = false;
+            return;
+        }
+	    
+    	Table         table     = rangeVar.getTable();
         Table         baseTable = table.getBaseTable();
 
         isInsertable = table.isInsertable();
         isUpdatable  = table.isUpdatable();
-
+        
         if (!isInsertable && !isUpdatable) {
             return;
         }
@@ -2074,7 +2087,11 @@ public class QuerySpecification extends QueryExpression {
     void getBaseTableNames(OrderedHashSet set) {
 
         for (int i = 0; i < rangeVariables.length; i++) {
-            Table    rangeTable = rangeVariables[i].rangeTable;
+            
+        	// GVoltDB graph
+        	if (rangeVariables[i].isGraph) continue;
+        	
+        	Table    rangeTable = rangeVariables[i].rangeTable;
             HsqlName name       = rangeTable.getName();
 
             if (rangeTable.isReadOnly() || rangeTable.isTemp()) {

@@ -19,6 +19,7 @@ package org.voltdb.plannodes;
 
 import java.util.List;
 
+import org.voltdb.catalog.CatalogType;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -28,6 +29,7 @@ import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.parseinfo.StmtTableScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetGraphScan;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
@@ -85,7 +87,16 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
             m_estimatedOutputTupleCount = SUBQUERY_TABLE_ESTIMATES_HACK.minTuples;
             return;
         }
-        Table target = ((StmtTargetTableScan)m_tableScan).getTargetTable();
+        //Table target = ((StmtTargetTableScan)m_tableScan).getTargetTable();
+        CatalogType target = null;
+        if (m_tableScan instanceof StmtTargetTableScan)
+        	target = ((StmtTargetTableScan)m_tableScan).getTargetTable();
+        else if (m_tableScan instanceof StmtTargetGraphScan)
+        	target = ((StmtTargetGraphScan)m_tableScan).getTargetGraph();
+        
+        assert(target != null);
+        
+        //Table target = ((StmtTableScan)m_tableScan).getTargetTable();
         TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
         // This maxTuples value estimates the number of tuples fetched from the sequential scan.
         // It's a vague measure of the cost of the scan.

@@ -1409,6 +1409,10 @@ public class ParserDQL extends ParserBase {
         OrderedHashSet columnList       = null;
         BitMap         columnNameQuoted = null;
         SimpleName[]   columnNameList   = null;
+        
+        GraphView      graph            = null;
+        boolean        isGraph          = false;
+        int            graphtype = -1;
 
         if (token.tokenType == Tokens.OPENBRACKET) {
             Expression e = XreadTableSubqueryOrJoinedTable();
@@ -1418,13 +1422,30 @@ public class ParserDQL extends ParserBase {
                 ((TableDerived)table).dataExpression = e;
             }
         } else {
-            table = readTableName();
+        	// TODO Identify SELECT from graph only
+        	if (token.namePrefix != null && 
+        	   (token.tokenType == Tokens.VERTEXES || token.tokenType == Tokens.EDGES ||
+        	    token.tokenType == Tokens.PATHS)) {
+            	
+        		graphtype = token.tokenType;
+        		
+        		checkIsIdentifier();
 
-            if (table.isView()) {
-                SubQuery sq = getViewSubquery((View) table);
-
-//                sq.queryExpression = ((View) table).queryExpression;
-                table = sq.getTable();
+                graph = database.schemaManager.getGraph(session,
+                	token.namePrefix, token.namePrePrefix, token.tokenType);
+                
+                if (graph != null) isGraph = true;
+                
+                read();
+            } else {            	
+	        	table = readTableName();
+	
+	            if (table.isView()) {
+	                SubQuery sq = getViewSubquery((View) table);
+	
+	//                sq.queryExpression = ((View) table).queryExpression;
+	                table = sq.getTable();
+	            }
             }
         }
 
@@ -1437,47 +1458,55 @@ public class ParserDQL extends ParserBase {
             hasAs = true;
         }
 
-        if (isNonCoreReservedIdentifier()) {
-            boolean limit = token.tokenType == Tokens.LIMIT
-                            || token.tokenType == Tokens.OFFSET;
-            int position = getPosition();
-
-            alias = HsqlNameManager.getSimpleName(token.tokenString,
-                                                  isDelimitedIdentifier());
-
-            read();
-
-            if (token.tokenType == Tokens.OPENBRACKET) {
-                columnNameQuoted = new BitMap(32);
-                columnList       = readColumnNames(columnNameQuoted, false);
-            } else if (!hasAs && limit) {
-                if (token.tokenType == Tokens.QUESTION
-                        || token.tokenType == Tokens.X_VALUE) {
-                    alias = null;
-
-                    rewind(position);
-                }
-            }
-        }
-
-        if (columnList != null) {
-            if (table.getColumnCount() != columnList.size()) {
-                throw Error.error(ErrorCode.X_42593);
-            }
-
-            columnNameList = new SimpleName[columnList.size()];
-
-            for (int i = 0; i < columnList.size(); i++) {
-                SimpleName name =
-                    HsqlNameManager.getSimpleName((String) columnList.get(i),
-                                                  columnNameQuoted.isSet(i));
-
-                columnNameList[i] = name;
-            }
-        }
-
-        RangeVariable range = new RangeVariable(table, alias, columnList,
-            columnNameList, compileContext);
+        if (token.tokenType != Tokens.EDGES) {
+        
+	        if (isNonCoreReservedIdentifier()) {
+	            boolean limit = token.tokenType == Tokens.LIMIT
+	                            || token.tokenType == Tokens.OFFSET;
+	            int position = getPosition();
+	
+	            alias = HsqlNameManager.getSimpleName(token.tokenString,
+	                                                  isDelimitedIdentifier());
+	
+	            read();
+	
+	            if (token.tokenType == Tokens.OPENBRACKET) {
+	                columnNameQuoted = new BitMap(32);
+	                columnList       = readColumnNames(columnNameQuoted, false);
+	            } else if (!hasAs && limit) {
+	                if (token.tokenType == Tokens.QUESTION
+	                        || token.tokenType == Tokens.X_VALUE) {
+	                    alias = null;
+	
+	                    rewind(position);
+	                }
+	            }
+	        }
+	
+	        if (columnList != null) {
+	            if (table.getColumnCount() != columnList.size()) {
+	                throw Error.error(ErrorCode.X_42593);
+	            }
+	
+	            columnNameList = new SimpleName[columnList.size()];
+	
+	            for (int i = 0; i < columnList.size(); i++) {
+	                SimpleName name =
+	                    HsqlNameManager.getSimpleName((String) columnList.get(i),
+	                                                  columnNameQuoted.isSet(i));
+	
+	                columnNameList[i] = name;
+	            }
+	        }
+    	}
+    
+        RangeVariable range;
+        if (isGraph)
+        	range = new RangeVariable(graph, graphtype, alias, columnList,
+                    columnNameList, compileContext);
+        else
+        	range = new RangeVariable(table, alias, columnList,
+        			columnNameList, compileContext);
 
         return range;
     }
@@ -3906,6 +3935,9 @@ public class ParserDQL extends ParserBase {
         String  prefix         = token.namePrefix;
         String  prePrefix      = token.namePrePrefix;
 
+        //org.voltdb.VLog.GLog("ParserDQL", "readColumnOrFunctionExpression", 3935, 
+    	//		"prePrefix = "+prePrefix + " prefix = "+prefix + " name = "+name);
+        
         if (isUndelimitedSimpleName()) {
             // A VoltDB extension to augment the standard sql function set.
             FunctionSQL function;
@@ -3966,11 +3998,26 @@ public class ParserDQL extends ParserBase {
         read();
 
         if (token.tokenType != Tokens.OPENBRACKET) {
-            Expression column = new ExpressionColumn(prePrefix, prefix, name);
-
+        	
+        	Expression column;
+        	if (prefix != null && (
+        		(prefix.equals(Tokens.getKeyword(Tokens.ENDVERTEX))) || (prefix.equals(Tokens.getKeyword(Tokens.STARTVERTEX))) ||
+        		(prefix.equals(Tokens.getKeyword(Tokens.EDGES))) || (prefix.equals(Tokens.getKeyword(Tokens.VERTEXES))) ||
+        		(prefix.equals(Tokens.getKeyword(Tokens.PATHS)))
+        		)
+        	   ) {
+        		column = new ExpressionColumn(null, prePrefix, prefix, name);
+        	}
+        	else {
+        		column = new ExpressionColumn(prePrefix, prefix, name);
+        	}
+        	
+        	//org.voltdb.VLog.GLog("ParserDQL", "readColumnOrFunctionExpression", 4012, 
+        	//		"column = " + column.getColumnName() + " object " + ((ExpressionColumn)column).getObjectName());
+        	
             return column;
-        }
-
+        }        
+        
         checkValidCatalogName(prePrefix);
 
         prefix = session.getSchemaName(prefix);

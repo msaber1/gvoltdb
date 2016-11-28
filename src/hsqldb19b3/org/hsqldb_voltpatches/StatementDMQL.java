@@ -1203,12 +1203,21 @@ public abstract class StatementDMQL extends Statement {
         voltAppendParameters(session, query, parameters);
 
         // scans
-        VoltXMLElement scans = new VoltXMLElement("tablescans");
+        VoltXMLElement scans;
+        
+        //if (select.isVertexSelect) scans = new VoltXMLElement("vertexscans");
+        //else if (select.isEdgeSelect) scans = new VoltXMLElement("edgescans");
+        //else 
+        scans = new VoltXMLElement("tablescans");
+        
         query.children.add(scans);
         assert(scans != null);
 
         for (RangeVariable rangeVariable : select.rangeVariables) {
-            scans.children.add(rangeVariable.voltGetRangeVariableXML(session));
+            if (rangeVariable.isGraph)
+            	scans.children.add(rangeVariable.voltGetGraphRangeVariableXML(session));
+            else
+            	scans.children.add(rangeVariable.voltGetRangeVariableXML(session));
         }
 
         // groupby

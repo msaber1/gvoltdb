@@ -67,6 +67,9 @@ public interface SchemaObject {
     int LABEL      = 21;
     int VARIABLE   = 22;
     int PARAMETER  = 23;
+    // A VoltDB extension to support graphs // tkuznets 10/05/16
+    int GRAPHVIEW  = 24;
+    int PROPERTY  = 25;
 
     //
     SchemaObject[] emptyArray = new SchemaObject[]{};

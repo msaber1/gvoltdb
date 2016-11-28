@@ -91,6 +91,13 @@ public class AdhocDDLTestBase extends TestCase {
         return found;
     }
 
+    protected boolean findGraphInSystemCatalogResults(String graph) throws Exception
+    {
+        VoltTable tables = m_client.callProcedure("@SystemCatalog", "GRAPHS").getResults()[0];
+        boolean found = VoltTableTestHelpers.moveToMatchingRow(tables, "GRAPH_NAME", graph);
+        return found;
+    }
+    
     protected boolean findIndexInSystemCatalogResults(String index) throws Exception
     {
         VoltTable indexinfo = m_client.callProcedure("@SystemCatalog", "INDEXINFO").getResults()[0];

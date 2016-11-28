@@ -70,6 +70,8 @@ public class TableBase {
     //
     public static final int COLUMNS_UNREFERENCED = 15;
     public static final int COLUMNS_REFERENCED   = 16;
+    public static final int DIRECTED_GRAPH       = 17;
+    public static final int UNDIRECTED_GRAPH     = 18;
 
     //
     public PersistentStore store;

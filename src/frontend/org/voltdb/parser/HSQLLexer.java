@@ -45,6 +45,18 @@ public class HSQLLexer extends SQLPatternFactory
                     SPF.capture("subject", SPF.databaseObjectName())))
         ).compile("HSQL_DDL_PREPROCESSOR");
 
+    private static final Pattern HSQL_DDLGRAPH_PREPROCESSOR =
+            SPF.statementLeader(
+                SPF.capture("verb", SPF.tokenAlternatives("create", "drop", "alter")),
+                SPF.optional(SPF.capture("dir", SPF.tokenAlternatives("directed", "undirected"))),
+                SPF.capture("object", SPF.tokenAlternatives("graph")),
+                SPF.capture("obj2", SPF.tokenAlternatives("view")),
+                SPF.capture("name", SPF.databaseObjectName()),  // table/view/index name
+                SPF.optional(SPF.clause(
+                        SPF.token("on"),
+                        SPF.capture("subject", SPF.databaseObjectName())))
+            ).compile("HSQL_DDLGRAPH_PREPROCESSOR");
+    
     // Does the ddl statement end with cascade or have if exists in the right place?
     private static final Pattern DDL_IFEXISTS_OR_CASCADE_CHECK =
         SPF.statementTrailer(
@@ -60,8 +72,15 @@ public class HSQLLexer extends SQLPatternFactory
     public static HSQLDDLInfo preprocessHSQLDDL(String ddl) {
         ddl = SQLLexer.stripComments(ddl);
 
-        Matcher matcher = HSQL_DDL_PREPROCESSOR.matcher(ddl);
-        if (matcher.find()) {
+        Matcher matcher = HSQL_DDLGRAPH_PREPROCESSOR.matcher(ddl);
+        boolean found = matcher.find(); 
+        
+        if (!found) {
+        	matcher = HSQL_DDL_PREPROCESSOR.matcher(ddl);
+        	found = matcher.find(); 
+        }
+        
+        if (found) {
             String verbString = matcher.group("verb");
             HSQLDDLInfo.Verb verb = HSQLDDLInfo.Verb.get(verbString);
             if (verb == null) {

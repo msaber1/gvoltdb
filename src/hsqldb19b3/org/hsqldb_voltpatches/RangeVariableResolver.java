@@ -466,16 +466,17 @@ public class RangeVariableResolver {
             }
         }
 
+        // TODO Index support by graphViews
         boolean isEqual = true;
-        Index   idx = rangeVar.rangeTable.getIndexForColumns(colIndexSetEqual);
+        Index   idx = rangeVar.getIndexForColumns(colIndexSetEqual); //rangeTable.getIndexForColumns(colIndexSetEqual);
 
         if (idx == null) {
             isEqual = false;
-            idx     = rangeVar.rangeTable.getIndexForColumns(colIndexSetOther);
+            idx     = rangeVar.getIndexForColumns(colIndexSetOther); //rangeTable.getIndexForColumns(colIndexSetOther);
         }
 
         // different procedure for subquery tables
-        if (idx == null && rangeVar.rangeTable.isSessionBased) {
+        if (idx == null && !rangeVar.isGraph && rangeVar.rangeTable.isSessionBased) { // graph is not supported
             if (!colIndexSetEqual.isEmpty()) {
                 int[] cols = colIndexSetEqual.toArray();
 

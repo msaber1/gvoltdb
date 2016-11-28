@@ -140,15 +140,14 @@ begin GraphView                              "A graph view in the database"
   Column* VertexProps                        "The set of properties of the vertex"
   Column* EdgeProps                          "The set of properties of the edge"
   Index* indexes                             "The set of indexes on the columns in the table"
-  Table? VTable                              "The reference of the vertexes table or materialized view"
-  Table? ETable                              "The reference of the edges table or materialized view"
+  Table? VTable                              "The reference of the vertexes table or materialized view (equivalent to materializer in Table)"
+  Table? ETable                              "The reference of the edges table or materialized view (equivalent to materializer in Table)"
   bool isDirected                            "Is the graph view directed?"
   bool isreplicated                          "Is the graph view replicated?"
   int estimatedvertexescount                 "A rough estimate of the number of vertexes in the graph view; used for planning"
   int estimatededgescount                    "A rough estimate of the number of edges in the graph view; used for planning"
   string signature                           "Catalog version independent signature of the graph view consisting of name and schema"
 end
-
 
 begin MaterializedViewHandlerInfo       "Information used to build and update a materialized view"
   Statement* fallbackQueryStmts         "Statements to search for mview min/max fallback value"
