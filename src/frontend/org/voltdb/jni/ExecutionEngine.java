@@ -40,6 +40,7 @@ import org.voltdb.TheHashinator.HashinatorConfig;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.types.PlanNodeType;
@@ -138,6 +139,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public long m_lastTuplesAccessed = 0;
     public long m_currMemoryInBytes = 0;
     public long m_peakMemoryInBytes = 0;
+
+    protected InitiatorMailbox m_mailbox;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -500,6 +503,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         }
         // get the plan for realz
         return ActivePlanRepository.planForFragmentId(fragmentId);
+    }
+
+    /**
+     * Request data from other from other cluster nodes.
+     * @param destinationId Host id of the node that holds the data
+     * @return VoltTable serialized in bytes
+     */
+
+    public byte[] requestData(long destinationId) throws InterruptedException {
+        return m_mailbox.requestData(destinationId);
     }
 
     /*
