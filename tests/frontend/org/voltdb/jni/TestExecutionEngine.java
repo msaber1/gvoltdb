@@ -166,7 +166,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false, null));
             }
         };
         destEEThread.start();
@@ -281,7 +281,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false, null));
             }
         };
         destEEThread.start();
@@ -343,7 +343,7 @@ public class TestExecutionEngine extends TestCase {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0), false);
+                        new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0), false, null);
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();
     }
