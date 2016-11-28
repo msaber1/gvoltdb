@@ -669,8 +669,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         defaultDrBufferSize,
                         deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
-                        m_mpDrGateway != null,
-                        m_initiatorMailbox);
+                        m_mpDrGateway != null);
             }
             else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
                 Class<?> spyClass = Class.forName("org.mockito.Mockito");
@@ -686,8 +685,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
-                        m_mpDrGateway != null,
-                        m_initiatorMailbox);
+                        m_mpDrGateway != null);
                 eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
             else {

@@ -229,15 +229,6 @@ class Table {
                         ReferenceSerializeOutput *uniqueViolationOutput = NULL,
                         bool shouldDRStreamRows = false);
 
-    /**
-     * Loads table from the serialized table.
-     * Used for retrieving data from the frontend.
-     */
-    void loadTable(SerializeInputBE &serialize_in,
-                   Pool *stringPool = NULL,
-                   ReferenceSerializeOutput *uniqueViolationOutput = NULL,
-                   bool shouldDRStreamRows = false);
-
 
     // ------------------------------------------------------------------
     // EXPORT
@@ -322,7 +313,6 @@ public:
 
     bool equals(voltdb::Table *other);
     virtual voltdb::TableStats* getTableStats() = 0;
-    virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
 protected:
     // virtual block management functions
@@ -347,6 +337,8 @@ protected:
         }
         return allocatedTupleCount() - activeTupleCount() > std::max(static_cast<int64_t>((m_tuplesPerBlock * 3)), (allocatedTupleCount() * (100 - m_compactionThreshold)) / 100);  /* using the integer percentage */
     }
+
+    virtual void initializeWithColumns(TupleSchema *schema, const std::vector<std::string> &columnNames, bool ownsTupleSchema, int32_t compactionThreshold = 95);
 
     // ------------------------------------------------------------------
     // DATA
