@@ -473,7 +473,10 @@ public class InitiatorMailbox implements Mailbox
                     new VoltTable.ColumnInfo("name",VoltType.STRING),
                     new VoltTable.ColumnInfo("age",VoltType.INTEGER));
 
-            table.addRow(new Object[] {"James", (25 + (response.getDestinationSiteId()>>32))});
+            if (message.getRequestDestinations().size() == 1)
+                table.addRow(new Object[] {"James", (25 + (response.getDestinationSiteId()>>32))});
+            else if (message.getRequestDestinations().size() == 0)
+                table.addRow(new Object[] {"Kate", (25 + (response.getDestinationSiteId()>>32))});
 
             response.pushRequestData(table);
 
@@ -482,10 +485,10 @@ public class InitiatorMailbox implements Mailbox
             send(response.getDestinationSiteId(), response);
 
             if (message.getRequestDestinations().isEmpty()) {
-            	InitiatorMailbox sender = message.getSender();
-            	sender.setRequestData(response.getRequestDatas());
-            	sender.setReady();
-            	sender.signalSem();
+                InitiatorMailbox sender = message.getSender();
+                sender.setRequestData(response.getRequestDatas());
+                sender.setReady();
+                sender.signalSem();
             }
 
 
