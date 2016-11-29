@@ -17,24 +17,24 @@
 //#include "debuglog.h"
 #endif /* !define(NDEBUG) */
 namespace voltdb {
-class TableTuple;
+
 class GraphElement
 {
 protected:
 	int m_id;
-	TableTuple* m_tuple;
+	char* m_tupleData;
 	GraphView* m_gview;
 	bool m_isRemote;
 public:
 	GraphElement(void);
-	GraphElement(int id, TableTuple* t, GraphView* graphView, bool remote);
+	GraphElement(int id, char* tupleData, GraphView* graphView, bool remote);
 	~GraphElement(void);
 
 	void setId(int id);
 	int getId();
-	void setTuple(TableTuple* t);
+	void setTupleData(char* tupleData);
 	void setGraphView(GraphView* gView);
-	TableTuple* getTuple();
+	char* getTupleData();
 	GraphView* getGraphView();
 	bool isRemote();
 };

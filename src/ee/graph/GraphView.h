@@ -38,17 +38,21 @@ public:
 	}
 
 	Vertex* getVertex(int id);
+	TableTuple* getVertexTuple(int id);
 	Edge* getEdge(int id);
+	TableTuple* getEdgeTuple(int id);
 	void addVertex(int id, Vertex* vertex);
 	void addEdge(int id, Edge* edge);
 	int numOfVertexes();
 	int numOfEdges();
 	string name();
+	string debug();
 	bool isDirected();
 
 	friend class GraphViewFactory;
 
 protected:
+	void fillGraphFromRelationalTables();
 	std::map<int, Vertex* > m_vertexes;
 	std::map<int, Edge* > m_edges;
 	Table* m_vertexTable;
