@@ -45,6 +45,9 @@ import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.plannodes.TupleScanPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
+import org.voltdb.plannodes.VertexScanPlanNode;
+import org.voltdb.plannodes.EdgeScanPlanNode;
+import org.voltdb.plannodes.PathScanPlanNode;
 
 /**
  *
@@ -55,6 +58,9 @@ public enum PlanNodeType {
     //
     // Scan Nodes
     //
+    PATHSCAN         ( 7, PathScanPlanNode.class),
+    EDGESCAN         ( 8, EdgeScanPlanNode.class),
+    VERTEXSCAN       ( 9, VertexScanPlanNode.class),        
     SEQSCAN          (10, SeqScanPlanNode.class),
     INDEXSCAN        (11, IndexScanPlanNode.class),
     INDEXCOUNT       (12, IndexCountPlanNode.class),
