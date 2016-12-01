@@ -1926,7 +1926,7 @@ public class DDLCompiler {
         assert(Vquery != null);
         assert(Equery != null);
         
-        boolean isdirected = Boolean.getBoolean((node.attributes.get("isdirected")));
+        boolean isdirected = Boolean.parseBoolean((node.attributes.get("isdirected")));
         
         graph.setIsdirected(isdirected);
         
