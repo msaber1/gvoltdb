@@ -43,15 +43,19 @@ import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.expressions.VectorValueExpression;
 import org.voltdb.planner.parseinfo.JoinNode;
 import org.voltdb.planner.parseinfo.StmtTableScan;
+import org.voltdb.planner.parseinfo.StmtTargetGraphScan;
 import org.voltdb.planner.parseinfo.StmtTargetTableScan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.EdgeScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
+import org.voltdb.plannodes.PathScanPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.VertexScanPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
@@ -1470,7 +1474,10 @@ public abstract class SubPlanAssembler {
 
         // if no index, it is a sequential scan
         if (path.index == null) {
-            return getScanAccessPlanForTable(tableScan, path);
+        	if (tableScan instanceof StmtTargetTableScan)
+        		return getScanAccessPlanForTable(tableScan, path);
+        	if (tableScan instanceof StmtTargetGraphScan)
+        		return getScanAccessPlanForGraph(tableScan, path);
         }
         return getIndexAccessPlanForTable(tableScan, path);
     }
@@ -1493,6 +1500,31 @@ public abstract class SubPlanAssembler {
         return scanNode;
     }
 
+    /**
+     * Get a sequential scan access plan for a graph.
+     *
+     * @param graph The table to scan.
+     * @param path The access path to access the data in the table (index/scan/etc).
+     * @return A scan plan node
+     */
+    private static AbstractScanPlanNode
+    getScanAccessPlanForGraph(StmtTableScan graphScan, AccessPath path)
+    {
+    	SeqScanPlanNode scanNode = null;
+        // build the scan node
+    	if (((StmtTargetGraphScan)graphScan).getGraphElementName() == "VERTEXES")
+    		scanNode = new VertexScanPlanNode(graphScan);
+    	else if (((StmtTargetGraphScan)graphScan).getGraphElementName() == "EDGES")
+    		scanNode = new EdgeScanPlanNode(graphScan);
+    	else if (((StmtTargetGraphScan)graphScan).getGraphElementName() == "PATHS")
+    		scanNode = new PathScanPlanNode(graphScan);
+    	
+    	assert(scanNode != null);
+        // build the predicate
+        scanNode.setPredicate(path.otherExprs);
+        return scanNode;
+    }
+    
     /**
      * Get an index scan access plan for a table.
      *
