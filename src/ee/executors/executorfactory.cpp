@@ -70,9 +70,10 @@
 #include "executors/unionexecutor.h"
 #include "executors/updateexecutor.h"
 #include "executors/partitionbyexecutor.h"
+#include "executors/udfexecutor.h"
 
 #include "plannodes/abstractplannode.h"
-
+#include "plannodes/udfplannode.h"
 
 #include <cassert>
 
@@ -108,6 +109,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_UNION: return new UnionExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_UPDATE: return new UpdateExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_PARTITIONBY: return new PartitionByExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_UDF: return new UDFExecutor(engine, abstract_node);
     // default: Don't provide a default, let the compiler enforce complete coverage.
     }
     VOLT_ERROR("Undefined plan node type %d", (int) type);

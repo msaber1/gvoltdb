@@ -81,7 +81,8 @@ public class SQLLexer extends SQLPatternFactory
         // Non-rename-able objects
         new ObjectToken("view", false),
         new ObjectToken("procedure", false),
-        new ObjectToken("role", false)
+        new ObjectToken("role", false),
+        new ObjectToken("function", false)
     };
 
     private final static String[] MODIFIER_TOKENS = {
@@ -281,7 +282,7 @@ public class SQLLexer extends SQLPatternFactory
         boolean hadWLMatch = false;
         for (CheckedPattern cp : WHITELISTS) {
             if (cp.matches(sql)) {
-                hadWLMatch = true;
+            	 hadWLMatch = true;
                 break;
             }
         }

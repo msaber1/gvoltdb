@@ -457,6 +457,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_PARTITIONBY: {
         return "PARTITIONBY";
     }
+    case PLAN_NODE_TYPE_UDF: {
+    	return "FUNCTION";
+    }
     } // END OF SWITCH
     return "UNDEFINED";
 }

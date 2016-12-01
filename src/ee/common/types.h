@@ -210,6 +210,7 @@ enum PlanNodeType {
     //
     // Misc Nodes
     //
+	PLAN_NODE_TYPE_UDF				= 59,
     PLAN_NODE_TYPE_AGGREGATE        = 50,
     PLAN_NODE_TYPE_HASHAGGREGATE    = 51,
     PLAN_NODE_TYPE_UNION            = 52,

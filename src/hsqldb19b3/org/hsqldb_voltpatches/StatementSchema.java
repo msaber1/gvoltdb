@@ -133,6 +133,7 @@ public class StatementSchema extends Statement {
             case StatementTypes.DROP_INDEX :
             case StatementTypes.DROP_CONSTRAINT :
             case StatementTypes.DROP_COLUMN :
+            case StatementTypes.DROP_FUNCTION :
                 group = StatementTypes.X_SQL_SCHEMA_MANIPULATION;
                 break;
 
@@ -185,6 +186,7 @@ public class StatementSchema extends Statement {
                 order = 1;
                 break;
 
+            case StatementTypes.CREATE_FUNCTION :
             case StatementTypes.CREATE_TRIGGER :
                 group = StatementTypes.X_SQL_SCHEMA_DEFINITION;
                 order = 7;
@@ -277,7 +279,7 @@ public class StatementSchema extends Statement {
     }
 
     Result getResult(Session session) {
-
+    	
         if (this.isExplain) {
             return Result.newSingleColumnStringResult("OPERATION",
                     describe(session));

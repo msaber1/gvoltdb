@@ -283,6 +283,7 @@ CTX.INPUT['executors'] = """
  tuplescanexecutor.cpp
  unionexecutor.cpp
  updateexecutor.cpp
+ udfexecutor.cpp
 """
 
 CTX.INPUT['expressions'] = """
@@ -328,6 +329,7 @@ CTX.INPUT['plannodes'] = """
  tuplescannode.cpp
  unionnode.cpp
  updatenode.cpp
+ udfplannode.cpp
 """
 
 CTX.INPUT['indexes'] = """
