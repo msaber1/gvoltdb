@@ -76,7 +76,9 @@ public:
         : AbstractJoinExecutor(engine, abstract_node)
         , m_indexNode(NULL)
         , m_lookupType(INDEX_LOOKUP_TYPE_INVALID)
-    { }
+    {
+    	LogManager::GLog("NestLoopIndexExecutor", "Constructor", 80, abstract_node->debug());
+    }
 
     ~NestLoopIndexExecutor();
 

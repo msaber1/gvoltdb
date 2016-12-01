@@ -61,7 +61,9 @@ namespace voltdb
         SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
             : AbstractExecutor(engine, abstract_node)
             , m_aggExec(NULL)
-        {}
+        {
+        	LogManager::GLog("SeqScanExecutor", "Constructor", 65, abstract_node->debug());
+        }
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);

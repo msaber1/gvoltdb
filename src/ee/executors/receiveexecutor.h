@@ -65,6 +65,7 @@ public:
     : AbstractExecutor(engine, abstract_node)
     {
         this->engine = engine;
+        LogManager::GLog("ReceiveExecutor", "Constructor", 68, abstract_node->debug());
     }
     ~ReceiveExecutor();
 protected:

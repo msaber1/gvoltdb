@@ -58,7 +58,9 @@ namespace voltdb {
 class NestLoopExecutor : public AbstractJoinExecutor {
     public:
         NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
-            AbstractJoinExecutor(engine, abstract_node) { }
+            AbstractJoinExecutor(engine, abstract_node) {
+        	LogManager::GLog("NestLoopExecutor", "Constructor", 62, abstract_node->debug());
+        }
     private:
 
         bool p_init(AbstractPlanNode*, TempTableLimits* limits);

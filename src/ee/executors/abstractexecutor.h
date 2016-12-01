@@ -52,6 +52,7 @@
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractplannode.h"
 #include "storage/temptable.h"
+#include "logging/LogManager.h"
 
 #include <cassert>
 #include <vector>

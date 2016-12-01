@@ -36,7 +36,9 @@ namespace voltdb
     public:
         MaterializedScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
         : AbstractExecutor(engine, abstract_node)
-        {}
+        {
+        	LogManager::GLog("MaterializedScanExecutor", "Constructor", 40, abstract_node->debug());
+        }
         ~MaterializedScanExecutor();
     protected:
         bool p_init(AbstractPlanNode* abstract_node,

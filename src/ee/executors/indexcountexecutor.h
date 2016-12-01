@@ -44,6 +44,7 @@ public:
     IndexCountExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
         : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL), m_endKeyBackingStore(NULL)
     {
+    	LogManager::GLog("IndexCountExecutor", "Constructor", 47, abstractNode->debug());
     }
     ~IndexCountExecutor();
 

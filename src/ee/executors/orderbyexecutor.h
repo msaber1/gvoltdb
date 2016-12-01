@@ -63,7 +63,9 @@ namespace voltdb {
     public:
         OrderByExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
             : AbstractExecutor(engine, abstract_node), limit_node(NULL)
-            { }
+            {
+        	LogManager::GLog("OrderByExecutor", "Constructor", 67, abstract_node->debug());
+            }
         ~OrderByExecutor();
 
     protected:

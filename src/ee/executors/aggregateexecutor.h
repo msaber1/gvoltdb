@@ -273,7 +273,9 @@ class AggregateHashExecutor : public AggregateExecutorBase
 {
 public:
     AggregateHashExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AggregateExecutorBase(engine, abstract_node) { }
+        AggregateExecutorBase(engine, abstract_node) {
+    	LogManager::GLog("AggregateHashExecutor", "Constructor", 277, abstract_node->debug());
+    }
 
     // empty destructor defined in .cpp file because of it is called virtually (not inline)
     // same reason for serial and partial
@@ -301,7 +303,10 @@ public:
     AggregateSerialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
         AggregateExecutorBase(engine, abstract_node),
         m_aggregateRow(NULL), m_noInputRows(true),
-        m_failPrePredicateOnFirstRow(false) { }
+        m_failPrePredicateOnFirstRow(false)
+{
+    	LogManager::GLog("AggregateSerialExecutor", "Constructor", 306, abstract_node->debug());
+}
     ~AggregateSerialExecutor();
 
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,
@@ -327,7 +332,9 @@ class AggregatePartialExecutor : public AggregateExecutorBase
 {
 public:
     AggregatePartialExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node) :
-        AggregateExecutorBase(engine, abstract_node), m_atTheFirstRow(true) { }
+        AggregateExecutorBase(engine, abstract_node), m_atTheFirstRow(true) {
+    	LogManager::GLog("AggregatePartialExecutor", "Constructor", 366, abstract_node->debug());
+    }
     ~AggregatePartialExecutor();
 
     TableTuple p_execute_init(const NValueArray& params, ProgressMonitorProxy* pmp,

@@ -69,6 +69,7 @@ public:
     {
         m_inputTable = NULL;
         m_engine = engine;
+        LogManager::GLog("DeleteExecutor", "Constructor", 72, abstract_node->debug());
     }
 
 protected:

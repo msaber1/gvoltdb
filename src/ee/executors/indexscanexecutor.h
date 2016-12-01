@@ -79,7 +79,9 @@ public:
         , m_projector()
         , m_searchKeyBackingStore(NULL)
         , m_aggExec(NULL)
-    {}
+    {
+    	LogManager::GLog("IndexScanExecutor", "Constructor", 83, abstractNode->debug());
+    }
     ~IndexScanExecutor();
 
     /** This is a helper function to get the "next tuple" during an

@@ -72,6 +72,7 @@ public:
         m_inputTable = NULL;
         m_engine = engine;
         m_partitionColumn = -1;
+        LogManager::GLog("UpdateExecutor", "Constructor", 75, abstract_node->debug());
     }
 
 protected:

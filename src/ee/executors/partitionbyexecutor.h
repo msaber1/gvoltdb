@@ -30,6 +30,7 @@ class PartitionByExecutor: public AggregateSerialExecutor {
 public:
     PartitionByExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
       : AggregateSerialExecutor(engine, abstract_node) {
+    	LogManager::GLog("PartitionByExecutor", "Constructor", 33, abstract_node->debug());
     }
     virtual ~PartitionByExecutor();
     bool outputForEachInputRow() const;

@@ -284,6 +284,9 @@ CTX.INPUT['executors'] = """
  tuplescanexecutor.cpp
  unionexecutor.cpp
  updateexecutor.cpp
+ VertexScanExecutor.cpp
+ EdgeScanExecutor.cpp
+ PathScanExecutor.cpp
 """
 
 CTX.INPUT['expressions'] = """
@@ -329,6 +332,9 @@ CTX.INPUT['plannodes'] = """
  tuplescannode.cpp
  unionnode.cpp
  updatenode.cpp
+ VertexScanNode.cpp
+ EdgeScanNode.cpp
+ PathScanNode.cpp
 """
 
 CTX.INPUT['indexes'] = """

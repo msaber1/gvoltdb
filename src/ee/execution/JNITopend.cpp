@@ -21,6 +21,7 @@
 #include "common/debuglog.h"
 #include "common/StreamBlock.h"
 #include "storage/table.h"
+#include "logging/LogManager.h"
 
 using namespace std;
 
@@ -322,7 +323,9 @@ std::string JNITopend::planForFragmentId(int64_t fragmentId) {
     // jbuf might be NULL or might have 0 length here.  In that case
     // we'll return a 0-length string to the caller, who will return
     // an appropriate error.
-    return jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
+    string plan = jbyteArrayToStdString(m_jniEnv, jni_frame, jbuf);
+    LogManager::GLog("JNITopend", "planForFragmentId", 1408, plan);
+    return plan;
 }
 
 std::string JNITopend::decodeBase64AndDecompress(const std::string& base64Str) {

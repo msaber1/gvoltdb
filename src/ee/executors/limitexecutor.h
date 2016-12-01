@@ -59,6 +59,7 @@ namespace voltdb
         LimitExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
             : AbstractExecutor(engine, abstract_node)
         {
+        	LogManager::GLog("LimitExecutor", "Constructor", 62, abstract_node->debug());
         }
 
         ~LimitExecutor() {

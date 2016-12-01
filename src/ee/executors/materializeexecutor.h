@@ -67,10 +67,11 @@ class MaterializeExecutor : public AbstractExecutor {
     MaterializeExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
         AbstractExecutor(engine, abstract_node)
     {
-        node = NULL;
+    	node = NULL;
         output_table = NULL;
         expression_array = NULL;
         this->engine = engine;
+        LogManager::GLog("MaterializeExecutor", "Constructor", 75, abstract_node->debug());
     }
     ~MaterializeExecutor();
   protected:

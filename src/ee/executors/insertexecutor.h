@@ -77,6 +77,7 @@ public:
         m_memoryPool(),
         m_nowFields()
     {
+    	LogManager::GLog("InsertExecutor", "Constructor", 80, abstract_node->debug());
     }
 
     protected:

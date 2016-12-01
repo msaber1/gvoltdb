@@ -29,7 +29,9 @@ namespace voltdb
     public:
         TableCountExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
             : AbstractExecutor(engine, abstract_node)
-        {}
+        {
+        	LogManager::GLog("TableCountExecutor", "Constructor", 33, abstract_node->debug());
+        }
         ~TableCountExecutor();
     protected:
         bool p_init(AbstractPlanNode* abstract_node,

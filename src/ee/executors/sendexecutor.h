@@ -62,6 +62,7 @@ public:
         : AbstractExecutor(engine, abstractNode)
     {
         m_engine = engine;
+        LogManager::GLog("SendExecutor", "Constructor", 68, abstractNode->debug());
     }
 
 protected:

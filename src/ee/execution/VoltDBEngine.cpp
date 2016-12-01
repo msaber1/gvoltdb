@@ -407,7 +407,7 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 {
 	std::stringstream params;
 	params << "numFragments = " << numFragments;
-	LogManager::GLog("VoltDBEngine", "executePanFragment(s)", 391, params.str());
+	LogManager::GLog("VoltDBEngine", "executePlanFragment(s)", 410, params.str());
     // count failures
     int failures = 0;
 
@@ -474,7 +474,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
 {
 	std::stringstream params;
 	params << "planFragmentId = " << planfragmentId;
-	LogManager::GLog("VoltDBEngine", "executePlanFragment", 458, params.str());
+	LogManager::GLog("VoltDBEngine", "executePlanFragment", 477, params.str());
     assert(planfragmentId != 0);
 
     m_currentInputDepId = static_cast<int32_t>(inputDependencyId);
@@ -1405,7 +1405,7 @@ void VoltDBEngine::setExecutorVectorForFragmentId(int64_t fragId)
 {
 	std::stringstream params;
 	params << "fragId = " << fragId;
-	LogManager::GLog("VoltDBEngine", "setExecutorVectorForFragmentId", 1293, params.str());
+	LogManager::GLog("VoltDBEngine", "setExecutorVectorForFragmentId", 1403, params.str());
     if (m_plans) {
         PlanSet& existing_plans = *m_plans;
         PlanSet::nth_index<1>::type::iterator iter = existing_plans.get<1>().find(fragId);
