@@ -138,6 +138,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         catalog::Table* getCatalogTable(const std::string& name) const;
         //msaber
         catalog::GraphView* getCatalogGraphView(const std::string& name) const;
+        GraphViewCatalogDelegate* getGraphViewDelegate(const std::string& name) const;
+
         bool getIsActiveActiveDREnabled() const { return m_isActiveActiveDREnabled; }
         StreamedTable* getPartitionedDRConflictStreamedTable() const { return m_drPartitionedConflictStreamedTable; }
         StreamedTable* getReplicatedDRConflictStreamedTable() const { return m_drReplicatedConflictStreamedTable; }

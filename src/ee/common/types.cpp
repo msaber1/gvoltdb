@@ -521,7 +521,15 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_TUPLESCAN;
     } else if (str == "PARTITIONBY") {
         return PLAN_NODE_TYPE_PARTITIONBY;
+    } else if (str == "VERTEXSCAN") {
+        return PLAN_NODE_TYPE_VERTEXSCAN;
+    } else if (str == "EDGESCAN") {
+        return PLAN_NODE_TYPE_EDGESCAN;
+    } else if (str == "PATHSCAN") {
+        return PLAN_NODE_TYPE_PATHSCAN;
     }
+
+
     return PLAN_NODE_TYPE_INVALID;
 }
 

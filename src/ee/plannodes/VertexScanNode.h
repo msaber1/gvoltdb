@@ -15,6 +15,7 @@
 namespace voltdb
 {
 
+class GraphViewCatalogDelegate;
 
 class VertexScanPlanNode : public AbstractPlanNode {
 public:
@@ -26,6 +27,17 @@ public:
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);
+
+    std::string m_target_graph_name;
+	GraphViewCatalogDelegate* m_gcd;
+	//
+	// This is the predicate used to filter out tuples during the scan
+	//
+	boost::scoped_ptr<AbstractExpression> m_predicate;
+	// True if this scan represents a sub query
+	bool m_isSubQuery;
+	// True if this scan has a predicate that always evaluates to FALSE
+	bool m_isEmptyScan;
 };
 
 }

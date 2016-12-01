@@ -341,6 +341,12 @@ catalog::Table* VoltDBEngine::getCatalogTable(const std::string& name) const {
     return NULL;
 }
 
+GraphViewCatalogDelegate* VoltDBEngine::getGraphViewDelegate(const std::string& name) const
+{
+    // Caller responsible for checking null return value.
+    return findInMapOrNull(name, m_graphViewDelegatesByName);
+}
+
 catalog::GraphView* VoltDBEngine::getCatalogGraphView(const std::string& name) const {
     // iterate over all of the tables in the new catalog
     BOOST_FOREACH (LabeledGraphView labeledTable, m_database->graphViews()) {
