@@ -49,6 +49,16 @@ void GraphView::addEdge(int id, Edge* edge)
 	this->m_edges[id] = edge;
 }
 
+Table* GraphView::getVertexTable()
+{
+	return this->m_vertexTable;
+}
+
+Table* GraphView::getEdgeTable()
+{
+	return this->m_edgeTable;
+}
+
 int GraphView::numOfVertexes()
 {
 	return this->m_vertexes.size();

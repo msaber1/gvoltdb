@@ -16,6 +16,7 @@ namespace voltdb
 {
 
 class GraphViewCatalogDelegate;
+class GraphView;
 
 class VertexScanPlanNode : public AbstractPlanNode {
 public:
@@ -24,6 +25,16 @@ public:
 
 	PlanNodeType getPlanNodeType() const;
 	std::string debugInfo(const std::string& spacer) const;
+
+	GraphView* getTargetGraphView() const;
+	void setTargetGraphViewDelegate(GraphViewCatalogDelegate* gcd) { m_gcd = gcd; } // DEPRECATED?
+
+	std::string getTargetGraphViewName() const { return m_target_graph_name; } // DEPRECATED?
+	AbstractExpression* getPredicate() const { return m_predicate.get(); }
+
+	bool isSubQuery() const { return m_isSubQuery; }
+
+	bool isEmptyScan() const { return m_isEmptyScan; }
 
 protected:
     void loadFromJSONObject(PlannerDomValue obj);

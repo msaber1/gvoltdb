@@ -22,8 +22,8 @@ GraphView* GraphViewFactory::createGraphView(const catalog::GraphView &catalogGr
 	GraphView* vw = new GraphView();
 	vw->m_name = catalogGraphView.name();
 	//TODO: msaber should check this with tatiana, the directed attribute is not communicated write from the FE
-	//vw->m_isDirected = catalogGraphView.isDirected();
-	vw->m_isDirected = true;
+	vw->m_isDirected = catalogGraphView.isDirected();
+	//vw->m_isDirected = true;
 	vw->m_vertexTable = vTable;
 	vw->m_edgeTable = eTable;
 	vw->m_databaseId = databaseId;

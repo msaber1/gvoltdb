@@ -34,6 +34,15 @@ std::string VertexScanPlanNode::debugInfo(const string& spacer) const
     return buffer.str();
 }
 
+GraphView* VertexScanPlanNode::getTargetGraphView() const
+{
+	if (m_gcd == NULL)
+	{
+		return NULL;
+	}
+	return m_gcd->getGraphView();
+}
+
 void VertexScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
 	m_target_graph_name = obj.valueForKey("TARGET_GRAPH_NAME").asStr();

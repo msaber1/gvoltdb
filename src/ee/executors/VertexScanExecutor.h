@@ -14,25 +14,36 @@
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
+#include "execution/VoltDBEngine.h"
 
 namespace voltdb {
 
 class AbstractExpression;
 class TempTable;
 class Table;
+class AggregateExecutorBase;
+struct CountingPostfilter;
 
 class VertexScanExecutor : public AbstractExecutor {
 
 public:
-	VertexScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) {
-            //output_table = NULL;
-            LogManager::GLog("VertexScanExecutor", "Constructor", 31, abstract_node->debug());
-        }
+	VertexScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+		: AbstractExecutor(engine, abstract_node)
+		  , m_aggExec(NULL)
+	{
+         //output_table = NULL;
+         LogManager::GLog("VertexScanExecutor", "Constructor", 32, abstract_node->debug());
+    }
         ~VertexScanExecutor();
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
+
+    private:
+        void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
+        AggregateExecutorBase* m_aggExec;
+
 
 };
 

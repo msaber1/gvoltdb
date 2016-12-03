@@ -48,6 +48,8 @@ public:
 	string name();
 	string debug();
 	bool isDirected();
+	Table* getVertexTable();
+	Table* getEdgeTable();
 
 	friend class GraphViewFactory;
 
