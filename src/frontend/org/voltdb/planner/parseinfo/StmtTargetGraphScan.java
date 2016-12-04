@@ -86,14 +86,14 @@ public class StmtTargetGraphScan extends StmtTableScan {
     }
 
     @Override
-    public void processTVE(TupleValueExpression expr, String properytype) {
+    public void processTVE(TupleValueExpression expr, String propertytype) {
     	//throw new PlanningErrorException("Unsupported processTVE operation for graph");
-    	expr.resolveForGraph(m_graph, properytype);
+    	expr.resolveForGraph(m_graph, propertytype);
     }
 
-    public void resolveTVE(TupleValueExpression expr, String properytype) {
+    public void resolveTVE(TupleValueExpression expr, String propertytype) {
         String columnName = expr.getColumnName();
-        processTVE(expr, properytype);
+        processTVE(expr, propertytype);
         expr.setOrigStmtId(m_stmtId);
 
         Pair<String, Integer> setItem = Pair.of(columnName, expr.getDifferentiator());

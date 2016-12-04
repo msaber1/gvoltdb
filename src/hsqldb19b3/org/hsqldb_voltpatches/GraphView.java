@@ -180,6 +180,8 @@ public class GraphView implements SchemaObject {
 
         graphxml.attributes.put("isdirected", String.valueOf(isDirected));
         
+        graphxml.attributes.put("DDL", statement);
+        
         // read all the vertex properties
         //VoltXMLElement vertexes = new VoltXMLElement("vertexes");
         //vertexes.attributes.put("name", "vertexes");

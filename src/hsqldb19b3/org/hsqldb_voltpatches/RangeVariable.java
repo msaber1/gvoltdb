@@ -230,12 +230,12 @@ final class RangeVariable {
 
     Index getIndexForColumns(OrderedIntHashSet set) {
     	
-    	//if (isGraph) {
+    	if (isGraph) {
     	//	System.out.println("RangeVariable.getIndexForColumns: Indexs for a graph are not supported.");
-    	//	return null;
-    	//} else {
+    		return null;
+    	} else {
     		return rangeTable.getIndexForColumns(set);
-    	//}
+    	}
     }
     
     void setJoinType(boolean isLeft, boolean isRight) {
