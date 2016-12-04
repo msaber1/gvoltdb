@@ -129,11 +129,12 @@ static void parse(const string &stmt,
     // cout << "Ref: " << ref << endl;
     // cout << "A: " << coll << endl;
     // cout << "B: " << child << endl;
-
+/*
     std::stringstream params;
     params << "stmt = " << stmt << ", command = " << command << ", ref = "
         		<< ref << ", coll = " << coll << ", child " << child;
     voltdb::LogManager::GLog("Catalog", "parse", 135, params.str());
+    */
 }
 
 /*
@@ -170,6 +171,13 @@ void Catalog::executeOne(const string &stmt) {
     // execute
     if (command.compare("add") == 0) {
         CatalogType *type = item->addChild(coll, child);
+
+        std::stringstream params;
+        params << "collection = " << coll << ", child = " << child;
+        if (coll == "tables" || coll == "graphViews")
+           params << ", relative index = " << type->relativeIndex();
+        voltdb::LogManager::GLog("Catalog", "executeOne", 177, params.str());
+
         if (type == NULL) {
             // Silently ignore failures -- these are indicative of commands for types
             // that the EE doesn't need/support (hopefully).

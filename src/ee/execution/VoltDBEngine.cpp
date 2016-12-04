@@ -1312,8 +1312,12 @@ void VoltDBEngine::rebuildTableCollections()
         assert(m_database);
         catalog::Table *catTable = m_database->tables().get(localTable->name());
         int32_t relativeIndexOfTable = catTable->relativeIndex();
+        std::stringstream params;
+        params << "table name = " << catTable->name() << ", relative index = " << relativeIndexOfTable;
+        LogManager::GLog("VoltDBEngine", "rebuildTableCollections", 1317, params.str());
         m_tables[relativeIndexOfTable] = localTable;
         m_tablesByName[tcd->getTable()->name()] = localTable;
+
 
         TableStats* stats;
         PersistentTable* persistentTable = tcd->getPersistentTable();
@@ -1338,6 +1342,7 @@ void VoltDBEngine::rebuildTableCollections()
         getStatsManager().registerStatsSource(STATISTICS_SELECTOR_TYPE_TABLE,
                                               relativeIndexOfTable,
                                               stats);
+
 
     }
     resetDRConflictStreamedTables();
@@ -1367,16 +1372,22 @@ void VoltDBEngine::rebuildGraphViewCollections()
             continue;
         }
         GraphView* localGraphView = gcd->getGraphView();
-        LogManager::GLog("VoltDBEngine", "rebuildTableCollections", 1128, "tableName = " + localGraphView->name());
+
         assert(localGraphView);
         if (!localGraphView) {
             VOLT_ERROR("DEBUG-NULL");//:%s", cd.first.c_str());
             std::cout << "DEBUG-NULL:" << cd.first << std::endl;
             continue;
         }
+        LogManager::GLog("VoltDBEngine", "rebuildGraphViewCollections", 1128, "graphViewName = " + localGraphView->name());
+
         assert(m_database);
         catalog::GraphView *catGraphView = m_database->graphViews().get(localGraphView->name());
+
         int32_t relativeIndexOfGraphView = catGraphView->relativeIndex();
+        std::stringstream params;
+        params << "graph view name = " << catGraphView->name() << ", relative index = " << relativeIndexOfGraphView;
+        LogManager::GLog("VoltDBEngine", "rebuildGraphViewCollections", 1384, params.str());
         m_graphViews[relativeIndexOfGraphView] = localGraphView;
         m_graphViewsByName[gcd->getGraphView()->name()] = localGraphView;
 
