@@ -150,6 +150,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_drReplicatedConflictStreamedTable = replicatedConflictTable;
         }
 
+        int64_t getSiteId();
+
         // -------------------------------------------------
         // Execution Functions
         // -------------------------------------------------
@@ -191,6 +193,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         bool send(Table* dependency);
         int loadNextDependency(Table* destination);
+
+        // -------------------------------------------------
+        // Request Data Functions
+        // -------------------------------------------------
+        int invokeRequestData(Table* destination, long destinationHsId);
 
         // -------------------------------------------------
         // Catalog Functions

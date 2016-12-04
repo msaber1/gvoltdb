@@ -146,4 +146,8 @@ namespace voltdb {
         return "";
     }
 
+    int DummyTopend::invokeRequestData(Table* destination, Pool *stringPool, long destinationHsId) {
+        return 0;
+    }
+
 }

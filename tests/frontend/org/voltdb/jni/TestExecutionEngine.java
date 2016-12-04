@@ -28,8 +28,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
 
-import junit.framework.TestCase;
-
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -47,6 +45,8 @@ import org.voltdb.catalog.Catalog;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.expressions.HashRangeExpressionBuilder;
 import org.voltdb.sysprocs.saverestore.SnapshotPredicates;
+
+import junit.framework.TestCase;
 
 /**
  * Tests native execution engine JNI interface.
@@ -166,7 +166,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false, null));
             }
         };
         destEEThread.start();
@@ -281,7 +281,7 @@ public class TestExecutionEngine extends TestCase {
                                 0,
                                 64*1024,
                                 100,
-                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false));
+                                new HashinatorConfig(HashinatorType.LEGACY, configBytes, 0, 0), false, null));
             }
         };
         destEEThread.start();
@@ -343,7 +343,7 @@ public class TestExecutionEngine extends TestCase {
                         0,
                         64*1024,
                         100,
-                        new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0), false);
+                        new HashinatorConfig(HashinatorType.LEGACY, LegacyHashinator.getConfigureBytes(1), 0, 0), false, null);
         m_project = new TPCCProjectBuilder();
         m_catalog = m_project.createTPCCSchemaCatalog();
     }

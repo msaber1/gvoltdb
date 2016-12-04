@@ -34,6 +34,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
@@ -120,7 +121,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int defaultDrBufferSize,
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
-            final boolean createDrReplicatedStream)
+            final boolean createDrReplicatedStream,
+            InitiatorMailbox mailbox)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
@@ -128,6 +130,8 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         org.voltdb.VLog.GLog("ExecutionEngineJNI", "Constructor", 125, 
     			"initialize the native Engine object.");
         
+        m_mailbox = mailbox;
+
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
                 + ", site_id = " + siteId + "...");

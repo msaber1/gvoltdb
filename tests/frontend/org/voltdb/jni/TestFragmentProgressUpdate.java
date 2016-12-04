@@ -25,10 +25,9 @@ package org.voltdb.jni;
 
 import static org.mockito.Matchers.contains;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.verify;
 
 import java.util.Arrays;
-
-import junit.framework.TestCase;
 
 import org.mockito.Mockito;
 import org.voltcore.logging.VoltLogger;
@@ -49,7 +48,8 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.planner.ActivePlanRepository;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
-import static org.mockito.Mockito.verify;
+
+import junit.framework.TestCase;
 
 public class TestFragmentProgressUpdate extends TestCase {
 
@@ -600,7 +600,7 @@ public class TestFragmentProgressUpdate extends TestCase {
                 new HashinatorConfig(HashinatorType.LEGACY,
                                      LegacyHashinator.getConfigureBytes(1),
                                      0,
-                                     0), false);
+                                     0), false, null);
     }
 
     @Override
