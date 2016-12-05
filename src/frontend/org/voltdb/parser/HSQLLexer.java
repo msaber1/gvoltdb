@@ -72,6 +72,9 @@ public class HSQLLexer extends SQLPatternFactory
     public static HSQLDDLInfo preprocessHSQLDDL(String ddl) {
         ddl = SQLLexer.stripComments(ddl);
 
+        //org.voltdb.VLog.GLog("HSQLLexer", "preprocessHSQLDDL", 668, 
+        //		"HSQL_DDLGRAPH_PREPROCESSOR is called");
+        
         Matcher matcher = HSQL_DDLGRAPH_PREPROCESSOR.matcher(ddl);
         boolean found = matcher.find(); 
         

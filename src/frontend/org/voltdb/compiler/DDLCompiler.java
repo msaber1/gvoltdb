@@ -1933,6 +1933,7 @@ public class DDLCompiler {
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
         graph.setAnnotation(annotation);
+        annotation.ddl = node.attributes.get("DDL");
 
         // all tables start replicated
         // if a partition is found in the project file later,

@@ -1328,10 +1328,10 @@ public class ExpressionColumn extends Expression {
         }
         
         if (rangeVariable != null && rangeVariable.isVertexes)
-        	exp.attributes.put("properytype", "vertex");
+        	exp.attributes.put("propertytype", "vertex");
         else if (rangeVariable != null && rangeVariable.isEdges)
-        	exp.attributes.put("properytype", "edge");
-        else exp.attributes.put("properytype", "column");
+        	exp.attributes.put("propertytype", "edge");
+        else exp.attributes.put("propertytype", "column");
         
         exp.attributes.put("column", columnName.toUpperCase());
         if ((alias == null) || (getAlias().length() == 0)) {

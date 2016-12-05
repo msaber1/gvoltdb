@@ -276,7 +276,9 @@ public abstract class AbstractParsedStmt {
             } else if (node.name.equalsIgnoreCase("tablescans")) {
                 parseTables(node);
             } else if (node.name.equalsIgnoreCase("vertexscan") ||
-            		   node.name.equalsIgnoreCase("edgescan") ) {
+            		   node.name.equalsIgnoreCase("edgescan")   ||
+            		   node.name.equalsIgnoreCase("pathscan")
+            		  ) {
                 parseGraph(node);
             }
         }
@@ -484,13 +486,13 @@ public abstract class AbstractParsedStmt {
             }
         }
 
-        String properytype = exprNode.attributes.get("properytype");
+        String propertytype = exprNode.attributes.get("propertytype");
         
         TupleValueExpression expr;
-        if (properytype == "vertex" )
+        if (propertytype == "vertex" )
 	        expr = new TupleValueExpression(tableName, tableAlias, "VERTEXES",
 	                columnName, columnAlias, -1, differentiator);
-        else if (properytype == "edge" )
+        else if (propertytype == "edge" )
 	        expr = new TupleValueExpression(tableName, tableAlias, "EDGES",
 	                columnName, columnAlias, -1, differentiator);
         else 
@@ -512,14 +514,14 @@ public abstract class AbstractParsedStmt {
         }
         
          
-        if (properytype == "vertex" ) {
+        if (propertytype == "vertex" ) {
         	StmtTargetGraphScan graphScan = (StmtTargetGraphScan)tableScan;
-        	graphScan.resolveTVE(expr, properytype);
+        	graphScan.resolveTVE(expr, propertytype);
         	tableScan = (StmtTableScan)graphScan;
         }
-        else if (properytype == "edge" ) {
+        else if (propertytype == "edge" ) {
         	StmtTargetGraphScan graphScan = (StmtTargetGraphScan)tableScan;
-        	graphScan.resolveTVE(expr, properytype);
+        	graphScan.resolveTVE(expr, propertytype);
         	tableScan = (StmtTableScan)graphScan;
         }	
         else tableScan.resolveTVE(expr);
@@ -1248,7 +1250,9 @@ public abstract class AbstractParsedStmt {
        graph = m_db.getGraphviews().getExact(tableName);//getGraphFromDB(tableName);
        assert(graph != null);
        m_graphList.add(graph);
-       String object = (tableNode.name == "vertexscan")?"VERTEXES":(tableNode.name == "edgescan")?"EDGES":null;
+       String object = (tableNode.name == "vertexscan")?"VERTEXES":
+    	               (tableNode.name == "edgescan")?"EDGES":
+    	               (tableNode.name == "pathscan")?"PATHS":null;
        graphScan = addGraphToStmtCache(graph, tableAlias, object);
 
        AbstractExpression joinExpr = parseJoinCondition(tableNode);
@@ -1281,7 +1285,6 @@ public abstract class AbstractParsedStmt {
            m_joinTree = joinNode;
       }
    }
-   
     
     /**
      *

@@ -661,9 +661,14 @@ public class VoltCompiler {
         if (catalog == null) {
             return null;
         }
+        
+        //System.out.println("VoltCompiler.compileInternal 665 catalog = "+catalog.toString());
 
         // Build DDL from Catalog Data
         String ddlWithBatchSupport = CatalogSchemaTools.toSchema(catalog, m_importLines);
+        
+        //System.out.println("VoltCompiler.compileInternal 668 ddlWithBatchSupport = "+ddlWithBatchSupport);
+        
         m_canonicalDDL = CatalogSchemaTools.toSchemaWithoutInlineBatches(ddlWithBatchSupport);
 
         // generate the catalog report and write it to disk
@@ -720,6 +725,8 @@ public class VoltCompiler {
         // WRITE CATALOG TO JAR HERE
         final String catalogCommands = catalog.serialize();
 
+        //System.out.println("VoltCompiler.compileInternal 728 catalogCommands = "+catalogCommands);
+        
         byte[] catalogBytes = catalogCommands.getBytes(Constants.UTF8ENCODING);
 
         try {

@@ -179,6 +179,9 @@ public class AsyncCompilerAgentHelper
                 return retval;
             }
             Catalog newCatalog = new Catalog();
+            
+            //System.out.println("AsyncCompiler...prepareApp 183 newCatalogCommands= "+newCatalogCommands);
+            
             newCatalog.execute(newCatalogCommands);
 
             String result = CatalogUtil.checkLicenseConstraint(newCatalog, m_licenseApi);
@@ -233,12 +236,17 @@ public class AsyncCompilerAgentHelper
 
             // compute the diff in StringBuilder
             CatalogDiffEngine diff = new CatalogDiffEngine(context.catalog, newCatalog);
+            
+            //System.out.println("AsyncCompiler...prepareApp 240 newCatalog= "+newCatalog.toString());
+            
             if (!diff.supported()) {
                 retval.errorMsg = "The requested catalog change(s) are not supported:\n" + diff.errors();
                 return retval;
             }
 
             String commands = diff.commands();
+            
+            //System.out.println("AsyncCompiler...prepareApp 249 commands= "+commands);
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(commands);
