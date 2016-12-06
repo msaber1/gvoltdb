@@ -50,7 +50,7 @@ bool VertexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 	isSubquery = node->isSubQuery();
 	assert(isSubquery || node->getTargetGraphView());
 	assert((! isSubquery) || (node->getChildren().size() == 1));
-	GraphView* graphView = node->getTargetGraphView();
+	graphView = node->getTargetGraphView();
 
 	//
 	// OPTIMIZATION: If there is no predicate for this SeqScan,
@@ -67,6 +67,8 @@ bool VertexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 				node->getChildren()[0]->getOutputTable()->name():
 				graphView->getVertexTable()->name();
 		setTempOutputTable(limits, temp_name);
+		LogManager::GLog("VertexScanExecutor", "p_init", 70,
+				"after calling setTempOutputTable with temp table = " + temp_name);
 	}
 	//
 	// Otherwise create a new temp table that mirrors the
@@ -74,9 +76,12 @@ bool VertexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 	// the output schema for any inlined projection)
 	//
 	else {
-		node->setOutputTable(isSubquery ?
-							 node->getChildren()[0]->getOutputTable() :
-							 graphView->getVertexTable());
+		Table* temp_t = isSubquery ?
+				 node->getChildren()[0]->getOutputTable() :
+				 graphView->getVertexTable();
+		node->setOutputTable(temp_t);
+		LogManager::GLog("VertexScanExecutor", "p_init", 83,
+						"after calling setOutputTable with temp table name = " + temp_t->name());
 	}
 
 	//node->setOutputTable(node->getTargetGraphView()->getVertexTable());
@@ -101,7 +106,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params) {
             node->getChildren()[0]->getOutputTable():
             node->getTargetTable();
 	*/
-    GraphView* graphView = node->getTargetGraphView();
+    //GraphView* graphView = node->getTargetGraphView();
     Table* input_table = graphView->getVertexTable();
     assert(input_table);
     int vertexId = -1, fanIn = -1, fanOut = -1;
@@ -207,10 +212,12 @@ bool VertexScanExecutor::p_execute(const NValueArray &params) {
                 {
                     VOLT_TRACE("inline projection...");
                     //get the vertex id
-                    vertexId = ValuePeeker::peekInteger(tuple.getNValue(0));
+                    vertexId = ValuePeeker::peekInteger(tuple.getNValue(graphView->getVertexIdColumnIndex()));
                     fanOut = graphView->getVertex(vertexId)->fanOut();
                     fanIn = graphView->getVertex(vertexId)->fanIn();
                     for (int ctr = 0; ctr < num_of_columns - 2; ctr++) {
+                    	//msaber: todo, need to check the projection operator construction
+                    	//and modify it to allow selecting graph vertex attributes
                         NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
                         temp_tuple.setNValue(ctr, value);
                     }
@@ -240,6 +247,35 @@ bool VertexScanExecutor::p_execute(const NValueArray &params) {
 
     return true;
 }
+
+/**
+ * Set up a multi-column temp output table for those executors that require one.
+ * Called from p_init.
+
+void VertexScanExecutor::setTempOutputTable(TempTableLimits* limits, const string tempTableName) {
+
+	LogManager::GLog("VertexScanExecutor", "setTempOutputTable", 255,
+							"setTempOutputTable in VertexScanExecutor called with tempTableName = " + tempTableName);
+
+    assert(limits);
+    TupleSchema* schema = m_abstractNode->generateTupleSchema();
+    int column_count = schema->columnCount();
+    std::vector<std::string> column_names(column_count);
+    assert(column_count >= 1);
+    const std::vector<SchemaColumn*>& outputSchema = m_abstractNode->getOutputSchema();
+
+    for (int ctr = 0; ctr < column_count; ctr++) {
+        column_names[ctr] = outputSchema[ctr]->getColumnName();
+    }
+
+    m_tmpOutputTable = TableFactory::getTempTable(m_abstractNode->databaseId(),
+                                                              tempTableName,
+                                                              schema,
+                                                              column_names,
+                                                              limits);
+    m_abstractNode->setOutputTable(m_tmpOutputTable);
+}
+ */
 
 void VertexScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple& tuple)
 {

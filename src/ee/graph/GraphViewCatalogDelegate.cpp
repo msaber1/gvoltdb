@@ -79,24 +79,64 @@ GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Data
 	LogManager::GLog("GraphViewCatalogDelegate", "GraphViewCatalogDelegate", 68, params.str());
 
 	// get an array of the vertex column names
-	const int numColumns = static_cast<int>(catalogGraphView.VTable()->columns().size());
+	int numColumns = catalogGraphView.VertexProps().size();
 	map<string, catalog::Column*>::const_iterator col_iterator;
-	vector<string> columnNamesVertex(numColumns + 2);
+	vector<string> columnNamesVertex(numColumns);
+	vector<int> columnIdsInVertexTable(catalogGraphView.VTable()->columns().size());
 	int colIndex = 0;
-	for (col_iterator = catalogGraphView.VTable()->columns().begin();
-		 col_iterator != catalogGraphView.VTable()->columns().end();
+	for (col_iterator = catalogGraphView.VertexProps().begin();
+		 col_iterator != catalogGraphView.VertexProps().end();
 		 col_iterator++)
 	{
 		const catalog::Column *catalog_column = col_iterator->second;
 		colIndex = catalog_column->index();
 		columnNamesVertex[colIndex] = catalog_column->name();
+
+		std::stringstream params;
+		params << "Graph vCol Index = " << colIndex
+				<< ", Graph vCol Name = " << catalog_column->name();
+
+		if(catalog_column->matviewsource())
+		{
+			columnIdsInVertexTable[colIndex] = catalog_column->matviewsource()->index();
+
+			params << ", VertexTable Column Index = " << catalog_column->matviewsource()->index();
+		}
+
+		LogManager::GLog("GraphViewCatalogDelegate", "constructGraphViewFromCatalog", 105, params.str());
 	}
-	columnNamesVertex[++colIndex] = "fanOut";
-	columnNamesVertex[++colIndex] = "fanIn";
 
 
-	// get the schema for the table
-	//TupleSchema *schema = createVertexTupleSchema(catalogDatabase, catalogGraphView);
+
+	numColumns = catalogGraphView.EdgeProps().size();
+	vector<string> columnNamesEdge(numColumns);
+	vector<int> columnIdsInEdgeTable(catalogGraphView.ETable()->columns().size());
+	for (col_iterator = catalogGraphView.EdgeProps().begin();
+			 col_iterator != catalogGraphView.EdgeProps().end();
+			 col_iterator++)
+	{
+		const catalog::Column *catalog_column = col_iterator->second;
+		colIndex = catalog_column->index();
+		columnNamesEdge[colIndex] = catalog_column->name();
+
+		std::stringstream params;
+		params << "Graph eCol Index = " << colIndex
+				<< ", Graph eCol Name = " << catalog_column->name();
+
+		if(catalog_column->matviewsource())
+		{
+			columnIdsInEdgeTable[colIndex] = catalog_column->matviewsource()->index();
+
+			params << ", EdgeTable Column Index = " << catalog_column->matviewsource()->index();
+		}
+
+		LogManager::GLog("GraphViewCatalogDelegate", "constructGraphViewFromCatalog", 131, params.str());
+	}
+
+
+	// get the schema
+	TupleSchema *vSchema = createOutputVertexTupleSchema(catalogDatabase, catalogGraphView);
+	TupleSchema *eSchema = createOutputEdgeTupleSchema(catalogDatabase, catalogGraphView);
 
 	//const string& graphViewName = catalogGraphView.name();
 	int32_t databaseId = catalogDatabase.relativeIndex();
@@ -106,8 +146,9 @@ GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Data
 	SHA1Final(reinterpret_cast<unsigned char *>(m_signatureHash), &shaCTX);
 	// Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
 
-	GraphView *graphView = GraphViewFactory::createGraphView(catalogGraphView,
-			databaseId, vTable, eTable, m_signatureHash);
+	GraphView *graphView = GraphViewFactory::createGraphView(catalogGraphView.name(), catalogGraphView.isDirected(),
+			vTable, eTable, vSchema, eSchema, columnNamesVertex, columnNamesEdge, columnIdsInVertexTable,
+			columnIdsInEdgeTable, databaseId, m_signatureHash);
 
 	return graphView;
 }
@@ -137,22 +178,22 @@ void GraphViewCatalogDelegate::initEdgeTupleWithDefaultValues(Pool* pool,
 
 }
 
-TupleSchema *GraphViewCatalogDelegate::createVertexTupleSchema(catalog::Database const &catalogDatabase,
+TupleSchema *GraphViewCatalogDelegate::createOutputVertexTupleSchema(catalog::Database const &catalogDatabase,
 	                                          catalog::GraphView const &catalogGraphView)
 {
 	// Columns:
 	// Column is stored as map<String, Column*> in Catalog. We have to
 	// sort it by Column index to preserve column order.
-	const catalog::Table *catalogTable = catalogGraphView.VTable();
-	const int numColumns = static_cast<int>(catalogTable->columns().size()) + 2;
-	bool needsDRTimestamp = catalogDatabase.isActiveActiveDRed() && catalogTable->isDRed();
+	const catalog::CatalogMap<catalog::Column> &cols = catalogGraphView.VertexProps();
+	const int numColumns = cols.size();
+	bool needsDRTimestamp = false;
 	TupleSchemaBuilder schemaBuilder(numColumns,
 									 needsDRTimestamp ? 1 : 0); // number of hidden columns
 
 	map<string, catalog::Column*>::const_iterator col_iterator;
 	int colIndex = 0;
-	for (col_iterator = catalogTable->columns().begin();
-		 col_iterator != catalogTable->columns().end(); col_iterator++) {
+	for (col_iterator = cols.begin();
+		 col_iterator != cols.end(); col_iterator++) {
 
 		const catalog::Column *catalog_column = col_iterator->second;
 		colIndex = catalog_column->index();
@@ -163,18 +204,24 @@ TupleSchema *GraphViewCatalogDelegate::createVertexTupleSchema(catalog::Database
 									   catalog_column->inbytes());
 	}
 
-	//msaber: need to check how the name is set
+	//msaber: the column names should be kept in a separate array per VoltDB design
+	//The FanOut and FaIn attributes are added in the previous loop as they are part of  the VertexProps collection,
+	//so no need to manuallly add them
 
+	//FANOUT
+	/*
 	schemaBuilder.setColumnAtIndex(++colIndex,
 								   ValueType::VALUE_TYPE_INTEGER,
 								   4,
 								   false,
 								   false); //not in bytes, msaber needs to check this
+	//FANIN
 	schemaBuilder.setColumnAtIndex(++colIndex,
 									   ValueType::VALUE_TYPE_INTEGER,
 									   4,
 									   false,
 									   false); //not in bytes, msaber needs to check this
+	*/
 
 	if (needsDRTimestamp) {
 		// Create a hidden timestamp column for a DRed table in an
@@ -191,10 +238,47 @@ TupleSchema *GraphViewCatalogDelegate::createVertexTupleSchema(catalog::Database
 
 	return schemaBuilder.build();
 }
-TupleSchema *GraphViewCatalogDelegate::createEdgeTupleSchema(catalog::Database const &catalogDatabase,
+TupleSchema *GraphViewCatalogDelegate::createOutputEdgeTupleSchema(catalog::Database const &catalogDatabase,
 	    									  catalog::GraphView const &catalogGraphView)
 {
-	return NULL;
+	// Columns:
+	// Column is stored as map<String, Column*> in Catalog. We have to
+	// sort it by Column index to preserve column order.
+	const catalog::CatalogMap<catalog::Column> &cols = catalogGraphView.EdgeProps();
+	const int numColumns = cols.size();
+	bool needsDRTimestamp = false;
+	TupleSchemaBuilder schemaBuilder(numColumns,
+									 needsDRTimestamp ? 1 : 0); // number of hidden columns
+
+	map<string, catalog::Column*>::const_iterator col_iterator;
+	int colIndex = 0;
+	for (col_iterator = cols.begin();
+		 col_iterator != cols.end(); col_iterator++) {
+
+		const catalog::Column *catalog_column = col_iterator->second;
+		colIndex = catalog_column->index();
+		schemaBuilder.setColumnAtIndex(colIndex,
+									   static_cast<ValueType>(catalog_column->type()),
+									   static_cast<int32_t>(catalog_column->size()),
+									   catalog_column->nullable(),
+									   catalog_column->inbytes());
+	}
+
+	if (needsDRTimestamp) {
+		// Create a hidden timestamp column for a DRed table in an
+		// active-active context.
+		//
+		// Column will be marked as not nullable in TupleSchema,
+		// because we never expect a null value here, but this is not
+		// actually enforced at runtime.
+		schemaBuilder.setHiddenColumnAtIndex(0,
+											 VALUE_TYPE_BIGINT,
+											 8,      // field size in bytes
+											 false); // nulls not allowed
+	}
+
+	return schemaBuilder.build();
+
 }
 
 }

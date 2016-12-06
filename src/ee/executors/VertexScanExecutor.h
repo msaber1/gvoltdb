@@ -20,8 +20,10 @@ namespace voltdb {
 
 class AbstractExpression;
 class TempTable;
+class TempTableLimits;
 class Table;
 class AggregateExecutorBase;
+class GraphView;
 struct CountingPostfilter;
 
 class VertexScanExecutor : public AbstractExecutor {
@@ -40,9 +42,12 @@ public:
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
+        //void setTempOutputTable(TempTableLimits* limits, const string tempTableName);
+
     private:
         void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
         AggregateExecutorBase* m_aggExec;
+        GraphView* graphView;
 
 
 };

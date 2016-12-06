@@ -50,6 +50,21 @@ public:
 	bool isDirected();
 	Table* getVertexTable();
 	Table* getEdgeTable();
+	TupleSchema* getVertexSchema();
+	TupleSchema* getEdgeSchema();
+	TupleSchema* getPathSchema();
+	void setVertexSchema(TupleSchema* s);
+	void setEdgeSchema(TupleSchema* s);
+	void setPathSchema(TupleSchema* s);
+
+	int getVertexIdColumnIndex();
+	int getEdgeIdColumnIndex();
+	int getEdgeFromColumnIndex();
+	int getEdgeToColumnIndex();
+	int getColumnIdInVertexTable(int vertexAttributeId);
+	int getColumnIdInEdgeTable(int edgeAttributeId);
+	string getVertexAttributeName(int vertexAttributeId);
+	string getEdgeAttributeName(int edgeAttributeId);
 
 	friend class GraphViewFactory;
 
@@ -62,6 +77,17 @@ protected:
 	TupleSchema* m_vertexSchema; //will contain fanIn and fanOut as additional attributes
 	TupleSchema* m_edgeSchema; //will contain startVertexId and endVertexId as additional attributes
 	TupleSchema* m_pathSchema; //will contain startVertexId, endVertexId, and cost for now (this should change dynamically per query and should not be placed here at this level)
+	// schema as array of string names
+	std::vector<std::string> m_vertexColumnNames;
+	std::vector<std::string> m_edgeColumnNames;
+	std::vector<std::string> m_pathColumnNames; //not sure yet, this may be removed
+	std::vector<int> m_columnIDsInVertexTable;
+	std::vector<int> m_columnIDsInEdgeTable;
+	int m_vertexIdColumnIndex;
+	int m_edgeIdColumnIndex;
+	int m_edgeFromColumnIndex;
+	int m_edgeToColumnIndex;
+
 	// identity information
 	CatalogId m_databaseId;
 	std::string m_name;

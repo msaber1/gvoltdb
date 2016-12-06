@@ -45,10 +45,10 @@ public:
 	                             catalog::GraphView const &catalogGraphView,
 	                             std::map<std::string, GraphViewCatalogDelegate*> const &graphViewsByName);
 
-	    static TupleSchema *createVertexTupleSchema(catalog::Database const &catalogDatabase,
+	    static TupleSchema *createOutputVertexTupleSchema(catalog::Database const &catalogDatabase,
 	                                          catalog::GraphView const &catalogGraphView);
 
-	    static TupleSchema *createEdgeTupleSchema(catalog::Database const &catalogDatabase,
+	    static TupleSchema *createOutputEdgeTupleSchema(catalog::Database const &catalogDatabase,
 	    									  catalog::GraphView const &catalogGraphView);
 
 
