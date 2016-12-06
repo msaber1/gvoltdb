@@ -152,6 +152,8 @@ public interface StatementTypes {
     int SIGNAL                           = 92;
     int CREATE_MODULE                    = 51;
     int WHILE                            = 97;
+    int CREATE_FUNCTION					 = 139;
+    int DROP_FUNCTION					 = 140;
 
     // hsqldb database
     int DATABASE_BACKUP     = 1001;

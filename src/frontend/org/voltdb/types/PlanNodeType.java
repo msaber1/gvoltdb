@@ -43,6 +43,7 @@ import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.plannodes.TupleScanPlanNode;
+import org.voltdb.plannodes.UDFPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.plannodes.VertexScanPlanNode;
@@ -100,6 +101,7 @@ public enum PlanNodeType {
     LIMIT           (56, LimitPlanNode.class),
     PARTIALAGGREGATE(57, PartialAggregatePlanNode.class),
     PARTITIONBY     (58, PartitionByPlanNode.class),
+    UDFPLANNODE     (59, UDFPlanNode.class)
     ;
 
     private final int val;

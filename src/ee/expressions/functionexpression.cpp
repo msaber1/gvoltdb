@@ -418,6 +418,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
        case FUNC_SEC:
             ret = new UnaryFunctionExpression<FUNC_SEC>((*arguments)[0]);
             break;
+       case FUNC_REVSTR:
+    	   ret = new UnaryFunctionExpression<FUNC_REVSTR>((*arguments)[0]);
+    	   break;
         default:
             return NULL;
         }

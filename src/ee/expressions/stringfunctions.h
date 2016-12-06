@@ -60,6 +60,19 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR>() const {
     return getTempStringValue(utf8.c_str(), utf8.length());
 }
 
+//template<> inline NValue NValue::callUnary<FUNC_REVSTR>() const {
+//    if (isNull())
+//        return getNullStringValue();
+//
+//    if (getValueType() != VALUE_TYPE_VARCHAR) {
+//        throwCastSQLException (getValueType(), VALUE_TYPE_VARCHAR);
+//    }
+//
+//
+//    std::string repeatStr="Hello";
+//
+//    return getTempStringValue(repeatStr.c_str(), repeatStr.length());
+//}
 /** implement the 1-argument SQL CHAR_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
     if (isNull()) {

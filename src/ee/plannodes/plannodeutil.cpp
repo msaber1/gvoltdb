@@ -68,6 +68,8 @@
 #include "plannodes/unionnode.h"
 #include "plannodes/updatenode.h"
 #include "plannodes/partitionbynode.h"
+#include "plannodes/udfplannode.h"
+
 #include <sstream>
 
 #include "EdgeScanNode.h"
@@ -230,6 +232,9 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
         case (voltdb::PLAN_NODE_TYPE_PATHSCAN):
         	ret = new voltdb::PathScanPlanNode();
             break;
+        case (voltdb::PLAN_NODE_TYPE_UDF):
+        	ret = new voltdb::UDFPlanNode();
+        	break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }
 

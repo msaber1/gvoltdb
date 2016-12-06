@@ -73,9 +73,10 @@
 #include "executors/VertexScanExecutor.h"
 #include "executors/EdgeScanExecutor.h"
 #include "executors/PathScanExecutor.h"
+#include "executors/udfexecutor.h"
 
 #include "plannodes/abstractplannode.h"
-
+#include "plannodes/udfplannode.h"
 
 #include <cassert>
 
@@ -115,6 +116,7 @@ AbstractExecutor* getNewExecutor(VoltDBEngine *engine,
     case PLAN_NODE_TYPE_VERTEXSCAN: return new VertexScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_EDGESCAN: return new EdgeScanExecutor(engine, abstract_node);
     case PLAN_NODE_TYPE_PATHSCAN: return new PathScanExecutor(engine, abstract_node);
+    case PLAN_NODE_TYPE_UDF: return new UDFExecutor(engine, abstract_node);
     // default: Don't provide a default, let the compiler enforce complete coverage.
     }
     VOLT_ERROR("Undefined plan node type %d", (int) type);

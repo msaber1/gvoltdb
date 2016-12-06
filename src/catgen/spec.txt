@@ -42,6 +42,7 @@ begin Database                       "A set of schema, procedures and other meta
   GraphView* graphViews              "The set of graph views in the database"
   Program*   programs                "The set of programs allowed to access this database"
   Procedure* procedures              "The set of stored procedures/transactions for this database"
+  Function* functions				 "The User defined functions for this database"
   Connector* connectors              "Export connector configuration"
   SnapshotSchedule* snapshotSchedule "Schedule for automated snapshots"
   bool   isActiveActiveDRed          "Are all DR tables in this database active-active DRed"
@@ -118,6 +119,15 @@ begin Procedure javaonly    "A stored procedure (transaction) in the system"
   AuthProgram* authPrograms "The set of authorized programs for this procedure (users)"
   Statement* statements     "The set of SQL statements this procedure may call"
   ProcParameter* parameters "The set of parameters to this stored procedure"
+end
+
+begin Function javaonly    "A UDF (transaction) in the system"
+  string classname          "The full class name for the Java class for this procedure"
+  int id					"The function id with which the implementation identifies the function"
+  string name               "Name of the function"
+  UserRef* authUsers        "Users authorized to invoke this procedure"
+  GroupRef* authGroups      "Groups authorized to invoke this proc"
+  AuthProgram* authPrograms "The set of authorized programs for this procedure (users)"
 end
 
 begin Table                                  "A table (relation) in the database"

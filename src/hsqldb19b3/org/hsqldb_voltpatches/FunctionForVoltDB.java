@@ -180,6 +180,7 @@ public class FunctionForVoltDB extends FunctionSQL {
         static final int FUNC_VOLT_MIN_VALID_TIMESTAMP          = 21021;    // Minimum valid timestamp.
         static final int FUNC_VOLT_MAX_VALID_TIMESTAMP          = 21022;    // Maximum valid timestamp.
         static final int FUNC_VOLT_IS_VALID_TIMESTAMP           = 21023;    // Is a timestamp value in range?
+        static final int FUNC_REVSTRING          				= 21024;    // Rev String
 
 
         /*
@@ -378,6 +379,9 @@ public class FunctionForVoltDB extends FunctionSQL {
             new FunctionId("is_valid_timestamp", Type.SQL_BOOLEAN, FUNC_VOLT_IS_VALID_TIMESTAMP, -1,
                     new Type[] { Type.SQL_TIMESTAMP },
                     singleParamList),
+            new FunctionId("revstring", Type.SQL_VARCHAR, FUNC_REVSTRING, -1,
+                    new Type[] { Type.SQL_VARCHAR },
+                    singleParamList),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -387,7 +391,7 @@ public class FunctionForVoltDB extends FunctionSQL {
                 by_LC_name.put(fn.m_name, fn);
             }
         }
-
+        
         static FunctionId fn_by_name(String anyCase) {
             String upCase = anyCase.toLowerCase();
             return by_LC_name.get(upCase);

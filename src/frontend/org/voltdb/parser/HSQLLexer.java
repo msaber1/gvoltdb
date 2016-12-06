@@ -64,12 +64,22 @@ public class HSQLLexer extends SQLPatternFactory
             SPF.optional(SPF.capture("cascade", SPF.token("cascade")))
         ).compile("DDL_IFEXISTS_OR_CASCADE_CHECK");
 
+    private static final Pattern HSQL_DDL_PREPROCESSOR_FUNC =
+            SPF.statementLeader(
+                SPF.capture("verb", SPF.tokenAlternatives("create", "drop", "alter")),
+                SPF.capture("object", SPF.tokenAlternatives("function")),
+                SPF.capture("name", SPF.databaseObjectName())
+                ).compile("HSQL_DDL_PREPROCESSOR_FUNC");
+    
+    
+    
     //===== Public interface
 
     /**
      * Glean some basic info about DDL statements sent to HSQLDB
      */
     public static HSQLDDLInfo preprocessHSQLDDL(String ddl) {
+    	System.out.println("printing in preprocessHSQLDDL "+ddl);
         ddl = SQLLexer.stripComments(ddl);
 
         //org.voltdb.VLog.GLog("HSQLLexer", "preprocessHSQLDDL", 668, 
@@ -77,6 +87,10 @@ public class HSQLLexer extends SQLPatternFactory
         
         Matcher matcher = HSQL_DDLGRAPH_PREPROCESSOR.matcher(ddl);
         boolean found = matcher.find(); 
+        if (!found) {
+        	matcher = HSQL_DDL_PREPROCESSOR_FUNC.matcher(ddl);
+        	found = matcher.find(); 
+        }
         
         if (!found) {
         	matcher = HSQL_DDL_PREPROCESSOR.matcher(ddl);
@@ -123,8 +137,17 @@ public class HSQLLexer extends SQLPatternFactory
                 }
             }
 
+            System.out.println("printing in preprocessHSQLDDL");
+            System.out.println("verb : "+verb);
+            System.out.println("noun : "+noun);
+            System.out.println("name : "+name.toLowerCase());
+            System.out.println("second name : "+secondName);
+            System.out.println("cascade : "+cascade);
+            System.out.println("ifExists : "+ifexists);
+            System.out.println("createStream : "+createStream);
             return new HSQLDDLInfo(verb, noun, name.toLowerCase(), secondName, cascade, ifexists, createStream);
         }
+        System.out.println("Nothing found ") ;
         return null;
     }
 }

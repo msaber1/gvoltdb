@@ -139,6 +139,7 @@ static const int FUNC_DATEDIFF         = 140;
 static const int FUNC_SECONDS_MIDNIGHT = 141;
 static const int FUNC_CSC              = 142;
 static const int FUNC_SEC              = 143;
+static const int FUNC_REVSTR           = 21024;
 
 // Function ID offsets for specializations of EXTRACT and TRIM.
 // Individual ID values are based on various Tokens.java constants
@@ -306,5 +307,5 @@ static const int FUNC_TRIM_BOTH_CHAR                  = SQL_TRIM_VOLT_FUNC_OFFSE
 #include "stringfunctions.h"
 #include "logicfunctions.h"
 #include "jsonfunctions.h"
-
+#include "myfunc.h"
 #endif
