@@ -106,7 +106,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params) {
             node->getChildren()[0]->getOutputTable():
             node->getTargetTable();
 	*/
-    //GraphView* graphView = node->getTargetGraphView();
+    GraphView* graphView = node->getTargetGraphView();
     Table* input_table = graphView->getVertexTable();
     assert(input_table);
     int vertexId = -1, fanIn = -1, fanOut = -1;
@@ -212,7 +212,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params) {
                 {
                     VOLT_TRACE("inline projection...");
                     //get the vertex id
-                    vertexId = ValuePeeker::peekInteger(tuple.getNValue(graphView->getVertexIdColumnIndex()));
+                    vertexId = ValuePeeker::peekInteger(tuple.getNValue(0));
                     fanOut = graphView->getVertex(vertexId)->fanOut();
                     fanIn = graphView->getVertex(vertexId)->fanIn();
                     for (int ctr = 0; ctr < num_of_columns - 2; ctr++) {
