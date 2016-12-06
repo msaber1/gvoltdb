@@ -466,6 +466,7 @@ string planNodeToString(PlanNodeType type)
     }
     case PLAN_NODE_TYPE_PATHSCAN: {
             return "PATHSCAN";
+    }
     case PLAN_NODE_TYPE_UDF: {
     	return "FUNCTION";
     }
