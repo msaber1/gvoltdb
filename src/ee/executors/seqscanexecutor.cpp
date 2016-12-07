@@ -133,8 +133,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
                (int)input_table->activeTupleCount(),
                (int)input_table->allocatedTupleCount());
 
+
     // invoke Java method that requests for data from other cluster node
     // and returns the data
+    //msaber: commented the hard coded testing lines of chris as they prevent selection from a single-node cluster
+    /*
     if (m_engine->getSiteId() == 0) {
         long destination = 1L;
 
@@ -166,6 +169,7 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 //cout << outputTable->debug() << endl;
         }
     }
+    */
 
     //
     // OPTIMIZATION: NESTED PROJECTION

@@ -469,6 +469,8 @@ public class InitiatorMailbox implements Mailbox
                 response.pushRequestData(oldTables.get(i));
             }
 
+            //msaber: commenting the hard coded testing lines by Chris
+            /*
             VoltTable table = new VoltTable(
                     new VoltTable.ColumnInfo("name",VoltType.STRING),
                     new VoltTable.ColumnInfo("age",VoltType.INTEGER));
@@ -479,7 +481,8 @@ public class InitiatorMailbox implements Mailbox
                 table.addRow(new Object[] {"Kate", (25 + (response.getDestinationSiteId()>>32))});
 
             response.pushRequestData(table);
-
+             */
+            
             response.setSender(message.getSender());
 
             send(response.getDestinationSiteId(), response);
