@@ -15,25 +15,46 @@ import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.utils.CatalogUtil;
 
 public class StmtTargetGraphScan extends StmtTableScan {
-    // Catalog table
+
+	// Catalog table
     private final GraphView m_graph;
     private final String m_graphElement;
+    private final String m_hint;
+    private final int m_startvertexid;
+    private final int m_endvertexid;
     private List<Index> m_indexes;
     private List<Column> m_columns;
 
-    public StmtTargetGraphScan(GraphView graph, String tableAlias, int stmtId, String object) {
+    public StmtTargetGraphScan(GraphView graph, String tableAlias, int stmtId, String object,
+    		                   String hint, int startvertexid, int endvertexid
+    		                   ) {
         super(tableAlias, stmtId);
         assert (graph != null);
         m_graph = graph;
         m_graphElement = object;
+        m_hint = hint;
+        m_startvertexid = startvertexid;
+        m_endvertexid = endvertexid;
 
         //findPartitioningColumns();
     }
 
     public StmtTargetGraphScan(GraphView graph, String tableAlias) {
-        this(graph, tableAlias, 0, null);
+        this(graph, tableAlias, 0, null, null, -1, -1);
     }
 
+    public String getHint() {
+		return m_hint;
+	}
+
+	public int getStartvertexid() {
+		return m_startvertexid;
+	}
+
+	public int getEndvertexid() {
+		return m_endvertexid;
+	}
+    
     @Override
     public String getTableName() {
         return m_graph.getTypeName();

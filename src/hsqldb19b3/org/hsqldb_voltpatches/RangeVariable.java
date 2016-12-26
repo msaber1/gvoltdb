@@ -66,6 +66,7 @@ final class RangeVariable {
     final boolean          isVertexes;
     final boolean          isEdges;
     final boolean          isPaths;
+    final String           hint;
     //
     final SimpleName       tableAlias;
     private OrderedHashSet columnAliases;
@@ -120,6 +121,7 @@ final class RangeVariable {
         isVertexes       = false;
         isEdges          = false;
         isPaths          = false;
+        hint             = null;
         
     }
 
@@ -139,12 +141,13 @@ final class RangeVariable {
         isVertexes       = false;
         isEdges          = false;
         isPaths          = false;
+        hint             = null;
 
         compileContext.registerRangeVariable(this);
     }
 
     RangeVariable(GraphView graph, int type, SimpleName alias, OrderedHashSet columnList,
-            SimpleName[] columnNameList, CompileContext compileContext) {
+            SimpleName[] columnNameList, CompileContext compileContext, String hint) {
 
       isGraph          = true;
       
@@ -170,6 +173,7 @@ final class RangeVariable {
       }
       
 	  rangeGraph       = graph;
+	  this.hint        = hint;
 	  
 	  rangeTable       = null;
 	  tableAlias       = alias;
@@ -221,11 +225,13 @@ final class RangeVariable {
         rangeIndex       = rangeTable.getPrimaryIndex();
         rangePosition    = range.rangePosition;
         level            = range.level;
+        
         isGraph          = false;
   	    rangeGraph       = null;
         isVertexes       = false;
         isEdges          = false;
         isPaths          = false;
+        hint             = null;
     }
 
     Index getIndexForColumns(OrderedIntHashSet set) {
@@ -372,7 +378,7 @@ final class RangeVariable {
             else if (isGraph && isEdges)
             	return rangeGraph.findEdgeProp(columnName);
             else if (isGraph && isPaths) {
-            	System.out.println("RangeVariable.findColumn() 347 column = " + columnName);
+            	//System.out.println("RangeVariable.findColumn() 347 column = " + columnName);
                 return rangeGraph.findPathProp(columnName);
             }
             else 
@@ -1506,6 +1512,8 @@ final class RangeVariable {
         	scan = new VoltXMLElement("vertexscan");
         else if (isEdges)
         	scan = new VoltXMLElement("edgescan");
+        else if (isPaths)
+        	scan = new VoltXMLElement("pathscan");
         else scan = new VoltXMLElement("graphscan");
 
         scan.attributes.put("graph", rangeGraph.getName().name.toUpperCase());
@@ -1525,7 +1533,6 @@ final class RangeVariable {
             scan.attributes.put("jointype", "inner");
         }
 
-        /*
         Expression joinCond = null;
         Expression whereCond = null;
         // if isJoinIndex and indexCondition are set then indexCondition is join condition
@@ -1554,11 +1561,37 @@ final class RangeVariable {
             }
 
         }
+        
         if (joinCond != null) {
             joinCond = joinCond.eliminateDuplicates(session);
-            VoltXMLElement joinCondEl = new VoltXMLElement("joincond");
-            joinCondEl.children.add(joinCond.voltGetXML(session));
-            scan.children.add(joinCondEl);
+            //VoltXMLElement joinCondEl = new VoltXMLElement("joincond");
+            
+            VoltXMLElement cond = joinCond.voltGetXML(session);
+            
+            //System.out.print("XML joinCond : " + cond);
+            
+            for (VoltXMLElement c: cond.children) {
+            	//if (c.attributes.get("optype") == "and")
+            		//for (VoltXMLElement cc: c.children) {
+            			if (c.attributes.get("optype") == "equal") {
+            				int i = 0;
+            				for (VoltXMLElement ccc: c.children) {
+            					if (ccc.attributes.get("column") == "STARTVERTEXID") {
+            						VoltXMLElement value = c.children.get(i+1);
+            						scan.attributes.put("startvertexid", value.attributes.get("value"));
+            					}
+            					if (ccc.attributes.get("column") == "ENDVERTEXID") {
+            						VoltXMLElement value = c.children.get(i+1);
+            						scan.attributes.put("endvertexid", value.attributes.get("value"));
+            					}
+            					i++;
+            				}
+            			}
+            		//}
+            }
+            
+            //joinCondEl.children.add(joinCond.voltGetXML(session));
+            //scan.children.add(joinCondEl);
         }
 
         if (whereCond != null) {
@@ -1567,7 +1600,8 @@ final class RangeVariable {
             whereCondEl.children.add(whereCond.voltGetXML(session));
             scan.children.add(whereCondEl);
         }
-        */
+        
+        if (hint != null) scan.attributes.put("hint", hint);        
         
         return scan;
     }

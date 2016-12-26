@@ -139,6 +139,7 @@ end
 begin GraphView                              "A graph view in the database"
   Column* VertexProps                        "The set of properties of the vertex"
   Column* EdgeProps                          "The set of properties of the edge"
+  Column* PathProps                          "The set of properties of the path"
   Index* indexes                             "The set of indexes on the columns in the table"
   Table? VTable                              "The reference of the vertexes table or materialized view (equivalent to materializer in Table)"
   Table? ETable                              "The reference of the edges table or materialized view (equivalent to materializer in Table)"

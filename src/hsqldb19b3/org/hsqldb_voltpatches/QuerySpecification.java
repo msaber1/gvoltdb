@@ -75,6 +75,7 @@ public class QuerySpecification extends QueryExpression {
     public boolean        isAggregated;
     public boolean        isGrouped;
     // GVoltDB extension
+    public String         hint;
     //public boolean        isGraphSelect;
     //public boolean        isVertexSelect;
     //public boolean        isEdgeSelect;
