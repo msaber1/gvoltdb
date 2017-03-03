@@ -168,6 +168,7 @@ public class QueryPlanner {
         // this is much easier to parse than SQL and is checked against the catalog
         try {
             m_xmlSQL = m_HSQL.getXMLCompiledStatement(m_sql);
+            //System.out.println("QueryPlanner.parse 171 m_xmlSQL="+m_xmlSQL);
         }
         catch (HSQLParseException e) {
             // XXXLOG probably want a real log message here

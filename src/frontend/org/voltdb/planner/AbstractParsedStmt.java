@@ -277,7 +277,8 @@ public abstract class AbstractParsedStmt {
                 parseTables(node);
             } else if (node.name.equalsIgnoreCase("vertexscan") ||
             		   node.name.equalsIgnoreCase("edgescan")   ||
-            		   node.name.equalsIgnoreCase("pathscan")
+            		   node.name.equalsIgnoreCase("pathscan")   ||
+            		   node.name.equalsIgnoreCase("graphscan")
             		  ) {
                 parseGraph(node);
             }
@@ -514,17 +515,15 @@ public abstract class AbstractParsedStmt {
         }
         
          
-        if (propertytype == "vertex" ) {
-        	StmtTargetGraphScan graphScan = (StmtTargetGraphScan)tableScan;
-        	graphScan.resolveTVE(expr, propertytype);
-        	tableScan = (StmtTableScan)graphScan;
-        }
-        else if (propertytype == "edge" ) {
+        if (propertytype == "vertex" || propertytype == "edge" || propertytype == "path" || 
+        	propertytype == "startvertex" || propertytype == "endvertex") {
         	StmtTargetGraphScan graphScan = (StmtTargetGraphScan)tableScan;
         	graphScan.resolveTVE(expr, propertytype);
         	tableScan = (StmtTableScan)graphScan;
         }	
-        else tableScan.resolveTVE(expr);
+        else {
+        	tableScan.resolveTVE(expr);
+        }
         
 
         if (m_stmtId == tableScan.getStatementId()) {
@@ -723,11 +722,14 @@ public abstract class AbstractParsedStmt {
      * @param tableAlias
      * @return the cache entry
      */
-    protected StmtTableScan addGraphToStmtCache(GraphView graph, String tableAlias, String object) {
+    protected StmtTableScan addGraphToStmtCache(GraphView graph, String tableAlias, String object,
+    		                                    String hint, int startvertexid, int endvertexid
+    		                                    ) {
         // Create an index into the query Catalog cache
         StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
         if (tableScan == null) {
-            tableScan = new StmtTargetGraphScan(graph, tableAlias, m_stmtId, object);
+            tableScan = new StmtTargetGraphScan(graph, tableAlias, m_stmtId, object, 
+            		                            hint, startvertexid, endvertexid);
             m_tableAliasMap.put(tableAlias, tableScan);
         }
         return tableScan;
@@ -1253,7 +1255,15 @@ public abstract class AbstractParsedStmt {
        String object = (tableNode.name == "vertexscan")?"VERTEXES":
     	               (tableNode.name == "edgescan")?"EDGES":
     	               (tableNode.name == "pathscan")?"PATHS":null;
-       graphScan = addGraphToStmtCache(graph, tableAlias, object);
+       
+       String hint = tableNode.attributes.get("hint");
+       int startvertexid = -1;
+       int endvertexid = -1;
+       if (tableNode.attributes.get("startvertexid") != null) {
+    	   startvertexid = Integer.parseInt(tableNode.attributes.get("startvertexid"));
+    	   endvertexid = Integer.parseInt(tableNode.attributes.get("endvertexid"));
+       }
+       graphScan = addGraphToStmtCache(graph, tableAlias, object, hint, startvertexid, endvertexid);
 
        AbstractExpression joinExpr = parseJoinCondition(tableNode);
        AbstractExpression whereExpr = parseWhereCondition(tableNode);
@@ -1311,7 +1321,10 @@ public abstract class AbstractParsedStmt {
                 visited.add(visitedTable);
             }
             // GVoltDB extension
-            if (node.name.equalsIgnoreCase("vertexscan") || node.name.equalsIgnoreCase("edgescan") 
+            if (node.name.equalsIgnoreCase("graphscan") ||
+            	node.name.equalsIgnoreCase("pathscan") ||
+            	node.name.equalsIgnoreCase("vertexscan") || 
+            	node.name.equalsIgnoreCase("edgescan") 
                 ) {
 
                 String visitedTable = node.attributes.get("tablealias");

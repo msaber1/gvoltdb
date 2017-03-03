@@ -299,6 +299,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 	cols = db.getGraphviews().getExact(m_targetTableName).getVertexprops();
                 else if (m_targetObjectName == "EDGES")
                 	cols = db.getGraphviews().getExact(m_targetTableName).getEdgeprops();
+                else if (m_targetObjectName == "PATHS")
+                	cols = db.getGraphviews().getExact(m_targetTableName).getPathprops();
                 
                 assert(cols != null);
                 

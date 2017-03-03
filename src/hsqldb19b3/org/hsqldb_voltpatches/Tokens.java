@@ -187,6 +187,7 @@ public class Tokens {
     static final String        T_HAVING            = "HAVING";
     static final String        T_HOLD              = "HOLD";
     public static final String T_HOUR              = "HOUR";
+    static final String        T_HINT              = "HINT";
     static final String        T_ID                = "ID";
     static final String        T_IDENTITY          = "IDENTITY";
     static final String        T_IF                = "IF";
@@ -1621,6 +1622,7 @@ public class Tokens {
     public static final int PATHS                      = 748;
     public static final int ENDVERTEX                  = 749;
     public static final int STARTVERTEX                = 750;
+    public static final int HINT                         = 751;
     
 
     //
@@ -1769,6 +1771,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_GROUPING, GROUPING);
         reservedKeys.put(Tokens.T_HANDLER, HANDLER);
         reservedKeys.put(Tokens.T_HAVING, HAVING);
+        reservedKeys.put(Tokens.T_HINT, HINT);
         reservedKeys.put(Tokens.T_HOLD, HOLD);
         reservedKeys.put(Tokens.T_HOUR, HOUR);
         reservedKeys.put(Tokens.T_ID, ID);
@@ -2041,6 +2044,7 @@ public class Tokens {
         commandSet.put(T_GENERATED, GENERATED);
         commandSet.put(T_GRANTED, GRANTED);
         commandSet.put(T_HEADER, HEADER);
+        commandSet.put(T_HINT, HINT);
         commandSet.put(T_IGNORECASE, IGNORECASE);
         commandSet.put(T_IMMEDIATELY, IMMEDIATELY);
         commandSet.put(T_INCLUDING, INCLUDING);

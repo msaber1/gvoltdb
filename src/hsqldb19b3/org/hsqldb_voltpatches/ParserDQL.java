@@ -807,6 +807,7 @@ public class ParserDQL extends ParserBase {
 
     void XreadTableExpression(QuerySpecification select) {
         XreadFromClause(select);
+        XreadGraphHints(select);
         readWhereGroupHaving(select);
     }
 
@@ -866,6 +867,34 @@ public class ParserDQL extends ParserBase {
         return select;
     }
 
+    String XreadGraphHints(QuerySpecification select) {
+
+        if (readIfThis(Tokens.HINT)) {
+            
+        	readThis(Tokens.OPENBRACKET);
+        	
+        	StringBuilder sb = new StringBuilder();
+        	
+        	sb.append(token.tokenString);
+        	read();
+        	readThis(Tokens.OPENBRACKET);
+        	sb.append("("+token.tokenString+")");
+        	
+        	//System.out.println("ParserDQL 883 "+token.tokenType);
+        	
+        	read();
+        	readThis(Tokens.CLOSEBRACKET);
+        	
+        	select.hint = sb.toString();
+        	
+        	readThis(Tokens.CLOSEBRACKET);
+        	
+        	return sb.toString(); 
+        }
+        
+        return null;
+    }
+    
     void XreadFromClause(QuerySpecification select) {
 
         readThis(Tokens.FROM);
@@ -1413,6 +1442,7 @@ public class ParserDQL extends ParserBase {
         GraphView      graph            = null;
         boolean        isGraph          = false;
         int            graphtype = -1;
+        String         hint      = null;
 
         if (token.tokenType == Tokens.OPENBRACKET) {
             Expression e = XreadTableSubqueryOrJoinedTable();
@@ -1436,7 +1466,8 @@ public class ParserDQL extends ParserBase {
                 
                 if (graph != null) isGraph = true;
                 
-                read();
+                read();                
+                
             } else {            	
 	        	table = readTableName();
 	
@@ -1469,6 +1500,10 @@ public class ParserDQL extends ParserBase {
 	                                                  isDelimitedIdentifier());
 	
 	            read();
+	            
+                // if alias
+                if (token.tokenType == Tokens.HINT)
+                	hint = XreadGraphHints(new QuerySpecification(compileContext));
 	
 	            if (token.tokenType == Tokens.OPENBRACKET) {
 	                columnNameQuoted = new BitMap(32);
@@ -1503,7 +1538,7 @@ public class ParserDQL extends ParserBase {
         RangeVariable range;
         if (isGraph)
         	range = new RangeVariable(graph, graphtype, alias, columnList,
-                    columnNameList, compileContext);
+                    columnNameList, compileContext, hint);
         else
         	range = new RangeVariable(table, alias, columnList,
         			columnNameList, compileContext);
@@ -4006,7 +4041,8 @@ public class ParserDQL extends ParserBase {
         		(prefix.equals(Tokens.getKeyword(Tokens.PATHS)))
         		)
         	   ) {
-        		column = new ExpressionColumn(null, prePrefix, prefix, name);
+        		column = new ExpressionColumn(prePrefix, prefix, name);
+        		//column = new ExpressionColumn(null, prePrefix, prefix, name);
         	}
         	else {
         		column = new ExpressionColumn(prePrefix, prefix, name);

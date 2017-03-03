@@ -47,6 +47,8 @@ public class GraphView implements SchemaObject {
         
     HsqlName VTableName;
     HsqlName ETableName;
+    
+    String Hint;
 
 	//public boolean focusVertexes;
 	//public boolean focusEdges;
@@ -81,17 +83,29 @@ public class GraphView implements SchemaObject {
 	 */
     public void addDefaultProperties(HsqlName schema, boolean isDelimitedIdentifier) {
     	
-    	HsqlName fanoutName = database.nameManager.newColumnHsqlName(schema, "FANOUT", isDelimitedIdentifier);
-    	ColumnSchema fanOut = new ColumnSchema(fanoutName, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	HsqlName Name = database.nameManager.newColumnHsqlName(schema, "FANOUT", isDelimitedIdentifier);
+    	ColumnSchema fanOut = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
     	addVertexPropNoCheck(fanOut);  
         
-        HsqlName faninName = database.nameManager.newColumnHsqlName(schema, "FANIN", isDelimitedIdentifier);
-    	ColumnSchema fanIn = new ColumnSchema(faninName, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+        Name = database.nameManager.newColumnHsqlName(schema, "FANIN", isDelimitedIdentifier);
+    	ColumnSchema fanIn = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
     	addVertexPropNoCheck(fanIn);
     	
-    	HsqlName pathLengthName = database.nameManager.newColumnHsqlName(schema, "LENGTH", isDelimitedIdentifier);
-    	ColumnSchema pathLength = new ColumnSchema(pathLengthName, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	Name = database.nameManager.newColumnHsqlName(schema, "LENGTH", isDelimitedIdentifier);
+    	ColumnSchema pathLength = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
     	addPathPropNoCheck(pathLength);    	
+    	
+    	Name = database.nameManager.newColumnHsqlName(schema, "COST", isDelimitedIdentifier);
+    	ColumnSchema pathCost = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	addPathPropNoCheck(pathCost);
+    	
+    	Name = database.nameManager.newColumnHsqlName(schema, "STARTVERTEXID", isDelimitedIdentifier);
+    	ColumnSchema col = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	addPathPropNoCheck(col);
+    	
+    	Name = database.nameManager.newColumnHsqlName(schema, "ENDVERTEXID", isDelimitedIdentifier);
+    	col = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	addPathPropNoCheck(col);
     }
     
 	@Override
@@ -188,56 +202,27 @@ public class GraphView implements SchemaObject {
         
         VoltXMLElement vertex = new VoltXMLElement("vertex");
         
-        //int j = 0;
         for (int i = 0; i < vertexPropCount; i++) {
             ColumnSchema property = getVertexProp(i);
             VoltXMLElement propChild = property.voltGetColumnXML(session);
             propChild.attributes.put("index", Integer.toString(i));
             vertex.children.add(propChild);
             assert(propChild != null);
-            //j = i;
         }
-        //j++;
-        /*
-         * Add default properties: FanOut & FanIn
-         */
-        /*
-        VoltXMLElement fanOut = new VoltXMLElement("column");
-        fanOut.attributes.put("name", "FanOut");
-        fanOut.attributes.put("index", Integer.toString(j));
-        j++;
-        String typestring = Types.getTypeName(Types.SQL_INTEGER);
-        fanOut.attributes.put("valuetype", typestring);
-        fanOut.attributes.put("nullable", String.valueOf(false));
-        fanOut.attributes.put("size", String.valueOf(FanPrecision));
-        vertex.children.add(fanOut);
-        
-        VoltXMLElement fanIn = new VoltXMLElement("column");
-        fanIn.attributes.put("name", "FanIn");
-        fanIn.attributes.put("index", Integer.toString(j));
-        typestring = Types.getTypeName(Types.SQL_INTEGER);
-        fanIn.attributes.put("valuetype", typestring);
-        fanIn.attributes.put("nullable", String.valueOf(false));
-        fanIn.attributes.put("size", String.valueOf(FanPrecision));
-        vertex.children.add(fanIn);
-        */
-        //*************************************************/
         
         graphxml.children.add(vertex);
-        /*
-        HsqlName[] VertexProperties = getVertexProperties();
-        for (HsqlName prop : VertexProperties) {
-        	VoltXMLElement property = new VoltXMLElement("property");
-            property.attributes.put("name", prop.statementName);
-            vertex.children.add(property);
-        }
-        */
-        //vertexes.children.add(vertex);
-
-        // read all the edge properties
-        //VoltXMLElement edges = new VoltXMLElement("edges");
-        //edges.attributes.put("name", "edges");
         
+        VoltXMLElement path = new VoltXMLElement("path");
+        for (int i = 0; i < pathPropCount; i++) {
+            ColumnSchema property = getPathProp(i);
+            VoltXMLElement propChild = property.voltGetColumnXML(session);
+            propChild.attributes.put("index", Integer.toString(i));
+            path.children.add(propChild);
+            assert(propChild != null);
+        }
+
+        graphxml.children.add(path);
+
         VoltXMLElement edge = new VoltXMLElement("edge");
         for (int i = 0; i < edgePropCount; i++) {
             ColumnSchema property = getEdgeProp(i);

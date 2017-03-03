@@ -1969,6 +1969,17 @@ public class DDLCompiler {
                 }
 		        // TODO Add graph indexes
 		    }
+        	if (subNode.name.equals("path")) {
+                int colIndex = 0;
+                for (VoltXMLElement columnNode : subNode.children) {
+                    if (columnNode.name.equals("column")) {
+                    	addPropertyToCatalog(graph, columnNode, columnTypes,
+                                columnMap, m_compiler, "path");
+                        colIndex++;
+                    }
+                }
+		        // TODO Add graph indexes
+		    }
 		}
         
         // Set materializer for properties
@@ -2092,7 +2103,10 @@ public class DDLCompiler {
         if (proptype == "vertex") {
         	column = graph.getVertexprops().add(name);
         }
-        else { 
+        else if (proptype == "path") {
+        	column = graph.getPathprops().add(name);
+        }
+        else { // "edge"
         	column = graph.getEdgeprops().add(name);
         }
         
