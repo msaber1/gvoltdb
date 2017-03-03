@@ -77,6 +77,7 @@ public class ExpressionColumn extends Expression {
     /**
      * Creates a OpCodes.COLUMN expression
      */
+    /*
     ExpressionColumn(String schema, String table, String object, String column) {
         super(OpTypes.COLUMN);
         this.schema = schema;
@@ -84,6 +85,7 @@ public class ExpressionColumn extends Expression {
         columnName  = column;
         objectName  = object;
     }
+    */
     
     ExpressionColumn(ColumnSchema column) {
         super(OpTypes.COLUMN);
@@ -1327,11 +1329,18 @@ public class ExpressionColumn extends Expression {
             }
         }
         
-        if (rangeVariable != null && rangeVariable.isVertexes)
-        	exp.attributes.put("properytype", "vertex");
+        
+        if (columnName.toUpperCase() == "STARTVERTEXID")
+        	exp.attributes.put("propertytype", "startvertex");
+        else if (columnName.toUpperCase() == "ENDVERTEXID")
+        	exp.attributes.put("propertytype", "endvertex");
+        else if (rangeVariable != null && rangeVariable.isVertexes)
+        	exp.attributes.put("propertytype", "vertex");
         else if (rangeVariable != null && rangeVariable.isEdges)
-        	exp.attributes.put("properytype", "edge");
-        else exp.attributes.put("properytype", "column");
+        	exp.attributes.put("propertytype", "edge");
+        else if (columnName.toUpperCase() == "COST")
+        	exp.attributes.put("propertytype", "path");
+        else exp.attributes.put("propertytype", "column");
         
         exp.attributes.put("column", columnName.toUpperCase());
         if ((alias == null) || (getAlias().length() == 0)) {

@@ -510,7 +510,6 @@ public abstract class CatalogUtil {
         return null;
     }
 
-
     /**
      * Return true if a table is the source table for a materialized view.
      */

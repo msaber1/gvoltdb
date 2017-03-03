@@ -42,6 +42,7 @@ import org.voltdb.catalog.Constraint;
 import org.voltdb.catalog.ConstraintRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.DatabaseConfiguration;
+import org.voltdb.catalog.GraphView;
 import org.voltdb.catalog.Group;
 import org.voltdb.catalog.GroupRef;
 import org.voltdb.catalog.Index;
@@ -76,6 +77,13 @@ public abstract class CatalogSchemaTools {
     private static final String startBatch = "file -inlinebatch END_OF_BATCH\n";
     private static final String endBatch = "END_OF_BATCH\n";
 
+    public static void toSchema(StringBuilder sb, GraphView graph) {
+        assert(graph != null);
+        
+        String sql = ((TableAnnotation) graph.getAnnotation()).ddl;
+        sb.append(sql);
+    }
+    
     /**
      * Convert a Table catalog object into the proper SQL DDL, including all indexes,
      * constraints, and foreign key references.
@@ -583,6 +591,16 @@ public abstract class CatalogSchemaTools {
                         toSchema(sb, table, viewQuery, CatalogUtil.getExportTargetIfExportTableOrNullOtherwise(db, table));
                     }
                 }
+                ///
+                List<GraphView> graphList = new ArrayList<GraphView>();
+
+                CatalogMap<GraphView> graphs = db.getGraphviews();
+                if (! graphs.isEmpty()) {
+                    for (GraphView graph : db.getGraphviews()) {
+                        toSchema(sb, graph);
+                    }
+                }
+                ///
 
                 CatalogMap<Procedure> procedures = db.getProcedures();
                 if (! procedures.isEmpty()) {

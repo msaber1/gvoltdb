@@ -395,6 +395,11 @@ public class TupleValueExpression extends AbstractValueExpression {
         
         if (type == "vertex")
         	column = graph.getVertexprops().getExact(m_columnName);
+        else if (type == "path")
+        	column = graph.getPathprops().getExact(m_columnName);
+        	//column = graph.getVertexprops().getExact(m_columnName);
+        else if (type == "startvertex" || type == "endvertex")
+        	column = graph.getVertexprops().getExact("ID");
         else column = graph.getEdgeprops().getExact(m_columnName);
         
         assert(column != null);

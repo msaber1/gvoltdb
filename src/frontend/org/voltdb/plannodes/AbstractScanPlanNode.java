@@ -299,6 +299,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 	cols = db.getGraphviews().getExact(m_targetTableName).getVertexprops();
                 else if (m_targetObjectName == "EDGES")
                 	cols = db.getGraphviews().getExact(m_targetTableName).getEdgeprops();
+                else if (m_targetObjectName == "PATHS")
+                	cols = db.getGraphviews().getExact(m_targetTableName).getPathprops();
                 
                 assert(cols != null);
                 
@@ -495,7 +497,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         	stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
         } else {
         	stringer.key(Members.TARGET_GRAPH_NAME.name()).value(m_targetTableName);
-        	stringer.key(Members.TARGET_OBJECT_NAME.name()).value(m_targetObjectName);
+        	//stringer.key(Members.TARGET_OBJECT_NAME.name()).value(m_targetObjectName);
         	stringer.key(Members.TARGET_GRAPH_ALIAS.name()).value(m_targetTableAlias);        	
         }
         if (m_isSubQuery) {
@@ -511,7 +513,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
         if (m_targetTableName == null) {
         	m_targetTableName = jobj.getString( Members.TARGET_GRAPH_NAME.name() );
-        	m_targetObjectName = jobj.getString( Members.TARGET_OBJECT_NAME.name() );
+        	//m_targetObjectName = jobj.getString( Members.TARGET_OBJECT_NAME.name() );
         	m_targetTableAlias = jobj.getString( Members.TARGET_GRAPH_ALIAS.name() );            
             isGraph = true;
         }

@@ -1926,13 +1926,14 @@ public class DDLCompiler {
         assert(Vquery != null);
         assert(Equery != null);
         
-        boolean isdirected = Boolean.getBoolean((node.attributes.get("isdirected")));
+        boolean isdirected = Boolean.parseBoolean((node.attributes.get("isdirected")));
         
         graph.setIsdirected(isdirected);
         
         // add the original DDL to the table (or null if it's not there)
         TableAnnotation annotation = new TableAnnotation();
         graph.setAnnotation(annotation);
+        annotation.ddl = node.attributes.get("DDL");
 
         // all tables start replicated
         // if a partition is found in the project file later,
@@ -1963,6 +1964,17 @@ public class DDLCompiler {
                     if (columnNode.name.equals("column")) {
                     	addPropertyToCatalog(graph, columnNode, columnTypes,
                                 columnMap, m_compiler, "edge");
+                        colIndex++;
+                    }
+                }
+		        // TODO Add graph indexes
+		    }
+        	if (subNode.name.equals("path")) {
+                int colIndex = 0;
+                for (VoltXMLElement columnNode : subNode.children) {
+                    if (columnNode.name.equals("column")) {
+                    	addPropertyToCatalog(graph, columnNode, columnTypes,
+                                columnMap, m_compiler, "path");
                         colIndex++;
                     }
                 }
@@ -2091,7 +2103,10 @@ public class DDLCompiler {
         if (proptype == "vertex") {
         	column = graph.getVertexprops().add(name);
         }
-        else { 
+        else if (proptype == "path") {
+        	column = graph.getPathprops().add(name);
+        }
+        else { // "edge"
         	column = graph.getEdgeprops().add(name);
         }
         
