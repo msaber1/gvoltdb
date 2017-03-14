@@ -4,6 +4,13 @@
 #include <map>
 #include <string>
 #include "storage/table.h"
+#include "storage/temptable.h"
+#include "graph/GraphTypes.h"
+
+#include "common/NValue.hpp"
+#include "common/ValuePeeker.hpp"
+#include "common/ValueFactory.hpp"
+
 using namespace std;
 
 namespace voltdb {
@@ -11,9 +18,14 @@ namespace voltdb {
 //#include "vertex.h"
 class Vertex;
 class Edge;
+class PathIterator;
 
 class GraphView
 {
+	friend class PathIterator;
+	friend class TableIterator;
+	friend class GraphViewFactory;
+
 public:
 	~GraphView(void);
 
@@ -37,6 +49,8 @@ public:
 		}
 	}
 
+
+	float shortestPath(int source, int destination, int costColumnId);
 	Vertex* getVertex(int id);
 	TableTuple* getVertexTuple(int id);
 	Edge* getEdge(int id);
@@ -50,9 +64,11 @@ public:
 	bool isDirected();
 	Table* getVertexTable();
 	Table* getEdgeTable();
+	Table* getPathTable();
 	TupleSchema* getVertexSchema();
 	TupleSchema* getEdgeSchema();
 	TupleSchema* getPathSchema();
+	string getPathsTableName() {return m_pathTableName; }
 	void setVertexSchema(TupleSchema* s);
 	void setEdgeSchema(TupleSchema* s);
 	void setPathSchema(TupleSchema* s);
@@ -66,28 +82,42 @@ public:
 	string getVertexAttributeName(int vertexAttributeId);
 	string getEdgeAttributeName(int edgeAttributeId);
 
-	friend class GraphViewFactory;
+	//path related members
+	//Notice that VoltDB allows one operation or query / one thread per time
+	//Hence, we assume that a single path traversal query is active at any point in time
+	PathIterator& iteratorDeletingAsWeGo(GraphOperationType opType);
+
+	void expandCurrentPathOperation();
+
 
 protected:
 	void fillGraphFromRelationalTables();
+	void constructPathSchema(); //constucts m_pathColumnNames and m_pathSchema
+	void constructPathTempTable();
 	std::map<int, Vertex* > m_vertexes;
 	std::map<int, Edge* > m_edges;
 	Table* m_vertexTable;
 	Table* m_edgeTable;
+	TempTable* m_pathTable;
+	TableIterator* m_pathTableIterator;
+	PathIterator* m_pathIterator;
 	TupleSchema* m_vertexSchema; //will contain fanIn and fanOut as additional attributes
 	TupleSchema* m_edgeSchema; //will contain startVertexId and endVertexId as additional attributes
-	TupleSchema* m_pathSchema; //will contain startVertexId, endVertexId, and cost for now (this should change dynamically per query and should not be placed here at this level)
+	TupleSchema* m_pathSchema; //will contain startVertexId, endVertexId, and cost for now
 	// schema as array of string names
 	std::vector<std::string> m_vertexColumnNames;
 	std::vector<std::string> m_edgeColumnNames;
-	std::vector<std::string> m_pathColumnNames; //not sure yet, this may be removed
+	std::vector<std::string> m_pathColumnNames;
 	std::vector<int> m_columnIDsInVertexTable;
 	std::vector<int> m_columnIDsInEdgeTable;
 	int m_vertexIdColumnIndex;
 	int m_edgeIdColumnIndex;
 	int m_edgeFromColumnIndex;
 	int m_edgeToColumnIndex;
-
+	string m_pathTableName = "PATHS_TEMP_TABLE";
+	GraphOperationType currentPathOperationType;
+	//TODO: this should be removed
+	int dummyPathExapansionState = 0;
 	// identity information
 	CatalogId m_databaseId;
 	std::string m_name;

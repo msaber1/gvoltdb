@@ -561,16 +561,34 @@ final class RangeVariable {
         if (!isGraph)
         	addTableColumns(exprList, exprList.size(), namedJoinColumns);
         // TODO Should we do it?
-        else addGraphVertProps(exprList, exprList.size(), namedJoinColumns);
+        else addGraphAllProps(exprList, exprList.size(), namedJoinColumns);
     }
 
-    private int addGraphVertProps(HsqlArrayList expList, int position, HashSet exclude) {
+    private int addGraphAllProps(HsqlArrayList expList, int position, HashSet exclude) {
 
+        assert(isGraph);
+        assert(isVertexes||isEdges);
+    	
         GraphView graph = getGraph();
-        int   count = graph.getVertexPropCount();
+        int   count = 0;
+        
+        if (isVertexes) 
+        	count = graph.getVertexPropCount();
+        else if (isEdges)
+        	count = graph.getEdgePropCount();
+        else 
+        	count = graph.getPathPropCount();
 
         for (int i = 0; i < count; i++) {
-            ColumnSchema column = graph.getVertexProp(i);
+            ColumnSchema column = null;
+            
+            if (isVertexes) 
+            	column = graph.getVertexProp(i);
+            else if (isEdges)
+            	column = graph.getEdgeProp(i);
+            else 
+            	column = graph.getPathProp(i);
+            
             String columnName = columnAliases == null ? column.getName().name
                                                       : (String) columnAliases
                                                           .get(i);

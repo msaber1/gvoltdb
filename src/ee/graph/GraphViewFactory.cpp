@@ -13,11 +13,12 @@ GraphView* GraphViewFactory::createGraphView(string graphViewName, bool isDirect
 	GraphView* vw = new GraphView();
 	vw->m_name = graphViewName;
 	vw->m_isDirected = isDirected;
+	//vw->constructPathSchema();
 	return vw;
 }
 
 GraphView* GraphViewFactory::createGraphView(const std::string &graphViewName, const bool isDirected,
-		   Table* vTable, Table* eTable, TupleSchema* vSchema, TupleSchema* eSchema,
+		   Table* vTable, Table* eTable, Table* pTable, TupleSchema* vSchema, TupleSchema* eSchema,
 		   vector<std::string> vertexColumnNames, vector<std::string> edgeColumnNames,
 		   vector<int> columnIdsInVertexTable, vector<int> columnIdsInEdgeTable,
            voltdb::CatalogId databaseId, char *signature)
@@ -27,6 +28,11 @@ GraphView* GraphViewFactory::createGraphView(const std::string &graphViewName, c
 	vw->m_isDirected = isDirected;
 	vw->m_vertexTable = vTable;
 	vw->m_edgeTable = eTable;
+	//construct the path schema
+	vw->constructPathSchema();
+	//construct the path temp table
+	vw->constructPathTempTable();
+
 	//set the vertex column names
 	int vColumnCount = vSchema->columnCount();
 	vw->m_vertexColumnNames.resize(vColumnCount);

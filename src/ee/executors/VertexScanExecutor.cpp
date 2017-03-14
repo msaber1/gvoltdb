@@ -47,7 +47,6 @@ bool VertexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 	VertexScanPlanNode* node = dynamic_cast<VertexScanPlanNode*>(abstractNode);
 	assert(node);
 	bool isSubquery = node->isSubQuery();
-	isSubquery = node->isSubQuery();
 	assert(isSubquery || node->getTargetGraphView());
 	assert((! isSubquery) || (node->getChildren().size() == 1));
 	graphView = node->getTargetGraphView();

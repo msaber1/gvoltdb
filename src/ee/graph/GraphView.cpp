@@ -1,10 +1,13 @@
 #include "GraphView.h"
 #include "storage/tableiterator.h"
+#include "storage/tablefactory.h"
 #include "common/TupleSchema.h"
 #include "common/NValue.hpp"
 #include "common/ValuePeeker.hpp"
 #include "common/tabletuple.h"
+#include "common/TupleSchemaBuilder.h"
 #include "logging/LogManager.h"
+#include "PathIterator.h"
 #include "Vertex.h"
 #include "Edge.h"
 #include <string>
@@ -13,8 +16,15 @@ using namespace std;
 namespace voltdb
 {
 
-GraphView::GraphView(void)
+GraphView::GraphView(void) //: m_pathIterator(this)
 {
+	m_pathIterator = new PathIterator(this);
+}
+
+float GraphView::shortestPath(int source, int destination, int costColumnId)
+{
+	//TODO: write real shortest path code that consults the edges table using costColumnId
+	return (float)source * destination;
 }
 
 Vertex* GraphView::getVertex(int id)
@@ -57,6 +67,11 @@ Table* GraphView::getVertexTable()
 Table* GraphView::getEdgeTable()
 {
 	return this->m_edgeTable;
+}
+
+Table* GraphView::getPathTable()
+{
+	return this->m_pathTable;
 }
 
 int GraphView::numOfVertexes()
@@ -153,6 +168,75 @@ string GraphView::getVertexAttributeName(int vertexAttributeId)
 string GraphView::getEdgeAttributeName(int edgeAttributeId)
 {
 	return m_edgeColumnNames[edgeAttributeId];
+}
+
+void GraphView::constructPathSchema()
+{
+	//
+	//Path tuple will contain 5 attributes
+	//0: StartVertex, Integer
+	//1: EndVertex, Integer
+	//2: Length, Integer
+	//3: Cost, Float
+	//4: Path: Varchar(256)
+	//add the column names
+	m_pathColumnNames.clear();
+	m_pathColumnNames.push_back("StartVertex");
+	m_pathColumnNames.push_back("EndVertex");
+	m_pathColumnNames.push_back("Length");
+	m_pathColumnNames.push_back("Cost");
+	m_pathColumnNames.push_back("Path");
+	int numOfPathColumns = m_pathColumnNames.size();
+
+	bool needsDRTimestamp = false; //TODO: we might revisit this
+	TupleSchemaBuilder schemaBuilder(numOfPathColumns,
+									 needsDRTimestamp ? 1 : 0); // number of hidden columns
+
+	schemaBuilder.setColumnAtIndex (0, ValueType::VALUE_TYPE_INTEGER, 4, false, false); //StartVertex
+	schemaBuilder.setColumnAtIndex(1, ValueType::VALUE_TYPE_INTEGER, 4, false, false); //EndVertex
+	schemaBuilder.setColumnAtIndex(2, ValueType::VALUE_TYPE_INTEGER, 4, false, false); //Length
+	schemaBuilder.setColumnAtIndex(3, ValueType::VALUE_TYPE_DOUBLE, 8, true, false); //Cost
+	schemaBuilder.setColumnAtIndex(4, ValueType::VALUE_TYPE_VARCHAR, 1024, true, false); //Path
+
+	m_pathSchema = schemaBuilder.build();
+}
+
+void GraphView::constructPathTempTable()
+{
+	m_pathTable = TableFactory::buildTempTable(m_pathTableName, m_pathSchema, m_pathColumnNames, NULL);
+}
+
+PathIterator& GraphView::iteratorDeletingAsWeGo(GraphOperationType opType)
+{
+	//empty the paths table, which is the staging memory for the paths to be explored
+	m_pathTable->deleteAllTempTupleDeepCopies();
+	//set the iterator for the temp table
+	m_pathTableIterator = &(m_pathTable->iteratorDeletingAsWeGo());
+	return *m_pathIterator;
+}
+
+void GraphView::expandCurrentPathOperation()
+{
+	//Check the current path operation type, and
+	//advance the paths exploration accordingly
+	//new entries should be added to the paths temp table
+	//adding no new entries means that the exploration is completely done
+	//and the iterator will have hasNext evaluated to false
+	if(dummyPathExapansionState < 3)
+	{
+		//create new tuple in the paths temp table
+		TableTuple temp_tuple;
+		temp_tuple = m_pathTable->tempTuple();
+		//start vertex, end vertex, length, cost, path
+		temp_tuple.setNValue(0, ValueFactory::getIntegerValue(dummyPathExapansionState));
+		temp_tuple.setNValue(1, ValueFactory::getIntegerValue(dummyPathExapansionState + 1));
+		temp_tuple.setNValue(2, ValueFactory::getIntegerValue(dummyPathExapansionState * 2));
+		temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(dummyPathExapansionState * 3)));
+
+		m_pathTable->insertTempTuple(temp_tuple);
+
+		dummyPathExapansionState++;
+	}
 }
 
 void GraphView::fillGraphFromRelationalTables()

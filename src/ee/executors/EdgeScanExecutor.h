@@ -14,12 +14,17 @@
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
+#include "execution/VoltDBEngine.h"
 
 namespace voltdb {
 
 class AbstractExpression;
 class TempTable;
 class Table;
+class TempTableLimits;
+class AggregateExecutorBase;
+class GraphView;
+struct CountingPostfilter;
 
 class EdgeScanExecutor : public AbstractExecutor {
 public:
@@ -32,6 +37,11 @@ public:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
+
+    private:
+        void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
+        AggregateExecutorBase* m_aggExec;
+        GraphView* graphView;
 };
 
 }

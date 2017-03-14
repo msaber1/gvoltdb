@@ -1152,13 +1152,16 @@ VoltDBEngine::processCatalogAdditions(int64_t timestamp)
 			// use the delegate to init the table and create indexes n' stuff
 			Table* vTable = findInMapOrNull(catalogGraphView->VTable()->path(), m_catalogDelegates)->getTable();
 			Table* eTable = findInMapOrNull(catalogGraphView->ETable()->path(), m_catalogDelegates)->getTable();
+			string pathsTableName = "TEMPPATHS";
 			if (vTable == NULL || eTable == NULL)
 			{
 				LogManager::GLog("VoltDBEngine", "processCatalogAdditions", 1125, "unable to get vTable or eTable or both");
 				continue;
 			}
 			LogManager::GLog("VoltDBEngine", "processCatalogAdditions", 1128, "before calling gcd.init");
-			gcd->init(*m_database, *catalogGraphView, vTable, eTable);
+			//TODO: pTable is not used as we assume one path table schema. The parameter may allow varying the path schema according to the view definition in the future
+			Table* pTable = NULL;
+			gcd->init(*m_database, *catalogGraphView, vTable, eTable, pTable);
 			m_graphViewCatalogDelegates[catalogGraphView->path()] = gcd;
 			GraphView* graphView = gcd->getGraphView();
 			m_graphViewDelegatesByName[graphView->name()] = gcd;

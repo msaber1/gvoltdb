@@ -30,7 +30,7 @@ PlanNodeType VertexScanPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE
 std::string VertexScanPlanNode::debugInfo(const string& spacer) const
 {
     std::ostringstream buffer;
-    buffer << "Graph Support";
+    buffer << "VerexScan PlanNode";
     return buffer.str();
 }
 

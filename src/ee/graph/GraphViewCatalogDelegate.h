@@ -38,7 +38,7 @@ public:
 	    void deleteCommand();
 
 	    void init(catalog::Database const &catalogDatabase,
-	            catalog::GraphView const &catalogGraphView, Table* vTable, Table* eTable);
+	            catalog::GraphView const &catalogGraphView, Table* vTable, Table* eTable, Table* pTable);
 
 
 	    void processSchemaChanges(catalog::Database const &catalogDatabase,
@@ -89,7 +89,7 @@ public:
 	  private:
 	    GraphView *constructGraphViewFromCatalog(catalog::Database const &catalogDatabase,
 	                                     catalog::GraphView const &catalogGraphView,
-	                                     Table* vTable, Table* eTable);
+	                                     Table* vTable, Table* eTable, Table* pTable);
 
 	    voltdb::GraphView *m_graphView;
 	    const std::string m_signature;

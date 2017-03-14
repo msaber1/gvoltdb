@@ -47,10 +47,10 @@ GraphView *GraphViewCatalogDelegate::getGraphView() const {
 }
 
 void GraphViewCatalogDelegate::init(catalog::Database const &catalogDatabase,
-	            catalog::GraphView const &catalogGraphView, Table* vTable, Table* eTable)
+	            catalog::GraphView const &catalogGraphView, Table* vTable, Table* eTable, Table* pTable)
 {
 	m_graphView = constructGraphViewFromCatalog(catalogDatabase,
-	                                        catalogGraphView, vTable, eTable);
+	                                        catalogGraphView, vTable, eTable, pTable);
 	if (!m_graphView) {
 	        return;
 	}
@@ -69,7 +69,7 @@ void GraphViewCatalogDelegate::init(catalog::Database const &catalogDatabase,
 
 GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Database const &catalogDatabase,
 	                                     catalog::GraphView const &catalogGraphView,
-	                                     Table* vTable, Table* eTable)
+	                                     Table* vTable, Table* eTable, Table* pTable)
 {
 	LogManager::GLog("GraphViewCatalogDelegate", "constructGraphViewFromCatalog", 71, "graphViewName = " + catalogGraphView.name());
 	// Create a persistent graph view for this table in our catalog
@@ -147,7 +147,7 @@ GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Data
 	// Persistent table will use default size (2MB) if tableAllocationTargetSize is zero.
 
 	GraphView *graphView = GraphViewFactory::createGraphView(catalogGraphView.name(), catalogGraphView.isDirected(),
-			vTable, eTable, vSchema, eSchema, columnNamesVertex, columnNamesEdge, columnIdsInVertexTable,
+			vTable, eTable, pTable, vSchema, eSchema, columnNamesVertex, columnNamesEdge, columnIdsInVertexTable,
 			columnIdsInEdgeTable, databaseId, m_signatureHash);
 
 	return graphView;
