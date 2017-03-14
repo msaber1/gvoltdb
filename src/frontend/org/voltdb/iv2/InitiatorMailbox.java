@@ -478,7 +478,6 @@ public class InitiatorMailbox implements Mailbox
     public void handleRequestDataMessage(RequestDataMessage message)
     {
         RequestDataResponseMessage response = new RequestDataResponseMessage(message.getSourceSiteId(), message);
-
         //  search for table (in the backend)
         long enginePointer = m_executionEngines.get(m_hsId);
         ByteBuffer bbTable = ByteBuffer.allocateDirect(1024);
@@ -490,6 +489,7 @@ public class InitiatorMailbox implements Mailbox
         else
             response.setRequestTableBuffer(bbTable);
 
+// System.out.println("host from: " + ((int)response.getSourceSiteId()) + " to: " + ((int)response.getDestinationSiteId()));
         System.out.println("thread: " + Thread.currentThread().getName() + " Send from: " + (response.getSourceSiteId()>>32) + " to: " + (response.getDestinationSiteId()>>32));
 
         send(response.getDestinationSiteId(), response);
@@ -501,6 +501,7 @@ public class InitiatorMailbox implements Mailbox
      */
     public void handleRequestDataResponseMessage(RequestDataResponseMessage message)
     {
+// System.out.println("host from: " + ((int)message.getSourceSiteId()) + " to: " + ((int)message.getDestinationSiteId()));
         System.out.println("thread: " + Thread.currentThread().getName() + " Receive from: " + (message.getSourceSiteId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
 
         // m_requestTableBuffer = message.getRequestTableBuffer();
