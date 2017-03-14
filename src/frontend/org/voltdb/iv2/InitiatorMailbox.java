@@ -21,8 +21,11 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ThreadLocalRandom;
 import java.util.concurrent.Semaphore;
 
 import org.voltcore.logging.VoltLogger;
@@ -36,6 +39,8 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
+import org.voltdb.jni.ExecutionEngine;
+import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -49,9 +54,6 @@ import org.voltdb.messaging.RequestDataResponseMessage;
 
 import com.google_voltpatches.common.base.Supplier;
 
-
-
-
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
  * configured InitiationRole.
@@ -61,7 +63,89 @@ import com.google_voltpatches.common.base.Supplier;
  * occur in the correct thread instead of using synchronization
  */
 public class InitiatorMailbox implements Mailbox
+, Runnable
 {
+    private String m_tableName;
+    private long m_destinationID;
+    private byte[] output;
+    private Semaphore m_sem = new Semaphore(0);
+    private Semaphore m_sem2 = new Semaphore(0);
+    private boolean m_ready = false;
+
+    public void setDestinationID(long destID) {m_destinationID = destID;}
+    public void setTableName(String tableName) {m_tableName = tableName;}
+    public void getSem() throws InterruptedException {m_sem.acquire();}
+
+    @Override
+    public void run() {
+      // try {
+      //     Thread.currentThread().setName("requestThread");
+      //     System.out.println("thread: " + Thread.currentThread().getName());
+      //     sendRequest(m_tableName, m_destinationID);
+      //
+      //     m_sem2.acquire();
+      //
+      //     // while (getResultTableBuffer() == null) {}
+      //
+      //     System.out.println("LOCK released");
+      //
+      //     // m_sem.release();
+      //
+      //     // //  convert byte buffer to byte array
+      //     // ByteBuffer bb = getResultTableBuffer();
+      //     // ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
+      //     //
+      //     // bb.rewind();
+      //     // clone.put(bb);
+      //     // bb.rewind();
+      //     // clone.flip();
+      //     //
+      //     // byte[] bytes = clone.array();
+      //     // output = new byte[bytes.length];
+      //     // System.arraycopy(bytes, 0, output, 0, bytes.length);
+      //
+      //     //  print table
+      //     // VoltTable table = new VoltTable(getResultTableBuffer(), true);
+      //     // System.out.println(table.toFormattedString());
+      //
+      //     m_sem.release();
+      // } catch (Exception e) {
+      //     e.printStackTrace();
+      // }
+    }
+
+    // m_requestThread = new Thread(new Runnable() {
+    //     public void run() {
+    //       try {
+    //           System.out.println("thread: " + Thread.currentThread().getName());
+    //           m_mailbox.sendRequest(tableName, destinationID);
+    //
+    //           while (m_mailbox.getResultTableBuffer() == null) {}
+    //
+    //           // m_sem.release();
+    //
+    //           //  convert byte buffer to byte array
+    //           ByteBuffer bb = m_mailbox.getResultTableBuffer();
+    //           ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
+    //
+    //           bb.rewind();
+    //           clone.put(bb);
+    //           bb.rewind();
+    //           clone.flip();
+    //
+    //           byte[] bytes = clone.array();
+    //           output = new byte[bytes.length];
+    //           System.arraycopy(bytes, 0, output, 0, bytes.length);
+    //
+    //           //  print table
+    //           VoltTable table = new VoltTable(bb, true);
+    //           System.out.println(table.toFormattedString());
+    //       } catch (Exception e) {
+    //           e.printStackTrace();
+    //       }
+    //     }
+    // });
+
     static final boolean LOG_TX = false;
     public static final boolean SCHEDULE_IN_SITE_THREAD;
     static {
@@ -80,11 +164,9 @@ public class InitiatorMailbox implements Mailbox
     private long m_hsId;
     private RepairAlgo m_algo;
 
-    private Semaphore m_sem;
-    private boolean m_ready;
-    private byte[] output;
-
-    ArrayList<VoltTable> m_requestData = new ArrayList<VoltTable>();
+    ExecutionEngineJNI m_engine;
+    TreeMap<Long,Long> m_executionEngines;
+    ByteBuffer m_requestTableBuffer;
 
     /*
      * Hacky global map of initiator mailboxes to support assertions
@@ -92,29 +174,6 @@ public class InitiatorMailbox implements Mailbox
      */
     public static final CopyOnWriteArrayList<InitiatorMailbox> m_allInitiatorMailboxes
                                                                          = new CopyOnWriteArrayList<InitiatorMailbox>();
-
-    // the cluster node that requested for data is blocked until data arrives
-    public void waitSem() throws InterruptedException {
-        m_sem.acquire();
-    }
-
-    // the cluster node that requested for data is ready to retrieve data
-    public void signalSem() {
-        m_sem.release();
-    }
-
-    // returns the semaphore of this cluster node
-    public void setReady() {
-        m_ready = true;
-    }
-
-    public ArrayList<VoltTable> getRequestData() {
-        return m_requestData;
-    }
-
-    public void setRequestData(ArrayList<VoltTable> tables) {
-        m_requestData = tables;
-    }
 
     synchronized public void setLeaderState(long maxSeenTxnId)
     {
@@ -180,9 +239,6 @@ public class InitiatorMailbox implements Mailbox
         m_messenger = messenger;
         m_repairLog = repairLog;
         m_joinProducer = joinProducer;
-
-        m_sem = new Semaphore(0);
-        m_ready = false;
 
         m_masterLeaderCache = new LeaderCache(m_messenger.getZK(), VoltZK.iv2masters);
         try {
@@ -294,10 +350,19 @@ public class InitiatorMailbox implements Mailbox
     @Override
     public void deliver(final VoltMessage message)
     {
+        System.out.println("thread run deliver: " + Thread.currentThread().getName() + " on " + message.getClass().getName());
+
+        if (message instanceof RequestDataResponseMessage) {
+          m_requestTableBuffer = ((RequestDataResponseMessage)message).getRequestTableBuffer();
+          // m_sem2.release();
+          m_sem.release();
+        }
+
         if (SCHEDULE_IN_SITE_THREAD) {
             this.m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
                 @Override
                 void run() {
+                    System.out.println("thread deliver: " + Thread.currentThread().getName() + " on " + message.getClass().getName());
                     synchronized (InitiatorMailbox.this) {
                         deliverInternal(message);
                     }
@@ -343,10 +408,6 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
         else if (message instanceof RequestDataResponseMessage) {
-            if (m_ready) {
-                return;
-            }
-
             handleRequestDataResponseMessage((RequestDataResponseMessage)message);
             return;
         }
@@ -410,93 +471,39 @@ public class InitiatorMailbox implements Mailbox
         this.m_hsId = hsId;
     }
 
-    /*
-     * Handles RequestDataMessage
+    /**
+     *  Handles RequestDataMessage
+     *  @param  message
      */
     public void handleRequestDataMessage(RequestDataMessage message)
     {
-        // if the message is sent from node 0 to node 1,
-        // send the message from node 1 to node 2
-        //    CoreUtils.getSiteIdFromHSId(hsId)
-        if ((message.getDestinationSiteId()>>32) == 1) {
-            RequestDataMessage send =
-                new RequestDataMessage(message.getDestinationSiteId(), (2L<<32), message);
+        RequestDataResponseMessage response = new RequestDataResponseMessage(message.getSourceSiteId(), message);
 
-            send.setRequestDestinations(message.getRequestDestinations());
+        //  search for table (in the backend)
+        long enginePointer = m_executionEngines.get(m_hsId);
+        ByteBuffer bbTable = ByteBuffer.allocateDirect(1024);
+        int result = m_engine.nativeSearchRequestTable(enginePointer, message.getTableName(), bbTable);
 
-            send.pushRequestDestination(message.getDestinationSiteId());
+        //  add table buffer to the message
+        if (result == 0)
+            response.setRequestTableBuffer(null);
+        else
+            response.setRequestTableBuffer(bbTable);
 
-            send.setSender(message.getSender());
-
-            send(send.getDestinationSiteId(), send);
-
-//System.out.println("Init: request data from:"
-        //+ (message.getInitiatorHSId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
-            return;
-        }
-
-        RequestDataResponseMessage response =
-            new RequestDataResponseMessage(message, message.getInitiatorHSId());
-
-        response.setRequestDestinations(message.getRequestDestinations());
-
-        response.setSender(message.getSender());
+        System.out.println("thread: " + Thread.currentThread().getName() + " Send from: " + (response.getSourceSiteId()>>32) + " to: " + (response.getDestinationSiteId()>>32));
 
         send(response.getDestinationSiteId(), response);
-
-//System.out.println("Init: request data from:"
-        //+ (message.getInitiatorHSId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
     }
 
-    /*
-     * Handles RequestDataResponseMessage
+    /**
+     *  Handles RequestDataResponseMessage
+     *  @param  message
      */
     public void handleRequestDataResponseMessage(RequestDataResponseMessage message)
     {
-        // if the messages need to return sequentially,
-        // then pop the destination Id and send the response message to the destination
-        if (message.getRequestDestinations().size() >= 1) {
-            RequestDataResponseMessage response =
-                new RequestDataResponseMessage(message.getRequestDestination(), message.popRequestDestination(), message);
+        System.out.println("thread: " + Thread.currentThread().getName() + " Receive from: " + (message.getSourceSiteId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
 
-            //    set response destination
-            response.setRequestDestinations(message.getRequestDestinations());
-
-            //    add data to the message
-            ArrayList<VoltTable> oldTables = message.getRequestDatas();
-
-            for (int i=0; i<oldTables.size(); i++) {
-                response.pushRequestData(oldTables.get(i));
-            }
-
-            VoltTable table = new VoltTable(
-                    new VoltTable.ColumnInfo("name",VoltType.STRING),
-                    new VoltTable.ColumnInfo("age",VoltType.INTEGER));
-
-            if (message.getRequestDestinations().size() == 1)
-                table.addRow(new Object[] {"James", (25 + (response.getDestinationSiteId()>>32))});
-            else if (message.getRequestDestinations().size() == 0)
-                table.addRow(new Object[] {"Kate", (25 + (response.getDestinationSiteId()>>32))});
-
-            response.pushRequestData(table);
-
-            response.setSender(message.getSender());
-
-            send(response.getDestinationSiteId(), response);
-
-            if (message.getRequestDestinations().isEmpty()) {
-                InitiatorMailbox sender = message.getSender();
-                sender.setRequestData(response.getRequestDatas());
-                sender.setReady();
-                sender.signalSem();
-            }
-
-
-//System.out.println("Init: request data response from:"
-        //+ (message.getExecutorSiteId()>>32) + " to: " + (response.getDestinationSiteId()>>32));
-
-            return;
-        }
+        // m_requestTableBuffer = message.getRequestTableBuffer();
     }
 
     /** Produce the repair log. This is idempotent. */
@@ -575,64 +582,32 @@ public class InitiatorMailbox implements Mailbox
     }
 
     /**
-     * Returns requested data from other from other cluster nodes.
-     * @param destinationId Host id of the node that holds the data
-     * @return VoltTable serialized in bytes
+     * Returns requested table to the specified cluster node.
+     * @param tableName
+     * @param destinationID
      */
-    public byte[] requestData(long destinationId) throws InterruptedException {
-        output = null;
+    public void sendRequest(String tableName, long destinationID) {
+        long sourceId = m_hsId;
+        long range = 999999999L;
+        long txnId = ThreadLocalRandom.current().nextLong(range);
+        long uniqueId = ThreadLocalRandom.current().nextLong(range);
+        RequestDataMessage requestMessage = new RequestDataMessage(sourceId, destinationID, tableName, txnId<<32, uniqueId<<32, false, false);
 
-        long src = m_hsId;
-        long dest = destinationId << 32;
+        System.out.println("thread: " + Thread.currentThread().getName() + " Send from: " + (requestMessage.getSourceSiteId()>>32) + " to: " + (requestMessage.getDestinationSiteId()>>32));
 
-        //    create message
-        RequestDataMessage req = new RequestDataMessage(src,dest,482934<<32,547089402<<32,false,false);
-
-        //    set returning destination
-        ArrayList<Long> destList = new ArrayList<Long>();
-        destList.add(src);
-        req.setRequestDestinations(destList);
-
-        req.setSender(this);
-
-        //    send message
-        send(req.getDestinationSiteId(), req);
-
-//System.out.println("sending");
-
-        m_sem.acquire();
-
-//System.out.println("waiting for final message");
-
-        if (m_requestData.size() == 0)
-            return output;
-
-        VoltTable outTable = new VoltTable(m_requestData.get(0).getTableSchema());
-
-        for (int i=0; i<m_requestData.size(); i++) {
-            VoltTable table = m_requestData.get(i);
-
-            for (int j=0; j<table.getRowCount(); j++) {
-                VoltTableRow row = table.fetchRow(j);
-                outTable.add(row);
-            }
-        }
-
-//System.out.println(outTable.toFormattedString());
-
-        ByteBuffer bb = outTable.getBuffer();
-        ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
-        bb.rewind();
-        clone.put(bb);
-        bb.rewind();
-        clone.flip();
-
-        byte[] ba = clone.array();
-        int length = ba.length;
-
-        output = new byte[length];
-        System.arraycopy(ba, 0, output, 0, ba.length);
-
-        return output;
+        send(destinationID, requestMessage);
     }
+
+    public void setMapSitesToEngines(TreeMap<Long, Long> executionEngines) {
+        m_executionEngines = executionEngines;
+    }
+
+    public void setEngineObject(ExecutionEngineJNI engine) {
+        m_engine = engine;
+    }
+
+    public ByteBuffer getResultTableBuffer() {
+        return m_requestTableBuffer;
+    }
+
 }

@@ -50,6 +50,8 @@ public:
 	bool isDirected();
 	Table* getVertexTable();
 	Table* getEdgeTable();
+	TupleSchema* getVertexSchema();
+	TupleSchema* getEdgeSchema();
 
 	friend class GraphViewFactory;
 

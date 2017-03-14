@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -85,6 +86,7 @@ import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.dtxn.UndoAction;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngine.EventType;
 import org.voltdb.jni.ExecutionEngine.TaskType;
@@ -115,6 +117,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Set to false trigger shutdown.
     volatile boolean m_shouldContinue = true;
+
+    //  mapping between sites and execution engine pointers
+    TreeMap<Long, Long> m_executionEngines;
+
+    TreeMap<Long, InitiatorMailbox> m_initiatorMailboxes;
+
+    //  "MP" or "SP" for multi-partiton or single-partition site
+    String m_whoamiPrefix;
 
     // HSId of this site's initiator.
     final long m_siteId;
@@ -201,7 +211,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
     }
     private StartupConfig m_startupConfig = null;
-
 
     // Undo token state for the corresponding EE.
     public final static long kInvalidUndoToken = -1L;
@@ -568,8 +577,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             String coreBindIds,
             TaskLog rejoinTaskLog,
             PartitionDRGateway drGateway,
-            PartitionDRGateway mpDrGateway)
+            PartitionDRGateway mpDrGateway,
+            TreeMap<Long, Long> executionEngines,
+            TreeMap<Long, InitiatorMailbox> initiatorMailboxes,
+            String whoamiPrefix)
     {
+        m_whoamiPrefix = whoamiPrefix;
+        m_initiatorMailboxes = initiatorMailboxes;
+        m_executionEngines = executionEngines;
         m_siteId = siteId;
         m_context = context;
         m_partitionId = partitionId;
@@ -670,7 +685,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         deploy.getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
                         m_mpDrGateway != null,
-                        m_initiatorMailbox);
+                        m_executionEngines,
+                        m_whoamiPrefix,
+                        m_initiatorMailbox,
+                        m_initiatorMailboxes);
             }
             else if (m_backend == BackendTarget.NATIVE_EE_SPY_JNI){
                 Class<?> spyClass = Class.forName("org.mockito.Mockito");
@@ -687,7 +705,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         getSystemsettings().get("systemsettings").getTemptablemaxsize(),
                         hashinatorConfig,
                         m_mpDrGateway != null,
-                        m_initiatorMailbox);
+                        m_executionEngines,
+                        m_whoamiPrefix,
+                        m_initiatorMailbox,
+                        m_initiatorMailboxes);
                 eeTemp = (ExecutionEngine) spyMethod.invoke(null, internalEE);
             }
             else {

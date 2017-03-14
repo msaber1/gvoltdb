@@ -77,14 +77,14 @@
 #include "plannodes/plannodefragment.h"
 #include "storage/tablefactory.h"
 #include "storage/persistenttable.h"
-#include "graph/GraphView.h"
 #include "storage/streamedtable.h"
 #include "storage/MaterializedViewHandler.h"
 #include "storage/MaterializedViewTriggerForWrite.h"
 #include "storage/TableCatalogDelegate.hpp"
-#include "graph/GraphViewCatalogDelegate.h"
 #include "storage/CompatibleDRTupleStream.h"
 #include "storage/DRTupleStream.h"
+#include "graph/GraphView.h"
+#include "graph/GraphViewCatalogDelegate.h"
 #include "org_voltdb_jni_ExecutionEngine.h" // to use static values
 
 #include "boost/foreach.hpp"
@@ -257,6 +257,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_drStream,
                                             m_drReplicatedStream,
                                             drClusterId);
+
     return true;
 }
 
@@ -341,6 +342,16 @@ catalog::Table* VoltDBEngine::getCatalogTable(const std::string& name) const {
     return NULL;
 }
 
+GraphView* VoltDBEngine::getGraphView(int32_t graphViewId) const
+{
+    return findInMapOrNull(graphViewId, m_graphViews);
+}
+
+GraphView* VoltDBEngine::getGraphView(const string& name) const
+{
+    return findInMapOrNull(name, m_graphViewsByName);
+}
+
 GraphViewCatalogDelegate* VoltDBEngine::getGraphViewDelegate(const std::string& name) const
 {
     // Caller responsible for checking null return value.
@@ -371,7 +382,7 @@ void VoltDBEngine::serializeTable(int32_t tableId, SerializeOutput& out) const
     table->serializeTo(out);
 }
 
-int64_t VoltDBEngine::getSiteId() {
+int64_t VoltDBEngine::getSiteId() const {
     return m_siteId;
 }
 
@@ -616,8 +627,232 @@ int VoltDBEngine::loadNextDependency(Table* destination) {
 // -------------------------------------------------
 // Request Data Functions
 // -------------------------------------------------
-int VoltDBEngine::invokeRequestData(Table* destination, long destinationHsId) {
-    return m_topend->invokeRequestData(destination, &m_stringPool, destinationHsId);
+FallbackSerializeOutput* VoltDBEngine::getRequestTableBuffer()
+{
+    return &m_requestTableOut;
+}
+
+Table* VoltDBEngine::getVertexAttributesFromClusterNode(long destinationID,
+                                                        vector<int> vertexIDs,
+                                                        vector<string> attrNames,
+                                                        GraphView* graphView)
+{
+    return getAttributesFromClusterNode(destinationID, vertexIDs, attrNames, graphView, true);
+}
+
+Table* VoltDBEngine::getEdgeAttributesFromClusterNode(long destinationID,
+                                                      vector<int> edgeIDs,
+                                                      vector<string> attrNames,
+                                                      GraphView* graphView)
+{
+    return getAttributesFromClusterNode(destinationID, edgeIDs, attrNames, graphView, false);
+}
+
+Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
+                                                  vector<int> vertexOrEdgeIDs,
+                                                  vector<string> attrNames,
+                                                  GraphView* graphView,
+                                                  bool isVertex)
+{
+    Table* vertexOrEdgeTable;
+
+    if (isVertex)
+        vertexOrEdgeTable = graphView->getVertexTable();
+    else
+        vertexOrEdgeTable = graphView->getEdgeTable();
+
+    //  mapping: graph view column index and name
+    map<int32_t, string> mapIndexColumn;
+
+    //  mapping: original column name and graph view column name
+    map<string, string> mapColumnName;
+
+    //  search if vertex/edge table exists within this cluster node
+    for (int i = 0; i < m_numSites; i++) {
+        VoltDBEngine *engine = reinterpret_cast<VoltDBEngine*>(m_executionEngines[i]);
+
+        catalog::Database* db = engine->getDatabase();
+        const catalog::CatalogMap<catalog::GraphView> & graphViews = static_cast<const catalog::CatalogMap<catalog::GraphView> &>(db->graphViews());
+        map<string, catalog::GraphView*>::const_iterator it;
+
+        for (it = graphViews.begin(); it != graphViews.end(); it++) {
+            string graphViewName = it->first;
+            catalog::GraphView* gv = it->second;
+
+            if (boost::iequals(graphViewName, graphView->name())) {
+                map<string, catalog::Column*>::const_iterator it2;
+
+                if (isVertex) {
+                    const catalog::CatalogMap<catalog::Column> & columns = static_cast<const catalog::CatalogMap<catalog::Column> &>(gv->VertexProps());
+
+                    for (it2 = columns.begin(); it2 != columns.end(); it2++) {
+                        catalog::Column* col = it2->second;
+                        mapIndexColumn.insert(pair<int32_t, string>(col->index(), col->name()));
+                    }
+                }
+                else {
+                    const catalog::CatalogMap<catalog::Column> & columns = static_cast<const catalog::CatalogMap<catalog::Column> &>(gv->EdgeProps());
+
+                    for (it2 = columns.begin(); it2 != columns.end(); it2++) {
+                        catalog::Column* col = it2->second;
+                        mapIndexColumn.insert(pair<int32_t, string>(col->index(), col->name()));
+                    }
+                }
+            }
+        }
+    }
+
+    //  output table arguments
+    string requestTableName = this->generateRandomString(16);
+    string outputTableName = this->generateRandomString(16);
+    TempTableLimits limit(DEFAULT_TEMP_TABLE_MEMORY);
+    vector<string> outputColumnNames;
+
+    //  map view column names to original column name
+    int defaultAttrIndex;
+    int numDefaultVertexAttributes = 1;
+    int numDefaultEdgeAttributes = 3;
+
+    if (isVertex) {
+        defaultAttrIndex = numDefaultVertexAttributes;
+    }
+    else {
+        defaultAttrIndex = numDefaultEdgeAttributes;
+    }
+
+    for (int i = 0; i < vertexOrEdgeTable->columnCount(); i++) {
+        const string originalColumnName = vertexOrEdgeTable->columnName(i);
+        map<int32_t, string>::const_iterator itViewColumn = mapIndexColumn.find(i);
+        string viewColumnName = itViewColumn->second;
+        mapColumnName.insert(pair<string, string>(originalColumnName, viewColumnName));
+
+        //  column names of output table follow graph view attribute names
+        if (i < defaultAttrIndex) {
+            outputColumnNames.push_back(viewColumnName);
+        }
+        else {
+            bool found = false;
+            vector<string>::const_iterator itAttrNames;
+            for (itAttrNames = attrNames.begin(); itAttrNames != attrNames.end(); itAttrNames++) {
+                if (boost::iequals(viewColumnName, *itAttrNames)) {
+                  outputColumnNames.push_back(viewColumnName);
+                  found = true;
+                }
+            }
+            if (!found) {
+                outputColumnNames.push_back("null");
+            }
+        }
+    }
+
+    Table* outputTable = TableFactory::buildTempTable(outputTableName,
+                                                      vertexOrEdgeTable->schemaNonConst(),
+                                                      outputColumnNames,
+                                                      &limit);
+    Table* requestTable = TableFactory::buildTempTable(requestTableName,
+                                                        vertexOrEdgeTable->schemaNonConst(),
+                                                        vertexOrEdgeTable->getColumnNamesNonConst(),
+                                                        &limit);
+
+    //  ask frontend to get table
+    int request = m_topend->invokeRequestTable(vertexOrEdgeTable->nameNonConst(), requestTable, &m_stringPool, destinationID);
+
+    if (request == 0)
+        return NULL;
+
+    //  fill in output table
+    TableTuple tuple(requestTable->schema());
+    TableIterator iterator = requestTable->iterator();
+    int veIndex = 0;
+    int numColumns = requestTable->columnCount();
+    int numVE = vertexOrEdgeIDs.size();
+
+    while (iterator.next(tuple)) {
+
+        //  select rows
+        if (ValuePeeker::peekInteger(tuple.getNValue(0)) == vertexOrEdgeIDs[veIndex]) {
+            TableTuple tempTuple = outputTable->tempTuple();
+            int columnIndex;
+
+            if (isVertex) {
+                columnIndex = numDefaultVertexAttributes;
+            }
+            else {
+                columnIndex = numDefaultEdgeAttributes;
+            }
+
+            //  fill in default attributes
+            for (int j = 0; j < columnIndex; j++) {
+                tempTuple.setNValue(j, tuple.getNValue(j));
+            }
+
+            //	project columns
+            for (int j = columnIndex; j < numColumns; j++) {
+                for (int k = 0; k < attrNames.size(); k++) {
+                    string attrName = attrNames[k];
+
+                    //  graph view column name associated with original column name
+                    const string orgColumnName = requestTable->columnName(j);
+                    map<string, string>::const_iterator itColumnName = mapColumnName.find(orgColumnName);
+                    string attrViewName = itColumnName->second;
+
+                    //  add attribute
+                    if (boost::iequals(attrName, attrViewName)) {
+                        tempTuple.setNValue(columnIndex, tuple.getNValue(columnIndex));
+                        columnIndex++;
+                    }
+                }
+            }
+
+            outputTable->insertTuple(tempTuple);
+
+            if (veIndex < (numVE-1))
+                veIndex++;
+        }
+    }
+
+    return outputTable;
+}
+
+Table* VoltDBEngine::searchRequestTable(const char* tableName)
+{
+    std::string name(tableName);
+
+    catalog::Database* db = getDatabase();
+    const catalog::CatalogMap<catalog::Table> & tables = static_cast<const catalog::CatalogMap<catalog::Table> &>(db->tables());
+    map<string, catalog::Table*>::const_iterator it;
+
+    for (it = tables.begin(); it != tables.end(); it++) {
+        if (boost::iequals(name, it->first)) {
+            return getTable(name);
+        }
+    }
+
+    return NULL;
+}
+
+int VoltDBEngine::updateMapSitesToEngines(int64_t siteIds[], int64_t executionEngines[], int numSites)
+{
+    m_siteIds = siteIds;
+    m_executionEngines = executionEngines;
+    m_numSites = numSites;
+
+    return 1;
+}
+
+std::string VoltDBEngine::generateRandomString(const int length) const
+{
+    string str(length, 'a');
+    static const char alphanum[] =
+        //"0123456789"
+        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+        "abcdefghijklmnopqrstuvwxyz";
+
+    for (int i = 0; i < length; ++i) {
+        str[i] = alphanum[rand() % (sizeof(alphanum) - 1)];
+    }
+
+    return str;
 }
 
 // -------------------------------------------------

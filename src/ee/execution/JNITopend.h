@@ -61,7 +61,9 @@ public:
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
-    int invokeRequestData(Table* destination, Pool *stringPool, long destinationHsId);
+    int invokeRequestTable(std::string tableName, Table* destination, voltdb::Pool *stringPool, long destinationID);
+
+    // int getRequestTable(Table* requestTable, voltdb::Pool* stringPool);
 
 private:
     JNIEnv *m_jniEnv;
@@ -81,7 +83,8 @@ private:
     jmethodID m_pushDRBufferMID;
     jmethodID m_reportDRConflictMID;
     jmethodID m_decodeBase64AndDecompressToBytesMID;
-    jmethodID m_requestDataMID;
+    jmethodID m_requestTableMID;
+    jmethodID m_getRequestTableMID;
     jclass m_exportManagerClass;
     jclass m_partitionDRGatewayClass;
     jclass m_encoderClass;

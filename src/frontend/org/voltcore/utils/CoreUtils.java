@@ -17,6 +17,7 @@
 
 package org.voltcore.utils;
 
+import java.nio.ByteBuffer;
 import java.io.ByteArrayOutputStream;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
@@ -1170,7 +1171,8 @@ public class CoreUtils {
      *
      * @param log VoltLogger used to print output or warnings.
      */
-    public static synchronized void printPortsInUse(VoltLogger log) {
+    public static synchronized void printPortsInUse(VoltLogger log)
+    {
         try {
             /*
              * Don't do DNS resolution, don't use names for port numbers
@@ -1197,5 +1199,21 @@ public class CoreUtils {
         catch (Exception e) {
             log.fatal("Unable to list ports in use at this time.");
         }
+    }
+
+    public static byte[] byteBufferToByteArray(ByteBuffer bb)
+    {
+        ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
+
+        bb.rewind();
+        clone.put(bb);
+        bb.rewind();
+        clone.flip();
+
+        byte[] bytes = clone.array();
+        byte[] output = new byte[bytes.length];
+        System.arraycopy(bytes, 0, output, 0, bytes.length);
+
+        return output;
     }
 }

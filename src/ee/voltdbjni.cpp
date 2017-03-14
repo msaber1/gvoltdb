@@ -192,7 +192,10 @@ void setupSigHandler(void) {
  * This does strictly nothing so that this method never throws an exception.
  * @return the created VoltDBEngine pointer casted to jlong.
 */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCreate(JNIEnv *env, jobject obj, jboolean isSunJVM) {
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCreate(JNIEnv *env,
+                                                                                   jobject obj,
+                                                                                   jboolean isSunJVM)
+{
     // obj is the instance pointer of the ExecutionEngineJNI instance
     // that is creating this native EE. Turn this into a global reference
     // and only use that global reference for calling back to Java.
@@ -218,10 +221,9 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeCrea
     JNITopend *topend = NULL;
     VoltDBEngine *engine = NULL;
     try {
-
     	LogManager::GLog("VoltDBJNI", "ExecutionEngine_nativeCreate", 222, "init topend for JNITopend and engine to VoltDBEngine");
         topend = new JNITopend(env, java_ee);
-        engine = new VoltDBEngine( topend, JNILogProxy::getJNILogProxy(env, vm));
+        engine = new VoltDBEngine( topend, JNILogProxy::getJNILogProxy(env, vm) );
     } catch (const FatalException &e) {
         if (topend != NULL) {
             topend->crashVoltDB(e);
@@ -311,6 +313,75 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
         topend->crashVoltDB(e);
     }
     return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+}
+
+/**
+ * Load the system catalog for this engine.
+ * @param engine_ptr
+ * @param siteIds
+ * @param executionEngines
+ * @param numSites
+ * @return error code
+*/
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeMapSitesToEngines(
+    JNIEnv *env, jobject obj,
+    jlong engine_ptr,
+    jlongArray siteIds,
+    jlongArray executionEngines,
+    jint numSites)
+{
+    //  cast to engine object
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+
+    //  get long pointer that points long array
+    jlong* siteIdsBuffer = NULL;
+    if (siteIds) {
+        siteIdsBuffer = engine->getBatchSiteIdsContainer();
+        env->GetLongArrayRegion(siteIds, 0, numSites, siteIdsBuffer);
+    }
+
+    jlong* executionEnginesBuffer = NULL;
+    if (executionEngines) {
+        executionEnginesBuffer = engine->getBatchExecutionEnginesContainer();
+        env->GetLongArrayRegion(executionEngines, 0, numSites, executionEnginesBuffer);
+    }
+
+    //  update mapping
+    return engine->updateMapSitesToEngines(siteIdsBuffer, executionEnginesBuffer, numSites);
+}
+
+/**
+ * Search a table with a given table name.
+ * @param engine_ptr
+ * @param tableName
+ * @return table object in byte array
+*/
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearchRequestTable(
+    JNIEnv *env, jobject obj,
+    jlong engine_ptr,
+    jstring tableName,
+    jobject byteBuffer)
+{
+    if (!byteBuffer) {
+        return 0;
+    }
+
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+
+    if (tableName) {
+        Table* table = engine->searchRequestTable(env->GetStringUTFChars(tableName, 0));
+
+        //  return serialized table
+        if (table) {
+          size_t serializeSize = table->getAccurateSizeToSerialize(false);
+          FallbackSerializeOutput* out2 = engine->getRequestTableBuffer();
+          out2->initializeWithPosition(env->GetDirectBufferAddress(byteBuffer), serializeSize, 0);
+          table->serializeToWithoutTotalSize(*out2);
+          return 1;
+        }
+    }
+
+    return 0;
 }
 
 /**

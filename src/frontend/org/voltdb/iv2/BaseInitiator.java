@@ -18,6 +18,9 @@
 package org.voltdb.iv2;
 
 import java.util.concurrent.ExecutionException;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.logging.VoltLogger;
@@ -61,16 +64,26 @@ public abstract class BaseInitiator implements Initiator
     protected Term m_term = null;
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
+    protected Thread m_mailboxThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
+
+    protected TreeMap<Long, Long> m_executionEngines;
+    protected TreeMap<Long, InitiatorMailbox> m_initiatorMailboxes;
+    protected String m_whoamiPrefix;
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix, StatsAgent agent,
-            StartAction startAction)
+            StartAction startAction,
+            TreeMap<Long, Long> executionEngines,
+            TreeMap<Long, InitiatorMailbox> initiatorMailboxes)
     {
         m_zkMailboxNode = zkMailboxNode;
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = scheduler;
+        m_executionEngines = executionEngines;
+        m_initiatorMailboxes = initiatorMailboxes;
+        m_whoamiPrefix = whoamiPrefix;
         JoinProducerBase joinProducer;
 
         if (startAction == StartAction.JOIN) {
@@ -88,7 +101,8 @@ public abstract class BaseInitiator implements Initiator
                     m_messenger,
                     m_repairLog,
                     joinProducer);
-        } else {
+        }
+        else {
             m_initiatorMailbox = new InitiatorMailbox(
                     m_partitionId,
                     m_scheduler,
@@ -96,6 +110,10 @@ public abstract class BaseInitiator implements Initiator
                     m_repairLog,
                     joinProducer);
         }
+
+        // m_mailboxThread = new Thread(m_initiatorMailbox);
+        // m_mailboxThread.setDaemon(false);
+        // m_mailboxThread.start();
 
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
@@ -163,7 +181,10 @@ public abstract class BaseInitiator implements Initiator
                                        coreBindIds,
                                        taskLog,
                                        drGateway,
-                                       mpDrGateway);
+                                       mpDrGateway,
+                                       m_executionEngines,
+                                       m_initiatorMailboxes,
+                                       m_whoamiPrefix);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 

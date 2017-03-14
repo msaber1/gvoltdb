@@ -86,7 +86,8 @@ bool VertexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
-bool VertexScanExecutor::p_execute(const NValueArray &params) {
+bool VertexScanExecutor::p_execute(const NValueArray &params)
+{
     VertexScanPlanNode* node = dynamic_cast<VertexScanPlanNode*>(m_abstractNode);
     assert(node);
 
@@ -116,6 +117,36 @@ bool VertexScanExecutor::p_execute(const NValueArray &params) {
                input_table->name().c_str(),
                (int)input_table->activeTupleCount(),
                (int)input_table->allocatedTupleCount());
+
+    // invoke method that requests for data from other cluster node and returns the data
+    if (m_engine->getSiteId() == 0L) {
+        int hostID = 0;
+        long destinationID = (1L << 32) + hostID;
+
+        //  vertex attributes
+        vector<int> vertexIDs;
+        vector<string> vertexAttrNames;
+        for (int i=0; i<3; i++) {
+            vertexIDs.push_back(i*2);
+        }
+        //vertexAttrNames.push_back("CourseNum");
+
+        //  edge attributes
+        vector<int> edgeIDs;
+        vector<string> edgeAttrNamtes;
+        for (int i=0; i<3; i++) {
+            edgeIDs.push_back(i);
+        }
+        //edgeAttrNamtes.push_back("CoursePrereqId");
+
+        Table* out1 = m_engine->getVertexAttributesFromClusterNode(destinationID, vertexIDs, vertexAttrNames, graphView);
+        cout << out1->debug() << endl;
+        // cout << out1->name() << endl;
+
+        Table* out2 = m_engine->getEdgeAttributesFromClusterNode(destinationID, edgeIDs, edgeAttrNamtes, graphView);
+        cout << out2->debug() << endl;
+        // cout << out2->name() << endl;
+    }
 
     //
     // OPTIMIZATION: NESTED PROJECTION
@@ -208,6 +239,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params) {
                     VOLT_TRACE("inline projection...");
                     //get the vertex id
                     vertexId = ValuePeeker::peekInteger(tuple.getNValue(0));
+
                     fanOut = graphView->getVertex(vertexId)->fanOut();
                     fanIn = graphView->getVertex(vertexId)->fanIn();
                     for (int ctr = 0; ctr < num_of_columns - 2; ctr++) {
@@ -224,6 +256,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params) {
                 {
                     outputTuple(postfilter, tuple);
                 }
+
                 pmp.countdownProgress();
             }
         }
@@ -254,9 +287,8 @@ void VertexScanExecutor::outputTuple(CountingPostfilter& postfilter, TableTuple&
     m_tmpOutputTable->insertTempTuple(tuple);
 }
 
-
 VertexScanExecutor::~VertexScanExecutor() {
-	// TODO Auto-generated destructor stub
+
 }
 
 }

@@ -166,11 +166,20 @@ class Table {
     // COLUMNS
     // ------------------------------------------------------------------
     int columnIndex(const std::string &name) const;
+
     const std::vector<std::string>& getColumnNames() const {
         return m_columnNames;
     }
 
+    std::vector<std::string> getColumnNamesNonConst() const {
+        return m_columnNames;
+    }
+
     inline const TupleSchema* schema() const {
+        return m_schema;
+    }
+
+    inline TupleSchema* schemaNonConst() const {
         return m_schema;
     }
 
@@ -186,6 +195,10 @@ class Table {
     // UTILITY
     // ------------------------------------------------------------------
     const std::string& name() const {
+        return m_name;
+    }
+
+    std::string nameNonConst() {
         return m_name;
     }
 

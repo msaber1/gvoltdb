@@ -19,6 +19,9 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -38,6 +41,7 @@ import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.iv2.SpScheduler.DurableUniqueIdListener;
 
@@ -73,11 +77,13 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
     public SpInitiator(HostMessenger messenger, Integer partition, StatsAgent agent,
             SnapshotCompletionMonitor snapMonitor,
-            StartAction startAction)
+            StartAction startAction,
+            TreeMap<Long, Long> executionEngines,
+            TreeMap<Long, InitiatorMailbox> initiatorMailboxes)
     {
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(partition, new SiteTaskerQueue(), snapMonitor),
-                "SP", agent, startAction);
+                "SP", agent, startAction, executionEngines, initiatorMailboxes);
         m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
         m_tickProducer = new TickProducer(m_scheduler.m_tasks);
     }

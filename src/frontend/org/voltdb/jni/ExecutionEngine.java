@@ -24,6 +24,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Semaphore;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -141,6 +143,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public long m_peakMemoryInBytes = 0;
 
     protected InitiatorMailbox m_mailbox;
+
+    protected Thread m_requestThread;
+
+    protected Semaphore m_sem;
+
+    byte[] output = null;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -507,12 +515,77 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Request data from other from other cluster nodes.
-     * @param destinationId Host id of the node that holds the data
+     * @param tableName
+     * @param destinationID
      * @return VoltTable serialized in bytes
      */
+    public byte[] requestTable(String tableName, long destinationID) throws InterruptedException {
+        System.out.println("frontend start");
 
-    public byte[] requestData(long destinationId) throws InterruptedException {
-        return m_mailbox.requestData(destinationId);
+        // m_requestThread = new Thread(new Runnable() {
+        //     public void run() {
+        //       try {
+        //           System.out.println("thread: " + Thread.currentThread().getName());
+        //           m_mailbox.sendRequest(tableName, destinationID);
+        //
+        //           while (m_mailbox.getResultTableBuffer() == null) {}
+        //
+        //           // m_sem.release();
+        //
+        //           //  convert byte buffer to byte array
+        //           ByteBuffer bb = m_mailbox.getResultTableBuffer();
+        //           ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
+        //
+        //           bb.rewind();
+        //           clone.put(bb);
+        //           bb.rewind();
+        //           clone.flip();
+        //
+        //           byte[] bytes = clone.array();
+        //           output = new byte[bytes.length];
+        //           System.arraycopy(bytes, 0, output, 0, bytes.length);
+        //
+        //           //  print table
+        //           VoltTable table = new VoltTable(bb, true);
+        //           System.out.println(table.toFormattedString());
+        //       } catch (Exception e) {
+        //           e.printStackTrace();
+        //       }
+        //     }
+        // });
+        //
+        // m_requestThread.setDaemon(false);
+        // m_requestThread.start();
+
+        // m_mailbox.setTableName(tableName);
+        // m_mailbox.setDestinationID(destinationID);
+
+        // m_requestThread = new Thread(m_mailbox);
+        // m_requestThread.setDaemon(false);
+        // m_requestThread.start();
+
+        //  block main thread
+        // m_sem.acquire();
+        m_mailbox.sendRequest(tableName, destinationID);
+
+        m_mailbox.getSem();
+
+        System.out.println("thread restored: " + Thread.currentThread().getName());
+
+        //  convert byte buffer to byte array
+        ByteBuffer bb = m_mailbox.getResultTableBuffer();
+        ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
+
+        bb.rewind();
+        clone.put(bb);
+        bb.rewind();
+        clone.flip();
+
+        byte[] bytes = clone.array();
+        output = new byte[bytes.length];
+        System.arraycopy(bytes, 0, output, 0, bytes.length);
+
+        return output;
     }
 
     /*
@@ -795,6 +868,25 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long tempTableMemory,
             boolean createDrReplicatedStream,
             int compactionThreshold);
+
+    /**
+     * Updates the mapping between sites and execution engine pointers.
+     * @param pointer
+     * @param siteIds
+     * @param executionEngines
+     * @param numSites
+     * @return error code
+     */
+    protected native int nativeMapSitesToEngines(long pointer, long[] siteIds, long[] executionEngines, int numSites);
+
+    /**
+     * Search a table with a given table name.
+     * @param pointer
+     * @param tableName
+     * @param buffer
+     * @return error code
+     */
+    public native int nativeSearchRequestTable(long pointer, String tableName, ByteBuffer buffer);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.

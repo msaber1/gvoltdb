@@ -20,6 +20,10 @@ package org.voltdb.jni;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
+import java.util.concurrent.Semaphore;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool;
@@ -108,6 +112,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     private final BBContainer exceptionBufferOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 5);
     private ByteBuffer exceptionBuffer = exceptionBufferOrigin.b();
 
+    //  mapping between sites and execution engine pointers
+    TreeMap<Long,Long> m_executionEngines;
+
+    TreeMap<Long, InitiatorMailbox> m_initiatorMailboxes;
+
     /**
      * initialize the native Engine object.
      */
@@ -122,19 +131,26 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final int tempTableMemory,
             final HashinatorConfig hashinatorConfig,
             final boolean createDrReplicatedStream,
-            InitiatorMailbox mailbox)
+            TreeMap<Long, Long> executionEngines,
+            String whoamiPrefix,
+            InitiatorMailbox mailbox,
+            TreeMap<Long, InitiatorMailbox> initiatorMailboxes)
     {
         // base class loads the volt shared library.
         super(siteId, partitionId);
 
-        org.voltdb.VLog.GLog("ExecutionEngineJNI", "Constructor", 125, 
+        org.voltdb.VLog.GLog("ExecutionEngineJNI", "Constructor", 125,
     			"initialize the native Engine object.");
-        
+
+        m_executionEngines = executionEngines;
         m_mailbox = mailbox;
+        m_initiatorMailboxes = initiatorMailboxes;
+        // m_sem = new Semaphore(0);
 
         //exceptionBuffer.order(ByteOrder.nativeOrder());
         LOG.trace("Creating Execution Engine on clusterIndex=" + clusterIndex
                 + ", site_id = " + siteId + "...");
+
         /*
          * (Ning): The reason I'm testing if we're running in Sun's JVM is that
          * EE needs this info in order to decide whether it's safe to install
@@ -142,7 +158,17 @@ public class ExecutionEngineJNI extends ExecutionEngine {
          */
         pointer = nativeCreate(System.getProperty("java.vm.vendor")
                                .toLowerCase().contains("sun microsystems"));
+
+        if (m_executionEngines != null) {
+          m_executionEngines.put(siteId, pointer);
+        }
+
+        if (m_initiatorMailboxes != null) {
+          m_initiatorMailboxes.put(siteId, mailbox);
+        }
+
         nativeSetLogLevels(pointer, EELoggers.getLogLevels());
+
         int errorCode =
             nativeInitialize(
                     pointer,
@@ -162,6 +188,37 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
         updateHashinator(hashinatorConfig);
         //LOG.info("Initialized Execution Engine");
+
+        //  if MP site is initialized, replace mapping (between sites and execution engine pointers) for all SP sites
+        if (whoamiPrefix.equals("MP")) {
+          if (m_executionEngines != null) {
+            long[] siteIds = new long[m_executionEngines.entrySet().size()];
+            long[] executionEnginePointers = new long[m_executionEngines.entrySet().size()];
+
+            int index = 0;
+
+            for (Map.Entry<Long, Long> entry : m_executionEngines.entrySet()) {
+                siteIds[index] = entry.getKey();
+                executionEnginePointers[index] = entry.getValue();
+                index++;
+            }
+
+            for (Map.Entry<Long, Long> entry : m_executionEngines.entrySet()) {
+                nativeMapSitesToEngines(entry.getValue(), siteIds, executionEnginePointers, m_executionEngines.entrySet().size());
+            }
+          }
+
+          //  let mailbox have access to the mapping
+          if (m_initiatorMailboxes != null) {
+            for (Map.Entry<Long, InitiatorMailbox> entry : m_initiatorMailboxes.entrySet()) {
+              InitiatorMailbox mb = entry.getValue();
+              mb.setMapSitesToEngines(m_executionEngines);
+            }
+          }
+        }
+
+        //  each mailbox can access the engine object
+        m_mailbox.setEngineObject(this);
     }
 
     final void setupPsetBuffer(int size) {
@@ -235,7 +292,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     protected void loadCatalog(long timestamp, final byte[] catalogBytes) throws EEException {
         LOG.trace("Loading Application Catalog...");
-        org.voltdb.VLog.GLog("ExecutionEngineJNI", "loadCatalog", 234, 
+        org.voltdb.VLog.GLog("ExecutionEngineJNI", "loadCatalog", 234,
     			"Loading Application Catalog.");
         int errorCode = 0;
         errorCode = nativeLoadCatalog(pointer, timestamp, catalogBytes);
@@ -250,7 +307,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public void updateCatalog(long timestamp, final String catalogDiffs) throws EEException {
         LOG.trace("Loading Application Catalog...");
-        org.voltdb.VLog.GLog("ExecutionEngineJNI", "updateCatalog", 249, 
+        org.voltdb.VLog.GLog("ExecutionEngineJNI", "updateCatalog", 249,
     			"timestamp =  " + timestamp +", diff = " + catalogDiffs);
         int errorCode = 0;
         errorCode = nativeUpdateCatalog(pointer, timestamp, getStringBytes(catalogDiffs));
@@ -272,7 +329,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             long uniqueId,
             final long undoToken) throws EEException
     {
-    	org.voltdb.VLog.GLog("ExecutionEngineJNI", "coreExecutePlanFragments", 269, 
+    	org.voltdb.VLog.GLog("ExecutionEngineJNI", "coreExecutePlanFragments", 269,
     			"unique id = " + uniqueId);
         // plan frag zero is invalid
         assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
@@ -377,7 +434,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         if (HOST_TRACE_ENABLED) {
             LOG.trace("Retrieving VoltTable:" + tableId);
         }
-        org.voltdb.VLog.GLog("ExecutionEngineJNI", "serializeTable", 376, 
+        org.voltdb.VLog.GLog("ExecutionEngineJNI", "serializeTable", 376,
     			"tableId =  " + tableId);
         //Clear is destructive, do it before the native call
         deserializer.clear();
@@ -397,9 +454,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         boolean shouldDRStream,
         long undoToken) throws EEException
     {
-    	org.voltdb.VLog.GLog("ExecutionEngineJNI", "loadTable", 390, 
+    	org.voltdb.VLog.GLog("ExecutionEngineJNI", "loadTable", 390,
     			"Loading table with id = " + tableId);
-    	
+
         if (HOST_TRACE_ENABLED) {
             LOG.trace("loading table id=" + tableId + "...");
         }
@@ -652,7 +709,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public byte[] executeTask(TaskType taskType, ByteBuffer task) throws EEException {
         try {
-        	org.voltdb.VLog.GLog("ExecutionEngineJNI", "executeTask", 645, 
+        	org.voltdb.VLog.GLog("ExecutionEngineJNI", "executeTask", 645,
         			"Executing task with type = " + taskType);
             psetBuffer.putLong(0, taskType.taskId);
 
@@ -669,7 +726,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public ByteBuffer getParamBufferForExecuteTask(int requiredCapacity) {
-    	org.voltdb.VLog.GLog("ExecutionEngineJNI", "getParamBufferForExecuteTask", 668, 
+    	org.voltdb.VLog.GLog("ExecutionEngineJNI", "getParamBufferForExecuteTask", 668,
     			"requiredCapacity = " + requiredCapacity);
         clearPsetAndEnsureCapacity(8 + requiredCapacity);
         psetBuffer.position(8);

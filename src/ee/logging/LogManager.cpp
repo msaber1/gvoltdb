@@ -26,7 +26,7 @@ namespace voltdb {
 
 
 
-bool LogManager::GDebug = true;
+bool LogManager::GDebug = false;
 void LogManager::GLog(string className, string methodName, int lineNo, string message)
 {
 	if(LogManager::GDebug)
@@ -66,4 +66,3 @@ LogManager::LogManager(LogProxy *proxy) :  m_proxy(proxy), m_sqlLogger(proxy, LO
 }
 
 }
-

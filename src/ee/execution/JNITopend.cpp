@@ -223,12 +223,19 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_requestDataMID = m_jniEnv->GetMethodID(m_javaExecutionEngineClass, "requestData", "(J)[B");
-    if (m_requestDataMID == NULL) {
+    m_requestTableMID = m_jniEnv->GetMethodID(m_javaExecutionEngineClass, "requestTable", "(Ljava/lang/String;J)[B");
+    if (m_requestTableMID == NULL) {
         m_jniEnv->ExceptionDescribe();
-        assert(m_requestDataMID != NULL);
+        assert(m_requestTableMID != NULL);
         throw std::exception();
     }
+
+    // m_getRequestTableMID = m_jniEnv->GetMethodID(m_javaExecutionEngineClass, "getRequestTableBuffer", "()[B");
+    // if (m_getRequestTableMID == NULL) {
+    //     m_jniEnv->ExceptionDescribe();
+    //     assert(m_getRequestTableMID != NULL);
+    //     throw std::exception();
+    // }
 }
 
 
@@ -592,11 +599,12 @@ int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
 }
 
 /*
- * Invokes Java function that sends a message to request data from other cluster nodes.
- * Returns a table holding the data.
+ *  Invokes Java function that sends a message to request data from other cluster nodes.
+ *  Returns a table holding the data.
  */
-int JNITopend::invokeRequestData(Table* destination, Pool *stringPool, long destinationHsId) {
-    VOLT_DEBUG("requesting data to host id %d", destinationHsId);
+int JNITopend::invokeRequestTable(std::string tableName, Table* requestTable, voltdb::Pool *stringPool, long destinationID)
+{
+    VOLT_DEBUG("requesting data to site id %d", destinationID);
 
     // initiate JNI frame
     int32_t numRefs = 10;
@@ -606,8 +614,9 @@ int JNITopend::invokeRequestData(Table* destination, Pool *stringPool, long dest
         throw std::exception();
     }
 
-    // call Java method that requests for data from other cluster nodes
-    jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine, m_requestDataMID, destinationHsId));
+    jstring tableNameToJava = m_jniEnv->NewStringUTF(tableName.c_str());
+
+    jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine, m_requestTableMID, tableNameToJava, destinationID));
 
     if (!jbuf)
         return 0;
@@ -617,12 +626,11 @@ int JNITopend::invokeRequestData(Table* destination, Pool *stringPool, long dest
     if (length <= 0)
         return 0;
 
-    // add tuples into the table
     jboolean is_copy;
     jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, &is_copy);
 
     ReferenceSerializeInputBE serialize_in(bytes, length);
-    destination->loadTable(serialize_in, stringPool);
+    requestTable->loadTuplesFrom(serialize_in, stringPool);
     return 1;
 }
 

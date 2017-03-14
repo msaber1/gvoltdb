@@ -43,7 +43,7 @@ void GraphView::addVertex(int id, Vertex* vertex)
 {
 	this->m_vertexes[id] = vertex;
 }
-	
+
 void GraphView::addEdge(int id, Edge* edge)
 {
 	this->m_edges[id] = edge;
@@ -63,17 +63,26 @@ int GraphView::numOfVertexes()
 {
 	return this->m_vertexes.size();
 }
-	
+
 int GraphView::numOfEdges()
 {
 	return this->m_edges.size();
+}
+
+TupleSchema* GraphView::getVertexSchema()
+{
+		return m_vertexSchema;
+}
+TupleSchema* GraphView::getEdgeSchema()
+{
+		return m_edgeSchema;
 }
 
 string GraphView::name()
 {
 	return m_name;
 }
-	
+
 bool GraphView::isDirected()
 {
 	return m_isDirected;

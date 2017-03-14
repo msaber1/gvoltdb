@@ -135,6 +135,19 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 
     // invoke Java method that requests for data from other cluster node
     // and returns the data
+    //cout << reinterpret_cast<int64_t>(m_engine) << endl;
+    //cout << (m_engine->getSiteId()>>32) << endl;
+    /*
+    vector<int> vertexIDs;
+    vector<string> attrNames;
+    for (int i=0; i<3; i++) {
+      vertexIDs.push_back(i+1);
+    }
+    attrNames.push_back("SRC");
+    attrNames.push_back("DEST");
+    m_engine->a(1L, vertexIDs, attrNames);
+    */
+    /*
     if (m_engine->getSiteId() == 0) {
         long destination = 1L;
 
@@ -163,10 +176,11 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
         int result = m_engine->invokeRequestData(outputTable, destination);
 
         if (result == 1) {
-//cout << outputTable->debug() << endl;
+cout << outputTable->debug() << endl;
         }
-    }
 
+    }
+*/
     //
     // OPTIMIZATION: NESTED PROJECTION
     //

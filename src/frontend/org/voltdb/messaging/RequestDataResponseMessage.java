@@ -18,13 +18,12 @@
 package org.voltdb.messaging;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable;
-import org.voltdb.iv2.InitiatorMailbox;
+//import org.voltdb.iv2.InitiatorMailbox;
 
 public class RequestDataResponseMessage extends VoltMessage {
 
@@ -32,40 +31,32 @@ public class RequestDataResponseMessage extends VoltMessage {
     public static final byte USER_ERROR       = 2;
     public static final byte UNEXPECTED_ERROR = 3;
 
-    private InitiatorMailbox m_sender;
+    //private InitiatorMailbox m_sender;
 
-    private long m_executorHSId;
-    private long m_destinationHSId;
+    private long m_sourceSiteId;
+    private long m_destinationSiteId;
     private long m_txnId;
     private long m_spHandle;
 
-    ArrayList<Long> m_requestDestinations = new ArrayList<Long>();
-    ArrayList<VoltTable> m_requestData = new ArrayList<VoltTable>();
+    private ByteBuffer m_requestTableBuffer;
 
     // Empty constructor for de-serialization
     RequestDataResponseMessage() {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    public RequestDataResponseMessage(RequestDataMessage task, long destinationHSId) {
-        m_executorHSId = task.getDestinationSiteId();
-        m_txnId = task.getTxnId();
-        m_spHandle = task.getSpHandle();
-        m_destinationHSId = destinationHSId;
-        m_subject = Subject.DEFAULT.getId();
-    }
-
-    public RequestDataResponseMessage(long executorHSId, long destinationHSId, RequestDataResponseMessage msg) {
-        m_executorHSId = executorHSId;
-        m_txnId = msg.getTxnId();
-        m_spHandle = msg.getSpHandle();
-        m_destinationHSId = destinationHSId;
+    public RequestDataResponseMessage(long destinationSiteId, RequestDataMessage requestMessage) {
+        m_sourceSiteId = requestMessage.getDestinationSiteId();
+        m_destinationSiteId = destinationSiteId;
+        m_txnId = requestMessage.getTxnId();
+        m_spHandle = requestMessage.getSpHandle();
         m_subject = Subject.DEFAULT.getId();
     }
 
     // getters and setters
     // request destination is the destination of the message.
     // a set of destinations (for chained messaging) is accessed as a stack.
+/*
     public void pushRequestDestination(long destHSId) {
         m_requestDestinations.add(destHSId);
     }
@@ -85,25 +76,33 @@ public class RequestDataResponseMessage extends VoltMessage {
     public ArrayList<Long> getRequestDestinations() {
         return m_requestDestinations;
     }
-
+*/
     // executor site = site that will be sending the data to destination site
-    public long getExecutorSiteId() {
-        return m_executorHSId;
+    public long getSourceSiteId() {
+        return m_sourceSiteId;
     }
 
-    public void setExecutorSiteId(long executorHSId) {
-        m_executorHSId = executorHSId;
+    public void setSourceSiteId(long srcSiteId) {
+        m_sourceSiteId = srcSiteId;
     }
 
     // destination site = site that requested the data
     public long getDestinationSiteId() {
-        return m_destinationHSId;
+        return m_destinationSiteId;
     }
 
-    public void setDestinationSiteId(long destHSId) {
-        m_destinationHSId = destHSId;
+    public void setDestinationSiteId(long destSiteId) {
+        m_destinationSiteId = destSiteId;
     }
 
+    public ByteBuffer getRequestTableBuffer() {
+        return m_requestTableBuffer;
+    }
+
+    public void setRequestTableBuffer(ByteBuffer tableBuffer) {
+        m_requestTableBuffer = tableBuffer;
+    }
+/*
     // a list of tables that holds the requested set of data, in stack order
     public void pushRequestData(VoltTable table) {
         m_requestData.add(table);
@@ -129,7 +128,7 @@ public class RequestDataResponseMessage extends VoltMessage {
     public VoltTable getRequestData() {
         return m_requestData.get(m_requestData.size()-1);
     }
-
+*/
     public long getTxnId() {
         return m_txnId;
     }
@@ -146,8 +145,8 @@ public class RequestDataResponseMessage extends VoltMessage {
 //System.out.println("RESPONSE: " + buf.position() + ", " + buf.capacity());
         buf.put(VoltDbMessageFactory.REQUEST_DATA_RESPONSE_ID);
 //System.out.println("RESPONSE: " + buf.position() + ", " + buf.capacity());
-        //buf.putLong(m_executorHSId);
-        //buf.putLong(m_destinationHSId);
+        //buf.putLong(m_sourceSiteId);
+        //buf.putLong(m_destinationSiteId);
         //buf.putLong(m_txnId);
         //buf.putLong(m_spHandle);
 
@@ -159,8 +158,8 @@ public class RequestDataResponseMessage extends VoltMessage {
     @Override
     public void initFromBuffer(ByteBuffer buf) {
 
-        //m_executorHSId = buf.getLong();
-        //m_destinationHSId = buf.getLong();
+        //m_sourceSiteId = buf.getLong();
+        //m_destinationSiteId = buf.getLong();
         //m_txnId = buf.getLong();
         //m_spHandle = buf.getLong();
 
@@ -173,9 +172,9 @@ public class RequestDataResponseMessage extends VoltMessage {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Request Data Response (FROM ");
-        sb.append(CoreUtils.hsIdToString(m_executorHSId));
+        sb.append(CoreUtils.hsIdToString(m_sourceSiteId));
         sb.append(" TO ");
-        sb.append(CoreUtils.hsIdToString(m_destinationHSId));
+        sb.append(CoreUtils.hsIdToString(m_destinationSiteId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
         sb.append(", SP HANDLE: ");

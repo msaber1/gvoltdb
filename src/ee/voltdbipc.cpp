@@ -614,7 +614,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
 
     std::string hostname(cs->data, cs->hostnameLength);
     try {
-        m_engine = new VoltDBEngine(this, new voltdb::StdoutLogProxy());
+        m_engine = new VoltDBEngine(this, new voltdb::StdoutLogProxy(), NULL, NULL);
         m_engine->getLogManager()->setLogLevels(cs->logLevels);
         m_reusedResultBuffer = new char[MAX_MSG_SZ];
         std::memset(m_reusedResultBuffer, 0, MAX_MSG_SZ);

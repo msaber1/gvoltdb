@@ -117,6 +117,7 @@ import org.voltdb.importer.ImportManager;
 import org.voltdb.iv2.BaseInitiator;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.iv2.KSafetyStats;
 import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MpInitiator;
@@ -235,6 +236,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
     Map<Integer, Long> m_iv2InitiatorStartingTxnIds = new HashMap<>();
     private ScheduledFuture<?> resMonitorWork;
 
+    //  mapping between sites and execution engine pointers
+    TreeMap<Long, Long> m_executionEngines = new TreeMap<>();
+
+    TreeMap<Long, InitiatorMailbox> m_initiatorMailboxes = new TreeMap<>();
 
     private NodeStateTracker m_statusTracker;
     // Should the execution sites be started in recovery mode
@@ -919,10 +924,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                     Integer partition = partitions.get(ii);
                     m_iv2InitiatorStartingTxnIds.put( partition, TxnEgo.makeZero(partition).getTxnId());
                 }
+
+                //  create single-partition (SP) initiators
                 m_iv2Initiators = createIv2Initiators(
                         partitions,
                         m_config.m_startAction,
-                        m_partitionsToSitesAtStartupForExportInit);
+                        m_partitionsToSitesAtStartupForExportInit,
+                        m_executionEngines,
+                        m_initiatorMailboxes);
                 m_iv2InitiatorStartingTxnIds.put(
                         MpInitiator.MP_INIT_PID,
                         TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId());
@@ -931,8 +940,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
                 List<Long> localHSIds = new ArrayList<>();
                 for (Initiator ii : m_iv2Initiators.values()) {
                     localHSIds.add(ii.getInitiatorHSId());
+
+                    //  store site IDs
+                    m_executionEngines.put(ii.getInitiatorHSId(), -1L);
+
+                    m_initiatorMailboxes.put(ii.getInitiatorHSId(), null);
                 }
-                m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent());
+
+                //  create multi-partition (MP) initiator
+                m_MPI = new MpInitiator(m_messenger, localHSIds, getStatsAgent(), m_executionEngines, m_initiatorMailboxes);
                 m_iv2Initiators.put(MpInitiator.MP_INIT_PID, m_MPI);
 
                 // Make a list of HDIds to join
@@ -1588,13 +1604,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, HostM
 
     private TreeMap<Integer, Initiator> createIv2Initiators(Collection<Integer> partitions,
                                                 StartAction startAction,
-                                                List<Integer> m_partitionsToSitesAtStartupForExportInit)
+                                                List<Integer> m_partitionsToSitesAtStartupForExportInit,
+                                                TreeMap<Long, Long> executionEngines,
+                                                TreeMap<Long, InitiatorMailbox> initiatorMailboxes)
     {
         TreeMap<Integer, Initiator> initiators = new TreeMap<>();
         for (Integer partition : partitions)
         {
             Initiator initiator = new SpInitiator(m_messenger, partition, getStatsAgent(),
-                    m_snapshotCompletionMonitor, startAction);
+                    m_snapshotCompletionMonitor, startAction, executionEngines, initiatorMailboxes);
             initiators.put(partition, initiator);
             m_partitionsToSitesAtStartupForExportInit.add(partition);
         }

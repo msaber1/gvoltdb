@@ -18,6 +18,9 @@
 package org.voltdb.iv2;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeMap;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.ExecutionException;
 
@@ -36,6 +39,7 @@ import org.voltdb.StartAction;
 import org.voltdb.StatsAgent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.iv2.RepairAlgo.RepairResult;
 import org.voltdb.messaging.DumpMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -49,8 +53,13 @@ public class MpInitiator extends BaseInitiator implements Promotable
 {
     public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
-    public MpInitiator(HostMessenger messenger, List<Long> buddyHSIds, StatsAgent agent)
+    public MpInitiator(HostMessenger messenger,
+                        List<Long> buddyHSIds,
+                        StatsAgent agent,
+                        TreeMap<Long, Long> executionEngines,
+                        TreeMap<Long, InitiatorMailbox> initiatorMailboxes)
     {
+
         super(VoltZK.iv2mpi,
                 messenger,
                 MP_INIT_PID,
@@ -60,7 +69,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
                     new SiteTaskerQueue()),
                 "MP",
                 agent,
-                StartAction.CREATE /* never for rejoin */);
+                StartAction.CREATE /* never for rejoin */,
+                executionEngines,
+                initiatorMailboxes);
     }
 
     @Override

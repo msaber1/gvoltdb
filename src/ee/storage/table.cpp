@@ -381,9 +381,11 @@ bool Table::serializeToWithoutTotalSize(SerializeOutput &serialize_io) {
 
     // active tuple counts
     serialize_io.writeInt(static_cast<int32_t>(m_tupleCount));
+    
     int64_t written_count = 0;
     TableIterator titer = iterator();
     TableTuple tuple(m_schema);
+
     while (titer.next(tuple)) {
         tuple.serializeTo(serialize_io);
         ++written_count;

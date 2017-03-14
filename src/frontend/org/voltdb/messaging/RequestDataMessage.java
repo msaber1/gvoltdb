@@ -19,48 +19,51 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
+//import java.util.ArrayList;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.iv2.InitiatorMailbox;
+//import org.voltdb.iv2.InitiatorMailbox;
 
 public class RequestDataMessage extends TransactionInfoBaseMessage {
 
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    private InitiatorMailbox m_sender;
-
-    private long m_destinationHSId;
-
-    ArrayList<Long> m_requestDestinations = new ArrayList<Long>();
+    private long m_sourceSiteId;
+    private long m_destinationSiteId;
+    private String m_tableName;
 
     // Empty constructor for de-serialization
     RequestDataMessage() {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    public RequestDataMessage(long sourceHSId,
-            long destinationHSId,
-            long txnId,
-            long uniqueId,
-            boolean isReadOnly,
-            boolean isForReplay) {
-        super(sourceHSId, destinationHSId, txnId, uniqueId, isReadOnly, isForReplay);
-        m_destinationHSId = destinationHSId;
+    public RequestDataMessage(long sourceSiteId,
+                              long destinationSiteId,
+                              String tableName,
+                              long txnId,
+                              long uniqueId,
+                              boolean isReadOnly,
+                              boolean isForReplay) {
+        super(sourceSiteId, destinationSiteId, txnId, uniqueId, isReadOnly, isForReplay);
+        m_sourceSiteId = sourceSiteId;
+        m_destinationSiteId = destinationSiteId;
+        m_tableName = tableName;
         m_subject = Subject.DEFAULT.getId();
     }
-
-    public RequestDataMessage(long sourceHSId, long destinationHSId, RequestDataMessage msg) {
-        super(sourceHSId, destinationHSId, msg.m_txnId, msg.m_uniqueId, msg.m_isReadOnly, msg.m_isForReplay);
-        m_destinationHSId = destinationHSId;
+/*
+    public RequestDataMessage(long sourceSiteId, long destinationSiteId, RequestDataMessage msg) {
+        super(sourceSiteId, destinationHSId, msg.m_txnId, msg.m_uniqueId, msg.m_isReadOnly, msg.m_isForReplay);
+        m_sourceSiteId = sourceSiteId;
+        m_destinationSiteId = destinationSiteId;
         m_subject = Subject.DEFAULT.getId();
     }
-
+*/
     // getters and setters
     // request destination is the destination of the message.
     // a set of destinations (for chained messaging) is accessed as a stack.
+/*
     public void pushRequestDestination(long destHSId) {
         m_requestDestinations.add(destHSId);
     }
@@ -80,16 +83,27 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     public ArrayList<Long> getRequestDestinations() {
         return m_requestDestinations;
     }
+*/
+    public String getTableName() {
+      return m_tableName;
+    }
 
-    // destination site ID
+    public long getSourceSiteId() {
+        return m_sourceSiteId;
+    }
+
+    public void setSourceSiteId(long srcSiteId) {
+        m_sourceSiteId = srcSiteId;
+    }
+
     public long getDestinationSiteId() {
-        return m_destinationHSId;
+        return m_destinationSiteId;
     }
 
-    public void setDestinationSiteId(long destHSId) {
-        m_destinationHSId = destHSId;
+    public void setDestinationSiteId(long destSiteId) {
+        m_destinationSiteId = destSiteId;
     }
-
+/*
     // an original sender
     public void setSender(InitiatorMailbox sender) {
         m_sender = sender;
@@ -98,7 +112,7 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     public InitiatorMailbox getSender() {
         return m_sender;
     }
-
+*/
     @Override
     public int getSerializedSize()
     {
@@ -112,7 +126,7 @@ System.out.println("REQUEST " + buf.capacity() + ", " + buf.position());
         buf.put(VoltDbMessageFactory.REQUEST_DATA_ID);
         super.flattenToBuffer(buf);
 /*
-        buf.putLong(m_destinationHSId);
+        buf.putLong(m_destinationSiteId);
 
         for (int i=0; i<m_requestDestinations.size(); i++)
         {
@@ -130,7 +144,7 @@ System.out.println("REQUEST " + buf.capacity() + ", " + buf.position());
 
         super.initFromBuffer(buf);
 /*
-        m_destinationHSId = buf.getLong();
+        m_destinationSiteId = buf.getLong();
 
         for (int i=0; i<m_requestDestinations.size(); i++)
         {

@@ -57,6 +57,7 @@
 #include "stats/StatsAgent.h"
 #include "storage/AbstractDRTupleStream.h"
 #include "storage/BinaryLogSinkWrapper.h"
+#include "graph/GraphView.h"
 
 #include "boost/scoped_ptr.hpp"
 #include "boost/unordered_map.hpp"
@@ -139,6 +140,8 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         //msaber
         catalog::GraphView* getCatalogGraphView(const std::string& name) const;
         GraphViewCatalogDelegate* getGraphViewDelegate(const std::string& name) const;
+        GraphView* getGraphView(int32_t graphViewId) const;
+        GraphView* getGraphView(const string& name) const;
 
         bool getIsActiveActiveDREnabled() const { return m_isActiveActiveDREnabled; }
         StreamedTable* getPartitionedDRConflictStreamedTable() const { return m_drPartitionedConflictStreamedTable; }
@@ -150,7 +153,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
             m_drReplicatedConflictStreamedTable = replicatedConflictTable;
         }
 
-        int64_t getSiteId();
+        int64_t getSiteId() const;
 
         // -------------------------------------------------
         // Execution Functions
@@ -195,9 +198,15 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int loadNextDependency(Table* destination);
 
         // -------------------------------------------------
-        // Request Data Functions
+        // Request Table Functions
         // -------------------------------------------------
-        int invokeRequestData(Table* destination, long destinationHsId);
+        Table* getAttributesFromClusterNode(long destinationID, vector<int> attrIDs, vector<string> attrNames, GraphView* graphView, bool isVertex);
+        Table* getVertexAttributesFromClusterNode(long destinationID, vector<int> vertexIDs, vector<string> attrNames, GraphView* graphView);
+        Table* getEdgeAttributesFromClusterNode(long destinationID, vector<int> edgeIDs, vector<string> attrNames, GraphView* graphView);
+        int updateMapSitesToEngines(int64_t siteIds[], int64_t executionEngines[], int numSites);
+        Table* searchRequestTable(const char* tableName);
+        string generateRandomString(const int length) const;
+        FallbackSerializeOutput* getRequestTableBuffer();
 
         // -------------------------------------------------
         // Catalog Functions
@@ -246,6 +255,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         const NValueArray& getParameterContainer() const { return m_staticParams; }
         int64_t* getBatchFragmentIdsContainer() { return m_batchFragmentIdsContainer; }
         int64_t* getBatchDepIdsContainer() { return m_batchDepIdsContainer; }
+        int64_t* getBatchSiteIdsContainer() { return m_batchSiteIdsContainer; }
+        int64_t* getBatchExecutionEnginesContainer() { return m_batchExecutionEnginesContainer; }
+        char* getBatchTableNameContainer() { return m_batchTableNameContainer; }
 
         /** check if this value hashes to the local partition */
         bool isLocalSite(const NValue& value) const;
@@ -504,6 +516,15 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         boost::scoped_ptr<TheHashinator> m_hashinator;
         size_t m_startOfResultBuffer;
         int64_t m_tempTableMemoryLimit;
+
+        int64_t* m_siteIds;
+        int64_t* m_executionEngines;
+        int64_t m_batchSiteIdsContainer[MAX_BATCH_COUNT];
+        int64_t m_batchExecutionEnginesContainer[MAX_BATCH_COUNT];
+        int m_numSites;
+        char* m_batchTableNameContainer;
+
+        FallbackSerializeOutput m_requestTableOut;
 
         /*
          * Catalog delegates hashed by path.

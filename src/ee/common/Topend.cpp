@@ -146,8 +146,11 @@ namespace voltdb {
         return "";
     }
 
-    int DummyTopend::invokeRequestData(Table* destination, Pool *stringPool, long destinationHsId) {
+    int DummyTopend::invokeRequestTable(std::string tableName, Table* destination, voltdb::Pool *stringPool, long destinationID) {
         return 0;
     }
 
+    // int DummyTopend::getRequestTable(Table* requestTable, voltdb::Pool* stringPool) {
+    //     return 0;
+    // }
 }

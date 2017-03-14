@@ -59,6 +59,11 @@ public:
         return value.getBoolean();
     }
 
+    static string peekVarchar(const NValue& value) {
+        assert(value.getValueType() == VALUE_TYPE_VARCHAR);
+        return value.toString();
+    }
+
     // cast as int and peek at value. this is used by index code that need a
     // real number from a tuple and the limit node code used to get the limit
     // from an expression.

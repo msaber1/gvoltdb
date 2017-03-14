@@ -359,7 +359,7 @@ public final class VoltTable extends VoltTableRow implements JSONString {
      * @param backing The buffer containing the serialized table.
      * @param readOnly Can this table be changed?
      */
-    VoltTable(ByteBuffer backing, boolean readOnly) {
+    public VoltTable(ByteBuffer backing, boolean readOnly) {
         // no test metadata when creating tables from buffers
         m_extraMetadata = null;
 
