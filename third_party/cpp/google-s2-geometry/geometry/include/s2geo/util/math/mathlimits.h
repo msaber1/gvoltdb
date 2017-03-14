@@ -236,7 +236,7 @@ struct MathLimits<FP_Type> { \
 
 DECL_FP_LIMITS(float, FLT)
 DECL_FP_LIMITS(double, DBL)
-DECL_FP_LIMITS(long double, LDBL)
+// DECL_FP_LIMITS(long double, LDBL)
 
 #undef DECL_FP_LIMITS
 #undef DECL_FP_LIMIT_FUNCS
