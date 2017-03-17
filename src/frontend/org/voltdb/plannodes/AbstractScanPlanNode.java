@@ -497,7 +497,6 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         	stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
         } else {
         	stringer.key(Members.TARGET_GRAPH_NAME.name()).value(m_targetTableName);
-        	//stringer.key(Members.TARGET_OBJECT_NAME.name()).value(m_targetObjectName);
         	stringer.key(Members.TARGET_GRAPH_ALIAS.name()).value(m_targetTableAlias);        	
         }
         if (m_isSubQuery) {

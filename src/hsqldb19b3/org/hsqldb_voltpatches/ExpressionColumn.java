@@ -59,6 +59,7 @@ public class ExpressionColumn extends Expression {
     String        columnName;
     RangeVariable rangeVariable;
     String        objectName;
+    int           objectIdx = -1; //id of edge/vertex in the ordered list of edges/vertexes in the path,e.g. Edge[0], Vertex[2]  
 
     //
     NumberSequence sequence;
@@ -77,15 +78,14 @@ public class ExpressionColumn extends Expression {
     /**
      * Creates a OpCodes.COLUMN expression
      */
-    /*
-    ExpressionColumn(String schema, String table, String object, String column) {
+    ExpressionColumn(String schema, String table, String object, String column, int objIdx) {
         super(OpTypes.COLUMN);
         this.schema = schema;
         tableName   = table;
         columnName  = column;
         objectName  = object;
+        objectIdx   = objIdx;
     }
-    */
     
     ExpressionColumn(ColumnSchema column) {
         super(OpTypes.COLUMN);
@@ -174,6 +174,12 @@ public class ExpressionColumn extends Expression {
 	        tableName   = table.getName().name;
 	        schema      = table.getSchemaName().name;
         }
+        
+        if (objectName == null)
+        	if (range.isPaths) objectName = "PATHS";
+        	else if (range.isVertexes) objectName = "VERTEXES";
+        	else if (range.isEdges) objectName = "EDGES";
+        
         if (alias == null && rangeVariable.hasColumnAliases()) {
             alias = rangeVariable.getColumnAliasName(index);
         }
@@ -1329,18 +1335,24 @@ public class ExpressionColumn extends Expression {
             }
         }
         
-        
-        if (columnName.toUpperCase() == "STARTVERTEXID")
-        	exp.attributes.put("propertytype", "startvertex");
-        else if (columnName.toUpperCase() == "ENDVERTEXID")
-        	exp.attributes.put("propertytype", "endvertex");
-        else if (rangeVariable != null && rangeVariable.isVertexes)
-        	exp.attributes.put("propertytype", "vertex");
-        else if (rangeVariable != null && rangeVariable.isEdges)
-        	exp.attributes.put("propertytype", "edge");
-        else if (columnName.toUpperCase() == "COST")
-        	exp.attributes.put("propertytype", "path");
+        if (rangeVariable != null && rangeVariable.isGraph) {
+	        //if (objectName == null)
+	        	//System.out.println("ExpressionColumn ln 1332: "+columnName);
+        	if (columnName.toUpperCase() == "STARTVERTEXID")
+	        	exp.attributes.put("propertytype", "startvertex");
+	        else if (columnName.toUpperCase() == "ENDVERTEXID")
+	        	exp.attributes.put("propertytype", "endvertex");
+	        else if ((objectName == null && rangeVariable.isVertexes) || "VERTEXES".equals(objectName))
+	        	exp.attributes.put("propertytype", "vertex");
+	        else if ((objectName == null && rangeVariable.isEdges) || "EDGES".equals(objectName))
+	        	exp.attributes.put("propertytype", "edge");
+	        else if ((objectName == null && rangeVariable.isPaths) || "PATHS".equals(objectName))
+	        	exp.attributes.put("propertytype", "path");
+	        else exp.attributes.put("propertytype", "column");
+        }
         else exp.attributes.put("propertytype", "column");
+        
+        if (objectIdx != -1) exp.attributes.put("propertytypeidx", Integer.toString(objectIdx));
         
         exp.attributes.put("column", columnName.toUpperCase());
         if ((alias == null) || (getAlias().length() == 0)) {

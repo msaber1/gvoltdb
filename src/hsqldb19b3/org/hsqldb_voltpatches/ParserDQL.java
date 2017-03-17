@@ -877,13 +877,15 @@ public class ParserDQL extends ParserBase {
         	
         	sb.append(token.tokenString);
         	read();
-        	readThis(Tokens.OPENBRACKET);
-        	sb.append("("+token.tokenString+")");
         	
-        	//System.out.println("ParserDQL 883 "+token.tokenType);
-        	
-        	read();
-        	readThis(Tokens.CLOSEBRACKET);
+        	if (readIfThis(Tokens.OPENBRACKET)) {
+	        	sb.append("("+token.tokenString+")");
+	        	
+	        	//System.out.println("ParserDQL 883 "+token.tokenType);
+	        	
+	        	read();
+	        	readThis(Tokens.CLOSEBRACKET);
+        	}
         	
         	select.hint = sb.toString();
         	
@@ -3969,6 +3971,7 @@ public class ParserDQL extends ParserBase {
         boolean isSimpleQuoted = isDelimitedSimpleName();
         String  prefix         = token.namePrefix;
         String  prePrefix      = token.namePrePrefix;
+        String  postfix        = token.namePrefixInfo;
 
         //org.voltdb.VLog.GLog("ParserDQL", "readColumnOrFunctionExpression", 3935, 
     	//		"prePrefix = "+prePrefix + " prefix = "+prefix + " name = "+name);
@@ -4034,15 +4037,24 @@ public class ParserDQL extends ParserBase {
 
         if (token.tokenType != Tokens.OPENBRACKET) {
         	
+        	// TODO 15 Mar 2017 parse IDX of Edge or Vertex and send as parameter
+        	
         	Expression column;
-        	if (prefix != null && (
-        		(prefix.equals(Tokens.getKeyword(Tokens.ENDVERTEX))) || (prefix.equals(Tokens.getKeyword(Tokens.STARTVERTEX))) ||
-        		(prefix.equals(Tokens.getKeyword(Tokens.EDGES))) || (prefix.equals(Tokens.getKeyword(Tokens.VERTEXES))) ||
-        		(prefix.equals(Tokens.getKeyword(Tokens.PATHS)))
-        		)
-        	   ) {
-        		column = new ExpressionColumn(prePrefix, prefix, name);
-        		//column = new ExpressionColumn(null, prePrefix, prefix, name);
+        	if (prefix != null && 
+        			 (prefix.equals(Tokens.getKeyword(Tokens.EDGES)) || 
+        		      prefix.equals(Tokens.getKeyword(Tokens.VERTEXES)) ||
+        		      prefix.equals(Tokens.getKeyword(Tokens.PATHS))
+        		     ))
+        	{
+        		int index = -1;
+        		if (postfix != null && postfix.equals("[0..*]")) {
+        			index = -1;
+        		}
+        		else if (postfix != null) {
+        			index = Character.getNumericValue(postfix.charAt(1));
+        		} 
+        		//System.out.println("ParserDQL ln 4056: "+prePrefix+'.'+prefix+'.'+name+'.'+index);
+        		column = new ExpressionColumn(null, prePrefix, prefix, name, index);
         	}
         	else {
         		column = new ExpressionColumn(prePrefix, prefix, name);
