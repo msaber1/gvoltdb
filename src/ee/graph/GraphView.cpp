@@ -209,9 +209,12 @@ void GraphView::constructPathTempTable()
 PathIterator& GraphView::iteratorDeletingAsWeGo(GraphOperationType opType)
 {
 	//empty the paths table, which is the staging memory for the paths to be explored
+	dummyPathExapansionState = 0;
 	m_pathTable->deleteAllTempTupleDeepCopies();
 	//set the iterator for the temp table
-	m_pathTableIterator = &(m_pathTable->iteratorDeletingAsWeGo());
+	//create new tuple in the paths temp table
+	//m_pathTableIterator = &(m_pathTable->iteratorDeletingAsWeGo());
+	m_pathTableIterator = NULL;
 	return *m_pathIterator;
 }
 
@@ -222,16 +225,17 @@ void GraphView::expandCurrentPathOperation()
 	//new entries should be added to the paths temp table
 	//adding no new entries means that the exploration is completely done
 	//and the iterator will have hasNext evaluated to false
-	if(dummyPathExapansionState < 3)
+	std::stringstream paramsToPrint;
+
+	if(dummyPathExapansionState < 6)
 	{
 		//create new tuple in the paths temp table
-		TableTuple temp_tuple;
-		temp_tuple = m_pathTable->tempTuple();
+		TableTuple temp_tuple = m_pathTable->tempTuple();
 		//start vertex, end vertex, length, cost, path
-		temp_tuple.setNValue(0, ValueFactory::getIntegerValue(dummyPathExapansionState));
-		temp_tuple.setNValue(1, ValueFactory::getIntegerValue(dummyPathExapansionState + 1));
-		temp_tuple.setNValue(2, ValueFactory::getIntegerValue(dummyPathExapansionState * 2));
-		temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(dummyPathExapansionState * 3)));
+		temp_tuple.setNValue(0, ValueFactory::getIntegerValue(dummyPathExapansionState + 6));
+		temp_tuple.setNValue(1, ValueFactory::getIntegerValue(dummyPathExapansionState + 11));
+		temp_tuple.setNValue(2, ValueFactory::getIntegerValue(dummyPathExapansionState + 16));
+		temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(dummyPathExapansionState + 21)));
 
 		m_pathTable->insertTempTuple(temp_tuple);
 

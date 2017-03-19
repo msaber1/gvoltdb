@@ -72,6 +72,8 @@ class TableIterator : public TupleIterator {
 
     friend class TempTable;
     friend class PersistentTable;
+    friend class GraphView;
+    friend class PathIterator;
 
 public:
 

@@ -29,13 +29,10 @@
 #include "plannodes/aggregatenode.h"
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
-#include "storage/table.h"
-#include "storage/temptable.h"
-#include "storage/tablefactory.h"
-#include "storage/tableiterator.h"
-#include "common/NValue.hpp"
-#include "common/ValuePeeker.hpp"
-#include "common/ValueFactory.hpp"
+#include "graph/PathIterator.h"
+//#include "common/NValue.hpp"
+//#include "common/ValuePeeker.hpp"
+//#include "common/ValueFactory.hpp"
 
 namespace voltdb {
 
@@ -66,7 +63,7 @@ bool PathScanExecutor::p_init(AbstractPlanNode *abstractNode,
 		const std::string& temp_name = (node->isSubQuery()) ?
 				node->getChildren()[0]->getOutputTable()->name():
 				graphView->getPathsTableName();
-		//setTempOutputTable(limits, PathScanPlanNode::pathsTableName);
+		setTempOutputTable(limits, temp_name);
 		LogManager::GLog("PathScanExecutor", "p_init", 70, "after calling setTempOutputTable with temp table = " + temp_name);
 	}
 	//
@@ -103,14 +100,14 @@ bool PathScanExecutor::p_execute(const NValueArray &params)
 	}
 	*/
 
-	/*
+	GraphView* graphView = node->getTargetGraphView();
 	Table* input_table = (node->isSubQuery()) ?
 			node->getChildren()[0]->getOutputTable():
-			node->getTargetTable();
-	*/
-	GraphView* graphView = node->getTargetGraphView();
-	Table* output_table = dynamic_cast<TempTable*>(node->getOutputTable());
-	assert(output_table);
+			graphView->getPathTable();
+
+
+	//Table* output_table = dynamic_cast<TempTable*>(node->getOutputTable());
+	//assert(output_table);
 	//float cost = -1;
 
 	//
@@ -147,25 +144,20 @@ bool PathScanExecutor::p_execute(const NValueArray &params)
 	if (node->getPredicate() != NULL || projection_node != NULL ||
 		limit_node != NULL || m_aggExec != NULL)
 	{
+
 		//
 		// Just walk through the table using our iterator and apply
 		// the predicate to each tuple. For each tuple that satisfies
 		// our expression, we'll insert them into the output table.
 		//
-		TableTuple tuple = m_tmpOutputTable->tempTuple();
-		tuple.setNValue(0, ValueFactory::getIntegerValue(node->getStartVertexId()));
-		tuple.setNValue(1, ValueFactory::getIntegerValue(node->getEndVertexId()));
-		tuple.setNValue(2, ValueFactory::getIntegerValue(10));
-		tuple.setNValue(3, ValueFactory::getDoubleValue(graphView->shortestPath(node->getStartVertexId(), node->getEndVertexId(), 0)));
-		//tuple.setNValue(4, ValueFactory::getStringValue("", pool));
-		//TableIterator iterator = input_table->iteratorDeletingAsWeGo();
-		//TODO: to be changed, just a replacement of the iterator object for graphs
-		bool pathScanHasRows = true;
+		TableTuple tuple(input_table->schema());
+		//TableIterator iterator =  input_table->iteratorDeletingAsWeGo();
+		PathIterator iterator =  graphView->iteratorDeletingAsWeGo(GraphOperationType::ShortestPath);
 		AbstractExpression *predicate = node->getPredicate();
 
 		if (predicate)
 		{
-			VOLT_TRACE("PATHSCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
+			VOLT_TRACE("SCAN PREDICATE :\n%s\n", predicate->debug(true).c_str());
 		}
 
 		int limit = CountingPostfilter::NO_LIMIT;
@@ -180,7 +172,7 @@ bool PathScanExecutor::p_execute(const NValueArray &params)
 		TableTuple temp_tuple;
 		assert(m_tmpOutputTable);
 		if (m_aggExec != NULL) {
-			const TupleSchema * inputSchema = output_table->schema();
+			const TupleSchema * inputSchema = input_table->schema();
 			if (projection_node != NULL) {
 				inputSchema = projection_node->getOutputTable()->schema();
 			}
@@ -190,10 +182,11 @@ bool PathScanExecutor::p_execute(const NValueArray &params)
 			temp_tuple = m_tmpOutputTable->tempTuple();
 		}
 
-		while (postfilter.isUnderLimit() && pathScanHasRows /*iterator.next(tuple)*/)
+		while (postfilter.isUnderLimit() && iterator.next(tuple))
 		{
-			pathScanHasRows = false;
-
+			VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
+					   tuple.debug(input_table->name()).c_str(), tuple_ctr,
+					   (int)input_table->activeTupleCount());
 			pmp.countdownProgress();
 
 			//
@@ -208,19 +201,13 @@ bool PathScanExecutor::p_execute(const NValueArray &params)
 				if (projection_node != NULL)
 				{
 					VOLT_TRACE("inline projection...");
-					//get the vertex id
-					//vertexId = ValuePeeker::peekInteger(tuple.getNValue(0));
-					//fanOut = graphView->getVertex(vertexId)->fanOut();
-					//fanIn = graphView->getVertex(vertexId)->fanIn();
+
 					for (int ctr = 0; ctr < num_of_columns; ctr++) {
 						//msaber: todo, need to check the projection operator construction
-						//and modify it to allow selecting graph vertex attributes
+
 						NValue value = projection_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
 						temp_tuple.setNValue(ctr, value);
 					}
-
-					//temp_tuple.setNValue(num_of_columns - 2, ValueFactory::getIntegerValue(fanOut));
-					//temp_tuple.setNValue(num_of_columns - 1, ValueFactory::getIntegerValue(fanIn));
 
 					outputTuple(postfilter, temp_tuple);
 				}

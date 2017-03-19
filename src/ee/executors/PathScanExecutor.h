@@ -29,14 +29,14 @@ class PathScanExecutor : public AbstractExecutor {
 public:
 	PathScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) {
             //output_table = NULL;
-            LogManager::GLog("PathScanExecutor", "Constructor", 28, abstract_node->debug());
+            LogManager::GLog("PathScanExecutor", "Constructor", 31, abstract_node->debug());
         }
         ~PathScanExecutor();
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
-        void setTempOutputTable(TempTableLimits* limits, const string tempTableName);
+        //void setTempOutputTable(TempTableLimits* limits, const string tempTableName);
     private:
         void outputTuple(CountingPostfilter& postfilter, TableTuple& tuple);
         AggregateExecutorBase* m_aggExec;

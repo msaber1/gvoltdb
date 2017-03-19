@@ -393,7 +393,6 @@ CTX.INPUT['logging'] = """
 """
 
 CTX.INPUT['graph'] = """
- TableTuple.cpp
  GraphElement.cpp
  Edge.cpp
  Vertex.cpp
