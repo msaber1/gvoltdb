@@ -571,7 +571,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         m_mailbox.getSem();
 
         System.out.println("thread restored: " + Thread.currentThread().getName());
-
+// crushed after here?
         //  convert byte buffer to byte array
         ByteBuffer bb = m_mailbox.getResultTableBuffer();
         ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
