@@ -355,6 +355,7 @@ public class InitiatorMailbox implements Mailbox
         if (message instanceof RequestDataResponseMessage) {
           m_requestTableBuffer = ((RequestDataResponseMessage)message).getRequestTableBuffer();
 
+          //  null BB
           System.out.println(m_requestTableBuffer.position());
           System.out.println(m_requestTableBuffer.limit());
           System.out.println(m_requestTableBuffer.remaining());
@@ -487,6 +488,14 @@ public class InitiatorMailbox implements Mailbox
         long enginePointer = m_executionEngines.get(m_hsId);
         ByteBuffer bbTable = ByteBuffer.allocateDirect(1024);
         int result = m_engine.nativeSearchRequestTable(enginePointer, message.getTableName(), bbTable);
+
+        //  null BB
+        System.out.println(bbTable.position());
+        System.out.println(bbTable.limit());
+        System.out.println(bbTable.remaining());
+
+        VoltTable table = new VoltTable(bbTable, true);
+        System.out.println(table.toFormattedString());
 
         //  add table buffer to the message
         if (result == 0)
