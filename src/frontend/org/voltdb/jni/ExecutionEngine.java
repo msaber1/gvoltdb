@@ -572,7 +572,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
         System.out.println("thread restored: " + Thread.currentThread().getName());
 // crushed after here?
-
+Thread.sleep(5000);
         //  convert byte buffer to byte array
         ByteBuffer bb = m_mailbox.getResultTableBuffer();
 
@@ -593,8 +593,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         byte[] bytes = clone.array();
         output = new byte[bytes.length];
         System.arraycopy(bytes, 0, output, 0, bytes.length);
-
-
 
         return output;
     }
