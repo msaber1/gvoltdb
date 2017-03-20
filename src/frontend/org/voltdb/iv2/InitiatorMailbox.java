@@ -489,17 +489,18 @@ public class InitiatorMailbox implements Mailbox
         ByteBuffer bbTable = ByteBuffer.allocateDirect(1024);
         int result = m_engine.nativeSearchRequestTable(enginePointer, message.getTableName(), bbTable);
 
-        //  null BB
-        System.out.println(bbTable.position());
-        System.out.println(bbTable.limit());
-        System.out.println(bbTable.remaining());
-
+        //  table not found?
+        //  0, 1024, 1024
+        // System.out.println(bbTable.position());
+        // System.out.println(bbTable.limit());
+        // System.out.println(bbTable.remaining());
+System.out.println("find table result: " + result);
         VoltTable table = new VoltTable(bbTable, true);
         System.out.println(table.toFormattedString());
 
         //  add table buffer to the message
         if (result == 0)
-            response.setRequestTableBuffer(null);
+            response.setRequestTableBuffer(bbTable);
         else
             response.setRequestTableBuffer(bbTable);
 
