@@ -354,6 +354,11 @@ public class InitiatorMailbox implements Mailbox
 
         if (message instanceof RequestDataResponseMessage) {
           m_requestTableBuffer = ((RequestDataResponseMessage)message).getRequestTableBuffer();
+
+          System.out.println(m_requestTableBuffer.position());
+          System.out.println(m_requestTableBuffer.limit());
+          System.out.println(m_requestTableBuffer.remaining());
+
           // m_sem2.release();
           m_sem.release();
         }
