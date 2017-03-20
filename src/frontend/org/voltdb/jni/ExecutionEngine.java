@@ -575,6 +575,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
         //  convert byte buffer to byte array
         ByteBuffer bb = m_mailbox.getResultTableBuffer();
+
+        System.out.println(bb.position());
+        System.out.println(bb.limit());
+        System.out.println(bb.remaining());
+
         ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
 
         VoltTable table = new VoltTable(bb, true);
