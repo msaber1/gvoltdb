@@ -158,7 +158,6 @@ public abstract class AbstractParsedStmt {
        AbstractParsedStmt retval = null;
 
        if (stmtTypeElement == null) {
-           System.err.println("Unexpected error parsing hsql parsed stmt xml");
            throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
        }
 

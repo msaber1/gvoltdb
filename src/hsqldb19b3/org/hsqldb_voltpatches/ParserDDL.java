@@ -376,6 +376,8 @@ public class ParserDDL extends ParserRoutine {
         	else br.append(" ");
         }
         
+        graph.addDefVertexProps(schema, isDelimitedIdentifier());
+        
         br.append(partsql);
         
         //System.out.println(br);
@@ -492,7 +494,7 @@ public class ParserDDL extends ParserRoutine {
         	else br.append(" ");
         }
         
-        graph.addDefaultProperties(schema, isDelimitedIdentifier());
+        graph.addDefPathProps(schema, isDelimitedIdentifier());
         
         br.append(partsql);
         

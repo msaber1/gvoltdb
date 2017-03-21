@@ -86,11 +86,11 @@ public class GraphView implements SchemaObject {
     }
     
     /*
-	 * Adds default properties
+	 * Adds default edge Vertex properties
 	 * Called after adding all other columns from tables 
 	 * in order to have column indices from source select statement matched indices of not defailt properties 
 	 */
-    public void addDefaultProperties(HsqlName schema, boolean isDelimitedIdentifier) {
+    public void addDefVertexProps(HsqlName schema, boolean isDelimitedIdentifier) {
     	
     	// VERTEX Def Prop
     	HsqlName Name = database.nameManager.newColumnHsqlName(schema, "FANOUT", isDelimitedIdentifier);
@@ -101,15 +101,17 @@ public class GraphView implements SchemaObject {
     	ColumnSchema fanIn = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
     	addVertexPropNoCheck(fanIn);
     	
+    }
+    
+    /*
+	 * Adds default Path properties
+	 * Called after adding all other columns from tables 
+	 * in order to have column indices from source select statement matched indices of not defailt properties 
+	 */
+    public void addDefPathProps(HsqlName schema, boolean isDelimitedIdentifier) {
+    	
+    	HsqlName Name;
     	// PATHS Def Prop
-    	Name = database.nameManager.newColumnHsqlName(schema, "LENGTH", isDelimitedIdentifier);
-    	ColumnSchema pathLength = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
-    	addPathPropNoCheck(pathLength);    	
-    	
-    	Name = database.nameManager.newColumnHsqlName(schema, "COST", isDelimitedIdentifier);
-    	ColumnSchema pathCost = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
-    	addPathPropNoCheck(pathCost);
-    	
     	Name = database.nameManager.newColumnHsqlName(schema, "STARTVERTEXID", isDelimitedIdentifier);
     	ColumnSchema col = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
     	addPathPropNoCheck(col);
@@ -118,16 +120,16 @@ public class GraphView implements SchemaObject {
     	col = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
     	addPathPropNoCheck(col);
     	
-    	Name = database.nameManager.newColumnHsqlName(schema, "EDGES", isDelimitedIdentifier);
-    	col = new ColumnSchema(Name, new CharacterType(Types.SQL_VARCHAR, 1000), false, false, null);
-    	addPathPropNoCheck(col);
+    	Name = database.nameManager.newColumnHsqlName(schema, "LENGTH", isDelimitedIdentifier);
+    	ColumnSchema pathLength = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	addPathPropNoCheck(pathLength);    	
     	
-    	Name = database.nameManager.newColumnHsqlName(schema, "VERTEXES", isDelimitedIdentifier);
-    	col = new ColumnSchema(Name, new CharacterType(Types.SQL_VARCHAR, 1000), false, false, null);
-    	addPathPropNoCheck(col);
+    	Name = database.nameManager.newColumnHsqlName(schema, "COST", isDelimitedIdentifier);
+    	ColumnSchema pathCost = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	addPathPropNoCheck(pathCost);
     	
     	Name = database.nameManager.newColumnHsqlName(schema, "PATH", isDelimitedIdentifier);
-    	col = new ColumnSchema(Name, new CharacterType(Types.SQL_VARCHAR, 1000), false, false, null);
+    	col = new ColumnSchema(Name, new CharacterType(Types.SQL_VARCHAR, 1024), false, false, null);
     	addPathPropNoCheck(col);
     	
     }

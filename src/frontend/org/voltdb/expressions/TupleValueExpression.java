@@ -122,10 +122,10 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     public TupleValueExpression(String tableName,
-            String tableAlias,
-            String columnName,
-            String columnAlias,
-            int columnIndex) {
+            					String tableAlias,
+            					String columnName,
+            					String columnAlias,
+            					int    columnIndex) {
         this(tableName, tableAlias, columnName, columnAlias, columnIndex, -1);
     }
 
@@ -256,7 +256,7 @@ public class TupleValueExpression extends AbstractValueExpression {
     }
 
     public void setTableIndex(int idx) {
-        m_tableIdx = idx;
+    	m_tableIdx = idx;
     }
 
     /**
@@ -421,23 +421,26 @@ public class TupleValueExpression extends AbstractValueExpression {
         // -- not bothering for now.
         Column column;
         
-        if (type == "vertex")
+        if (type == "vertex") {
         	column = graph.getVertexprops().getExact(m_columnName);
-        else if (type == "path")
+            if (m_graphObject == null) m_graphObject = "VERTEXES";
+        }
+        else if (type == "path") {
         	column = graph.getPathprops().getExact(m_columnName);
-        else if (type == "startvertex" || type == "endvertex")
+            if (m_graphObject == null) m_graphObject = "PATHS";
+        }
+        else if (type == "startvertex" || type == "endvertex") {
         	column = graph.getPathprops().getExact(m_columnName);
-        else column = graph.getEdgeprops().getExact(m_columnName);
-        
-        //System.out.println("TVE ln 432: "+m_columnName+" "+type);
+            if (m_graphObject == null) m_graphObject = "VERTEXES";
+        }
+        else {
+        	column = graph.getEdgeprops().getExact(m_columnName);
+        	if (m_graphObject == null) m_graphObject = "EDGES";
+        }
         
         assert(column != null);
         m_tableName = graph.getTypeName();
         m_columnIndex = column.getIndex();
-        
-        //System.out.println("TVE ln 436: "+m_columnName+" "+m_columnIndex+" "+type);
-        
-        // TODO GVoltDB assign graphObject, create unc in GraphView for that
 
         setTypeSizeBytes(column.getType(), column.getSize(), column.getInbytes());
     }
@@ -548,7 +551,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (name != null) {
         	
             if (alias != null && !name.equals(alias)) {
-                return (object != null)? String.format("%s(%s).%s", name, alias, object) : 
+            	return (object != null)? String.format("%s(%s).%s", name, alias, object) : 
                 			String.format("%s(%s)", name, alias);// String.format("%s(%s)", fullname, alias);
             } else {
                 return (object != null)? name+"."+object : name;
@@ -575,9 +578,13 @@ public class TupleValueExpression extends AbstractValueExpression {
     
     @Override
     protected String getExpressionNodeNameForToString() {
+    	String obj = null;
+    	if (m_graphObject != null) {
+    		obj = (new StringBuffer()).append(m_graphObject).append(getGraphObjectInfo()).toString();
+    	}
     	return String.format("%s: %s.%s(index:%d, diff'tor:%d)",
                              super.getExpressionNodeNameForToString(),
-                             chooseThreeNames(m_tableName, m_tableAlias, m_graphObject+getGraphObjectInfo()),
+                             chooseThreeNames(m_tableName, m_tableAlias, obj),
                              chooseTwoNames(m_columnName, m_columnAlias),
                              m_columnIndex, m_differentiator);
     }

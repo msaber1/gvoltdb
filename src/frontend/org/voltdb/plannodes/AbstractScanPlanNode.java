@@ -278,6 +278,35 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         return m_isSubQuery;
     }
 
+    /*
+     * GVoltDB
+     * Original VoltDB code, but should be run 3 times for GVoltB 
+     */
+    private void addColsToSchema(CatalogMap<Column> cols, String type) {
+        assert(cols != null);
+        
+        // you don't strictly need to sort this, but it makes diff-ing easier
+        for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
+        {
+            // must produce a tuple value expression for this column.
+            TupleValueExpression tve = new TupleValueExpression(m_targetTableName, 
+            													m_targetTableAlias,
+            													type,
+            													col.getTypeName(), 
+            													col.getTypeName(),
+            													col.getIndex(),
+            													-1,
+            													-1);
+
+            tve.setTypeSizeBytes(col.getType(), col.getSize(), col.getInbytes());
+            m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
+                                                     m_targetTableAlias,
+                                                     col.getTypeName(),
+                                                     col.getTypeName(),
+                                                     tve, col.getIndex()));
+        }
+    }
+    
     @Override
     public void generateOutputSchema(Database db)
     {
@@ -293,15 +322,24 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             } else {
                 m_tableSchema = new NodeSchema();
                 CatalogMap<Column> cols = null;
+                
                 if (!isGraph)
                 	cols = db.getTables().getExact(m_targetTableName).getColumns();
                 else if (m_targetObjectName == "VERTEXES") 
                 	cols = db.getGraphviews().getExact(m_targetTableName).getVertexprops();
                 else if (m_targetObjectName == "EDGES")
                 	cols = db.getGraphviews().getExact(m_targetTableName).getEdgeprops();
-                else if (m_targetObjectName == "PATHS")
+                else if (m_targetObjectName == "PATHS") {
+                	cols = db.getGraphviews().getExact(m_targetTableName).getVertexprops();
+                	addColsToSchema(cols, "VERTEXES");
+                	cols = db.getGraphviews().getExact(m_targetTableName).getEdgeprops();
+                	addColsToSchema(cols, "EDGES");
                 	cols = db.getGraphviews().getExact(m_targetTableName).getPathprops();
+                }
+
+                addColsToSchema(cols, m_targetObjectName);
                 
+                /*
                 assert(cols != null);
                 
                 // you don't strictly need to sort this, but it makes diff-ing easier
@@ -319,6 +357,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                                                              col.getTypeName(),
                                                              tve, col.getIndex()));
                 }
+                */
             }
         }
 
