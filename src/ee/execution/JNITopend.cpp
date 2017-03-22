@@ -618,13 +618,17 @@ int JNITopend::invokeRequestTable(std::string tableName, Table* requestTable, vo
 
     jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine, m_requestTableMID, tableNameToJava, destinationID));
 
-    if (!jbuf)
+    if (!jbuf) {
+        cout << "backend null result" << endl;
         return 0;
+    }
 
     jsize length = m_jniEnv->GetArrayLength(jbuf);
 
-    if (length <= 0)
+    if (length <= 0) {
+        cout << "backend empty result" << endl;
         return 0;
+    }
 
     jboolean is_copy;
     jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, &is_copy);
