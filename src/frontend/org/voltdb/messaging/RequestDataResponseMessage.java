@@ -141,10 +141,13 @@ public class RequestDataResponseMessage extends VoltMessage {
     @Override
     public void flattenToBuffer(ByteBuffer buf)
     {
-      System.out.println("reponse msg flatten buffer");
-//System.out.println("RESPONSE: " + buf.position() + ", " + buf.capacity());
+        System.out.println("RESPONSE flatten " + buf.capacity() + ", " + buf.position());
+        // System.out.println(buf.position());
+        System.out.println(buf.limit());
+        System.out.println(buf.remaining());
+
         buf.put(VoltDbMessageFactory.REQUEST_DATA_RESPONSE_ID);
-//System.out.println("RESPONSE: " + buf.position() + ", " + buf.capacity());
+
         //buf.putLong(m_sourceSiteId);
         //buf.putLong(m_destinationSiteId);
         //buf.putLong(m_txnId);
@@ -159,8 +162,8 @@ public class RequestDataResponseMessage extends VoltMessage {
     public void initFromBuffer(ByteBuffer buf) {
 
         //  formulate how to serialize
-      System.out.println("reponse msg init buffer");
-      System.out.println(buf.position());
+      System.out.println("RESPONSE init " + buf.capacity() + ", " + buf.position());
+      // System.out.println(buf.position());
       System.out.println(buf.limit());
       System.out.println(buf.remaining());
 

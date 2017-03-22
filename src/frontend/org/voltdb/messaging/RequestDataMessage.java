@@ -122,7 +122,10 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-System.out.println("REQUEST " + buf.capacity() + ", " + buf.position());
+        System.out.println("REQUEST flatten " + buf.capacity() + ", " + buf.position());
+        // System.out.println(buf.position());
+        System.out.println(buf.limit());
+        System.out.println(buf.remaining());
         buf.put(VoltDbMessageFactory.REQUEST_DATA_ID);
         super.flattenToBuffer(buf);
 /*
@@ -141,7 +144,10 @@ System.out.println("REQUEST " + buf.capacity() + ", " + buf.position());
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
-
+        System.out.println("REQUEST init " + buf.capacity() + ", " + buf.position());
+        // System.out.println(buf.position());
+        System.out.println(buf.limit());
+        System.out.println(buf.remaining());
         super.initFromBuffer(buf);
 /*
         m_destinationSiteId = buf.getLong();
