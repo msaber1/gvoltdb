@@ -148,7 +148,7 @@ public class RequestDataResponseMessage extends VoltMessage {
         System.out.println(buf.limit());
         System.out.println(buf.remaining());
 
-        // buf.put(VoltDbMessageFactory.REQUEST_DATA_RESPONSE_ID);
+        buf.put(VoltDbMessageFactory.REQUEST_DATA_RESPONSE_ID);
 
         // super.flattenToBuffer(buf);
 
