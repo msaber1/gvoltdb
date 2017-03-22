@@ -757,8 +757,10 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
     //  ask frontend to get table
     int request = m_topend->invokeRequestTable(vertexOrEdgeTable->nameNonConst(), requestTable, &m_stringPool, destinationID);
 
-    if (request == 0)
+    if (request == 0) {
+        cout << "no table found." << endl;
         return NULL;
+    }
 
     //  fill in output table
     TableTuple tuple(requestTable->schema());
