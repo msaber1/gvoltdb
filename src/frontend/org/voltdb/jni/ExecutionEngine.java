@@ -520,70 +520,23 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return VoltTable serialized in bytes
      */
     public byte[] requestTable(String tableName, long destinationID) throws InterruptedException {
-        System.out.println("frontend start");
+        // System.out.println("Frontend start");
 
-        // m_requestThread = new Thread(new Runnable() {
-        //     public void run() {
-        //       try {
-        //           System.out.println("thread: " + Thread.currentThread().getName());
-        //           m_mailbox.sendRequest(tableName, destinationID);
-        //
-        //           while (m_mailbox.getResultTableBuffer() == null) {}
-        //
-        //           // m_sem.release();
-        //
-        //           //  convert byte buffer to byte array
-        //           ByteBuffer bb = m_mailbox.getResultTableBuffer();
-        //           ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
-        //
-        //           bb.rewind();
-        //           clone.put(bb);
-        //           bb.rewind();
-        //           clone.flip();
-        //
-        //           byte[] bytes = clone.array();
-        //           output = new byte[bytes.length];
-        //           System.arraycopy(bytes, 0, output, 0, bytes.length);
-        //
-        //           //  print table
-        //           VoltTable table = new VoltTable(bb, true);
-        //           System.out.println(table.toFormattedString());
-        //       } catch (Exception e) {
-        //           e.printStackTrace();
-        //       }
-        //     }
-        // });
-        //
-        // m_requestThread.setDaemon(false);
-        // m_requestThread.start();
-
-        // m_mailbox.setTableName(tableName);
-        // m_mailbox.setDestinationID(destinationID);
-
-        // m_requestThread = new Thread(m_mailbox);
-        // m_requestThread.setDaemon(false);
-        // m_requestThread.start();
-
-        //  block main thread
-        // m_sem.acquire();
         m_mailbox.sendRequest(tableName, destinationID);
+
+        System.out.println("Thread blocks.");
 
         m_mailbox.getSem();
 
-        System.out.println("thread restored: " + Thread.currentThread().getName());
-// crushed after here?
+        System.out.println("Thread restored: " + Thread.currentThread().getName());
 
-        //  convert byte buffer to byte array
         ByteBuffer bb = m_mailbox.getResultTableBuffer();
 
         if (bb == null) {
           return null;
         }
 
-        System.out.println(bb.position());
-        System.out.println(bb.limit());
-        System.out.println(bb.remaining());
-
+        //  convert byte buffer to byte array
         ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
 
         VoltTable table = new VoltTable(bb, true);
