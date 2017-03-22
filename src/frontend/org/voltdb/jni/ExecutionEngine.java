@@ -576,8 +576,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         //  convert byte buffer to byte array
         ByteBuffer bb = m_mailbox.getResultTableBuffer();
 
-        if (bb == null)
+        if (bb == null) {
+          System.out.println("empty result.");
           return null;
+        }
+
+        System.out.println("bb.");
 
         System.out.println(bb.position());
         System.out.println(bb.limit());
