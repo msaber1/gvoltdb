@@ -360,8 +360,8 @@ public class InitiatorMailbox implements Mailbox
           // System.out.println(m_requestTableBuffer.limit());
           // System.out.println(m_requestTableBuffer.remaining());
 
-          // m_sem2.release();
-          // m_sem.release();
+          System.out.println("Releasing thread.");
+          m_sem.release();
         }
 
         if (SCHEDULE_IN_SITE_THREAD) {
@@ -519,7 +519,7 @@ System.out.println("find table result: " + result);
 // System.out.println("host from: " + ((int)message.getSourceSiteId()) + " to: " + ((int)message.getDestinationSiteId()));
         System.out.println("thread: " + Thread.currentThread().getName() + " Receive from: " + (message.getSourceSiteId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
 
-        m_sem.release();
+        // m_sem.release();
         // m_requestTableBuffer = message.getRequestTableBuffer();
     }
 
