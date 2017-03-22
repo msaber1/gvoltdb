@@ -758,7 +758,6 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
     int request = m_topend->invokeRequestTable(vertexOrEdgeTable->nameNonConst(), requestTable, &m_stringPool, destinationID);
 
     if (request == 0) {
-        cout << "no table found." << endl;
         return NULL;
     }
 

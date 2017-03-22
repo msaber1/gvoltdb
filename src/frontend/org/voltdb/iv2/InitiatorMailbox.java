@@ -360,7 +360,6 @@ public class InitiatorMailbox implements Mailbox
           // System.out.println(m_requestTableBuffer.limit());
           // System.out.println(m_requestTableBuffer.remaining());
 
-          System.out.println("Releasing thread.");
           m_sem.release();
         }
 

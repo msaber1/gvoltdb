@@ -577,7 +577,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         ByteBuffer bb = m_mailbox.getResultTableBuffer();
 
         if (bb == null) {
-          System.out.println("empty result.");
           return null;
         }
 
