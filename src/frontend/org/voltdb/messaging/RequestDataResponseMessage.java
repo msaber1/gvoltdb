@@ -141,34 +141,39 @@ public class RequestDataResponseMessage extends VoltMessage {
     @Override
     public void flattenToBuffer(ByteBuffer buf)
     {
-        System.out.println("RESPONSE flatten " + buf.capacity() + ", " + buf.position());
-        // System.out.println(buf.position());
+        System.out.println("RESPONSE flatten");
+        System.out.println(buf.capacity());
+        System.out.println(buf.position());
         System.out.println(buf.limit());
         System.out.println(buf.remaining());
 
         buf.put(VoltDbMessageFactory.REQUEST_DATA_RESPONSE_ID);
+
+        super.flattenToBuffer(buf);
 
         //buf.putLong(m_sourceSiteId);
         //buf.putLong(m_destinationSiteId);
         //buf.putLong(m_txnId);
         //buf.putLong(m_spHandle);
 
-        assert(buf.capacity() == buf.position());
-        buf.limit(buf.position());
-
+        // assert(buf.capacity() == buf.position());
+        // buf.limit(buf.position());
     }
 
     @Override
     public void initFromBuffer(ByteBuffer buf) {
 
         //  formulate how to serialize
-      System.out.println("RESPONSE init " + buf.capacity() + ", " + buf.position());
-      // System.out.println(buf.position());
+      System.out.println("RESPONSE init");
+      System.out.println(buf.capacity());
+      System.out.println(buf.position());
       System.out.println(buf.limit());
       System.out.println(buf.remaining());
 
-      VoltTable table = new VoltTable(buf, true);
-      System.out.println(table.toFormattedString());
+      super.initFromBuffer(buf);
+
+      // VoltTable table = new VoltTable(buf, true);
+      // System.out.println(table.toFormattedString());
         //m_sourceSiteId = buf.getLong();
         //m_destinationSiteId = buf.getLong();
         //m_txnId = buf.getLong();

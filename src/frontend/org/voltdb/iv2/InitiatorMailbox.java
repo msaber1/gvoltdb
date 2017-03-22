@@ -356,12 +356,12 @@ public class InitiatorMailbox implements Mailbox
           m_requestTableBuffer = ((RequestDataResponseMessage)message).getRequestTableBuffer();
 
           //  null BB
-          System.out.println(m_requestTableBuffer.position());
-          System.out.println(m_requestTableBuffer.limit());
-          System.out.println(m_requestTableBuffer.remaining());
+          // System.out.println(m_requestTableBuffer.position());
+          // System.out.println(m_requestTableBuffer.limit());
+          // System.out.println(m_requestTableBuffer.remaining());
 
           // m_sem2.release();
-          m_sem.release();
+          // m_sem.release();
         }
 
         if (SCHEDULE_IN_SITE_THREAD) {
@@ -519,6 +519,7 @@ System.out.println("find table result: " + result);
 // System.out.println("host from: " + ((int)message.getSourceSiteId()) + " to: " + ((int)message.getDestinationSiteId()));
         System.out.println("thread: " + Thread.currentThread().getName() + " Receive from: " + (message.getSourceSiteId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
 
+        m_sem.release();
         // m_requestTableBuffer = message.getRequestTableBuffer();
     }
 
