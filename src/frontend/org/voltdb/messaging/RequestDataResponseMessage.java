@@ -157,7 +157,15 @@ public class RequestDataResponseMessage extends VoltMessage {
 
     @Override
     public void initFromBuffer(ByteBuffer buf) {
+
+        //  formulate how to serialize
       System.out.println("reponse msg init buffer");
+      System.out.println(buf.position());
+      System.out.println(buf.limit());
+      System.out.println(buf.remaining());
+
+      VoltTable table = new VoltTable(buf, true);
+      System.out.println(table.toFormattedString());
         //m_sourceSiteId = buf.getLong();
         //m_destinationSiteId = buf.getLong();
         //m_txnId = buf.getLong();
