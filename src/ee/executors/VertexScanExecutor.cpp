@@ -119,8 +119,8 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
                (int)input_table->allocatedTupleCount());
 
     // invoke method that requests for data from other cluster node and returns the data
-    if (m_engine->getSiteId() == 0L) {
-        int hostID = 1;
+    if (m_engine->getSiteId() == 1L) {
+        int hostID = 0;
         long destinationID = (0L << 32) + hostID;
 
         //  vertex attributes
