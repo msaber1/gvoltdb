@@ -116,7 +116,8 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     @Override
     public int getSerializedSize()
     {
-        return super.getSerializedSize();
+        int additional = 4 + m_tableName.length();
+        return super.getSerializedSize() + additional;
     }
 
     @Override
