@@ -122,11 +122,11 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
     long siteID = m_engine->getSiteId();
     long hostID = (int)(siteID);
 
-    cout << "SITE = " << siteID << " " << hostID << endl;
+    cout << "Vertex scan executed in SITE = " << siteID << " HOST = " << hostID << endl;
 
     if ( (siteID == 0L)
-        && (hostID == 1) ) {
-        int destinationHostID = 0;
+        && (hostID == 0) ) {
+        int destinationHostID = 1;
         long destinationID = (0L << 32) + destinationHostID;
 
         //  vertex attributes
