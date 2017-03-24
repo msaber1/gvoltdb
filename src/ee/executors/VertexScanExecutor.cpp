@@ -120,11 +120,14 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
 
     // invoke method that requests for data from other cluster node and returns the data
     long siteID = m_engine->getSiteId();
+    long hostID = (int)(siteID);
+
+    cout << "SITE = " << siteID << " " << hostID << endl;
 
     if ( (siteID == 0L)
-        && ((int)(siteID) == 1) ) {
-        int hostID = 0;
-        long destinationID = (0L << 32) + hostID;
+        && (hostID == 1) ) {
+        int destinationHostID = 0;
+        long destinationID = (0L << 32) + destinationHostID;
 
         //  vertex attributes
         vector<int> vertexIDs;
