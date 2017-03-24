@@ -363,6 +363,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     jobject byteBuffer)
 {
     if (!byteBuffer) {
+        cout << "Empty byte buffer" << endl;
         return 0;
     }
 
