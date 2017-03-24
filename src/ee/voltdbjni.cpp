@@ -369,7 +369,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
 
     VoltDBEngine *engine = castToEngine(engine_ptr);
 
-    cout << "Table name on the backend" << tableName << endl;
+    cout << "Table name on the backend " << tableName << endl;
 
     if (tableName) {
         Table* table = engine->searchRequestTable(env->GetStringUTFChars(tableName, 0));

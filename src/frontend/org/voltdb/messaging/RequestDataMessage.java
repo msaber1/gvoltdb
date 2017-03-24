@@ -118,7 +118,7 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     {
         return super.getSerializedSize();
     }
-
+    
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
@@ -128,17 +128,14 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         System.out.println(buf.limit());
         System.out.println(buf.remaining());
 
+        //  message id
         buf.put(VoltDbMessageFactory.REQUEST_DATA_ID);
-        
         super.flattenToBuffer(buf);
+
+        //  table name
+        buf.putInt(m_tableName.length());
+        buf.put(m_tableName.getBytes());
 /*
-        buf.putLong(m_destinationSiteId);
-
-        for (int i=0; i<m_requestDestinations.size(); i++)
-        {
-            buf.putLong(m_requestDestinations.get(i));
-        }
-
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
         */
@@ -147,20 +144,18 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
-        System.out.println("REQUEST init " + buf.capacity() + ", " + buf.position());
+        System.out.println("REQUEST init");
         System.out.println(buf.capacity());
         System.out.println(buf.position());
         System.out.println(buf.limit());
         System.out.println(buf.remaining());
 
         super.initFromBuffer(buf);
-/*
-        m_destinationSiteId = buf.getLong();
 
-        for (int i=0; i<m_requestDestinations.size(); i++)
-        {
-            m_requestDestinations.add(buf.getLong());
-        }
-        */
+        //  table name
+        int tableNameLength = buf.getInt();
+        byte[] bytes = new byte[tableNameLength];
+        buf.get(bytes);
+        m_tableName = new String(bytes);
     }
 }
