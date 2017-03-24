@@ -118,7 +118,7 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     {
         return super.getSerializedSize();
     }
-    
+
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
@@ -135,10 +135,16 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         //  table name
         buf.putInt(m_tableName.length());
         buf.put(m_tableName.getBytes());
-/*
-        assert(buf.capacity() == buf.position());
+
+        // assert(buf.capacity() == buf.position());
+        // buf.limit(buf.position());
+
+        buf.position(buf.capacity());
         buf.limit(buf.position());
-        */
+
+        System.out.println(buf.position());
+        System.out.println(buf.limit());
+        System.out.println(buf.remaining());
     }
 
     @Override
