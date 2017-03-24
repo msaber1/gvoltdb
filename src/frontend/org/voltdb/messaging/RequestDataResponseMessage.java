@@ -155,41 +155,32 @@ public class RequestDataResponseMessage extends VoltMessage {
         System.out.println(buf.remaining());
 
         buf.put(VoltDbMessageFactory.REQUEST_DATA_RESPONSE_ID);
+
+        //  table byte buffer
         buf.put(m_requestTableBuffer);
 
-        //buf.putLong(m_sourceSiteId);
-        //buf.putLong(m_destinationSiteId);
-        //buf.putLong(m_txnId);
-        //buf.putLong(m_spHandle);
-
-        // assert(buf.capacity() == buf.position());
-        // buf.limit(buf.position());
-
-        System.out.println(buf.capacity());
-        System.out.println(buf.limit());
-        System.out.println(buf.position());
-        System.out.println(buf.remaining());
+        assert(buf.capacity() == buf.position());
+        buf.limit(buf.position());
     }
 
+    //  capacity = 1024
+    //  limit = 1024
+    //  position = 0
+    //  remaining = 1024
     @Override
     public void initFromBuffer(ByteBuffer buf)
     {
       System.out.println("RESPONSE init");
-      System.out.println(buf.capacity());
-      System.out.println(buf.limit());
-      System.out.println(buf.position());
-      System.out.println(buf.remaining());
 
-      // super.initFromBuffer(buf);
+      m_requestTableBuffer = ByteBuffer.allocate(buf.capacity());
 
-      // VoltTable table = new VoltTable(buf, true);
-      // System.out.println(table.toFormattedString());
-        //m_sourceSiteId = buf.getLong();
-        //m_destinationSiteId = buf.getLong();
-        //m_txnId = buf.getLong();
-        //m_spHandle = buf.getLong();
+      buf.rewind();
+      m_requestTableBuffer.put(buf);
+      buf.rewind();
+      m_requestTableBuffer.flip();
 
-        //assert(buf.capacity() == buf.position());
+      VoltTable table = new VoltTable(m_requestTableBuffer, true);
+      System.out.println(table.toFormattedString());
     }
 
     @Override
