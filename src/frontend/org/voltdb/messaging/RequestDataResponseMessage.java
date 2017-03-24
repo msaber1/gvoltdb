@@ -141,7 +141,7 @@ public class RequestDataResponseMessage extends VoltMessage {
     @Override
     public int getSerializedSize()
     {
-        int additional = 0;
+        int additional = m_requestTableBuffer.capacity();
         return super.getSerializedSize() + additional;
     }
 
@@ -150,12 +150,12 @@ public class RequestDataResponseMessage extends VoltMessage {
     {
         System.out.println("RESPONSE flatten");
         System.out.println(buf.capacity());
-        System.out.println(buf.position());
         System.out.println(buf.limit());
+        System.out.println(buf.position());
         System.out.println(buf.remaining());
 
         buf.put(VoltDbMessageFactory.REQUEST_DATA_RESPONSE_ID);
-        // super.flattenToBuffer(buf);
+        buf.put(m_requestTableBuffer);
 
         //buf.putLong(m_sourceSiteId);
         //buf.putLong(m_destinationSiteId);
@@ -164,16 +164,20 @@ public class RequestDataResponseMessage extends VoltMessage {
 
         // assert(buf.capacity() == buf.position());
         // buf.limit(buf.position());
+
+        System.out.println(buf.capacity());
+        System.out.println(buf.limit());
+        System.out.println(buf.position());
+        System.out.println(buf.remaining());
     }
 
     @Override
-    public void initFromBuffer(ByteBuffer buf) {
-
-        //  formulate how to serialize
+    public void initFromBuffer(ByteBuffer buf)
+    {
       System.out.println("RESPONSE init");
       System.out.println(buf.capacity());
-      System.out.println(buf.position());
       System.out.println(buf.limit());
+      System.out.println(buf.position());
       System.out.println(buf.remaining());
 
       // super.initFromBuffer(buf);
@@ -186,7 +190,6 @@ public class RequestDataResponseMessage extends VoltMessage {
         //m_spHandle = buf.getLong();
 
         //assert(buf.capacity() == buf.position());
-
     }
 
     @Override

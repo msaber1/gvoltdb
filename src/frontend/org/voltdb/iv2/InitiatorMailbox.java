@@ -494,6 +494,7 @@ public class InitiatorMailbox implements Mailbox
           System.out.println("Table size: " + bbTable.remaining());
         }
 
+        //  print table in destination host
         // VoltTable table = new VoltTable(bbTable, true);
         // System.out.println(table.toFormattedString());
 
