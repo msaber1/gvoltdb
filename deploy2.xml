@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<deployment>
+    <cluster hostcount="2"/>
+    <partition-detection>
+        <snapshot/>
+    </partition-detection>
+    <admin-mode adminstartup="false"/>
+    <heartbeat/>
+    <httpd enabled="true">
+        <jsonapi enabled="true"/>
+    </httpd>
+    <snapshot enabled="false"/>
+    <commandlog enabled="false">
+        <frequency/>
+    </commandlog>
+    <systemsettings>
+        <temptables/>
+        <snapshot/>
+        <elastic/>
+        <query/>
+        <resourcemonitor>
+            <memorylimit/>
+        </resourcemonitor>
+    </systemsettings>
+    <security/>
+	<dr id="1" role="replica">
+      <connection source="172.18.11.129" />
+   </dr>
+</deployment>

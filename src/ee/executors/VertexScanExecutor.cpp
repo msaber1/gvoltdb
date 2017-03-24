@@ -120,7 +120,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
 
     // invoke method that requests for data from other cluster node and returns the data
     if (m_engine->getSiteId() == 0L) {
-        int hostID = 0;
+        int hostID = 1;
         long destinationID = (1L << 32) + hostID;
 
         //  vertex attributes

@@ -539,8 +539,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         //  convert byte buffer to byte array
         ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
 
-        VoltTable table = new VoltTable(bb, true);
-        System.out.println(table.toFormattedString());
+        // VoltTable table = new VoltTable(bb, true);
+        // System.out.println(table.toFormattedString());
 
         bb.rewind();
         clone.put(bb);
