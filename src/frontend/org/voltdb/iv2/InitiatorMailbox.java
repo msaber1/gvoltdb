@@ -486,8 +486,9 @@ public class InitiatorMailbox implements Mailbox
 
         System.out.println("Table name in destination host: " + message.getTableName());
         System.out.println("Table find result: " + result);
-        // VoltTable table = new VoltTable(bbTable, true);
-        // System.out.println(table.toFormattedString());
+
+        VoltTable table = new VoltTable(bbTable, true);
+        System.out.println(table.toFormattedString());
 
         //  add table buffer to the message
         // if (result == 0)
@@ -496,7 +497,7 @@ public class InitiatorMailbox implements Mailbox
         //     response.setRequestTableBuffer(bbTable);
         response.setRequestTableBuffer(bbTable);
 
-        System.out.println("thread: " + Thread.currentThread().getName() + " Send from: " + (response.getSourceSiteId()>>32) + " to: " + (response.getDestinationSiteId()>>32));
+        System.out.println("Thread: " + Thread.currentThread().getName() + " Send from: " + (response.getSourceSiteId()>>32) + " to: " + (response.getDestinationSiteId()>>32));
 
         send(response.getDestinationSiteId(), response);
     }
@@ -507,7 +508,7 @@ public class InitiatorMailbox implements Mailbox
      */
     public void handleRequestDataResponseMessage(RequestDataResponseMessage message)
     {
-        System.out.println("thread: " + Thread.currentThread().getName() + " Receive from: " + (message.getSourceSiteId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
+        System.out.println("Thread: " + Thread.currentThread().getName() + " Receive from: " + (message.getSourceSiteId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
 
         // m_requestTableBuffer = message.getRequestTableBuffer();
     }
