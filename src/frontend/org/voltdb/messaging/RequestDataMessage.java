@@ -137,11 +137,11 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         buf.putInt(m_tableName.length());
         buf.put(m_tableName.getBytes());
 
-        // assert(buf.capacity() == buf.position());
-        // buf.limit(buf.position());
-
-        buf.position(buf.capacity());
+        assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
+
+        // buf.position(buf.capacity());
+        // buf.limit(buf.position());
 
         System.out.println(buf.position());
         System.out.println(buf.limit());

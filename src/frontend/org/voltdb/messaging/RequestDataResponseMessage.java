@@ -149,7 +149,7 @@ public class RequestDataResponseMessage extends VoltMessage {
         System.out.println(buf.remaining());
 
         buf.put(VoltDbMessageFactory.REQUEST_DATA_RESPONSE_ID);
-        super.flattenToBuffer(buf);
+        // super.flattenToBuffer(buf);
 
         //buf.putLong(m_sourceSiteId);
         //buf.putLong(m_destinationSiteId);
@@ -170,7 +170,7 @@ public class RequestDataResponseMessage extends VoltMessage {
       System.out.println(buf.limit());
       System.out.println(buf.remaining());
 
-      super.initFromBuffer(buf);
+      // super.initFromBuffer(buf);
 
       // VoltTable table = new VoltTable(buf, true);
       // System.out.println(table.toFormattedString());
