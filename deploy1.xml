@@ -23,5 +23,5 @@
         </resourcemonitor>
     </systemsettings>
     <security/>
-	<dr id="0"/>
+    <dr id="0" role="master"/>
 </deployment>
