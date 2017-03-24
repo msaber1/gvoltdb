@@ -23,7 +23,7 @@
         </resourcemonitor>
     </systemsettings>
     <security/>
-	<dr id="1" role="replica">
+	<dr id="1">
       <connection source="172.18.11.129" />
    </dr>
 </deployment>
