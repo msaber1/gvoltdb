@@ -362,27 +362,25 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     jstring tableName,
     jobject byteBuffer)
 {
-    if (!byteBuffer) {
-        cout << "Empty byte buffer" << endl;
+    if (!byteBuffer || !tableName) {
         return 0;
     }
 
     VoltDBEngine *engine = castToEngine(engine_ptr);
 
-    if (tableName) {
-        Table* table = engine->searchRequestTable(env->GetStringUTFChars(tableName, 0));
+    Table* table = engine->searchRequestTable(env->GetStringUTFChars(tableName, 0));
 
-        //  return serialized table
-        if (table) {
-          size_t serializeSize = table->getAccurateSizeToSerialize(false);
-          FallbackSerializeOutput* out2 = engine->getRequestTableBuffer();
-          out2->initializeWithPosition(env->GetDirectBufferAddress(byteBuffer), serializeSize, 0);
-          table->serializeToWithoutTotalSize(*out2);
-          return 1;
-        }
+    if (!table) {
+        return 0;
     }
 
-    return 0;
+    //  return serialized table
+    size_t serializeSize = table->getAccurateSizeToSerialize(false);
+    FallbackSerializeOutput* out2 = engine->getRequestTableBuffer();
+    out2->initializeWithPosition(env->GetDirectBufferAddress(byteBuffer), serializeSize, 0);
+    table->serializeToWithoutTotalSize(*out2);
+    
+    return 1;
 }
 
 /**

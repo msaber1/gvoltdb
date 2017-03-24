@@ -609,6 +609,7 @@ int JNITopend::invokeRequestTable(std::string tableName, Table* requestTable, vo
     // initiate JNI frame
     int32_t numRefs = 10;
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, numRefs);
+    
     if (jni_frame.checkResult() < 0) {
         VOLT_ERROR("Unable to request data: jni frame error.");
         throw std::exception();
@@ -633,6 +634,7 @@ int JNITopend::invokeRequestTable(std::string tableName, Table* requestTable, vo
 
     ReferenceSerializeInputBE serialize_in(bytes, length);
     requestTable->loadTuplesFrom(serialize_in, stringPool);
+
     return 1;
 }
 

@@ -528,6 +528,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
         // System.out.println("Thread restored: " + Thread.currentThread().getName());
 
+        //  get table byte buffer
         ByteBuffer bb = m_mailbox.getResultTableBuffer();
 
         if (bb == null) {

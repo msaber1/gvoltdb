@@ -756,7 +756,6 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
 
     //  table name
     string tableName = vertexOrEdgeTable->nameNonConst();
-    cout << "Table name: " << tableName << endl;
 
     //  ask frontend to get table
     int request = m_topend->invokeRequestTable(vertexOrEdgeTable->nameNonConst(), requestTable, &m_stringPool, destinationID);
