@@ -138,7 +138,6 @@ public class RequestDataResponseMessage extends VoltMessage {
         return m_spHandle;
     }
 
-
     @Override
     public void flattenToBuffer(ByteBuffer buf)
     {

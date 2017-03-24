@@ -124,6 +124,10 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         return super.getSerializedSize() + additional;
     }
 
+    //  position = 24
+    //  capacity = 94
+    //  limit = 94
+    //  remaining = 70
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
@@ -143,13 +147,6 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
-
-        // buf.position(buf.capacity());
-        // buf.limit(buf.position());
-
-        System.out.println(buf.position());
-        System.out.println(buf.limit());
-        System.out.println(buf.remaining());
     }
 
     @Override
