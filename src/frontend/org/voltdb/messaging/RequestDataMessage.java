@@ -117,6 +117,8 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     //  foreign host = 24
     //  message id = 1
     //  transaction = 58
+    //  additional = 4 (table name length)
+    //             + ? (table name)
     @Override
     public int getSerializedSize()
     {
@@ -132,10 +134,6 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         System.out.println("REQUEST flatten");
-        System.out.println(buf.capacity());
-        System.out.println(buf.position());
-        System.out.println(buf.limit());
-        System.out.println(buf.remaining());
 
         //  message id
         buf.put(VoltDbMessageFactory.REQUEST_DATA_ID);
@@ -149,14 +147,14 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         buf.limit(buf.position());
     }
 
+    //  capacity = 69
+    //  limit = 69
+    //  position = 0
+    //  remaining = 69
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
         System.out.println("REQUEST init");
-        System.out.println(buf.capacity());
-        System.out.println(buf.position());
-        System.out.println(buf.limit());
-        System.out.println(buf.remaining());
 
         super.initFromBuffer(buf);
 

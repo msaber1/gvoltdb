@@ -487,8 +487,15 @@ public class InitiatorMailbox implements Mailbox
         System.out.println("Table name in destination host: " + message.getTableName());
         System.out.println("Table find result: " + result);
 
-        VoltTable table = new VoltTable(bbTable, true);
-        System.out.println(table.toFormattedString());
+        if (result == 1) {
+          System.out.println("Table size: " + bbTable.capacity());
+          System.out.println("Table size: " + bbTable.limit());
+          System.out.println("Table size: " + bbTable.position());
+          System.out.println("Table size: " + bbTable.remaining());
+        }
+
+        // VoltTable table = new VoltTable(bbTable, true);
+        // System.out.println(table.toFormattedString());
 
         //  add table buffer to the message
         // if (result == 0)

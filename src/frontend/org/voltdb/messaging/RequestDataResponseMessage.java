@@ -139,6 +139,13 @@ public class RequestDataResponseMessage extends VoltMessage {
     }
 
     @Override
+    public int getSerializedSize()
+    {
+        int additional = 0;
+        return super.getSerializedSize() + additional;
+    }
+
+    @Override
     public void flattenToBuffer(ByteBuffer buf)
     {
         System.out.println("RESPONSE flatten");
