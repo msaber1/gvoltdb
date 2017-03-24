@@ -1,5 +1,4 @@
-CREATE DIRECTED GRAPH
-VIEW CourseDependencyGraph
+CREATE DIRECTED GRAPH VIEW CourseDependencyGraph
 VERTEXES (ID = CourseId, CourseNum = Course)
 	FROM Courses
 EDGES (ID = PrereqId, FROM = CourseId, TO = CoursePrereqId)

@@ -823,6 +823,8 @@ Table* VoltDBEngine::searchRequestTable(const char* tableName)
 {
     std::string name(tableName);
 
+    cout << "Searching table in host " << (int)(this->getSiteId()) << endl;
+
     catalog::Database* db = getDatabase();
     const catalog::CatalogMap<catalog::Table> & tables = static_cast<const catalog::CatalogMap<catalog::Table> &>(db->tables());
     map<string, catalog::Table*>::const_iterator it;
