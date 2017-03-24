@@ -149,11 +149,8 @@ public class RequestDataResponseMessage extends VoltMessage {
     public void flattenToBuffer(ByteBuffer buf)
     {
         System.out.println("RESPONSE flatten");
-        System.out.println(buf.capacity());
-        System.out.println(buf.limit());
-        System.out.println(buf.position());
-        System.out.println(buf.remaining());
 
+        //  message id
         buf.put(VoltDbMessageFactory.REQUEST_DATA_RESPONSE_ID);
 
         //  table byte buffer
@@ -170,21 +167,20 @@ public class RequestDataResponseMessage extends VoltMessage {
     @Override
     public void initFromBuffer(ByteBuffer buf)
     {
-      System.out.println("RESPONSE init");
+        System.out.println("RESPONSE init");
 
-      m_requestTableBuffer = ByteBuffer.allocate(buf.capacity());
+        //  copy table byte buffer
+        m_requestTableBuffer = ByteBuffer.allocate(buf.capacity());
 
-      buf.rewind();
-      m_requestTableBuffer.put(buf);
-      buf.rewind();
-      m_requestTableBuffer.flip();
-
-      VoltTable table = new VoltTable(m_requestTableBuffer, true);
-      System.out.println(table.toFormattedString());
+        buf.rewind();
+        m_requestTableBuffer.put(buf);
+        buf.rewind();
+        m_requestTableBuffer.flip();
     }
 
     @Override
-    public String toString() {
+    public String toString()
+    {
         StringBuilder sb = new StringBuilder();
 
         sb.append("Request Data Response (FROM ");

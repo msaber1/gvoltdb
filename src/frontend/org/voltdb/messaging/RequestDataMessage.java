@@ -137,20 +137,24 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
 
         //  message id
         buf.put(VoltDbMessageFactory.REQUEST_DATA_ID);
+
+        //  transaction info
         super.flattenToBuffer(buf);
 
-        //  table name
+        //  table name length
         buf.putInt(m_tableName.length());
+
+        //  table name
         buf.put(m_tableName.getBytes());
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
 
-    //  capacity = 69
-    //  limit = 69
+    //  capacity = 76
+    //  limit = 76
     //  position = 0
-    //  remaining = 69
+    //  remaining = 76
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
@@ -158,8 +162,10 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
 
         super.initFromBuffer(buf);
 
-        //  table name
+        //  table name length
         int tableNameLength = buf.getInt();
+
+        //  table name
         byte[] bytes = new byte[tableNameLength];
         buf.get(bytes);
         m_tableName = new String(bytes);

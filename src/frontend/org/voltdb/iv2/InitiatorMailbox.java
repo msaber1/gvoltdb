@@ -350,7 +350,7 @@ public class InitiatorMailbox implements Mailbox
     @Override
     public void deliver(final VoltMessage message)
     {
-        System.out.println("thread run deliver: " + Thread.currentThread().getName() + " on " + message.getClass().getName());
+        // System.out.println("thread run deliver: " + Thread.currentThread().getName() + " on " + message.getClass().getName());
 
         if (message instanceof RequestDataResponseMessage) {
           m_requestTableBuffer = ((RequestDataResponseMessage)message).getRequestTableBuffer();
@@ -362,7 +362,7 @@ public class InitiatorMailbox implements Mailbox
             this.m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
                 @Override
                 void run() {
-                    System.out.println("thread deliver: " + Thread.currentThread().getName() + " on " + message.getClass().getName());
+                    // System.out.println("thread deliver: " + Thread.currentThread().getName() + " on " + message.getClass().getName());
                     synchronized (InitiatorMailbox.this) {
                         deliverInternal(message);
                     }
@@ -484,28 +484,17 @@ public class InitiatorMailbox implements Mailbox
         ByteBuffer bbTable = ByteBuffer.allocateDirect(1024);
         int result = m_engine.nativeSearchRequestTable(enginePointer, message.getTableName(), bbTable);
 
-        System.out.println("Table name in destination host: " + message.getTableName());
-        System.out.println("Table find result: " + result);
-
-        if (result == 1) {
-          System.out.println("Table size: " + bbTable.capacity());
-          System.out.println("Table size: " + bbTable.limit());
-          System.out.println("Table size: " + bbTable.position());
-          System.out.println("Table size: " + bbTable.remaining());
-        }
+        // System.out.println("Table name in destination host: " + message.getTableName());
+        // System.out.println("Table find result: " + result);
 
         //  print table in destination host
         // VoltTable table = new VoltTable(bbTable, true);
         // System.out.println(table.toFormattedString());
 
         //  add table buffer to the message
-        // if (result == 0)
-        //     response.setRequestTableBuffer(bbTable);
-        // else
-        //     response.setRequestTableBuffer(bbTable);
         response.setRequestTableBuffer(bbTable);
 
-        System.out.println("Thread: " + Thread.currentThread().getName() + " Send from: " + (response.getSourceSiteId()>>32) + " to: " + (response.getDestinationSiteId()>>32));
+        // System.out.println("Thread: " + Thread.currentThread().getName() + " Send from: " + (response.getSourceSiteId()>>32) + " to: " + (response.getDestinationSiteId()>>32));
 
         send(response.getDestinationSiteId(), response);
     }
@@ -516,9 +505,7 @@ public class InitiatorMailbox implements Mailbox
      */
     public void handleRequestDataResponseMessage(RequestDataResponseMessage message)
     {
-        System.out.println("Thread: " + Thread.currentThread().getName() + " Receive from: " + (message.getSourceSiteId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
-
-        // m_requestTableBuffer = message.getRequestTableBuffer();
+        // System.out.println("Thread: " + Thread.currentThread().getName() + " Receive from: " + (message.getSourceSiteId()>>32) + " to: " + (message.getDestinationSiteId()>>32));
     }
 
     /** Produce the repair log. This is idempotent. */

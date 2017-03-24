@@ -520,15 +520,13 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return VoltTable serialized in bytes
      */
     public byte[] requestTable(String tableName, long destinationID) throws InterruptedException {
-        // System.out.println("Frontend start");
-
         m_mailbox.sendRequest(tableName, destinationID);
 
-        System.out.println("Thread blocks.");
+        // System.out.println("Thread blocks.");
 
         m_mailbox.getSem();
 
-        System.out.println("Thread restored: " + Thread.currentThread().getName());
+        // System.out.println("Thread restored: " + Thread.currentThread().getName());
 
         ByteBuffer bb = m_mailbox.getResultTableBuffer();
 
@@ -538,9 +536,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
         //  convert byte buffer to byte array
         ByteBuffer clone = ByteBuffer.allocate(bb.capacity());
-
-        // VoltTable table = new VoltTable(bb, true);
-        // System.out.println(table.toFormattedString());
 
         bb.rewind();
         clone.put(bb);
