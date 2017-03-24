@@ -113,6 +113,10 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         return m_sender;
     }
 */
+
+    //  foreign host = 24
+    //  message id = 1
+    //  transaction = 58
     @Override
     public int getSerializedSize()
     {
