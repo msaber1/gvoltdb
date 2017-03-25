@@ -142,15 +142,13 @@ namespace voltdb {
 
     void DummyTopend::fallbackToEEAllocatedBuffer(char *buffer, size_t length) {}
 
-    std::string DummyTopend::decodeBase64AndDecompress(const std::string& buffer) {
+    std::string DummyTopend::decodeBase64AndDecompress(const std::string& buffer)
+    {
         return "";
     }
 
-    int DummyTopend::invokeRequestTable(std::string tableName, Table* destination, voltdb::Pool *stringPool, long destinationID) {
+    int DummyTopend::invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, Table* destination, voltdb::Pool *stringPool)
+    {
         return 0;
     }
-
-    // int DummyTopend::getRequestTable(Table* requestTable, voltdb::Pool* stringPool) {
-    //     return 0;
-    // }
 }

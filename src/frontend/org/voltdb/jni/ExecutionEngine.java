@@ -25,7 +25,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.Semaphore;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -143,12 +142,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public long m_peakMemoryInBytes = 0;
 
     protected InitiatorMailbox m_mailbox;
-
-    protected Thread m_requestThread;
-
-    protected Semaphore m_sem;
-
-    byte[] output = null;
 
     /** Make the EE clean and ready to do new transactional work. */
     public void resetDirtyStatus() {
@@ -515,24 +508,27 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     /**
      * Request data from other from other cluster nodes.
-     * @param tableName
      * @param destinationID
-     * @return VoltTable serialized in bytes
+     * @param tableName
+     * @param graphViewName
+     * @return VoltTable serialized in byte array
      */
-    public byte[] requestTable(String tableName, long destinationID) throws InterruptedException {
-        m_mailbox.sendRequest(tableName, destinationID);
+    public byte[] requestTable(long destinationID, String tableName, String graphViewName) throws InterruptedException {
+        int sendResult = m_mailbox.sendRequest(destinationID, tableName, graphViewName);
 
-        // System.out.println("Thread blocks.");
+        //  invalid host ID
+        if (sendResult == 0) {
+            return null;
+        }
 
-        m_mailbox.getSem();
+        //  block the caller thread until result comes back
+        m_mailbox.waitSem();
 
-        // System.out.println("Thread restored: " + Thread.currentThread().getName());
-
-        //  get table byte buffer
+        //  get table byte buffer after the caller thread is released
         ByteBuffer bb = m_mailbox.getResultTableBuffer();
 
         if (bb == null) {
-          return null;
+            return null;
         }
 
         //  convert byte buffer to byte array
@@ -544,7 +540,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         clone.flip();
 
         byte[] bytes = clone.array();
-        output = new byte[bytes.length];
+        byte[] output = new byte[bytes.length];
         System.arraycopy(bytes, 0, output, 0, bytes.length);
 
         return output;
@@ -845,10 +841,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Search a table with a given table name.
      * @param pointer
      * @param tableName
+     * @param graphViewName
      * @param buffer
      * @return error code
      */
-    public native int nativeSearchRequestTable(long pointer, String tableName, ByteBuffer buffer);
+    public native int nativeSearchRequestTable(long pointer, String tableName, String graphViewName, ByteBuffer buffer);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.

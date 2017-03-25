@@ -111,10 +111,6 @@ public abstract class BaseInitiator implements Initiator
                     joinProducer);
         }
 
-        // m_mailboxThread = new Thread(m_initiatorMailbox);
-        // m_mailboxThread.setDaemon(false);
-        // m_mailboxThread.start();
-
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
         if (joinProducer != null) {

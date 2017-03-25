@@ -335,12 +335,14 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeMapSi
 
     //  get long pointer that points long array
     jlong* siteIdsBuffer = NULL;
+
     if (siteIds) {
         siteIdsBuffer = engine->getBatchSiteIdsContainer();
         env->GetLongArrayRegion(siteIds, 0, numSites, siteIdsBuffer);
     }
 
     jlong* executionEnginesBuffer = NULL;
+
     if (executionEngines) {
         executionEnginesBuffer = engine->getBatchExecutionEnginesContainer();
         env->GetLongArrayRegion(executionEngines, 0, numSites, executionEnginesBuffer);
@@ -360,15 +362,16 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     JNIEnv *env, jobject obj,
     jlong engine_ptr,
     jstring tableName,
+    jstring graphViewName,
     jobject byteBuffer)
 {
-    if (!byteBuffer || !tableName) {
+    if (!byteBuffer || !tableName || !graphViewName) {
         return 0;
     }
 
     VoltDBEngine *engine = castToEngine(engine_ptr);
 
-    Table* table = engine->searchRequestTable(env->GetStringUTFChars(tableName, 0));
+    Table* table = engine->searchRequestTable(env->GetStringUTFChars(tableName, 0), env->GetStringUTFChars(graphViewName, 0));
 
     if (!table) {
         return 0;
@@ -379,7 +382,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     FallbackSerializeOutput* out2 = engine->getRequestTableBuffer();
     out2->initializeWithPosition(env->GetDirectBufferAddress(byteBuffer), serializeSize, 0);
     table->serializeToWithoutTotalSize(*out2);
-    
+
     return 1;
 }
 

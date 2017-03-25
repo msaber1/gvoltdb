@@ -216,6 +216,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
+    //  specifies the ExecutionEngine object on the frontend
     m_javaExecutionEngineClass = m_jniEnv->GetObjectClass(m_javaExecutionEngine);
     if (m_javaExecutionEngineClass == NULL) {
         m_jniEnv->ExceptionDescribe();
@@ -223,19 +224,13 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
         throw std::exception();
     }
 
-    m_requestTableMID = m_jniEnv->GetMethodID(m_javaExecutionEngineClass, "requestTable", "(Ljava/lang/String;J)[B");
+    //  specify the type and the order of arguments of a frontend function that will be called by the backend
+    m_requestTableMID = m_jniEnv->GetMethodID(m_javaExecutionEngineClass, "requestTable", "(JLjava/lang/String;Ljava/lang/String;)[B");
     if (m_requestTableMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_requestTableMID != NULL);
         throw std::exception();
     }
-
-    // m_getRequestTableMID = m_jniEnv->GetMethodID(m_javaExecutionEngineClass, "getRequestTableBuffer", "()[B");
-    // if (m_getRequestTableMID == NULL) {
-    //     m_jniEnv->ExceptionDescribe();
-    //     assert(m_getRequestTableMID != NULL);
-    //     throw std::exception();
-    // }
 }
 
 
@@ -602,22 +597,24 @@ int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
  *  Invokes Java function that sends a message to request data from other cluster nodes.
  *  Returns a table holding the data.
  */
-int JNITopend::invokeRequestTable(std::string tableName, Table* requestTable, voltdb::Pool *stringPool, long destinationID)
+int JNITopend::invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, Table* requestTable, voltdb::Pool *stringPool)
 {
     VOLT_DEBUG("requesting data to site id %d", destinationID);
 
     // initiate JNI frame
     int32_t numRefs = 10;
     JNILocalFrameBarrier jni_frame = JNILocalFrameBarrier(m_jniEnv, numRefs);
-    
+
     if (jni_frame.checkResult() < 0) {
         VOLT_ERROR("Unable to request data: jni frame error.");
         throw std::exception();
     }
 
     jstring tableNameToJava = m_jniEnv->NewStringUTF(tableName.c_str());
+    jstring graphViewNameToJava = m_jniEnv->NewStringUTF(graphViewName.c_str());
 
-    jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine, m_requestTableMID, tableNameToJava, destinationID));
+    //  calls frontend to obtain requested table
+    jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine, m_requestTableMID, destinationID, tableNameToJava, graphViewNameToJava));
 
     if (!jbuf) {
         return 0;
@@ -629,6 +626,7 @@ int JNITopend::invokeRequestTable(std::string tableName, Table* requestTable, vo
         return 0;
     }
 
+    //  copy the table contents to Table object
     jboolean is_copy;
     jbyte *bytes = m_jniEnv->GetByteArrayElements(jbuf, &is_copy);
 

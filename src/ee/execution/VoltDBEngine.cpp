@@ -627,39 +627,75 @@ int VoltDBEngine::loadNextDependency(Table* destination) {
 // -------------------------------------------------
 // Request Data Functions
 // -------------------------------------------------
+/*
+ *  Returns a serializer object used specifically to serialize requested table.
+ */
 FallbackSerializeOutput* VoltDBEngine::getRequestTableBuffer()
 {
     return &m_requestTableOut;
 }
 
+/*
+ *  A wrapper function to ask vertex attributes from other cluster node.
+ *  @param  destinationID   destination ID
+ *  @param  vertexIDs       a vector of vertex IDs
+ *  @param  attrNames       a vector of attribute names
+ *  @param  graphView       a pointer to GraphView object
+ */
 Table* VoltDBEngine::getVertexAttributesFromClusterNode(long destinationID,
                                                         vector<int> vertexIDs,
                                                         vector<string> attrNames,
-                                                        GraphView* graphView)
+                                                        // GraphView* graphView)
+                                                        string graphViewName)
 {
-    return getAttributesFromClusterNode(destinationID, vertexIDs, attrNames, graphView, true);
+    // return getAttributesFromClusterNode(destinationID, vertexIDs, attrNames, graphView, true);
+    return getAttributesFromClusterNode(destinationID, vertexIDs, attrNames, graphViewName, true);
 }
 
+/*
+ *  A wrapper function to ask edge attributes from other cluster node.
+ *  @param  destinationID   destination ID
+ *  @param  edgeIDs         a vector of edge IDs
+ *  @param  attrNames       a vector of attribute names
+ *  @param  graphView       a pointer to GraphView object
+ */
 Table* VoltDBEngine::getEdgeAttributesFromClusterNode(long destinationID,
                                                       vector<int> edgeIDs,
                                                       vector<string> attrNames,
-                                                      GraphView* graphView)
+                                                      // GraphView* graphView)
+                                                      string graphViewName)
 {
-    return getAttributesFromClusterNode(destinationID, edgeIDs, attrNames, graphView, false);
+    // return getAttributesFromClusterNode(destinationID, edgeIDs, attrNames, graphView, false);
+    return getAttributesFromClusterNode(destinationID, edgeIDs, attrNames, graphViewName, false);
 }
 
+/*
+ *  A wrapper function to ask vertex/edge attributes from other cluster node.
+ *  @param  destinationID   destination ID
+ *  @param  edgeIDs         a vector of edge IDs
+ *  @param  attrNames       a vector of attribute names
+ *  @param  graphView       a pointer to GraphView object
+ *  @param  isVertex        true if the caller asks for vertex attributes, false for edge attributes
+ */
 Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
                                                   vector<int> vertexOrEdgeIDs,
                                                   vector<string> attrNames,
-                                                  GraphView* graphView,
+                                                  // GraphView* graphView,
+                                                  string graphViewName,
                                                   bool isVertex)
 {
-    Table* vertexOrEdgeTable;
+    int sourceHostID = (int)(getSiteId());
+    int destinationHostID = (int)(destinationID);
+    // if (destinationID < 0 || (getSiteId() == destinationID) || (sourceHostID == destinationHostID) || vertexOrEdgeIDs.empty() || graphView == NULL) {
+    if (destinationID < 0 || (getSiteId() == destinationID) || (sourceHostID == destinationHostID) || vertexOrEdgeIDs.empty() || graphViewName.empty()) {
+        return NULL;
+    }
 
-    if (isVertex)
-        vertexOrEdgeTable = graphView->getVertexTable();
-    else
-        vertexOrEdgeTable = graphView->getEdgeTable();
+    //  sort vertex/edge IDs
+    sort(vertexOrEdgeIDs.begin(), vertexOrEdgeIDs.end());
+
+    GraphView* graphView = getGraphView(graphViewName);
+    // cout << graphView->debug() << endl;
 
     //  mapping: graph view column index and name
     map<int32_t, string> mapIndexColumn;
@@ -676,10 +712,11 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
         map<string, catalog::GraphView*>::const_iterator it;
 
         for (it = graphViews.begin(); it != graphViews.end(); it++) {
-            string graphViewName = it->first;
+            string gvName = it->first;
             catalog::GraphView* gv = it->second;
 
-            if (boost::iequals(graphViewName, graphView->name())) {
+            // if (boost::iequals(gvName, graphView->name())) {
+            if (boost::iequals(gvName, graphViewName)) {
                 map<string, catalog::Column*>::const_iterator it2;
 
                 if (isVertex) {
@@ -698,6 +735,8 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
                         mapIndexColumn.insert(pair<int32_t, string>(col->index(), col->name()));
                     }
                 }
+
+                break;
             }
         }
     }
@@ -720,6 +759,17 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
         defaultAttrIndex = numDefaultEdgeAttributes;
     }
 
+    //  the original table of vertex or edge table
+    Table* vertexOrEdgeTable;
+
+    if (isVertex) {
+        vertexOrEdgeTable = graphView->getVertexTable();
+    }
+    else {
+        vertexOrEdgeTable = graphView->getEdgeTable();
+    }
+
+    //  a vector of attribute names
     for (int i = 0; i < vertexOrEdgeTable->columnCount(); i++) {
         const string originalColumnName = vertexOrEdgeTable->columnName(i);
         map<int32_t, string>::const_iterator itViewColumn = mapIndexColumn.find(i);
@@ -735,8 +785,8 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
             vector<string>::const_iterator itAttrNames;
             for (itAttrNames = attrNames.begin(); itAttrNames != attrNames.end(); itAttrNames++) {
                 if (boost::iequals(viewColumnName, *itAttrNames)) {
-                  outputColumnNames.push_back(viewColumnName);
-                  found = true;
+                    outputColumnNames.push_back(viewColumnName);
+                    found = true;
                 }
             }
             if (!found) {
@@ -745,10 +795,13 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
         }
     }
 
+    //  the table that will be returned to the caller
     Table* outputTable = TableFactory::buildTempTable(outputTableName,
                                                       vertexOrEdgeTable->schemaNonConst(),
                                                       outputColumnNames,
                                                       &limit);
+
+    //  a temporary table that stores requested table
     Table* requestTable = TableFactory::buildTempTable(requestTableName,
                                                         vertexOrEdgeTable->schemaNonConst(),
                                                         vertexOrEdgeTable->getColumnNamesNonConst(),
@@ -758,24 +811,29 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
     string tableName = vertexOrEdgeTable->nameNonConst();
 
     //  ask frontend to get table
-    int request = m_topend->invokeRequestTable(vertexOrEdgeTable->nameNonConst(), requestTable, &m_stringPool, destinationID);
+    int isRequestSuccessful = m_topend->invokeRequestTable(destinationID, tableName, graphViewName, requestTable, &m_stringPool);
 
-    if (request == 0) {
+    if (isRequestSuccessful == 0) {
         return NULL;
     }
 
     //  fill in output table
     TableTuple tuple(requestTable->schema());
     TableIterator iterator = requestTable->iterator();
-    int veIndex = 0;
+    int indexVE = 0;
     int numColumns = requestTable->columnCount();
     int numVE = vertexOrEdgeIDs.size();
 
     while (iterator.next(tuple)) {
 
         //  select rows
-        if (ValuePeeker::peekInteger(tuple.getNValue(0)) == vertexOrEdgeIDs[veIndex]) {
+        //  assumes the first attribute is associated with vertex/edge ID
+        if (ValuePeeker::peekInteger(tuple.getNValue(0)) == vertexOrEdgeIDs[indexVE]) {
+
+            //  output tuple
             TableTuple tempTuple = outputTable->tempTuple();
+
+            //  the current column index to insert vertex/edge attribute
             int columnIndex;
 
             if (isVertex) {
@@ -785,7 +843,7 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
                 columnIndex = numDefaultEdgeAttributes;
             }
 
-            //  fill in default attributes
+            //  fill in default attributes, such as vertex/edge IDs
             for (int j = 0; j < columnIndex; j++) {
                 tempTuple.setNValue(j, tuple.getNValue(j));
             }
@@ -810,33 +868,53 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
 
             outputTable->insertTuple(tempTuple);
 
-            if (veIndex < (numVE-1))
-                veIndex++;
+            if (indexVE < (numVE -1)) {
+                indexVE++;
+            }
         }
     }
 
     return outputTable;
 }
 
-Table* VoltDBEngine::searchRequestTable(const char* tableName)
+/*
+ *  Searches a requested table on the backend.
+ *  @param  tableName   table name
+ */
+Table* VoltDBEngine::searchRequestTable(const char* tableNameChar, const char* graphViewNameChar)
 {
-    std::string name(tableName);
+    std::string tableName(tableNameChar);
+    std::string graphViewName(graphViewNameChar);
+
+    if (tableName.empty() || graphViewName.empty()) {
+        return NULL;
+    }
+
+    Table* table = getTable(tableName);
+    GraphView* graphView = getGraphView(graphViewName);
+    cout << graphView->name() << endl;
 
     cout << "Searching table in host " << (int)(this->getSiteId()) << endl;
 
-    catalog::Database* db = getDatabase();
-    const catalog::CatalogMap<catalog::Table> & tables = static_cast<const catalog::CatalogMap<catalog::Table> &>(db->tables());
-    map<string, catalog::Table*>::const_iterator it;
+    return table;
 
-    for (it = tables.begin(); it != tables.end(); it++) {
-        if (boost::iequals(name, it->first)) {
-            return getTable(name);
-        }
-    }
-
-    return NULL;
+    // catalog::Database* db = getDatabase();
+    // const catalog::CatalogMap<catalog::Table> & tables = static_cast<const catalog::CatalogMap<catalog::Table> &>(db->tables());
+    // map<string, catalog::Table*>::const_iterator it;
+    //
+    // //  check if table exists
+    // for (it = tables.begin(); it != tables.end(); it++) {
+    //     if (boost::iequals(tableName, it->first)) {
+    //         return getTable(tableName);
+    //     }
+    // }
+    //
+    // return NULL;
 }
 
+/*
+ *
+ */
 int VoltDBEngine::updateMapSitesToEngines(int64_t siteIds[], int64_t executionEngines[], int numSites)
 {
     m_siteIds = siteIds;
@@ -846,6 +924,9 @@ int VoltDBEngine::updateMapSitesToEngines(int64_t siteIds[], int64_t executionEn
     return 1;
 }
 
+/*
+ *  Randomly generates a string of a given length.
+ */
 std::string VoltDBEngine::generateRandomString(const int length) const
 {
     string str(length, 'a');

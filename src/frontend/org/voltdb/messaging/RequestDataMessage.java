@@ -19,12 +19,10 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-//import java.util.ArrayList;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-//import org.voltdb.iv2.InitiatorMailbox;
 
 public class RequestDataMessage extends TransactionInfoBaseMessage {
 
@@ -33,6 +31,7 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     private long m_sourceSiteId;
     private long m_destinationSiteId;
     private String m_tableName;
+    private String m_graphViewName;
 
     // Empty constructor for de-serialization
     RequestDataMessage() {
@@ -42,6 +41,7 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     public RequestDataMessage(long sourceSiteId,
                               long destinationSiteId,
                               String tableName,
+                              String graphViewName,
                               long txnId,
                               long uniqueId,
                               boolean isReadOnly,
@@ -50,16 +50,10 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         m_sourceSiteId = sourceSiteId;
         m_destinationSiteId = destinationSiteId;
         m_tableName = tableName;
+        m_graphViewName = graphViewName;
         m_subject = Subject.DEFAULT.getId();
     }
-/*
-    public RequestDataMessage(long sourceSiteId, long destinationSiteId, RequestDataMessage msg) {
-        super(sourceSiteId, destinationHSId, msg.m_txnId, msg.m_uniqueId, msg.m_isReadOnly, msg.m_isForReplay);
-        m_sourceSiteId = sourceSiteId;
-        m_destinationSiteId = destinationSiteId;
-        m_subject = Subject.DEFAULT.getId();
-    }
-*/
+
     // getters and setters
     // request destination is the destination of the message.
     // a set of destinations (for chained messaging) is accessed as a stack.
@@ -85,7 +79,11 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     }
 */
     public String getTableName() {
-      return m_tableName;
+        return m_tableName;
+    }
+
+    public String getGraphViewName() {
+        return m_graphViewName;
     }
 
     public long getSourceSiteId() {
@@ -103,26 +101,18 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     public void setDestinationSiteId(long destSiteId) {
         m_destinationSiteId = destSiteId;
     }
-/*
-    // an original sender
-    public void setSender(InitiatorMailbox sender) {
-        m_sender = sender;
-    }
-
-    public InitiatorMailbox getSender() {
-        return m_sender;
-    }
-*/
 
     //  foreign host = 24
     //  message id = 1
     //  transaction = 58
     //  additional = 4 (table name length)
     //             + ? (table name)
+    //             + 4 (graph view name length)
+    //             + ? (graph view name)
     @Override
     public int getSerializedSize()
     {
-        int additional = 4 + m_tableName.length();
+        int additional = 4 + m_tableName.length() + 4 + m_graphViewName.length();
         return super.getSerializedSize() + additional;
     }
 
@@ -147,6 +137,12 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         //  table name
         buf.put(m_tableName.getBytes());
 
+        //  graph view name length
+        buf.putInt(m_graphViewName.length());
+
+        //  graph view name
+        buf.put(m_graphViewName.getBytes());
+
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
     }
@@ -169,5 +165,13 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         byte[] bytes = new byte[tableNameLength];
         buf.get(bytes);
         m_tableName = new String(bytes);
+
+        //  graph view name length
+        int graphViewNameLength = buf.getInt();
+
+        //  graph view name
+        byte[] bytes2 = new byte[graphViewNameLength];
+        buf.get(bytes2);
+        m_graphViewName = new String(bytes2);
     }
 }

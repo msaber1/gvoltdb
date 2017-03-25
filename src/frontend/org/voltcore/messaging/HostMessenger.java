@@ -67,8 +67,6 @@ import org.voltcore.utils.ShutdownHooks;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.probe.MeshProber;
-import org.voltdb.messaging.RequestDataMessage;
-import org.voltdb.messaging.RequestDataResponseMessage;
 
 import com.google_voltpatches.common.base.Preconditions;
 import com.google_voltpatches.common.base.Predicate;
@@ -1124,14 +1122,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         if (hostId == m_localHostId) {
             Mailbox mbox = m_siteMailboxes.get(hsId);
             if (mbox != null) {
-
-                if (message instanceof RequestDataMessage) {
-                  System.out.println("HOST thread send: " + Thread.currentThread().getName());
-                }
-                else if (message instanceof RequestDataResponseMessage) {
-                  System.out.println("HOST thread get: " + Thread.currentThread().getName());
-                }
-
                 mbox.deliver(message);
                 return null;
             } else {
@@ -1484,4 +1474,12 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
+    /*
+     *  Returns an instance of ForeignHost of a given host ID.
+     *  @param  hostID
+     */
+    public ForeignHost getForeignHost(int hostID)
+    {
+        return m_foreignHosts.get(hostID);
+    }
 }
