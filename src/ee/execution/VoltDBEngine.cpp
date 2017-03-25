@@ -645,11 +645,9 @@ FallbackSerializeOutput* VoltDBEngine::getRequestTableBuffer()
 Table* VoltDBEngine::getVertexAttributesFromClusterNode(long destinationID,
                                                         vector<int> vertexIDs,
                                                         vector<string> attrNames,
-                                                        // GraphView* graphView)
-                                                        string graphViewName)
+                                                        GraphView* graphView)
 {
-    // return getAttributesFromClusterNode(destinationID, vertexIDs, attrNames, graphView, true);
-    return getAttributesFromClusterNode(destinationID, vertexIDs, attrNames, graphViewName, true);
+    return getAttributesFromClusterNode(destinationID, vertexIDs, attrNames, graphView, true);
 }
 
 /*
@@ -662,11 +660,9 @@ Table* VoltDBEngine::getVertexAttributesFromClusterNode(long destinationID,
 Table* VoltDBEngine::getEdgeAttributesFromClusterNode(long destinationID,
                                                       vector<int> edgeIDs,
                                                       vector<string> attrNames,
-                                                      // GraphView* graphView)
-                                                      string graphViewName)
+                                                      GraphView* graphView)
 {
-    // return getAttributesFromClusterNode(destinationID, edgeIDs, attrNames, graphView, false);
-    return getAttributesFromClusterNode(destinationID, edgeIDs, attrNames, graphViewName, false);
+    return getAttributesFromClusterNode(destinationID, edgeIDs, attrNames, graphView, false);
 }
 
 /*
@@ -680,22 +676,22 @@ Table* VoltDBEngine::getEdgeAttributesFromClusterNode(long destinationID,
 Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
                                                   vector<int> vertexOrEdgeIDs,
                                                   vector<string> attrNames,
-                                                  // GraphView* graphView,
-                                                  string graphViewName,
+                                                  GraphView* graphView,
                                                   bool isVertex)
 {
     int sourceHostID = (int)(getSiteId());
     int destinationHostID = (int)(destinationID);
-    // if (destinationID < 0 || (getSiteId() == destinationID) || (sourceHostID == destinationHostID) || vertexOrEdgeIDs.empty() || graphView == NULL) {
-    if (destinationID < 0 || (getSiteId() == destinationID) || (sourceHostID == destinationHostID) || vertexOrEdgeIDs.empty() || graphViewName.empty()) {
+
+    if (destinationID < 0
+        || (getSiteId() == destinationID)
+        || (sourceHostID == destinationHostID)
+        || vertexOrEdgeIDs.empty()
+        || graphView == NULL) {
         return NULL;
     }
 
     //  sort vertex/edge IDs
     sort(vertexOrEdgeIDs.begin(), vertexOrEdgeIDs.end());
-
-    GraphView* graphView = getGraphView(graphViewName);
-    // cout << graphView->debug() << endl;
 
     //  mapping: graph view column index and name
     map<int32_t, string> mapIndexColumn;
@@ -715,8 +711,7 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
             string gvName = it->first;
             catalog::GraphView* gv = it->second;
 
-            // if (boost::iequals(gvName, graphView->name())) {
-            if (boost::iequals(gvName, graphViewName)) {
+            if (boost::iequals(gvName, graphView->name())) {
                 map<string, catalog::Column*>::const_iterator it2;
 
                 if (isVertex) {
@@ -752,22 +747,26 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
     int numDefaultVertexAttributes = 1;
     int numDefaultEdgeAttributes = 3;
 
-    if (isVertex) {
-        defaultAttrIndex = numDefaultVertexAttributes;
-    }
-    else {
-        defaultAttrIndex = numDefaultEdgeAttributes;
-    }
+    defaultAttrIndex = (isVertex) ? numDefaultVertexAttributes : numDefaultEdgeAttributes;
+
+    // if (isVertex) {
+    //     defaultAttrIndex = numDefaultVertexAttributes;
+    // }
+    // else {
+    //     defaultAttrIndex = numDefaultEdgeAttributes;
+    // }
 
     //  the original table of vertex or edge table
     Table* vertexOrEdgeTable;
 
-    if (isVertex) {
-        vertexOrEdgeTable = graphView->getVertexTable();
-    }
-    else {
-        vertexOrEdgeTable = graphView->getEdgeTable();
-    }
+    vertexOrEdgeTable = (isVertex) ? graphView->getVertexTable() : graphView->getEdgeTable();
+
+    // if (isVertex) {
+    //     vertexOrEdgeTable = graphView->getVertexTable();
+    // }
+    // else {
+    //     vertexOrEdgeTable = graphView->getEdgeTable();
+    // }
 
     //  a vector of attribute names
     for (int i = 0; i < vertexOrEdgeTable->columnCount(); i++) {
@@ -807,11 +806,10 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
                                                         vertexOrEdgeTable->getColumnNamesNonConst(),
                                                         &limit);
 
-    //  table name
     string tableName = vertexOrEdgeTable->nameNonConst();
 
     //  ask frontend to get table
-    int isRequestSuccessful = m_topend->invokeRequestTable(destinationID, tableName, graphViewName, requestTable, &m_stringPool);
+    int isRequestSuccessful = m_topend->invokeRequestTable(destinationID, tableName, graphView->name(), requestTable, &m_stringPool);
 
     if (isRequestSuccessful == 0) {
         return NULL;
@@ -836,12 +834,14 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
             //  the current column index to insert vertex/edge attribute
             int columnIndex;
 
-            if (isVertex) {
-                columnIndex = numDefaultVertexAttributes;
-            }
-            else {
-                columnIndex = numDefaultEdgeAttributes;
-            }
+            columnIndex = (isVertex) ? numDefaultVertexAttributes : numDefaultEdgeAttributes;
+
+            // if (isVertex) {
+            //     columnIndex = numDefaultVertexAttributes;
+            // }
+            // else {
+            //     columnIndex = numDefaultEdgeAttributes;
+            // }
 
             //  fill in default attributes, such as vertex/edge IDs
             for (int j = 0; j < columnIndex; j++) {

@@ -145,8 +145,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
         }
         //edgeAttrNamtes.push_back("CoursePrereqId");
 
-        // Table* out1 = m_engine->getVertexAttributesFromClusterNode(destinationID, vertexIDs, vertexAttrNames, graphView);
-        Table* out1 = m_engine->getVertexAttributesFromClusterNode(destinationID, vertexIDs, vertexAttrNames, graphView->name());
+        Table* out1 = m_engine->getVertexAttributesFromClusterNode(destinationID, vertexIDs, vertexAttrNames, graphView);
         if (!out1) {
           cout << "table 1 fails." << endl;
         }
@@ -154,8 +153,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
           cout << out1->debug() << endl;
         }
 
-        // Table* out2 = m_engine->getEdgeAttributesFromClusterNode(destinationID, edgeIDs, edgeAttrNamtes, graphView);
-        Table* out2 = m_engine->getEdgeAttributesFromClusterNode(destinationID, edgeIDs, edgeAttrNamtes, graphView->name());
+        Table* out2 = m_engine->getEdgeAttributesFromClusterNode(destinationID, edgeIDs, edgeAttrNamtes, graphView);
         if (!out1) {
           cout << "table 2 fails." << endl;
         }

@@ -365,7 +365,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     jstring graphViewName,
     jobject byteBuffer)
 {
-    if (!byteBuffer || !tableName || !graphViewName) {
+    if (!tableName || !graphViewName || !byteBuffer) {
         return 0;
     }
 
