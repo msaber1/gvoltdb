@@ -413,11 +413,10 @@ public class InitiatorMailbox implements Mailbox
         //  search for table (in the backend)
         long enginePointer = m_executionEngines.get(m_hsId);
         ByteBuffer bbTable = ByteBuffer.allocateDirect(1024);
-        int result = m_engine.nativeSearchRequestTable(enginePointer, message.getTableName(), message.getGraphViewName(), bbTable);
+        int result = m_engine.nativeSearchRequestTable(enginePointer, message.getTableName(), message.getGraphViewName(), message.getIsVertex(), bbTable);
 
         // System.out.println("View name in destination host: " + message.getGraphViewName());
         // System.out.println("Table find result: " + result);
-        System.out.println("Is Vertex: " + message.getIsVertex());
 
         //  print table in destination host
         // VoltTable table = new VoltTable(bbTable, true);

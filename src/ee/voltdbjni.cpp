@@ -363,6 +363,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     jlong engine_ptr,
     jstring tableName,
     jstring graphViewName,
+    jboolean isVertex,
     jobject byteBuffer)
 {
     if (!tableName || !graphViewName || !byteBuffer) {
@@ -371,7 +372,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
 
     VoltDBEngine *engine = castToEngine(engine_ptr);
 
-    Table* table = engine->searchRequestTable(env->GetStringUTFChars(tableName, 0), env->GetStringUTFChars(graphViewName, 0));
+    Table* table = engine->searchRequestTable(env->GetStringUTFChars(tableName, 0), env->GetStringUTFChars(graphViewName, 0), isVertex);
 
     if (!table) {
         return 0;

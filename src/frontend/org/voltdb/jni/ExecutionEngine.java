@@ -843,10 +843,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param pointer
      * @param tableName
      * @param graphViewName
+     * @param isVertex
      * @param buffer
      * @return error code
      */
-    public native int nativeSearchRequestTable(long pointer, String tableName, String graphViewName, ByteBuffer buffer);
+    public native int nativeSearchRequestTable(long pointer, String tableName, String graphViewName, boolean isVertex, ByteBuffer buffer);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.

@@ -853,9 +853,11 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
 
 /*
  *  Searches a requested table on the backend.
- *  @param  tableName   table name
+ *  @param  tableNameChar     table name in char
+ *  @param  graphViewNameChar graph view name in char
+ *  @param  isVertex
  */
-Table* VoltDBEngine::searchRequestTable(const char* tableNameChar, const char* graphViewNameChar)
+Table* VoltDBEngine::searchRequestTable(const char* tableNameChar, const char* graphViewNameChar, bool isVertex)
 {
     std::string tableName(tableNameChar);
     std::string graphViewName(graphViewNameChar);
@@ -870,19 +872,6 @@ Table* VoltDBEngine::searchRequestTable(const char* tableNameChar, const char* g
     cout << "Searching table in host " << (int)(this->getSiteId()) << endl;
 
     return table;
-
-    // catalog::Database* db = getDatabase();
-    // const catalog::CatalogMap<catalog::Table> & tables = static_cast<const catalog::CatalogMap<catalog::Table> &>(db->tables());
-    // map<string, catalog::Table*>::const_iterator it;
-    //
-    // //  check if table exists
-    // for (it = tables.begin(); it != tables.end(); it++) {
-    //     if (boost::iequals(tableName, it->first)) {
-    //         return getTable(tableName);
-    //     }
-    // }
-    //
-    // return NULL;
 }
 
 /*

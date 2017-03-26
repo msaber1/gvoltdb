@@ -203,7 +203,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         Table* getVertexAttributesFromClusterNode(long destinationID, vector<int> vertexIDs, vector<string> attrNames, GraphView* graphView);
         Table* getEdgeAttributesFromClusterNode(long destinationID, vector<int> edgeIDs, vector<string> attrNames, GraphView* graphView);
         Table* getAttributesFromClusterNode(long destinationID, vector<int> attrIDs, vector<string> attrNames, GraphView* graphView, bool isVertex);
-        Table* searchRequestTable(const char* tableNameChar, const char* graphViewNameChar);
+        Table* searchRequestTable(const char* tableNameChar, const char* graphViewNameChar, bool isVertex);
         int updateMapSitesToEngines(int64_t siteIds[], int64_t executionEngines[], int numSites);
         string generateRandomString(const int length) const;
         FallbackSerializeOutput* getRequestTableBuffer();
