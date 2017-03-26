@@ -136,6 +136,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
             vertexIDs.push_back(i*2);
         }
         //vertexAttrNames.push_back("CourseNum");
+        vertexAttrNames.push_back("lstName");
 
         //  edge attributes
         vector<int> edgeIDs;
@@ -144,6 +145,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
             edgeIDs.push_back(i);
         }
         //edgeAttrNamtes.push_back("CoursePrereqId");
+        edgeAttrNamtes.push_back("relative");
 
         Table* out1 = m_engine->getVertexAttributesFromClusterNode(destinationID, vertexIDs, vertexAttrNames, graphView);
         if (!out1) {

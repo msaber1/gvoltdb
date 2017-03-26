@@ -742,31 +742,14 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
     TempTableLimits limit(DEFAULT_TEMP_TABLE_MEMORY);
     vector<string> outputColumnNames;
 
-    //  map view column names to original column name
-    int defaultAttrIndex;
     int numDefaultVertexAttributes = 1;
     int numDefaultEdgeAttributes = 3;
 
-    defaultAttrIndex = (isVertex) ? numDefaultVertexAttributes : numDefaultEdgeAttributes;
-
-    // if (isVertex) {
-    //     defaultAttrIndex = numDefaultVertexAttributes;
-    // }
-    // else {
-    //     defaultAttrIndex = numDefaultEdgeAttributes;
-    // }
+    //  map view column names to original column name
+    int defaultAttrIndex = (isVertex) ? numDefaultVertexAttribut
 
     //  the original table of vertex or edge table
-    Table* vertexOrEdgeTable;
-
-    vertexOrEdgeTable = (isVertex) ? graphView->getVertexTable() : graphView->getEdgeTable();
-
-    // if (isVertex) {
-    //     vertexOrEdgeTable = graphView->getVertexTable();
-    // }
-    // else {
-    //     vertexOrEdgeTable = graphView->getEdgeTable();
-    // }
+    Table* vertexOrEdgeTable = (isVertex) ? graphView->getVertexTable() : graphView->getEdgeTable();
 
     //  a vector of attribute names
     for (int i = 0; i < vertexOrEdgeTable->columnCount(); i++) {
@@ -832,16 +815,7 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
             TableTuple tempTuple = outputTable->tempTuple();
 
             //  the current column index to insert vertex/edge attribute
-            int columnIndex;
-
-            columnIndex = (isVertex) ? numDefaultVertexAttributes : numDefaultEdgeAttributes;
-
-            // if (isVertex) {
-            //     columnIndex = numDefaultVertexAttributes;
-            // }
-            // else {
-            //     columnIndex = numDefaultEdgeAttributes;
-            // }
+            int columnIndex = (isVertex) ? numDefaultVertexAttributes : numDefaultEdgeAttributes;
 
             //  fill in default attributes, such as vertex/edge IDs
             for (int j = 0; j < columnIndex; j++) {
@@ -892,7 +866,6 @@ Table* VoltDBEngine::searchRequestTable(const char* tableNameChar, const char* g
 
     Table* table = getTable(tableName);
     GraphView* graphView = getGraphView(graphViewName);
-    cout << graphView->name() << endl;
 
     cout << "Searching table in host " << (int)(this->getSiteId()) << endl;
 
