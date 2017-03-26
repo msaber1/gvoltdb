@@ -746,7 +746,7 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
     int numDefaultEdgeAttributes = 3;
 
     //  map view column names to original column name
-    int defaultAttrIndex = (isVertex) ? numDefaultVertexAttribut
+    int defaultAttrIndex = (isVertex) ? numDefaultVertexAttributes : numDefaultEdgeAttributes;
 
     //  the original table of vertex or edge table
     Table* vertexOrEdgeTable = (isVertex) ? graphView->getVertexTable() : graphView->getEdgeTable();
