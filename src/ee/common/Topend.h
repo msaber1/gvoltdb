@@ -79,7 +79,7 @@ class Topend {
     /** Calls the java method in org.voltdb.utils.Encoder */
     virtual std::string decodeBase64AndDecompress(const std::string& buffer) = 0;
 
-    virtual int invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, Table* destination, voltdb::Pool *stringPool) = 0;
+    virtual int invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, bool isVertex, Table* destination, voltdb::Pool *stringPool) = 0;
 
     virtual ~Topend()
     {
@@ -120,7 +120,7 @@ public:
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
-    int invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, Table* destination, voltdb::Pool *stringPool);
+    int invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, bool isVertex, Table* destination, voltdb::Pool *stringPool);
 
     std::queue<int32_t> partitionIds;
     std::queue<std::string> signatures;

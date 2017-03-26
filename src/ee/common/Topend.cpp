@@ -147,7 +147,7 @@ namespace voltdb {
         return "";
     }
 
-    int DummyTopend::invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, Table* destination, voltdb::Pool *stringPool)
+    int DummyTopend::invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, bool isVertex, Table* destination, voltdb::Pool *stringPool)
     {
         return 0;
     }

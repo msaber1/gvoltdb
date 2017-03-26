@@ -61,7 +61,7 @@ public:
 
     std::string decodeBase64AndDecompress(const std::string& buffer);
 
-    int invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, Table* destination, voltdb::Pool *stringPool);
+    int invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, bool isVertex, Table* destination, voltdb::Pool *stringPool);
 
 private:
     JNIEnv *m_jniEnv;

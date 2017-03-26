@@ -417,6 +417,7 @@ public class InitiatorMailbox implements Mailbox
 
         // System.out.println("View name in destination host: " + message.getGraphViewName());
         // System.out.println("Table find result: " + result);
+        System.out.println("Is Vertex: " + message.getIsVertex());
 
         //  print table in destination host
         // VoltTable table = new VoltTable(bbTable, true);
@@ -517,8 +518,9 @@ public class InitiatorMailbox implements Mailbox
      * @param destinationID
      * @param tableName
      * @param graphViewName
+     * @param isVertex
      */
-    public int sendRequest(long destinationID, String tableName, String graphViewName)
+    public int sendRequest(long destinationID, String tableName, String graphViewName, boolean isVertex)
     {
         int hostID = (int)(destinationID);
 
@@ -533,7 +535,7 @@ public class InitiatorMailbox implements Mailbox
         long range = 999999999L;
         long txnId = ThreadLocalRandom.current().nextLong(range);
         long uniqueId = ThreadLocalRandom.current().nextLong(range);
-        RequestDataMessage requestMessage = new RequestDataMessage(sourceId, destinationID, tableName, graphViewName, txnId<<32, uniqueId<<32, false, false);
+        RequestDataMessage requestMessage = new RequestDataMessage(sourceId, destinationID, tableName, graphViewName, isVertex, txnId<<32, uniqueId<<32, false, false);
 
         send(destinationID, requestMessage);
 

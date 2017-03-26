@@ -32,6 +32,7 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     private long m_destinationSiteId;
     private String m_tableName;
     private String m_graphViewName;
+    private boolean m_isVertex;
 
     // Empty constructor for de-serialization
     RequestDataMessage() {
@@ -42,6 +43,7 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
                               long destinationSiteId,
                               String tableName,
                               String graphViewName,
+                              boolean isVertex,
                               long txnId,
                               long uniqueId,
                               boolean isReadOnly,
@@ -51,6 +53,7 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         m_destinationSiteId = destinationSiteId;
         m_tableName = tableName;
         m_graphViewName = graphViewName;
+        m_isVertex = isVertex;
         m_subject = Subject.DEFAULT.getId();
     }
 
@@ -86,6 +89,10 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         return m_graphViewName;
     }
 
+    public boolean getIsVertex() {
+        return m_isVertex;
+    }
+
     public long getSourceSiteId() {
         return m_sourceSiteId;
     }
@@ -109,10 +116,11 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     //             + ? (table name)
     //             + 4 (graph view name length)
     //             + ? (graph view name)
+    //             + 1 (isVertex)
     @Override
     public int getSerializedSize()
     {
-        int additional = 4 + m_tableName.length() + 4 + m_graphViewName.length();
+        int additional = 4 + m_tableName.length() + 4 + m_graphViewName.length() + 1;
         return super.getSerializedSize() + additional;
     }
 
@@ -142,6 +150,9 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
 
         //  graph view name
         buf.put(m_graphViewName.getBytes());
+
+        //  the type of requested table (vertex or edge)
+        buf.put((byte) ((m_isVertex == true) ? 1 : 0));
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -173,5 +184,9 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         byte[] bytes2 = new byte[graphViewNameLength];
         buf.get(bytes2);
         m_graphViewName = new String(bytes2);
+
+        //  the type of requested table (vertex or edge)
+        byte isVertex = buf.get();
+        m_isVertex = (isVertex == 1) ? true : false;
     }
 }

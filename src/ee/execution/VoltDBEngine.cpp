@@ -792,7 +792,7 @@ Table* VoltDBEngine::getAttributesFromClusterNode(long destinationID,
     string tableName = vertexOrEdgeTable->nameNonConst();
 
     //  ask frontend to get table
-    int isRequestSuccessful = m_topend->invokeRequestTable(destinationID, tableName, graphView->name(), requestTable, &m_stringPool);
+    int isRequestSuccessful = m_topend->invokeRequestTable(destinationID, tableName, graphView->name(), isVertex, requestTable, &m_stringPool);
 
     if (isRequestSuccessful == 0) {
         return NULL;
@@ -865,7 +865,7 @@ Table* VoltDBEngine::searchRequestTable(const char* tableNameChar, const char* g
     }
 
     Table* table = getTable(tableName);
-    GraphView* graphView = getGraphView(graphViewName);
+    // GraphView* graphView = getGraphView(graphViewName);
 
     cout << "Searching table in host " << (int)(this->getSiteId()) << endl;
 

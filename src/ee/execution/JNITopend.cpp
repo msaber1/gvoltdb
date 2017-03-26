@@ -225,7 +225,7 @@ JNITopend::JNITopend(JNIEnv *env, jobject caller) : m_jniEnv(env), m_javaExecuti
     }
 
     //  specify the type and the order of arguments of a frontend function that will be called by the backend
-    m_requestTableMID = m_jniEnv->GetMethodID(m_javaExecutionEngineClass, "requestTable", "(JLjava/lang/String;Ljava/lang/String;)[B");
+    m_requestTableMID = m_jniEnv->GetMethodID(m_javaExecutionEngineClass, "requestTable", "(JLjava/lang/String;Ljava/lang/String;Z)[B");
     if (m_requestTableMID == NULL) {
         m_jniEnv->ExceptionDescribe();
         assert(m_requestTableMID != NULL);
@@ -597,7 +597,7 @@ int JNITopend::reportDRConflict(int32_t partitionId, int32_t remoteClusterId, in
  *  Invokes Java function that sends a message to request data from other cluster nodes.
  *  Returns a table holding the data.
  */
-int JNITopend::invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, Table* requestTable, voltdb::Pool *stringPool)
+int JNITopend::invokeRequestTable(long destinationID, std::string tableName, std::string graphViewName, bool isVertex, Table* requestTable, voltdb::Pool *stringPool)
 {
     VOLT_DEBUG("requesting data to site id %d", destinationID);
 
@@ -614,7 +614,7 @@ int JNITopend::invokeRequestTable(long destinationID, std::string tableName, std
     jstring graphViewNameToJava = m_jniEnv->NewStringUTF(graphViewName.c_str());
 
     //  calls frontend to obtain requested table
-    jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine, m_requestTableMID, destinationID, tableNameToJava, graphViewNameToJava));
+    jbyteArray jbuf = (jbyteArray)(m_jniEnv->CallObjectMethod(m_javaExecutionEngine, m_requestTableMID, destinationID, tableNameToJava, graphViewNameToJava, isVertex));
 
     if (!jbuf) {
         return 0;

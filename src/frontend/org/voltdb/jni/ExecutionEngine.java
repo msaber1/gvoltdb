@@ -511,10 +511,11 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param destinationID
      * @param tableName
      * @param graphViewName
+     * @param isVertex
      * @return VoltTable serialized in byte array
      */
-    public byte[] requestTable(long destinationID, String tableName, String graphViewName) throws InterruptedException {
-        int sendResult = m_mailbox.sendRequest(destinationID, tableName, graphViewName);
+    public byte[] requestTable(long destinationID, String tableName, String graphViewName, boolean isVertex) throws InterruptedException {
+        int sendResult = m_mailbox.sendRequest(destinationID, tableName, graphViewName, isVertex);
 
         //  invalid host ID
         if (sendResult == 0) {

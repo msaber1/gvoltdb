@@ -149,7 +149,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
 
         Table* out1 = m_engine->getVertexAttributesFromClusterNode(destinationID, vertexIDs, vertexAttrNames, graphView);
         if (!out1) {
-          cout << "table 1 fails." << endl;
+          cout << "vertex table fails." << endl;
         }
         else {
           cout << out1->debug() << endl;
@@ -157,7 +157,7 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
 
         Table* out2 = m_engine->getEdgeAttributesFromClusterNode(destinationID, edgeIDs, edgeAttrNamtes, graphView);
         if (!out1) {
-          cout << "table 2 fails." << endl;
+          cout << "edge table fails." << endl;
         }
         else {
           cout << out2->debug() << endl;
