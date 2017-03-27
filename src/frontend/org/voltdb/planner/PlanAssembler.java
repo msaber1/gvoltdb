@@ -1702,7 +1702,8 @@ public class PlanAssembler {
         // Adjust the differentiator fields of TVEs, since they need to reflect
         // the inlined projection node in scan nodes.
         for (TupleValueExpression tve : allTves) {
-            if ( ! tve.needsDifferentiation() ) {
+            //System.out.println("PlanAssembler 1705 "+tve.getColumnName()+" "+tve.getColumnIndex()+" "+tve.needsDifferentiation());;
+        	if ( ! tve.needsDifferentiation() ) {
                 // PartitionByPlanNode and a following OrderByPlanNode
                 // can have an internally generated RANK column.  These do not need
                 // to have their differentiator updated, since its only used for disambiguation in some

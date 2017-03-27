@@ -31,6 +31,8 @@ public:
 	void addOutEdge(Edge* edge);
 	void addInEdge(Edge* edge);
 	string toString();
+
+	int Level; //used for BFS
 };
 
 }

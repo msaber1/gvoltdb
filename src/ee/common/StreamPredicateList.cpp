@@ -22,6 +22,7 @@
 #include "StreamPredicateList.h"
 #include "expressions/abstractexpression.h"
 #include "common/PlannerDomValue.h"
+#include "logging/LogManager.h"
 
 namespace voltdb
 {
@@ -41,6 +42,7 @@ bool StreamPredicateList::parseStrings(
          iter != predicateStrings.end(); ++iter) {
         bool predFailed = false;
         std::string predicateString = *iter;
+        LogManager::GLog("StreamPredicateList", "parseStrings", 44, predicateString);
         if (!predicateString.empty()) {
             try {
                 PlannerDomRoot domRoot((*iter).c_str());

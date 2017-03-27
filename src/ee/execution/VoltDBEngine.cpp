@@ -417,7 +417,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
 {
 	std::stringstream params;
 	params << "numFragments = " << numFragments;
-	LogManager::GLog("VoltDBEngine", "executePlanFragment(s)", 410, params.str());
+
+	LogManager::GLog("VoltDBEngine", "executePlanFragment(s)!", 410, params.str());
     // count failures
     int failures = 0;
 
@@ -436,6 +437,9 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_tuplesProcessedInBatch = 0;
     m_tuplesProcessedInFragment = 0;
     m_tuplesProcessedSinceReport = 0;
+
+    timeval begin, end;
+    gettimeofday (&begin, NULL);
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
@@ -470,6 +474,15 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         m_stringPool.purge();
     }
 
+    gettimeofday (&end, NULL);
+
+    double totalTimeInMilliSeconds =  ((double)(end.tv_usec - begin.tv_usec) / 1000.0) + ((double)(end.tv_sec - begin.tv_sec) * 1000.0);
+    std::stringstream execTimeString;
+    execTimeString << "execution time in milliseconds = " << totalTimeInMilliSeconds;
+
+    LogManager::GLog("VoltDBEngine", "executePlanFragment(s)!", 483, "End of execution!");
+    LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, execTimeString.str().c_str());
+    LogManager::GLog("VoltDBEngine", "executePlanFragment(s)!", 485, execTimeString.str());
     return failures;
 }
 
@@ -482,6 +495,7 @@ int VoltDBEngine::executePlanFragment(int64_t planfragmentId,
                                       bool first,
                                       bool last)
 {
+	//LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, "This is my Testing, Warn!");
 	std::stringstream params;
 	params << "planFragmentId = " << planfragmentId;
 	LogManager::GLog("VoltDBEngine", "executePlanFragment", 477, params.str());

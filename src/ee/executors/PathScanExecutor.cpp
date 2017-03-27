@@ -30,6 +30,7 @@
 #include "plannodes/projectionnode.h"
 #include "plannodes/limitnode.h"
 #include "graph/PathIterator.h"
+
 //#include "common/NValue.hpp"
 //#include "common/ValuePeeker.hpp"
 //#include "common/ValueFactory.hpp"
@@ -48,7 +49,8 @@ bool PathScanExecutor::p_init(AbstractPlanNode *abstractNode,
 	assert(isSubquery || node->getTargetGraphView());
 	assert((! isSubquery) || (node->getChildren().size() == 1));
 	graphView = node->getTargetGraphView();
-
+	graphView->fromVertexId = node->getStartVertexId();
+	graphView->traversalDepth = node->getEndVertexId();
 	//
 	// OPTIMIZATION: If there is no predicate for this SeqScan,
 	// then we want to just set our OutputTable pointer to be the
@@ -192,7 +194,8 @@ bool PathScanExecutor::p_execute(const NValueArray &params)
 			//
 			// For each tuple we need to evaluate it against our predicate and limit/offset
 			//
-			if (postfilter.eval(&tuple, NULL))
+			//TODO: uncomment after fixing the path filter FE and EE code
+			//if (postfilter.eval(&tuple, NULL))
 			{
 				//
 				// Nested Projection

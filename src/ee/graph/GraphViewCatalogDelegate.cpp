@@ -89,7 +89,7 @@ GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Data
 		 col_iterator++)
 	{
 		const catalog::Column *catalog_column = col_iterator->second;
-		colIndex = catalog_column->index();
+		//colIndex = catalog_column->index();
 		columnNamesVertex[colIndex] = catalog_column->name();
 
 		std::stringstream params;
@@ -104,10 +104,11 @@ GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Data
 		}
 
 		LogManager::GLog("GraphViewCatalogDelegate", "constructGraphViewFromCatalog", 105, params.str());
+		colIndex++;
 	}
 
 
-
+	colIndex = 0;
 	numColumns = catalogGraphView.EdgeProps().size();
 	vector<string> columnNamesEdge(numColumns);
 	vector<int> columnIdsInEdgeTable(catalogGraphView.ETable()->columns().size());
@@ -116,7 +117,7 @@ GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Data
 			 col_iterator++)
 	{
 		const catalog::Column *catalog_column = col_iterator->second;
-		colIndex = catalog_column->index();
+		//colIndex = catalog_column->index();
 		columnNamesEdge[colIndex] = catalog_column->name();
 
 		std::stringstream params;
@@ -131,12 +132,16 @@ GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Data
 		}
 
 		LogManager::GLog("GraphViewCatalogDelegate", "constructGraphViewFromCatalog", 131, params.str());
+		colIndex++;
 	}
 
 
 	// get the schema
-	TupleSchema *vSchema = createOutputVertexTupleSchema(catalogDatabase, catalogGraphView);
-	TupleSchema *eSchema = createOutputEdgeTupleSchema(catalogDatabase, catalogGraphView);
+	//TODO: we will uncomment the code below when the graph attributes indexes are fixed
+	//TupleSchema *vSchema = createOutputVertexTupleSchema(catalogDatabase, catalogGraphView);
+	//TupleSchema *eSchema = createOutputEdgeTupleSchema(catalogDatabase, catalogGraphView);
+	TupleSchema *vSchema = NULL;
+	TupleSchema *eSchema = NULL;
 
 	//const string& graphViewName = catalogGraphView.name();
 	int32_t databaseId = catalogDatabase.relativeIndex();
@@ -252,11 +257,14 @@ TupleSchema *GraphViewCatalogDelegate::createOutputEdgeTupleSchema(catalog::Data
 
 	map<string, catalog::Column*>::const_iterator col_iterator;
 	int colIndex = 0;
+	int numOfVertexProps = catalogGraphView.VertexProps().size();
 	for (col_iterator = cols.begin();
 		 col_iterator != cols.end(); col_iterator++) {
 
 		const catalog::Column *catalog_column = col_iterator->second;
-		colIndex = catalog_column->index();
+		//TODO: the following line depends on having the FF to start the first edge prop index
+		//starting from n, where n-1 is the last index of a vertex property (also n is the # vertex properties)
+		colIndex = catalog_column->index() - numOfVertexProps;
 		schemaBuilder.setColumnAtIndex(colIndex,
 									   static_cast<ValueType>(catalog_column->type()),
 									   static_cast<int32_t>(catalog_column->size()),

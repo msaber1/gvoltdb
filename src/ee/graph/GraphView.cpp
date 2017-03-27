@@ -11,6 +11,8 @@
 #include "Vertex.h"
 #include "Edge.h"
 #include <string>
+
+#include <queue>
 using namespace std;
 
 namespace voltdb
@@ -210,6 +212,7 @@ PathIterator& GraphView::iteratorDeletingAsWeGo(GraphOperationType opType)
 {
 	//empty the paths table, which is the staging memory for the paths to be explored
 	dummyPathExapansionState = 0;
+	traverseBFS = true;
 	m_pathTable->deleteAllTempTupleDeepCopies();
 	//set the iterator for the temp table
 	//create new tuple in the paths temp table
@@ -225,8 +228,8 @@ void GraphView::expandCurrentPathOperation()
 	//new entries should be added to the paths temp table
 	//adding no new entries means that the exploration is completely done
 	//and the iterator will have hasNext evaluated to false
-	std::stringstream paramsToPrint;
-
+	//std::stringstream paramsToPrint;
+	/*
 	if(dummyPathExapansionState < 6)
 	{
 		//create new tuple in the paths temp table
@@ -236,11 +239,68 @@ void GraphView::expandCurrentPathOperation()
 		temp_tuple.setNValue(1, ValueFactory::getIntegerValue(dummyPathExapansionState + 11));
 		temp_tuple.setNValue(2, ValueFactory::getIntegerValue(dummyPathExapansionState + 16));
 		temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(dummyPathExapansionState + 21)));
-
+		temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
 		m_pathTable->insertTempTuple(temp_tuple);
-
+		paramsToPrint << "current tuple count in m_pathTable = " << m_pathTable->activeTupleCount();
+		LogManager::GLog("GraphView", "expandCurrentPathOperation", 242,
+									paramsToPrint.str());
+		paramsToPrint.clear();
 		dummyPathExapansionState++;
 	}
+	*/
+	if(traverseBFS)
+	{
+		this->BFS(this->fromVertexId, this->traversalDepth);
+	}
+}
+
+void GraphView::BFS(int startVertexId, int depth)
+{
+	queue<Vertex*> q;
+	int currentDepth = 1;
+	Vertex* currentVertex = this->getVertex(startVertexId);
+	if(NULL != currentVertex)
+	{
+		currentVertex->Level = 0;
+		q.push(currentVertex);
+		int fanOut;
+		Edge* outEdge = NULL;
+		Vertex* outVertex = NULL;
+		while(!q.empty() && currentVertex->Level < depth)
+		{
+			currentVertex = q.front();
+			q.pop();
+			fanOut = currentVertex->fanOut();
+			for(int i = 0; i < fanOut; i++)
+			{
+				outEdge = currentVertex->getOutEdge(i);
+				outVertex = outEdge->getEndVertex();
+				outVertex->Level = currentVertex->Level + 1;
+				if(outVertex->Level == depth)
+				{
+					//Now, we reached the destination vertexes, where we should add tuples into the output table
+					TableTuple temp_tuple = m_pathTable->tempTuple();
+					//start vertex, end vertex, length, cost, path
+					temp_tuple.setNValue(0, ValueFactory::getIntegerValue(startVertexId));
+					temp_tuple.setNValue(1, ValueFactory::getIntegerValue(outVertex->getId()));
+					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(currentDepth));
+					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)currentDepth));
+					//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+					m_pathTable->insertTempTuple(temp_tuple);
+				}
+				else
+				{
+					//add to the queue, as currentDepth is less than depth
+					q.push(outVertex);
+				}
+			}
+		}
+	}
+	traverseBFS = false;
+
+	std::stringstream paramsToPrint;
+	paramsToPrint << "BFS: from = " << startVertexId << ", depth = " << depth << ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
+	LogManager::GLog("GraphView", "BFS", 302, paramsToPrint.str());
 }
 
 void GraphView::fillGraphFromRelationalTables()

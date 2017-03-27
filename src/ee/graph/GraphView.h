@@ -3,6 +3,9 @@
 
 #include <map>
 #include <string>
+#include <ctime>
+#include <sys/time.h>
+//#include <chrono>
 #include "storage/table.h"
 #include "storage/temptable.h"
 #include "graph/GraphTypes.h"
@@ -89,6 +92,10 @@ public:
 
 	void expandCurrentPathOperation();
 
+	//BFS
+	void BFS(int startVertexId, int depth);
+	int fromVertexId, traversalDepth;
+
 
 protected:
 	void fillGraphFromRelationalTables();
@@ -118,6 +125,7 @@ protected:
 	GraphOperationType currentPathOperationType;
 	//TODO: this should be removed
 	int dummyPathExapansionState = 0;
+	bool traverseBFS = false;
 	// identity information
 	CatalogId m_databaseId;
 	std::string m_name;

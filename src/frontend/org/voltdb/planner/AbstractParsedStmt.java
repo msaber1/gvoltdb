@@ -488,14 +488,19 @@ public abstract class AbstractParsedStmt {
         }
 
         String propertytype = exprNode.attributes.get("propertytype");
+        int objectidx = (exprNode.attributes.get("propertytypeidx") != null) ? 
+        					Integer.parseInt(exprNode.attributes.get("propertytypeidx")) : -1;
         
         TupleValueExpression expr;
-        if (propertytype == "vertex" )
+        if (propertytype == "vertex" )        	
 	        expr = new TupleValueExpression(tableName, tableAlias, "VERTEXES",
-	                columnName, columnAlias, -1, differentiator);
+	                columnName, columnAlias, -1, differentiator, objectidx);
         else if (propertytype == "edge" )
 	        expr = new TupleValueExpression(tableName, tableAlias, "EDGES",
-	                columnName, columnAlias, -1, differentiator);
+	                columnName, columnAlias, -1, differentiator, objectidx);
+        else if (propertytype == "path" || propertytype == "startvertex" || propertytype == "endvertex")
+	        expr = new TupleValueExpression(tableName, tableAlias, "PATHS",
+	                columnName, columnAlias, -1, differentiator, objectidx);
         else 
         	expr = new TupleValueExpression(tableName, tableAlias,
                     columnName, columnAlias, -1, differentiator);
@@ -516,7 +521,8 @@ public abstract class AbstractParsedStmt {
         
          
         if (propertytype == "vertex" || propertytype == "edge" || propertytype == "path" || 
-        	propertytype == "startvertex" || propertytype == "endvertex") {
+        	propertytype == "startvertex" || propertytype == "endvertex")
+        {
         	StmtTargetGraphScan graphScan = (StmtTargetGraphScan)tableScan;
         	graphScan.resolveTVE(expr, propertytype);
         	tableScan = (StmtTableScan)graphScan;
@@ -1261,6 +1267,8 @@ public abstract class AbstractParsedStmt {
        int endvertexid = -1;
        if (tableNode.attributes.get("startvertexid") != null) {
     	   startvertexid = Integer.parseInt(tableNode.attributes.get("startvertexid"));
+       }
+       if (tableNode.attributes.get("endvertexid") != null) {
     	   endvertexid = Integer.parseInt(tableNode.attributes.get("endvertexid"));
        }
        graphScan = addGraphToStmtCache(graph, tableAlias, object, hint, startvertexid, endvertexid);

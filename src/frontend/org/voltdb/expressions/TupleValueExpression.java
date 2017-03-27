@@ -36,16 +36,21 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     public enum Members {
         COLUMN_IDX,
+        GRAPH_OBJECT, // used to identify if an attribute belongs to either edge or vertex
+        GRAPH_OBJECT_IDX,   // id of edge/vertex in the ordered list of edges/vertexes in the path,e.g. Edge[0], Vertex[2]  
         TABLE_IDX,  // used for JOIN queries only, 0 for outer table, 1 for inner table
     }
 
     protected int m_columnIndex = -1;
     protected String m_tableName = null;
     protected String m_tableAlias = null;
-    protected String m_tableObject = null;  // GVoltDB extension - Vertexes or Edges for GraphView and null for table
     protected String m_columnName = null;
     protected String m_columnAlias = null;
     protected int m_tableIdx = 0;
+    
+    protected String m_graphObject = null;  // GVoltDB extension - Vertexes or Edges for GraphView and null for table
+    protected int m_graphObjectIdx = -1;          // Used if m_istableObjectAll = false
+    //protected boolean m_istableObjectAll = true; // True if all idx are included, false if idx is specified as Edges[2]
 
     // Tables that are not persistent tables, but those produced internally,
     // (by subqueries for example) may contains columns whose names are the same.
@@ -80,7 +85,7 @@ public class TupleValueExpression extends AbstractValueExpression {
         super(ExpressionType.VALUE_TUPLE);
         m_tableName = tableName;
         m_tableAlias = tableAlias;
-        m_tableObject = null;
+        m_graphObject = null;
         m_columnName = columnName;
         m_columnAlias = columnAlias;
         m_columnIndex = columnIndex;
@@ -103,15 +108,17 @@ public class TupleValueExpression extends AbstractValueExpression {
                                 String columnName,
                                 String columnAlias,
                                 int columnIndex,
-                                int differentiator) {
+                                int differentiator,
+                                int graphObjectIdx) {
         super(ExpressionType.VALUE_TUPLE);
         m_tableName = tableName;
         m_tableAlias = tableAlias;
-        m_tableObject = tableObject;
+        m_graphObject = tableObject;
         m_columnName = columnName;
         m_columnAlias = columnAlias;
         m_columnIndex = columnIndex;
         m_differentiator = differentiator;
+        m_graphObjectIdx = graphObjectIdx;
     }
 
     public TupleValueExpression(String tableName,
@@ -159,6 +166,8 @@ public class TupleValueExpression extends AbstractValueExpression {
         clone.m_columnAlias = m_columnAlias;
         clone.m_origStmtId = m_origStmtId;
         clone.m_differentiator = m_differentiator;
+        clone.m_graphObject = m_graphObject;
+        clone.m_graphObjectIdx = m_graphObjectIdx;
         return clone;
     }
 
@@ -330,6 +339,16 @@ public class TupleValueExpression extends AbstractValueExpression {
                 return false;
             }
         }
+        
+        if ((m_graphObject == null) != (expr.m_graphObject == null)) {
+            return false;
+        }
+        if (m_graphObject != null) { // Implying both sides non-null
+            if (m_graphObject.equals(expr.m_graphObject) == false) {
+                return false;
+            }
+        }
+        
         return true;
     }
 
@@ -343,6 +362,9 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (m_columnName != null) {
             result += m_columnName.hashCode();
         }
+        if (m_graphObject != null) {
+            result += m_graphObject.hashCode();
+        }
         // defer to the superclass, which factors in other attributes
         return result += super.hashCode();
     }
@@ -351,6 +373,12 @@ public class TupleValueExpression extends AbstractValueExpression {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.COLUMN_IDX.name()).value(m_columnIndex);
+        if (m_graphObject != null) {
+        	stringer.key(Members.GRAPH_OBJECT.name()).value(m_graphObject);
+        }
+        if (m_graphObjectIdx != -1) {
+        	stringer.key(Members.GRAPH_OBJECT_IDX.name()).value(m_graphObjectIdx);
+        }
         if (m_tableIdx > 0) {
             stringer.key(Members.TABLE_IDX.name()).value(m_tableIdx);
         }
@@ -397,14 +425,19 @@ public class TupleValueExpression extends AbstractValueExpression {
         	column = graph.getVertexprops().getExact(m_columnName);
         else if (type == "path")
         	column = graph.getPathprops().getExact(m_columnName);
-        	//column = graph.getVertexprops().getExact(m_columnName);
         else if (type == "startvertex" || type == "endvertex")
-        	column = graph.getVertexprops().getExact("ID");
+        	column = graph.getPathprops().getExact(m_columnName);
         else column = graph.getEdgeprops().getExact(m_columnName);
+        
+        //System.out.println("TVE ln 432: "+m_columnName+" "+type);
         
         assert(column != null);
         m_tableName = graph.getTypeName();
         m_columnIndex = column.getIndex();
+        
+        //System.out.println("TVE ln 436: "+m_columnName+" "+m_columnIndex+" "+type);
+        
+        // TODO GVoltDB assign graphObject, create unc in GraphView for that
 
         setTypeSizeBytes(column.getType(), column.getSize(), column.getInbytes());
     }
@@ -461,6 +494,9 @@ public class TupleValueExpression extends AbstractValueExpression {
         if (columnName == null || columnName.equals("")) {
             columnName = "column#" + m_columnIndex;
         }
+        
+        // TODO GVoltDB add graphObject to the explanation
+        
         if (m_verboseExplainForDebugging) {
             columnName += " (as JSON: ";
             JSONStringer stringer = new JSONStringer();
@@ -510,13 +546,12 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     private String chooseThreeNames(String name, String alias, String object) {
         if (name != null) {
-    		
-        	String fullname = (object != null)? name+"."+object : name;
         	
             if (alias != null && !name.equals(alias)) {
-                return String.format("%s(%s)", fullname, alias);
+                return (object != null)? String.format("%s(%s).%s", name, alias, object) : 
+                			String.format("%s(%s)", name, alias);// String.format("%s(%s)", fullname, alias);
             } else {
-                return fullname;
+                return (object != null)? name+"."+object : name;
             }
             
         } else if (alias != null) {
@@ -534,11 +569,15 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_needsDifferentiation = false;
     }
 
+    private String getGraphObjectInfo() {
+    	return (m_graphObjectIdx != -1)? "["+Integer.toString(m_graphObjectIdx)+"]": "";//"[0..*]";
+    }
+    
     @Override
     protected String getExpressionNodeNameForToString() {
-        return String.format("%s: %s.%s(index:%d, diff'tor:%d)",
+    	return String.format("%s: %s.%s(index:%d, diff'tor:%d)",
                              super.getExpressionNodeNameForToString(),
-                             chooseThreeNames(m_tableName, m_tableAlias, m_tableObject),
+                             chooseThreeNames(m_tableName, m_tableAlias, m_graphObject+getGraphObjectInfo()),
                              chooseTwoNames(m_columnName, m_columnAlias),
                              m_columnIndex, m_differentiator);
     }

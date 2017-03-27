@@ -49,6 +49,7 @@
 #include "common/serializeio.h"
 #include "common/types.h"
 #include "expressions/expressionutil.h"
+#include "logging/LogManager.h"
 
 #include <sstream>
 #include <cassert>
@@ -147,6 +148,8 @@ AbstractExpression::buildExpressionTree(PlannerDomValue obj)
 
     if (exp)
         exp->initParamShortCircuits();
+
+    LogManager::GLog("AbstractExpression", "buildExpressionTree", 152, exp->debug(true));
     return exp;
 }
 

@@ -34,7 +34,8 @@ GraphView* GraphViewFactory::createGraphView(const std::string &graphViewName, c
 	vw->constructPathTempTable();
 
 	//set the vertex column names
-	int vColumnCount = vSchema->columnCount();
+	//int vColumnCount = vSchema->columnCount();
+	int vColumnCount = vertexColumnNames.size();
 	vw->m_vertexColumnNames.resize(vColumnCount);
 
 	for(int i = 0; i < vColumnCount; i++)
@@ -51,7 +52,8 @@ GraphView* GraphViewFactory::createGraphView(const std::string &graphViewName, c
 	}
 
 	//set the edges columns
-	int eColumnCount = eSchema->columnCount();
+	//int eColumnCount = eSchema->columnCount();
+	int eColumnCount = edgeColumnNames.size();
 	vw->m_edgeColumnNames.resize(eColumnCount);
 
 	for(int i = 0; i < eColumnCount; i++)
@@ -67,6 +69,7 @@ GraphView* GraphViewFactory::createGraphView(const std::string &graphViewName, c
 		vw->m_columnIDsInEdgeTable[i] = columnIdsInEdgeTable[i];
 	}
 
+
 	for(int i = 0; i < vw->m_vertexColumnNames.size(); i++)
 	{
 		if (vw->m_vertexColumnNames[i] == "ID")
@@ -75,6 +78,8 @@ GraphView* GraphViewFactory::createGraphView(const std::string &graphViewName, c
 			break;
 		}
 	}
+	//TODO: fix issue by setting vw->m_vertexIdColumnIndex dynamically
+	vw->m_vertexIdColumnIndex = 0;
 
 	for(int i = 0; i < vw->m_edgeColumnNames.size(); i++)
 	{
