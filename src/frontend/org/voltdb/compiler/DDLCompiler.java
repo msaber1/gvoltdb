@@ -2045,7 +2045,7 @@ public class DDLCompiler {
         String typename = node.attributes.get("valuetype");
         String nullable = node.attributes.get("nullable");
         String sizeString = node.attributes.get("size");
-        int index = Integer.valueOf(node.attributes.get("index"));
+        int index = Integer.valueOf(node.attributes.get("index0"));
         String defaultvalue = null;
         String defaulttype = null;
 

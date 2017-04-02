@@ -474,14 +474,21 @@ public abstract class AbstractParsedStmt {
         String usingAttr = exprNode.attributes.get("using");
         boolean isUsingColumn = usingAttr != null ? Boolean.parseBoolean(usingAttr) : false;
 
+        // GVoltDB uses index0 for graphs
+        int idx = Integer.parseInt(exprNode.attributes.get("index"));
+        if (exprNode.attributes.containsKey("index0") && Integer.parseInt(exprNode.attributes.get("index0")) != -1) {
+        	idx = Integer.parseInt(exprNode.attributes.get("index0"));
+        }
+        
         // Use the index produced by HSQL as a way to differentiate columns that have
-        // the same name with a single table (which can happen for subqueries containing joins).
-        int differentiator = Integer.parseInt(exprNode.attributes.get("index"));
+        // the same name with a single table (which can happen for subqueries containing joins).        
+        int differentiator = idx;
+        
         if (differentiator == -1 && isUsingColumn) {
             for (VoltXMLElement usingElem : exprNode.children) {
                 String usingTableAlias = usingElem.attributes.get("tablealias");
                 if (usingTableAlias != null && usingTableAlias.equals(tableAlias)) {
-                    differentiator = Integer.parseInt(usingElem.attributes.get("index"));
+                    differentiator = idx;
                 }
             }
         }

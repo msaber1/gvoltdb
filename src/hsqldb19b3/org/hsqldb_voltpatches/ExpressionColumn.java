@@ -59,7 +59,8 @@ public class ExpressionColumn extends Expression {
     String        columnName;
     RangeVariable rangeVariable;
     String        objectName;
-    int           objectIdx = -1; //id of edge/vertex in the ordered list of edges/vertexes in the path,e.g. Edge[0], Vertex[2]  
+    int           objectIdx = -1; //id of edge/vertex in the ordered list of edges/vertexes in the path,e.g. Edge[0], Vertex[2]
+    int           columnIndex0 = -1;
 
     //
     NumberSequence sequence;
@@ -169,6 +170,7 @@ public class ExpressionColumn extends Expression {
 	        GraphView graph = range.getGraph();
 	        tableName   = graph.getName().name;
 	        schema      = graph.getSchemaName().name;
+	        columnIndex0 = graph.getPropIndex0(columnIndex);
         } else {
 	        Table table = range.getTable();
 	        tableName   = table.getName().name;
@@ -1362,6 +1364,7 @@ public class ExpressionColumn extends Expression {
             exp.attributes.put("tablealias",  rangeVariable.tableAlias.name.toUpperCase());
         }
         exp.attributes.put("index", Integer.toString(columnIndex));
+        exp.attributes.put("index0", Integer.toString(columnIndex0));
         return exp;
     }
     /**********************************************************************/
