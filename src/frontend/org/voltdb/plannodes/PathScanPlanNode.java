@@ -17,12 +17,22 @@ public class PathScanPlanNode extends SeqScanPlanNode {
     public enum Members {
     	HINT,
     	STARTVERTEX,
-    	ENDVERTEX;
+    	ENDVERTEX,
+    	PROP1,
+    	PROP2,
+    	PROP3,
+    	PROP4,
+    	PROP5,;
     }
     
     String hint;
     int startvertexid;
     int endverexid;
+    int prop1;
+    int prop2;
+    int prop3;
+    int prop4;
+    int prop5;
 	
     public PathScanPlanNode() {
         super();
@@ -35,6 +45,11 @@ public class PathScanPlanNode extends SeqScanPlanNode {
         hint = graphScan.getHint();
         startvertexid = graphScan.getStartvertexid();
         endverexid = graphScan.getEndvertexid();
+        prop1 = graphScan.getProp1();
+        prop2 = graphScan.getProp2();
+        prop3 = graphScan.getProp3();
+        prop4 = graphScan.getProp4();
+        prop5 = graphScan.getProp5();
     }
 
     public PathScanPlanNode(String tableName, String tableAlias) {
@@ -135,5 +150,10 @@ public class PathScanPlanNode extends SeqScanPlanNode {
         stringer.key(Members.HINT.name()).value(hint);
         stringer.key(Members.STARTVERTEX.name()).value(startvertexid);
         stringer.key(Members.ENDVERTEX.name()).value(endverexid);
+        stringer.key(Members.PROP1.name()).value(prop1);
+        stringer.key(Members.PROP2.name()).value(prop2);
+        stringer.key(Members.PROP3.name()).value(prop3);
+        stringer.key(Members.PROP4.name()).value(prop4);
+        stringer.key(Members.PROP5.name()).value(prop5);
     }
 }

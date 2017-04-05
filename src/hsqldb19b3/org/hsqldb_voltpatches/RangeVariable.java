@@ -56,6 +56,14 @@ import org.hsqldb_voltpatches.types.Type;
  */
 final class RangeVariable {
 
+	//
+	private final String c_PROP1 = "PROP1";
+	private final String c_PROP2 = "PROP2";
+	private final String c_PROP3 = "PROP3";
+	private final String c_PROP4 = "PROP4";
+	private final String c_PROP5 = "PROP5";
+	//
+	
     static final RangeVariable[] emptyArray = new RangeVariable[]{};
 
     //
@@ -1505,19 +1513,47 @@ final class RangeVariable {
      * used by voltGetGraphRangeVariableXML
      */
     void updatescan(VoltXMLElement cond, VoltXMLElement scan) {
+    	
     	for (VoltXMLElement c: cond.children) {
-        	if (c.attributes.get("optype") == "and")
+    		if (c.attributes.get("optype") == "and")
         		updatescan(c, scan);
         	else if (c.attributes.get("optype") == "equal") {
 				int i = 0;
 				for (VoltXMLElement ccc: c.children) {
-					if (ccc.attributes.get("column") == "STARTVERTEXID") {
+					if (ccc.attributes.containsKey("column") && 
+						ccc.attributes.get("column").equals("STARTVERTEXID")) {
 						VoltXMLElement value = c.children.get(i+1);
 						scan.attributes.put("startvertexid", value.attributes.get("value"));
 					}
-					else if (ccc.attributes.get("column") == "ENDVERTEXID") {
+					else if (ccc.attributes.containsKey("column") && 
+							 ccc.attributes.get("column").equals("ENDVERTEXID")) {
 						VoltXMLElement value = c.children.get(i+1);
 						scan.attributes.put("endvertexid", value.attributes.get("value"));
+					}
+					else if (ccc.attributes.containsKey("column") && 
+							 ccc.attributes.get("column").equals(c_PROP1)) {
+						VoltXMLElement value = c.children.get(i+1);
+						scan.attributes.put("prop1", value.attributes.get("value"));
+					}
+					else if (ccc.attributes.containsKey("column") && 
+							 ccc.attributes.get("column").equals(c_PROP2)) {
+						VoltXMLElement value = c.children.get(i+1);
+						scan.attributes.put("prop2", value.attributes.get("value"));
+					}
+					else if (ccc.attributes.containsKey("column") && 
+							 ccc.attributes.get("column").equals(c_PROP3)) {
+						VoltXMLElement value = c.children.get(i+1);
+						scan.attributes.put("prop3", value.attributes.get("value"));
+					}
+					else if (ccc.attributes.containsKey("column") && 
+							 ccc.attributes.get("column").equals(c_PROP4)) {
+						VoltXMLElement value = c.children.get(i+1);
+						scan.attributes.put("prop4", value.attributes.get("value"));
+					}
+					else if (ccc.attributes.containsKey("column") && 
+							 ccc.attributes.get("column").equals(c_PROP5)) {
+						VoltXMLElement value = c.children.get(i+1);
+						scan.attributes.put("prop5", value.attributes.get("value"));
 					}
 					i++;
 				}
@@ -1608,8 +1644,6 @@ final class RangeVariable {
             VoltXMLElement joinCondEl = new VoltXMLElement("joincond");
             
             VoltXMLElement cond = joinCond.voltGetXML(session);
-            
-            //System.out.print("XML joinCond : " + cond);
             
             updatescan(cond, scan);
             /*

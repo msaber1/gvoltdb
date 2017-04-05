@@ -22,11 +22,17 @@ public class StmtTargetGraphScan extends StmtTableScan {
     private final String m_hint;
     private final int m_startvertexid;
     private final int m_endvertexid;
+    private final int m_prop1;
+    private final int m_prop2;
+    private final int m_prop3;
+    private final int m_prop4;
+    private final int m_prop5;
     private List<Index> m_indexes;
     private List<Column> m_columns;
 
     public StmtTargetGraphScan(GraphView graph, String tableAlias, int stmtId, String object,
-    		                   String hint, int startvertexid, int endvertexid
+    		                   String hint, int startvertexid, int endvertexid,
+    		                   int prop1, int prop2, int prop3, int prop4,int prop5
     		                   ) {
         super(tableAlias, stmtId);
         assert (graph != null);
@@ -35,12 +41,17 @@ public class StmtTargetGraphScan extends StmtTableScan {
         m_hint = hint;
         m_startvertexid = startvertexid;
         m_endvertexid = endvertexid;
+        m_prop1 = prop1;
+        m_prop2 = prop2;
+        m_prop3 = prop3;
+        m_prop4 = prop4;
+        m_prop5 = prop5;
 
         //findPartitioningColumns();
     }
 
     public StmtTargetGraphScan(GraphView graph, String tableAlias) {
-        this(graph, tableAlias, 0, null, null, -1, -1);
+        this(graph, tableAlias, 0, null, null, -1, -1, -1, -1, -1, -1, -1);
     }
 
     public String getHint() {
@@ -54,7 +65,27 @@ public class StmtTargetGraphScan extends StmtTableScan {
 	public int getEndvertexid() {
 		return m_endvertexid;
 	}
-    
+
+	public int getProp1() {
+		return m_prop1;
+	}
+	
+	public int getProp2() {
+		return m_prop2;
+	}
+	
+	public int getProp3() {
+		return m_prop3;
+	}
+	
+	public int getProp4() {
+		return m_prop4;
+	}
+	
+	public int getProp5() {
+		return m_prop5;
+	}
+	
     @Override
     public String getTableName() {
         return m_graph.getTypeName();
