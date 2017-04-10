@@ -382,7 +382,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     }
 
     //  return serialized table
-    size_t serializeSize = table->getAccurateSizeToSerialize(false);
+    size_t serializeSize = table->getAccurateSizeToSerialize(true);
     FallbackSerializeOutput* out2 = engine->getRequestTableBuffer();
     out2->initializeWithPosition(env->GetDirectBufferAddress(byteBuffer), serializeSize, 0);
     table->serializeToWithoutTotalSize(*out2);

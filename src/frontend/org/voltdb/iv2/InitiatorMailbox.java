@@ -428,23 +428,19 @@ public class InitiatorMailbox implements Mailbox
           bbTable.rewind();
           clone.flip();
 
-          byte[] bytes = clone.array();
-          byte[] output = new byte[bytes.length];
-          System.arraycopy(bytes, 0, output, 0, bytes.length);
+          // byte[] bytes = clone.array();
+          // byte[] output = new byte[bytes.length];
+          // System.arraycopy(bytes, 0, output, 0, bytes.length);
 
-          VoltTable table = new VoltTable(clone, true);
-          System.out.println(table.toFormattedString());
+          //  print table in destination host
+          // VoltTable table = new VoltTable(clone, true);
+          // System.out.println(table.toFormattedString());
 
           bbTable = clone;
         }
         else {
           bbTable = null;
         }
-
-        // System.out.println("View name in destination host: " + message.getGraphViewName());
-        // System.out.println("Table find result: " + result);
-
-        //  print table in destination host
 
         //  add table buffer to the message
         response.setRequestTableBuffer(bbTable);
