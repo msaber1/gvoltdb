@@ -364,6 +364,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     jstring tableName,
     jstring graphViewName,
     jboolean isVertex,
+    jint tableSize,
     jobject byteBuffer)
 {
     if (!tableName || !graphViewName || !byteBuffer) {
@@ -383,6 +384,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     FallbackSerializeOutput* out2 = engine->getRequestTableBuffer();
     out2->initializeWithPosition(env->GetDirectBufferAddress(byteBuffer), serializeSize, 0);
     table->serializeToWithoutTotalSize(*out2);
+
+    //  store actual table size
+    tableSize = static_cast<int>(serializeSize);
 
     return 1;
 }
@@ -698,7 +702,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSeria
         jint table_id,
         jobject output_buffer,
         jint output_capacity) {
-    //VOLT_DEBUG("nativeSerializeTable() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     if (engine == NULL) {
         VOLT_ERROR("The VoltDBEngine pointer is null!");
