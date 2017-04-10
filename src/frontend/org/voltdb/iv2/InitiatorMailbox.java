@@ -423,7 +423,9 @@ public class InitiatorMailbox implements Mailbox
           ByteBuffer clone = ByteBuffer.allocate(tableSize);
 
           bbTable.rewind();
-          clone.put(bbTable.array(), 0, tableSize);
+          // clone.put(bbTable.array(), 0, tableSize);
+          bbTable.limit(tableSize);
+          clone.put(bbTable);
           bbTable.rewind();
           clone.flip();
 
