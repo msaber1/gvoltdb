@@ -417,7 +417,8 @@ public class InitiatorMailbox implements Mailbox
         int result = m_engine.nativeSearchRequestTable(enginePointer, message.getTableName(), message.getGraphViewName(), message.getIsVertex(), tableSize, bbTable);
 
         //  get actual table size
-        System.out.println("Table size is: " + tableSize);
+        // System.out.println("Table size is: " + tableSize);
+        System.out.println("Table size is: " + result);
 
         // System.out.println("View name in destination host: " + message.getGraphViewName());
         // System.out.println("Table find result: " + result);
