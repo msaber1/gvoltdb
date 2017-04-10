@@ -428,14 +428,6 @@ public class InitiatorMailbox implements Mailbox
           bbTable.rewind();
           clone.flip();
 
-          // byte[] bytes = clone.array();
-          // byte[] output = new byte[bytes.length];
-          // System.arraycopy(bytes, 0, output, 0, bytes.length);
-
-          //  print table in destination host
-          // VoltTable table = new VoltTable(clone, true);
-          // System.out.println(table.toFormattedString());
-
           bbTable = clone;
         }
         else {

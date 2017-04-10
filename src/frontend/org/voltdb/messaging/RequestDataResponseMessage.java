@@ -142,7 +142,6 @@ public class RequestDataResponseMessage extends VoltMessage {
     public int getSerializedSize()
     {
         int additional = m_requestTableBuffer.capacity();
-        System.out.println("RESPONSE table size: " + additional);
         return super.getSerializedSize() + additional;
     }
 
