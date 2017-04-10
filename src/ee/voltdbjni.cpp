@@ -356,7 +356,10 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeMapSi
  * Search a table with a given table name.
  * @param engine_ptr
  * @param tableName
- * @return table object in byte array
+ * @param graphViewName
+ * @param isVertex
+ * @param byteBuffer
+ * @return table size in bytes
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearchRequestTable(
     JNIEnv *env, jobject obj,
@@ -364,7 +367,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     jstring tableName,
     jstring graphViewName,
     jboolean isVertex,
-    jint tableSize,
     jobject byteBuffer)
 {
     if (!tableName || !graphViewName || !byteBuffer) {
@@ -388,7 +390,6 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSearc
     //  store actual table size
     tableSize = static_cast<int>(serializeSize);
 
-    // return 1;
     return tableSize;
 }
 

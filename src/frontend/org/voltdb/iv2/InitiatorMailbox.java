@@ -411,21 +411,37 @@ public class InitiatorMailbox implements Mailbox
         RequestDataResponseMessage response = new RequestDataResponseMessage(message.getSourceSiteId(), message);
 
         //  search for table (in the backend)
-        int tableSize = 0;
         long enginePointer = m_executionEngines.get(m_hsId);
         ByteBuffer bbTable = ByteBuffer.allocateDirect(1024 * 1024);
-        int result = m_engine.nativeSearchRequestTable(enginePointer, message.getTableName(), message.getGraphViewName(), message.getIsVertex(), tableSize, bbTable);
+        int tableSize = m_engine.nativeSearchRequestTable(enginePointer, message.getTableName(), message.getGraphViewName(), message.getIsVertex(), bbTable);
 
         //  get actual table size
-        // System.out.println("Table size is: " + tableSize);
-        System.out.println("Table size is: " + result);
+        System.out.println("Table size is: " + tableSize);
+
+        //  re-allocate byte buffer with actual table size
+        if (tableSize > 0) {
+          ByteBuffer clone = ByteBuffer.allocate(tableSize);
+
+          bbTable.rewind();
+          clone.put(bbTable);
+          bbTable.rewind();
+          clone.flip();
+
+          byte[] bytes = clone.array();
+          byte[] output = new byte[bytes.length];
+          System.arraycopy(bytes, 0, output, 0, bytes.length);
+
+          VoltTable table = new VoltTable(clone, true);
+          System.out.println(table.toFormattedString());
+        }
+        else {
+          bbTable = null;
+        }
 
         // System.out.println("View name in destination host: " + message.getGraphViewName());
         // System.out.println("Table find result: " + result);
 
         //  print table in destination host
-        // VoltTable table = new VoltTable(bbTable, true);
-        // System.out.println(table.toFormattedString());
 
         //  add table buffer to the message
         response.setRequestTableBuffer(bbTable);
