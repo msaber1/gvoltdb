@@ -281,8 +281,6 @@ public class InitiatorMailbox implements Mailbox
     @Override
     public void deliver(final VoltMessage message)
     {
-        // System.out.println("thread run deliver: " + Thread.currentThread().getName() + " on " + message.getClass().getName());
-
         if (message instanceof RequestDataResponseMessage) {
           m_requestTableBuffer = ((RequestDataResponseMessage)message).getRequestTableBuffer();
 
@@ -293,7 +291,6 @@ public class InitiatorMailbox implements Mailbox
             this.m_scheduler.getQueue().offer(new SiteTasker.SiteTaskerRunnable() {
                 @Override
                 void run() {
-                    // System.out.println("thread deliver: " + Thread.currentThread().getName() + " on " + message.getClass().getName());
                     synchronized (InitiatorMailbox.this) {
                         deliverInternal(message);
                     }

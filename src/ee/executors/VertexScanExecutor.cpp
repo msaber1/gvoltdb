@@ -119,50 +119,48 @@ bool VertexScanExecutor::p_execute(const NValueArray &params)
                (int)input_table->allocatedTupleCount());
 
     // invoke method that requests for data from other cluster node and returns the data
-    long siteID = m_engine->getSiteId();
-    long hostID = (int)(siteID);
+    // long siteID = m_engine->getSiteId();
+    // long hostID = (int)(siteID);
 
-    cout << "Vertex scan executed in SITE = " << siteID << " HOST = " << hostID << endl;
-
-    if ( (siteID == 0L)
-        && (hostID == 0) ) {
-        int destinationHostID = 1;
-        long destinationID = (0L << 32) + destinationHostID;
-
-        //  vertex attributes
-        vector<int> vertexIDs;
-        vector<string> vertexAttrNames;
-        for (int i=0; i<3; i++) {
-            vertexIDs.push_back(i*2);
-        }
-        //vertexAttrNames.push_back("CourseNum");
-        // vertexAttrNames.push_back("lstName");
-
-        //  edge attributes
-        vector<int> edgeIDs;
-        vector<string> edgeAttrNamtes;
-        for (int i=0; i<3; i++) {
-            edgeIDs.push_back(i);
-        }
-        //edgeAttrNamtes.push_back("CoursePrereqId");
-        // edgeAttrNamtes.push_back("relative");
-
-        Table* out1 = m_engine->getVertexAttributesFromClusterNode(destinationID, vertexIDs, vertexAttrNames, graphView);
-        if (!out1) {
-          cout << "vertex table fails." << endl;
-        }
-        else {
-          cout << out1->debug() << endl;
-        }
-
-        Table* out2 = m_engine->getEdgeAttributesFromClusterNode(destinationID, edgeIDs, edgeAttrNamtes, graphView);
-        if (!out1) {
-          cout << "edge table fails." << endl;
-        }
-        else {
-          cout << out2->debug() << endl;
-        }
-    }
+    // if ( (siteID == 0L)
+    //     && (hostID == 0) ) {
+    //     int destinationHostID = 1;
+    //     long destinationID = (0L << 32) + destinationHostID;
+    //
+    //     //  vertex attributes
+    //     vector<int> vertexIDs;
+    //     vector<string> vertexAttrNames;
+    //     for (int i=0; i<3; i++) {
+    //         vertexIDs.push_back(i*2);
+    //     }
+    //     //vertexAttrNames.push_back("CourseNum");
+    //     // vertexAttrNames.push_back("lstName");
+    //
+    //     //  edge attributes
+    //     vector<int> edgeIDs;
+    //     vector<string> edgeAttrNamtes;
+    //     for (int i=0; i<3; i++) {
+    //         edgeIDs.push_back(i);
+    //     }
+    //     //edgeAttrNamtes.push_back("CoursePrereqId");
+    //     // edgeAttrNamtes.push_back("relative");
+    //
+    //     Table* out1 = m_engine->getVertexAttributesFromClusterNode(destinationID, vertexIDs, vertexAttrNames, graphView);
+    //     if (!out1) {
+    //       cout << "vertex table fails." << endl;
+    //     }
+    //     else {
+    //       cout << out1->debug() << endl;
+    //     }
+    //
+    //     Table* out2 = m_engine->getEdgeAttributesFromClusterNode(destinationID, edgeIDs, edgeAttrNamtes, graphView);
+    //     if (!out1) {
+    //       cout << "edge table fails." << endl;
+    //     }
+    //     else {
+    //       cout << out2->debug() << endl;
+    //     }
+    // }
 
     //
     // OPTIMIZATION: NESTED PROJECTION
