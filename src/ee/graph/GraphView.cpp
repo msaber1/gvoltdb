@@ -250,15 +250,15 @@ void GraphView::expandCurrentPathOperation()
 	*/
 	if(traverseBFS)
 	{
-		this->BFS(this->fromVertexId, this->traversalDepth);
+		//this->BFS(this->fromVertexId, this->traversalDepth);
+		this->SubGraphLoop(this->fromVertexId, this->traversalDepth);
 	}
 }
 
 void GraphView::BFS(int startVertexId, int depth)
 {
 	queue<Vertex*> q;
-	int currentDepth = 1;
-	Vertex* currentVertex = this->getVertex(startVertexId);
+	Vertex* currentVertex = this->m_vertexes[startVertexId];
 	if(NULL != currentVertex)
 	{
 		currentVertex->Level = 0;
@@ -283,8 +283,8 @@ void GraphView::BFS(int startVertexId, int depth)
 					//start vertex, end vertex, length, cost, path
 					temp_tuple.setNValue(0, ValueFactory::getIntegerValue(startVertexId));
 					temp_tuple.setNValue(1, ValueFactory::getIntegerValue(outVertex->getId()));
-					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(currentDepth));
-					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)currentDepth));
+					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
+					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
 					//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
 					m_pathTable->insertTempTuple(temp_tuple);
 				}
@@ -300,6 +300,112 @@ void GraphView::BFS(int startVertexId, int depth)
 
 	std::stringstream paramsToPrint;
 	paramsToPrint << "BFS: from = " << startVertexId << ", depth = " << depth << ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
+	LogManager::GLog("GraphView", "BFS", 302, paramsToPrint.str());
+}
+
+void GraphView::SubGraphLoop(int startVertexId, int length)
+{
+	queue<Vertex*> q;
+	Vertex* currentVertex = NULL;
+	if(startVertexId >= 0)
+	{
+		currentVertex = this->m_vertexes[startVertexId];
+	}
+	if(NULL != currentVertex)
+	{
+		currentVertex->Level = 0;
+		q.push(currentVertex);
+		int fanOut;
+		Edge* outEdge = NULL;
+		Vertex* outVertex = NULL;
+		while(!q.empty() && currentVertex->Level < length)
+		{
+			currentVertex = q.front();
+			q.pop();
+			fanOut = currentVertex->fanOut();
+			for(int i = 0; i < fanOut; i++)
+			{
+				outEdge = currentVertex->getOutEdge(i);
+				outVertex = outEdge->getEndVertex();
+				outVertex->Level = currentVertex->Level + 1;
+				if(outVertex->Level == length)
+				{
+					//we found a loop of the desired length
+					if(outVertex->getId() == startVertexId)
+					{
+						//Now, we reached the destination vertexes, where we should add tuples into the output table
+						TableTuple temp_tuple = m_pathTable->tempTuple();
+						//start vertex, end vertex, length, cost, path
+						temp_tuple.setNValue(0, ValueFactory::getIntegerValue(startVertexId));
+						temp_tuple.setNValue(1, ValueFactory::getIntegerValue(outVertex->getId()));
+						temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
+						temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
+						//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+						m_pathTable->insertTempTuple(temp_tuple);
+					}
+				}
+				else
+				{
+					//add to the queue, as currentDepth is less than depth
+					q.push(outVertex);
+				}
+			}
+		}
+	}
+	else
+	{
+		for (std::map<int, Vertex*>::iterator it = m_vertexes.begin(); it != m_vertexes.end(); ++it)
+		{
+			currentVertex = it->second;
+			currentVertex->Level = 0;
+			q.push(currentVertex);
+			int fanOut;
+			Edge* outEdge = NULL;
+			Vertex* outVertex = NULL;
+			while(!q.empty() && currentVertex->Level < length)
+			{
+				currentVertex = q.front();
+				q.pop();
+				fanOut = currentVertex->fanOut();
+				for(int i = 0; i < fanOut; i++)
+				{
+					outEdge = currentVertex->getOutEdge(i);
+					outVertex = outEdge->getEndVertex();
+					outVertex->Level = currentVertex->Level + 1;
+					if(outVertex->Level == length)
+					{
+						//we found a loop of the desired length
+						if(outVertex->getId() == startVertexId)
+						{
+							//Now, we reached the destination vertexes, where we should add tuples into the output table
+							TableTuple temp_tuple = m_pathTable->tempTuple();
+							//start vertex, end vertex, length, cost, path
+							temp_tuple.setNValue(0, ValueFactory::getIntegerValue(startVertexId));
+							temp_tuple.setNValue(1, ValueFactory::getIntegerValue(outVertex->getId()));
+							temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
+							temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
+							//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+							m_pathTable->insertTempTuple(temp_tuple);
+						}
+					}
+					else
+					{
+						//add to the queue, as currentDepth is less than depth
+						q.push(outVertex);
+					}
+				}
+			}
+			//empty the queue
+			while(!q.empty())
+			{
+				q.pop();
+			}
+		}
+	}
+	traverseBFS = false;
+
+	std::stringstream paramsToPrint;
+	paramsToPrint << "SubGraphLoop: from = " << startVertexId << ", length = " << length << ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
 	LogManager::GLog("GraphView", "BFS", 302, paramsToPrint.str());
 }
 

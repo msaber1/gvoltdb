@@ -11,6 +11,8 @@ namespace voltdb {
 class Vertex 
 	: public GraphElement
 {
+	class GraphView;
+	friend class GraphView;
 protected:
 	//mohamed: we are using ids instead of pointers for two reasons
 	// 1) this will abstract referencing the graph elements from thier memory locations (e.g., we can easily relocate the edges in the memory)

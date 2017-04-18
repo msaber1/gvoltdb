@@ -7,6 +7,8 @@ namespace voltdb {
 class Edge 
 	: public GraphElement
 {
+	class GraphView;
+	friend class GraphView;
 protected:
 	int m_startVertexId;
 	int m_endVertexId;

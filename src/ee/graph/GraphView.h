@@ -28,6 +28,8 @@ class GraphView
 	friend class PathIterator;
 	friend class TableIterator;
 	friend class GraphViewFactory;
+	friend class Vertex;
+	friend class Edge;
 
 public:
 	~GraphView(void);
@@ -95,6 +97,9 @@ public:
 	//BFS
 	void BFS(int startVertexId, int depth);
 	int fromVertexId, traversalDepth;
+
+	//Topology query, i.e., connected sub-graph of
+	void SubGraphLoop(int startVertexId, int length); //startVertexId of -1 means to try all the vertexes as the start of the loop
 
 
 protected:
