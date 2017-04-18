@@ -867,9 +867,6 @@ Table* VoltDBEngine::searchRequestTable(const char* tableNameChar, const char* g
     }
 
     Table* table = getTable(tableName);
-    // GraphView* graphView = getGraphView(graphViewName);
-
-    cout << "Searching table in host " << (int)(this->getSiteId()) << endl;
 
     return table;
 }

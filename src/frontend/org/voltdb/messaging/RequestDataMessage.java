@@ -60,27 +60,7 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
     // getters and setters
     // request destination is the destination of the message.
     // a set of destinations (for chained messaging) is accessed as a stack.
-/*
-    public void pushRequestDestination(long destHSId) {
-        m_requestDestinations.add(destHSId);
-    }
 
-    public long popRequestDestination() {
-        return m_requestDestinations.remove(m_requestDestinations.size()-1);
-    }
-
-    public long getRequestDestination() {
-        return m_requestDestinations.get(m_requestDestinations.size()-1);
-    }
-
-    public void setRequestDestinations(ArrayList<Long> dest) {
-        m_requestDestinations = dest;
-    }
-
-    public ArrayList<Long> getRequestDestinations() {
-        return m_requestDestinations;
-    }
-*/
     public String getTableName() {
         return m_tableName;
     }
@@ -124,15 +104,9 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         return super.getSerializedSize() + additional;
     }
 
-    //  capacity = 100
-    //  limit = 100
-    //  position = 24
-    //  remaining = 76
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
-        System.out.println("REQUEST flatten");
-
         //  message id
         buf.put(VoltDbMessageFactory.REQUEST_DATA_ID);
 
@@ -158,15 +132,9 @@ public class RequestDataMessage extends TransactionInfoBaseMessage {
         buf.limit(buf.position());
     }
 
-    //  capacity = 76
-    //  limit = 76
-    //  position = 0
-    //  remaining = 76
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
-        System.out.println("REQUEST init");
-
         super.initFromBuffer(buf);
 
         //  table name length
