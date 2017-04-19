@@ -132,6 +132,26 @@ public class GraphView implements SchemaObject {
     	col = new ColumnSchema(Name, new CharacterType(Types.SQL_VARCHAR, 1024), false, false, null);
     	addPathPropNoCheck(col);
     	
+    	Name = database.nameManager.newColumnHsqlName(schema, "PROP1", isDelimitedIdentifier);
+    	col = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	addPathPropNoCheck(col);
+    	
+    	Name = database.nameManager.newColumnHsqlName(schema, "PROP2", isDelimitedIdentifier);
+    	col = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	addPathPropNoCheck(col);
+    	
+    	Name = database.nameManager.newColumnHsqlName(schema, "PROP3", isDelimitedIdentifier);
+    	col = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	addPathPropNoCheck(col);
+    	
+    	Name = database.nameManager.newColumnHsqlName(schema, "PROP4", isDelimitedIdentifier);
+    	col = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	addPathPropNoCheck(col);
+    	
+    	Name = database.nameManager.newColumnHsqlName(schema, "PROP5", isDelimitedIdentifier);
+    	col = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	addPathPropNoCheck(col);
+    	
     }
     
 	@Override

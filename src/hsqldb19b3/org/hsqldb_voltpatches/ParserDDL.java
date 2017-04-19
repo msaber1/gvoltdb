@@ -291,6 +291,9 @@ public class ParserDDL extends ParserRoutine {
         ArrayList<HsqlName> props = new ArrayList<HsqlName>();
         ArrayList<HsqlName> cols = new ArrayList<HsqlName>();
         
+        // Add Def Path Properties
+        graph.addDefPathProps(schema, isDelimitedIdentifier());
+        
         // Rear ID property
         readThis(Tokens.ID);
         propName = database.nameManager.newColumnHsqlName(schema, "ID", isDelimitedIdentifier());
@@ -493,8 +496,6 @@ public class ParserDDL extends ParserRoutine {
         	if (i < props.size()-1) br.append(", ");
         	else br.append(" ");
         }
-        
-        graph.addDefPathProps(schema, isDelimitedIdentifier());
         
         br.append(partsql);
         
