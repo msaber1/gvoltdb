@@ -330,10 +330,10 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 else if (m_targetObjectName == "EDGES")
                 	cols = db.getGraphviews().getExact(m_targetTableName).getEdgeprops();
                 else if (m_targetObjectName == "PATHS") {
-                	cols = db.getGraphviews().getExact(m_targetTableName).getVertexprops();
-                	addColsToSchema(cols, "VERTEXES");
-                	cols = db.getGraphviews().getExact(m_targetTableName).getEdgeprops();
-                	addColsToSchema(cols, "EDGES");
+                	//cols = db.getGraphviews().getExact(m_targetTableName).getVertexprops();
+                	//addColsToSchema(cols, "VERTEXES");
+                	//cols = db.getGraphviews().getExact(m_targetTableName).getEdgeprops();
+                	//addColsToSchema(cols, "EDGES");
                 	cols = db.getGraphviews().getExact(m_targetTableName).getPathprops();
                 }
 
@@ -411,6 +411,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             for (TupleValueExpression tve : scan_tves)
             {
                 int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
+                
+                //System.out.println("AbstractScanPlanNode 415: "+m_tableSchema);
+                
                 tve.setColumnIndex(index);
             }
             m_tableScanSchema.sortByTveIndex();
@@ -462,6 +465,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         for (TupleValueExpression tve : predicate_tves)
         {
             int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
+            
+            //System.out.println("AbstractScanPlanNode 469: "+m_tableSchema);
+            
             tve.setColumnIndex(index);
         }
 
@@ -486,6 +492,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 assert(col.getExpression() instanceof TupleValueExpression);
                 TupleValueExpression tve = (TupleValueExpression)col.getExpression();
                 int index = tve.resolveColumnIndexesUsingSchema(m_tableSchema);
+                
+                //System.out.println("AbstractScanPlanNode 496: "+m_tableSchema);
+                
                 tve.setColumnIndex(index);
             }
             m_outputSchema.sortByTveIndex();

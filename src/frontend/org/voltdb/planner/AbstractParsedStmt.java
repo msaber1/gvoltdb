@@ -474,14 +474,21 @@ public abstract class AbstractParsedStmt {
         String usingAttr = exprNode.attributes.get("using");
         boolean isUsingColumn = usingAttr != null ? Boolean.parseBoolean(usingAttr) : false;
 
+        // GVoltDB uses index0 for graphs
+        int idx = Integer.parseInt(exprNode.attributes.get("index"));
+        if (exprNode.attributes.containsKey("index0") && Integer.parseInt(exprNode.attributes.get("index0")) != -1) {
+        	idx = Integer.parseInt(exprNode.attributes.get("index0"));
+        }
+        
         // Use the index produced by HSQL as a way to differentiate columns that have
-        // the same name with a single table (which can happen for subqueries containing joins).
-        int differentiator = Integer.parseInt(exprNode.attributes.get("index"));
+        // the same name with a single table (which can happen for subqueries containing joins).        
+        int differentiator = idx;
+        
         if (differentiator == -1 && isUsingColumn) {
             for (VoltXMLElement usingElem : exprNode.children) {
                 String usingTableAlias = usingElem.attributes.get("tablealias");
                 if (usingTableAlias != null && usingTableAlias.equals(tableAlias)) {
-                    differentiator = Integer.parseInt(usingElem.attributes.get("index"));
+                    differentiator = idx;
                 }
             }
         }
@@ -728,13 +735,15 @@ public abstract class AbstractParsedStmt {
      * @return the cache entry
      */
     protected StmtTableScan addGraphToStmtCache(GraphView graph, String tableAlias, String object,
-    		                                    String hint, int startvertexid, int endvertexid
+    		                                    String hint, int startvertexid, int endvertexid,
+    		                                    int prop1, int prop2, int prop3, int prop4, int prop5
     		                                    ) {
         // Create an index into the query Catalog cache
         StmtTableScan tableScan = m_tableAliasMap.get(tableAlias);
         if (tableScan == null) {
             tableScan = new StmtTargetGraphScan(graph, tableAlias, m_stmtId, object, 
-            		                            hint, startvertexid, endvertexid);
+            		                            hint, startvertexid, endvertexid, 
+            		                            prop1, prop2, prop3, prop4, prop5);
             m_tableAliasMap.put(tableAlias, tableScan);
         }
         return tableScan;
@@ -1264,13 +1273,34 @@ public abstract class AbstractParsedStmt {
        String hint = tableNode.attributes.get("hint");
        int startvertexid = -1;
        int endvertexid = -1;
+       int prop1 = -1;
+       int prop2 = -1;
+       int prop3 = -1;
+       int prop4 = -1;
+       int prop5 = -1;
        if (tableNode.attributes.get("startvertexid") != null) {
     	   startvertexid = Integer.parseInt(tableNode.attributes.get("startvertexid"));
        }
        if (tableNode.attributes.get("endvertexid") != null) {
     	   endvertexid = Integer.parseInt(tableNode.attributes.get("endvertexid"));
        }
-       graphScan = addGraphToStmtCache(graph, tableAlias, object, hint, startvertexid, endvertexid);
+       if (tableNode.attributes.get("prop1") != null) {
+    	   prop1 = Integer.parseInt(tableNode.attributes.get("prop1"));
+       }
+       if (tableNode.attributes.get("prop2") != null) {
+    	   prop2 = Integer.parseInt(tableNode.attributes.get("prop2"));
+       }
+       if (tableNode.attributes.get("prop3") != null) {
+    	   prop3 = Integer.parseInt(tableNode.attributes.get("prop3"));
+       }
+       if (tableNode.attributes.get("prop4") != null) {
+    	   prop4 = Integer.parseInt(tableNode.attributes.get("prop4"));
+       }
+       if (tableNode.attributes.get("prop5") != null) {
+    	   prop5 = Integer.parseInt(tableNode.attributes.get("prop5"));
+       }
+       graphScan = addGraphToStmtCache(graph, tableAlias, object, hint, startvertexid, endvertexid,
+    		                           prop1, prop2, prop3, prop4, prop5);
 
        AbstractExpression joinExpr = parseJoinCondition(tableNode);
        AbstractExpression whereExpr = parseWhereCondition(tableNode);

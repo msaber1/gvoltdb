@@ -232,7 +232,11 @@ public class GraphView implements SchemaObject {
         	if (PropTypeList.get(i) == VERTEX) {
         		ColumnSchema property = getVertexProp(i);
         		VoltXMLElement propChild = property.voltGetColumnXML(session);
+        		
         		propChild.attributes.put("index", Integer.toString(i));
+        		// Index Vertex props from 0 ... 
+        		propChild.attributes.put("index0", Integer.toString(VertexPropList.getIndex(property.getNameString())));
+        		
         		vertex.children.add(propChild);
         		assert(propChild != null);
         	}
@@ -245,7 +249,11 @@ public class GraphView implements SchemaObject {
         	if (PropTypeList.get(i) == PATH) {
         		ColumnSchema property = getPathProp(i);
         		VoltXMLElement propChild = property.voltGetColumnXML(session);
+        		
         		propChild.attributes.put("index", Integer.toString(i));
+        		// Index Path props from 0 ... 
+        		propChild.attributes.put("index0", Integer.toString(PathPropList.getIndex(property.getNameString())));
+        		
         		path.children.add(propChild);
         		assert(propChild != null);
         	}
@@ -258,7 +266,11 @@ public class GraphView implements SchemaObject {
         	if (PropTypeList.get(i) == EDGE) {
         		ColumnSchema property = getEdgeProp(i);
         		VoltXMLElement propChild = property.voltGetColumnXML(session);
+        		
         		propChild.attributes.put("index", Integer.toString(i));
+        		// Index Edge props from 0 ... 
+        		propChild.attributes.put("index0", Integer.toString(EdgePropList.getIndex(property.getNameString())));
+        		
         		edge.children.add(propChild);
         		assert(propChild != null);
         	}
@@ -288,6 +300,17 @@ public class GraphView implements SchemaObject {
 		return VertexProperties;
 	}
     */
+    
+    public int getPropIndex0(int i) {
+    	if (PropTypeList.get(i) == VERTEX) {
+    		return VertexPropList.getIndex(getVertexProp(i).getNameString());
+    	}
+    	else if (PropTypeList.get(i) == EDGE) {
+    		return EdgePropList.getIndex(getEdgeProp(i).getNameString());
+    	}
+    	else
+    		return PathPropList.getIndex(getPathProp(i).getNameString());
+    }
     
 	public ColumnSchema getVertexProp(int i) {
 		return (ColumnSchema) AllPropList.get(i);
