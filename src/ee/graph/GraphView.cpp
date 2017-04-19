@@ -183,11 +183,11 @@ void GraphView::constructPathSchema()
 	//4: Path: Varchar(256)
 	//add the column names
 	m_pathColumnNames.clear();
-	m_pathColumnNames.push_back("StartVertex");
-	m_pathColumnNames.push_back("EndVertex");
-	m_pathColumnNames.push_back("Length");
-	m_pathColumnNames.push_back("Cost");
-	m_pathColumnNames.push_back("Path");
+	m_pathColumnNames.push_back("STARTVERTEXID");
+	m_pathColumnNames.push_back("ENDVERTEXID");
+	m_pathColumnNames.push_back("LENGTH");
+	m_pathColumnNames.push_back("COST");
+	m_pathColumnNames.push_back("PATH");
 	int numOfPathColumns = m_pathColumnNames.size();
 
 	bool needsDRTimestamp = false; //TODO: we might revisit this
@@ -250,8 +250,8 @@ void GraphView::expandCurrentPathOperation()
 	*/
 	if(traverseBFS)
 	{
-		//this->BFS(this->fromVertexId, this->traversalDepth);
-		this->SubGraphLoop(this->fromVertexId, this->traversalDepth);
+		this->BFS(this->fromVertexId, this->traversalDepth);
+		//this->SubGraphLoop(this->fromVertexId, this->traversalDepth);
 	}
 }
 
@@ -284,8 +284,8 @@ void GraphView::BFS(int startVertexId, int depth)
 					temp_tuple.setNValue(0, ValueFactory::getIntegerValue(startVertexId));
 					temp_tuple.setNValue(1, ValueFactory::getIntegerValue(outVertex->getId()));
 					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
-					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
-					//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(outVertex->Level + 1)));
+					temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
 					m_pathTable->insertTempTuple(temp_tuple);
 				}
 				else
