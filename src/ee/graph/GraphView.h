@@ -32,6 +32,7 @@ class GraphView
 	friend class Edge;
 
 public:
+	typedef pair<int, int> PQEntry;
 	~GraphView(void);
 
 	/*
@@ -94,9 +95,13 @@ public:
 
 	void expandCurrentPathOperation();
 
-	//BFS
-	void BFS(int startVertexId, int depth);
-	int fromVertexId, traversalDepth;
+	//Queries
+	void BFS_Reachability_ByDepth(int startVertexId, int depth);
+	void BFS_Reachability_ByDestination(int startVertexId, int endVertex);
+	void BFS_Reachability_ByDepth_eSelectivity(int startVertexId, int depth, int eSelectivity);
+	void SP_TopK(int src, int dest, int k);
+	void SP_EdgeSelectivity(int src, int dest, int edgeSelectivity);
+	int fromVertexId, toVertexId, queryType, pathLength, topK, vSelectivity, eSelectivity;
 
 	//Topology query, i.e., connected sub-graph of
 	void SubGraphLoop(int startVertexId, int length); //startVertexId of -1 means to try all the vertexes as the start of the loop
@@ -126,11 +131,13 @@ protected:
 	int m_edgeIdColumnIndex;
 	int m_edgeFromColumnIndex;
 	int m_edgeToColumnIndex;
+	int m_vPropColumnIndex, m_ePropColumnIndex;
 	string m_pathTableName = "PATHS_TEMP_TABLE";
 	GraphOperationType currentPathOperationType;
 	//TODO: this should be removed
 	int dummyPathExapansionState = 0;
-	bool traverseBFS = false;
+	//bool traverseBFS = false;
+	bool executeTraversal = false;
 	// identity information
 	CatalogId m_databaseId;
 	std::string m_name;

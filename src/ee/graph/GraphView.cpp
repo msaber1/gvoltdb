@@ -212,7 +212,7 @@ PathIterator& GraphView::iteratorDeletingAsWeGo(GraphOperationType opType)
 {
 	//empty the paths table, which is the staging memory for the paths to be explored
 	dummyPathExapansionState = 0;
-	traverseBFS = true;
+	executeTraversal = true;
 	m_pathTable->deleteAllTempTupleDeepCopies();
 	//set the iterator for the temp table
 	//create new tuple in the paths temp table
@@ -248,14 +248,213 @@ void GraphView::expandCurrentPathOperation()
 		dummyPathExapansionState++;
 	}
 	*/
-	if(traverseBFS)
+	if(executeTraversal)
 	{
-		this->BFS(this->fromVertexId, this->traversalDepth);
-		//this->SubGraphLoop(this->fromVertexId, this->traversalDepth);
+		switch(this->queryType)
+		{
+		//reachability, BFS,...
+		case 1: //reachability BFS without selectivity
+			this->BFS_Reachability_ByDepth(this->fromVertexId, this->pathLength);
+			break;
+		case 2: //reachaility BFS with edge selectivity
+			this->BFS_Reachability_ByDepth_eSelectivity(this->fromVertexId, this->pathLength, this->eSelectivity);
+			break;
+		case 3: //reachability BFS with start and end
+			this->BFS_Reachability_ByDestination(this->fromVertexId, this->toVertexId);
+			break;
+		//topological queries
+		case 11:
+			this->SubGraphLoop(this->fromVertexId, this->pathLength);
+			break;
+		//shortest paths
+		case 21: //top k shortest paths
+			this->SP_TopK(this->fromVertexId, this->toVertexId, this->topK);
+			break;
+		case 22: //top 1 shortest path with edge selectivity
+			this->SP_EdgeSelectivity(this->fromVertexId, this->toVertexId, this->eSelectivity);
+			break;
+		}
+		executeTraversal = false;
 	}
 }
 
-void GraphView::BFS(int startVertexId, int depth)
+void GraphView::SP_TopK(int src, int dest, int k)
+{
+	int minCost = INT_MAX;
+	int foundPathsSoFar = 0;
+	priority_queue<PQEntry, vector<PQEntry>, std::greater<PQEntry>> pq;
+	//map<int, int> costMap;
+	//costMap[src] = 0;
+	pq.push(make_pair(0, src)); //zero cost to reach Vertex from
+	Vertex* v = NULL;
+	Edge* e = NULL;
+	int currVId, fanOut = -1, candVertexId = -1;
+
+	while(!pq.empty())
+	{
+		//select next vertex to explore
+		currVId = pq.top().second;
+		minCost = pq.top().first;
+		if(currVId == dest)
+		{
+			foundPathsSoFar++;
+
+			//add a tuple here
+			TableTuple temp_tuple = m_pathTable->tempTuple();
+			//start vertex, end vertex, length, cost, path
+			temp_tuple.setNValue(0, ValueFactory::getIntegerValue(src));
+			temp_tuple.setNValue(1, ValueFactory::getIntegerValue(dest));
+			temp_tuple.setNValue(2, ValueFactory::getIntegerValue(minCost));
+			temp_tuple.setNValue(3, ValueFactory::getDoubleValue(minCost));
+			//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+			m_pathTable->insertTempTuple(temp_tuple);
+		}
+		if(foundPathsSoFar == k)
+		{
+			break;
+		}
+		pq.pop();
+
+		//explore the outgoing vertexes
+		v = this->getVertex(currVId);
+		fanOut = v->fanOut();
+		for(int i = 0; i < fanOut; i++)
+		{
+			e = v->getOutEdge(i);
+			candVertexId = e->getEndVertex()->getId();
+
+			//these lines are commented to allow top k search
+			//if ( (costMap.find(candVertexId) == costMap.end()) ||
+			//	 (costMap[candVertexId] > minCost + 1) )
+			{
+				//costMap[candVertexId] = minCost + 1;
+				pq.push(make_pair(minCost + 1, candVertexId));
+			}
+
+		}
+	}
+
+	std::stringstream paramsToPrint;
+	paramsToPrint << "TopK SP: from = " << src << ", to = " << dest
+			<< ", k = " << k
+			<< ", foundPaths = " << foundPathsSoFar
+			<< ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
+	LogManager::GLog("GraphView", "TopK_SP", 334, paramsToPrint.str());
+}
+
+void GraphView::SP_EdgeSelectivity(int src, int dest, int edgeSelectivity)
+{
+	int minCost = INT_MAX;
+	priority_queue<PQEntry, vector<PQEntry>, std::greater<PQEntry>> pq;
+	map<int, int> costMap;
+	costMap[src] = 0;
+	pq.push(make_pair(0, src)); //zero cost to reach Vertex from
+	Vertex* v = NULL;
+	Edge* e = NULL;
+	int currVId, fanOut = -1, candVertexId = -1;
+
+	while(!pq.empty())
+	{
+		//select next vertex to explore
+		currVId = pq.top().second;
+		minCost = pq.top().first;
+		if(currVId == dest)
+		{
+			//add a tuple here
+			TableTuple temp_tuple = m_pathTable->tempTuple();
+			//start vertex, end vertex, length, cost, path
+			temp_tuple.setNValue(0, ValueFactory::getIntegerValue(src));
+			temp_tuple.setNValue(1, ValueFactory::getIntegerValue(dest));
+			temp_tuple.setNValue(2, ValueFactory::getIntegerValue(minCost));
+			temp_tuple.setNValue(3, ValueFactory::getDoubleValue(minCost));
+			//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+			m_pathTable->insertTempTuple(temp_tuple);
+			break;
+		}
+		pq.pop();
+
+		//explore the outgoing vertexes
+		v = this->getVertex(currVId);
+		fanOut = v->fanOut();
+		for(int i = 0; i < fanOut; i++)
+		{
+			e = v->getOutEdge(i);
+			candVertexId = e->getEndVertex()->getId();
+
+			if(e->eProp > eSelectivity)
+			{
+				continue;
+			}
+
+			if ( (costMap.find(candVertexId) == costMap.end()) ||
+				 (costMap[candVertexId] > minCost + 1) )
+			{
+				costMap[candVertexId] = minCost + 1;
+				pq.push(make_pair(minCost + 1, candVertexId));
+			}
+
+		}
+	}
+
+	std::stringstream paramsToPrint;
+	paramsToPrint << "SP with eSelectivity: from = " << src << ", to = " << dest
+			<< ", eSelectivity = " << edgeSelectivity
+			<< ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
+	LogManager::GLog("GraphView", "SP_eSelectivity", 398, paramsToPrint.str());
+}
+
+void GraphView::BFS_Reachability_ByDepth_eSelectivity(int startVertexId, int depth, int eSelectivity)
+{
+	queue<Vertex*> q;
+	Vertex* currentVertex = this->m_vertexes[startVertexId];
+	if(NULL != currentVertex)
+	{
+		currentVertex->Level = 0;
+		q.push(currentVertex);
+		int fanOut;
+		Edge* outEdge = NULL;
+		Vertex* outVertex = NULL;
+		while(!q.empty() && currentVertex->Level < depth)
+		{
+			currentVertex = q.front();
+			q.pop();
+			fanOut = currentVertex->fanOut();
+			for(int i = 0; i < fanOut; i++)
+			{
+				outEdge = currentVertex->getOutEdge(i);
+				if(outEdge->eProp > eSelectivity)
+				{
+					continue;
+				}
+				outVertex = outEdge->getEndVertex();
+				outVertex->Level = currentVertex->Level + 1;
+				if( (depth > 0 && outVertex->Level == depth))
+				{
+					//Now, we reached the destination vertexes, where we should add tuples into the output table
+					TableTuple temp_tuple = m_pathTable->tempTuple();
+					//start vertex, end vertex, length, cost, path
+					temp_tuple.setNValue(0, ValueFactory::getIntegerValue(startVertexId));
+					temp_tuple.setNValue(1, ValueFactory::getIntegerValue(outVertex->getId()));
+					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
+					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(outVertex->Level + 1)));
+					//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+					m_pathTable->insertTempTuple(temp_tuple);
+				}
+				else
+				{
+					//add to the queue, as currentDepth is less than depth
+					q.push(outVertex);
+				}
+			}
+		}
+	}
+
+	std::stringstream paramsToPrint;
+	paramsToPrint << "BFS_ByDepth: from = " << startVertexId << ", depth = " << depth << ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
+	LogManager::GLog("GraphView", "BFS_ByDepth", 463, paramsToPrint.str());
+}
+
+void GraphView::BFS_Reachability_ByDepth(int startVertexId, int depth)
 {
 	queue<Vertex*> q;
 	Vertex* currentVertex = this->m_vertexes[startVertexId];
@@ -276,7 +475,7 @@ void GraphView::BFS(int startVertexId, int depth)
 				outEdge = currentVertex->getOutEdge(i);
 				outVertex = outEdge->getEndVertex();
 				outVertex->Level = currentVertex->Level + 1;
-				if(outVertex->Level == depth)
+				if( (depth > 0 && outVertex->Level == depth))
 				{
 					//Now, we reached the destination vertexes, where we should add tuples into the output table
 					TableTuple temp_tuple = m_pathTable->tempTuple();
@@ -285,7 +484,7 @@ void GraphView::BFS(int startVertexId, int depth)
 					temp_tuple.setNValue(1, ValueFactory::getIntegerValue(outVertex->getId()));
 					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
 					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(outVertex->Level + 1)));
-					temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+					//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
 					m_pathTable->insertTempTuple(temp_tuple);
 				}
 				else
@@ -296,11 +495,61 @@ void GraphView::BFS(int startVertexId, int depth)
 			}
 		}
 	}
-	traverseBFS = false;
 
 	std::stringstream paramsToPrint;
-	paramsToPrint << "BFS: from = " << startVertexId << ", depth = " << depth << ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
-	LogManager::GLog("GraphView", "BFS", 302, paramsToPrint.str());
+	paramsToPrint << "BFS_ByDepth: from = " << startVertexId << ", depth = " << depth << ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
+	LogManager::GLog("GraphView", "BFS_ByDepth", 463, paramsToPrint.str());
+}
+
+void GraphView::BFS_Reachability_ByDestination(int startVertexId, int destVerexId)
+{
+	queue<Vertex*> q;
+	Vertex* currentVertex = this->m_vertexes[startVertexId];
+	if(NULL != currentVertex)
+	{
+		currentVertex->Level = 0;
+		q.push(currentVertex);
+		int fanOut;
+		Edge* outEdge = NULL;
+		Vertex* outVertex = NULL;
+		bool found = false;
+		while(!q.empty() && !found)
+		{
+			currentVertex = q.front();
+			q.pop();
+			fanOut = currentVertex->fanOut();
+			for(int i = 0; i < fanOut; i++)
+			{
+				outEdge = currentVertex->getOutEdge(i);
+				outVertex = outEdge->getEndVertex();
+				if(outVertex->getId() == destVerexId)
+				{
+					//Now, we reached the destination vertexes, where we should add tuples into the output table
+					TableTuple temp_tuple = m_pathTable->tempTuple();
+					//start vertex, end vertex, length, cost, path
+					temp_tuple.setNValue(0, ValueFactory::getIntegerValue(startVertexId));
+					temp_tuple.setNValue(1, ValueFactory::getIntegerValue(outVertex->getId()));
+					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
+					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(outVertex->Level + 1)));
+					temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+					m_pathTable->insertTempTuple(temp_tuple);
+
+					found = true;
+					break;
+				}
+				else
+				{
+					//add to the queue, as currentDepth is less than depth
+					q.push(outVertex);
+				}
+			}
+		}
+	}
+	executeTraversal = false;
+
+	std::stringstream paramsToPrint;
+	paramsToPrint << "BFS_Reachability_ByDestination: from = " << startVertexId << ", to = " << destVerexId << ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
+	LogManager::GLog("GraphView", "BFS_Reachability", 513, paramsToPrint.str());
 }
 
 void GraphView::SubGraphLoop(int startVertexId, int length)
@@ -402,7 +651,7 @@ void GraphView::SubGraphLoop(int startVertexId, int length)
 			}
 		}
 	}
-	traverseBFS = false;
+	executeTraversal = false;
 
 	std::stringstream paramsToPrint;
 	paramsToPrint << "SubGraphLoop: from = " << startVertexId << ", length = " << length << ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
@@ -455,6 +704,9 @@ void GraphView::fillGraphFromRelationalTables()
 
 	assert(m_vertexIdColumnIndex >= 0 && m_edgeIdColumnIndex >= 0 && m_edgeFromColumnIndex >= 0 && m_edgeToColumnIndex >=0);
 
+	bool vPropExists = (m_vPropColumnIndex >= 0);
+	bool ePropExists = (m_ePropColumnIndex >= 0);
+
 	if (this->m_vertexTable->activeTupleCount() != 0)
 	{
 		while (iter.next(tuple))
@@ -466,6 +718,10 @@ void GraphView::fillGraphFromRelationalTables()
 				vertex->setGraphView(this);
 				vertex->setId(id);
 				vertex->setTupleData(tuple.address());
+				if(vPropExists)
+				{
+					vertex->vProp = ValuePeeker::peekInteger(tuple.getNValue(m_vPropColumnIndex));
+				}
 				this->addVertex(id, vertex);
 				//LogManager::GLog("GraphView", "fillGraphFromRelationalTables", 77, "vertex: " + vertex->toString());
 			}
@@ -492,6 +748,10 @@ void GraphView::fillGraphFromRelationalTables()
 				edge->setTupleData(edgeTuple.address());
 				edge->setStartVertexId(from);
 				edge->setEndVertexId(to);
+				if(ePropExists)
+				{
+					edge->eProp = ValuePeeker::peekInteger(edgeTuple.getNValue(m_ePropColumnIndex));
+				}
 				//update the endpoint vertexes in and out lists
 				vFrom = edge->getStartVertex();
 				vTo = edge->getEndVertex();

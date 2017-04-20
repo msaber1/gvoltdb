@@ -44,8 +44,13 @@ GraphView* PathScanPlanNode::getTargetGraphView() const
 void PathScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
 	m_target_graph_name = obj.valueForKey("TARGET_GRAPH_NAME").asStr();
-	startVertexId = obj.valueForKey("STARTVERTEX").asInt();
-	endVertexId = obj.valueForKey("ENDVERTEX").asInt();
+	m_t_startVertexId = obj.valueForKey("STARTVERTEX").asInt();
+	m_t_endVertexId = obj.valueForKey("ENDVERTEX").asInt();
+	m_t_queryType = obj.valueForKey("PROP1").asInt();
+	m_t_pathLength = obj.valueForKey("PROP2").asInt();
+	m_t_topK = obj.valueForKey("PROP3").asInt();
+	m_t_vSelectivity = obj.valueForKey("PROP4").asInt();
+	m_t_eSelectivity = obj.valueForKey("PROP5").asInt();
 
 	m_isEmptyScan = obj.hasNonNullKey("PREDICATE_FALSE");
 
@@ -72,7 +77,12 @@ void PathScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 		{
 			std::stringstream paramsToPrint;
 			paramsToPrint << "Target graph view name = " << m_gcd->getGraphView()->name()
-					<< ", StartVertexId = " << startVertexId << ", EndVertexId = " << endVertexId;
+					<< ", StartVertexId = " << m_t_startVertexId << ", EndVertexId = " << m_t_endVertexId
+					<< ", QType = " << m_t_queryType
+					<< ", PLength = " << m_t_pathLength
+					<< ", K = " << m_t_topK
+					<< ", vSelectivity = " << m_t_vSelectivity
+					<< ", eSelectivity = " << m_t_eSelectivity;
 
 			LogManager::GLog("PathScanPlanNode", "loadFromJSONObject", 72, paramsToPrint.str());
 		}

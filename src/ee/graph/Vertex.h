@@ -34,6 +34,7 @@ public:
 	void addInEdge(Edge* edge);
 	string toString();
 
+	int vProp; //temporary, used for selectivity testing
 	int Level; //used for BFS
 };
 

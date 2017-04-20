@@ -31,8 +31,13 @@ public:
 
 	std::string getTargetGraphViewName() const { return m_target_graph_name; } // DEPRECATED?
 	AbstractExpression* getPredicate() const { return m_predicate.get(); }
-	int getStartVertexId() const { return startVertexId; }
-	int getEndVertexId() const { return endVertexId; }
+	int getStartVertexId() const { return m_t_startVertexId; }
+	int getEndVertexId() const { return m_t_endVertexId; }
+	int getQType() const { return m_t_queryType; }
+	int getPathLength() const { return m_t_pathLength; }
+	int getTopK() const { return m_t_topK; }
+	int getVertexSelectivity() const { return m_t_vSelectivity; }
+	int getEdgeSelectivity() const { return m_t_eSelectivity; }
 
 	bool isSubQuery() const { return m_isSubQuery; }
 
@@ -43,8 +48,13 @@ protected:
 
     std::string m_target_graph_name;
 	GraphViewCatalogDelegate* m_gcd;
-	int startVertexId = -1;
-	int endVertexId = -1;
+	int m_t_startVertexId = -1;
+	int m_t_endVertexId = -1;
+	int m_t_queryType = -1; //prop1
+	int m_t_pathLength= -1; //prop2
+	int m_t_topK= -1; //prop3
+	int m_t_vSelectivity= -1; //prop4
+	int m_t_eSelectivity= -1; //prop5
 	//
 	// This is the predicate used to filter out tuples during the scan
 	//

@@ -24,6 +24,8 @@ public:
 	Vertex* getStartVertex();
 	Vertex* getEndVertex();
 	string toString();
+
+	int eProp; //temporary, used for selectivity testing
 };
 
 }

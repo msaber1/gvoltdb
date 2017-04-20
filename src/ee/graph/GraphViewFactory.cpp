@@ -69,6 +69,7 @@ GraphView* GraphViewFactory::createGraphView(const std::string &graphViewName, c
 		vw->m_columnIDsInEdgeTable[i] = columnIdsInEdgeTable[i];
 	}
 
+	vw->m_vPropColumnIndex = -1;
 
 	for(int i = 0; i < vw->m_vertexColumnNames.size(); i++)
 	{
@@ -77,9 +78,16 @@ GraphView* GraphViewFactory::createGraphView(const std::string &graphViewName, c
 			vw->m_vertexIdColumnIndex = vw->m_columnIDsInVertexTable[i];
 			break;
 		}
+		else if (vw->m_vertexColumnNames[i] == "VPROP")
+		{
+			vw->m_vPropColumnIndex = vw->m_columnIDsInVertexTable[i];
+			break;
+		}
 	}
 	//TODO: fix issue by setting vw->m_vertexIdColumnIndex dynamically
 	vw->m_vertexIdColumnIndex = 0;
+
+	vw->m_ePropColumnIndex = -1;
 
 	for(int i = 0; i < vw->m_edgeColumnNames.size(); i++)
 	{
@@ -94,6 +102,10 @@ GraphView* GraphViewFactory::createGraphView(const std::string &graphViewName, c
 		else if (vw->m_edgeColumnNames[i] == "TO")
 		{
 			vw->m_edgeToColumnIndex = vw->m_columnIDsInEdgeTable[i];
+		}
+		else if (vw->m_edgeColumnNames[i] == "EPROP")
+		{
+			vw->m_ePropColumnIndex = vw->m_columnIDsInEdgeTable[i];
 		}
 	}
 

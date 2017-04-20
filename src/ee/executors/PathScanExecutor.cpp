@@ -50,7 +50,13 @@ bool PathScanExecutor::p_init(AbstractPlanNode *abstractNode,
 	assert((! isSubquery) || (node->getChildren().size() == 1));
 	graphView = node->getTargetGraphView();
 	graphView->fromVertexId = node->getStartVertexId();
-	graphView->traversalDepth = node->getEndVertexId();
+	graphView->toVertexId = node->getEndVertexId();
+	graphView->queryType = node->getQType();
+	graphView->pathLength = node->getPathLength();
+	graphView->topK = node->getTopK();
+	graphView->vSelectivity = node->getVertexSelectivity();
+	graphView->eSelectivity = node->getEdgeSelectivity();
+
 	//
 	// OPTIMIZATION: If there is no predicate for this SeqScan,
 	// then we want to just set our OutputTable pointer to be the
