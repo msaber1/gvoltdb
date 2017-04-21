@@ -89,22 +89,25 @@ GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Data
 		 col_iterator++)
 	{
 		const catalog::Column *catalog_column = col_iterator->second;
-		//colIndex = catalog_column->index();
-		columnNamesVertex[colIndex] = catalog_column->name();
-
-		std::stringstream params;
-		params << "Graph vCol Index = " << colIndex
-				<< ", Graph vCol Name = " << catalog_column->name();
-
 		if(catalog_column->matviewsource())
 		{
+			//colIndex = catalog_column->index();
+			columnNamesVertex[colIndex] = catalog_column->name();
+
+			std::stringstream params;
+			params << "Graph vCol Index = " << colIndex
+					<< ", Graph vCol Name = " << catalog_column->name();
+
+
+
 			columnIdsInVertexTable[colIndex] = catalog_column->matviewsource()->index();
 
 			params << ", VertexTable Column Index = " << catalog_column->matviewsource()->index();
-		}
 
-		LogManager::GLog("GraphViewCatalogDelegate", "constructGraphViewFromCatalog", 105, params.str());
-		colIndex++;
+
+			LogManager::GLog("GraphViewCatalogDelegate", "constructGraphViewFromCatalog", 108, params.str());
+			colIndex++;
+		}
 	}
 
 
@@ -117,22 +120,25 @@ GraphView *GraphViewCatalogDelegate::constructGraphViewFromCatalog(catalog::Data
 			 col_iterator++)
 	{
 		const catalog::Column *catalog_column = col_iterator->second;
-		//colIndex = catalog_column->index();
-		columnNamesEdge[colIndex] = catalog_column->name();
-
-		std::stringstream params;
-		params << "Graph eCol Index = " << colIndex
-				<< ", Graph eCol Name = " << catalog_column->name();
-
 		if(catalog_column->matviewsource())
 		{
+			//colIndex = catalog_column->index();
+			columnNamesEdge[colIndex] = catalog_column->name();
+
+			std::stringstream params;
+			params << "Graph eCol Index = " << colIndex
+					<< ", Graph eCol Name = " << catalog_column->name();
+
+
+
 			columnIdsInEdgeTable[colIndex] = catalog_column->matviewsource()->index();
 
 			params << ", EdgeTable Column Index = " << catalog_column->matviewsource()->index();
-		}
 
-		LogManager::GLog("GraphViewCatalogDelegate", "constructGraphViewFromCatalog", 131, params.str());
-		colIndex++;
+
+			LogManager::GLog("GraphViewCatalogDelegate", "constructGraphViewFromCatalog", 139, params.str());
+			colIndex++;
+		}
 	}
 
 

@@ -60,7 +60,9 @@ Edge* Vertex::getInEdge(int index)
 string Vertex::toString()
 {
 	std::ostringstream stream;
-	stream << "(id = " << this->getId() << ", fanOut = " << this->fanOut() << ", fanIn = " << this->fanIn() << ")"; 
+	stream << "(id = " << this->getId()
+			<< ", vProp = " << this->vProp
+		    << ", fanOut = " << this->fanOut() << ", fanIn = " << this->fanIn() << ")";
 	return stream.str();
 }
 

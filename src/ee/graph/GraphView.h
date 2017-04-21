@@ -104,6 +104,9 @@ public:
 	int fromVertexId, toVertexId, queryType, pathLength, topK, vSelectivity, eSelectivity;
 
 	//Topology query, i.e., connected sub-graph of
+
+	//to select all vertexes, set vSelectivty to 100, same for the edges
+	void SubGraphLoop(int length, int vSelectivity, int eSelectivity);
 	void SubGraphLoop(int startVertexId, int length); //startVertexId of -1 means to try all the vertexes as the start of the loop
 
 

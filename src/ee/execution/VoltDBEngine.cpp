@@ -480,9 +480,9 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     std::stringstream execTimeString;
     execTimeString << "execution time in milliseconds = " << totalTimeInMilliSeconds;
 
-    LogManager::GLog("VoltDBEngine", "executePlanFragment(s)!", 483, "End of execution!");
-    LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, execTimeString.str().c_str());
-    LogManager::GLog("VoltDBEngine", "executePlanFragment(s)!", 485, execTimeString.str());
+    //LogManager::GLog("VoltDBEngine", "executePlanFragment(s)!", 483, "End of execution!");
+    //LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, execTimeString.str().c_str());
+    //LogManager::GLog("VoltDBEngine", "executePlanFragment(s)!", 485, execTimeString.str());
     return failures;
 }
 

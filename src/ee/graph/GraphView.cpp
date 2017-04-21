@@ -263,8 +263,14 @@ void GraphView::expandCurrentPathOperation()
 			this->BFS_Reachability_ByDestination(this->fromVertexId, this->toVertexId);
 			break;
 		//topological queries
-		case 11:
-			this->SubGraphLoop(this->fromVertexId, this->pathLength);
+		case 11: //vOnly selectivity
+			this->SubGraphLoop(this->pathLength, this->vSelectivity, 100);
+			break;
+		case 12: //eOnly selectivity
+			this->SubGraphLoop(this->pathLength, 100, this->eSelectivity);
+					break;
+		case 13: //vertex and edge selectivity
+			this->SubGraphLoop(this->pathLength, this->vSelectivity, this->eSelectivity);
 			break;
 		//shortest paths
 		case 21: //top k shortest paths
@@ -552,6 +558,81 @@ void GraphView::BFS_Reachability_ByDestination(int startVertexId, int destVerexI
 	LogManager::GLog("GraphView", "BFS_Reachability", 513, paramsToPrint.str());
 }
 
+void GraphView::SubGraphLoop(int length, int vSelectivity, int eSelectivity)
+{
+	queue<Vertex*> q;
+	Vertex* currentVertex = NULL;
+	int startVertexId = -1;
+	for(std::map<int, Vertex*>::iterator it = m_vertexes.begin(); it != m_vertexes.end(); ++it)
+	{
+		currentVertex = it->second;
+		if(currentVertex->vProp > vSelectivity)
+		{
+			cout << "skipping vertex " << currentVertex->getId() << endl;
+			continue;
+		}
+		startVertexId = currentVertex->getId();
+		currentVertex->Level = 0;
+		q.push(currentVertex);
+		int fanOut;
+		Edge* outEdge = NULL;
+		Vertex* outVertex = NULL;
+		while(!q.empty() && currentVertex->Level < length)
+		{
+			currentVertex = q.front();
+			q.pop();
+			fanOut = currentVertex->fanOut();
+			for(int i = 0; i < fanOut; i++)
+			{
+				outEdge = currentVertex->getOutEdge(i);
+
+				if(outEdge->eProp > eSelectivity)
+				{
+					cout << "skipping edge " << outEdge->getId() << endl;
+					continue;
+				}
+
+				outVertex = outEdge->getEndVertex();
+				outVertex->Level = currentVertex->Level + 1;
+				if(outVertex->Level == length)
+				{
+					//we found a loop of the desired length
+					if(outVertex->getId() == startVertexId)
+					{
+						//Now, we reached the destination vertexes, where we should add tuples into the output table
+						TableTuple temp_tuple = m_pathTable->tempTuple();
+						//start vertex, end vertex, length, cost, path
+						//set the start vertex to the vertex having an edge that closes the loop (for debugging purposes)
+						temp_tuple.setNValue(0, ValueFactory::getIntegerValue(outEdge->getStartVertex()->getId()));
+						temp_tuple.setNValue(1, ValueFactory::getIntegerValue(startVertexId));
+						temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
+						temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
+						//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+						m_pathTable->insertTempTuple(temp_tuple);
+					}
+				}
+				else
+				{
+					//add to the queue, as currentDepth is less than depth
+					q.push(outVertex);
+				}
+			}
+		}
+
+		//empty the queue
+		while(!q.empty())
+		{
+			q.pop();
+		}
+	}
+
+	std::stringstream paramsToPrint;
+	paramsToPrint << "SubGraphLoop: length = " << length << ", vSelectivity = " << vSelectivity
+			<< ", eSelectivity = " << eSelectivity
+			<< ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
+	LogManager::GLog("GraphView", "SubGraphLoop", 625, paramsToPrint.str());
+}
+
 void GraphView::SubGraphLoop(int startVertexId, int length)
 {
 	queue<Vertex*> q;
@@ -698,9 +779,10 @@ void GraphView::fillGraphFromRelationalTables()
 	}
 
 	paramsToPrint << " ##### vertexId= " << m_vertexIdColumnIndex << ", edgeId= " << m_edgeIdColumnIndex
-			<< "from = " << m_edgeFromColumnIndex << ", to = " << m_edgeToColumnIndex;
+			<< "from = " << m_edgeFromColumnIndex << ", to = " << m_edgeToColumnIndex
+			<< "vPropColIndex = " << m_vPropColumnIndex << ", ePropColIndex = " << m_ePropColumnIndex;
 
-	LogManager::GLog("GraphView", "fill", 180, paramsToPrint.str());
+	LogManager::GLog("GraphView", "fill", 785, paramsToPrint.str());
 
 	assert(m_vertexIdColumnIndex >= 0 && m_edgeIdColumnIndex >= 0 && m_edgeFromColumnIndex >= 0 && m_edgeToColumnIndex >=0);
 

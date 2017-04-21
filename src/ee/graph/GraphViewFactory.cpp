@@ -70,24 +70,22 @@ GraphView* GraphViewFactory::createGraphView(const std::string &graphViewName, c
 	}
 
 	vw->m_vPropColumnIndex = -1;
+	vw->m_ePropColumnIndex = -1;
 
 	for(int i = 0; i < vw->m_vertexColumnNames.size(); i++)
 	{
 		if (vw->m_vertexColumnNames[i] == "ID")
 		{
 			vw->m_vertexIdColumnIndex = vw->m_columnIDsInVertexTable[i];
-			break;
 		}
 		else if (vw->m_vertexColumnNames[i] == "VPROP")
 		{
 			vw->m_vPropColumnIndex = vw->m_columnIDsInVertexTable[i];
-			break;
 		}
 	}
 	//TODO: fix issue by setting vw->m_vertexIdColumnIndex dynamically
-	vw->m_vertexIdColumnIndex = 0;
-
-	vw->m_ePropColumnIndex = -1;
+	//Fixed
+	//vw->m_vertexIdColumnIndex = 0;
 
 	for(int i = 0; i < vw->m_edgeColumnNames.size(); i++)
 	{

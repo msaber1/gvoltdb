@@ -34,7 +34,9 @@ Vertex* Edge::getEndVertex()
 string Edge::toString()
 {
 	std::ostringstream stream;
-	stream << "(id = " << this->getId() << ", from = " << this->m_startVertexId << ", to = " <<
+	stream << "(id = " << this->getId()
+		   << ", eProp = " << this->eProp
+			<< ", from = " << this->m_startVertexId << ", to = " <<
 		this->m_endVertexId << ")";
 	return stream.str();
 }
