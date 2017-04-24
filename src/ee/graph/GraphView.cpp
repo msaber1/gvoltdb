@@ -568,7 +568,6 @@ void GraphView::SubGraphLoop(int length, int vSelectivity, int eSelectivity)
 		currentVertex = it->second;
 		if(currentVertex->vProp > vSelectivity)
 		{
-			cout << "skipping vertex " << currentVertex->getId() << endl;
 			continue;
 		}
 		startVertexId = currentVertex->getId();
@@ -588,7 +587,6 @@ void GraphView::SubGraphLoop(int length, int vSelectivity, int eSelectivity)
 
 				if(outEdge->eProp > eSelectivity)
 				{
-					cout << "skipping edge " << outEdge->getId() << endl;
 					continue;
 				}
 
