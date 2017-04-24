@@ -301,6 +301,9 @@ void GraphView::SP_TopK(int src, int dest, int k)
 	Vertex* v = NULL;
 	Edge* e = NULL;
 	int currVId, fanOut = -1, candVertexId = -1;
+	
+	int maxPQOperations = this->numOfVertexes();
+	int iterationNum = 0;
 
 	while(!pq.empty())
 	{
@@ -321,10 +324,12 @@ void GraphView::SP_TopK(int src, int dest, int k)
 			//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
 			m_pathTable->insertTempTuple(temp_tuple);
 		}
-		if(foundPathsSoFar == k)
+		iterationNum++;
+
+		if(foundPathsSoFar == k || iterationNum == maxPQOperations)
 		{
 			break;
-		}
+		} 
 		pq.pop();
 
 		//explore the outgoing vertexes
