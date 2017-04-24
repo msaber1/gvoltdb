@@ -272,12 +272,18 @@ void GraphView::expandCurrentPathOperation()
 		case 13: //vertex and edge selectivity
 			this->SubGraphLoop(this->pathLength, this->vSelectivity, this->eSelectivity);
 			break;
+		case 14: //start from a specific vertex and allow vertex and edge selectivity
+			this->SubGraphLoopFromStartVertex(this->fromVertexId, this->pathLength, this->vSelectivity, this->eSelectivity);
+			break;
 		//shortest paths
 		case 21: //top k shortest paths
 			this->SP_TopK(this->fromVertexId, this->toVertexId, this->topK);
 			break;
 		case 22: //top 1 shortest path with edge selectivity
 			this->SP_EdgeSelectivity(this->fromVertexId, this->toVertexId, this->eSelectivity);
+			break;
+		case 23: //Single source to all vertexes shortest paths
+			this->SP_ToAllVertexes_EdgeSelectivity(this->fromVertexId, this->eSelectivity);
 			break;
 		}
 		executeTraversal = false;
@@ -347,6 +353,70 @@ void GraphView::SP_TopK(int src, int dest, int k)
 			<< ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
 	LogManager::GLog("GraphView", "TopK_SP", 334, paramsToPrint.str());
 }
+
+void GraphView::SP_ToAllVertexes_EdgeSelectivity(int src, int edgeSelectivity)
+{
+	int minCost = INT_MAX;
+	priority_queue<PQEntry, vector<PQEntry>, std::greater<PQEntry>> pq;
+	map<int, int> costMap;
+	costMap[src] = 0;
+	pq.push(make_pair(0, src)); //zero cost to reach Vertex from
+	Vertex* v = NULL;
+	Edge* e = NULL;
+	int currVId, fanOut = -1, candVertexId = -1;
+
+	while(!pq.empty())
+	{
+		//select next vertex to explore
+		currVId = pq.top().second;
+		minCost = pq.top().first;
+		/*
+		if(currVId == dest)
+		{
+			//add a tuple here
+			TableTuple temp_tuple = m_pathTable->tempTuple();
+			//start vertex, end vertex, length, cost, path
+			temp_tuple.setNValue(0, ValueFactory::getIntegerValue(src));
+			temp_tuple.setNValue(1, ValueFactory::getIntegerValue(dest));
+			temp_tuple.setNValue(2, ValueFactory::getIntegerValue(minCost));
+			temp_tuple.setNValue(3, ValueFactory::getDoubleValue(minCost));
+			//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+			m_pathTable->insertTempTuple(temp_tuple);
+			break;
+		}
+		*/
+		pq.pop();
+
+		//explore the outgoing vertexes
+		v = this->getVertex(currVId);
+		fanOut = v->fanOut();
+		for(int i = 0; i < fanOut; i++)
+		{
+			e = v->getOutEdge(i);
+			candVertexId = e->getEndVertex()->getId();
+
+			if(e->eProp > eSelectivity)
+			{
+				continue;
+			}
+
+			if ( (costMap.find(candVertexId) == costMap.end()) ||
+				 (costMap[candVertexId] > minCost + 1) )
+			{
+				costMap[candVertexId] = minCost + 1;
+				pq.push(make_pair(minCost + 1, candVertexId));
+			}
+
+		}
+	}
+
+	std::stringstream paramsToPrint;
+	paramsToPrint << "SSSP with eSelectivity: from = "
+			<< ", eSelectivity = " << edgeSelectivity
+			<< ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
+	LogManager::GLog("GraphView", "SP_eSelectivity", 398, paramsToPrint.str());
+}
+
 
 void GraphView::SP_EdgeSelectivity(int src, int dest, int edgeSelectivity)
 {
@@ -557,6 +627,81 @@ void GraphView::BFS_Reachability_ByDestination(int startVertexId, int destVerexI
 	paramsToPrint << "BFS_Reachability_ByDestination: from = " << startVertexId << ", to = " << destVerexId << ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
 	LogManager::GLog("GraphView", "BFS_Reachability", 513, paramsToPrint.str());
 }
+
+void GraphView::SubGraphLoopFromStartVertex(int startVertexId, int length, int vSelectivity, int eSelectivity)
+{
+	queue<Vertex*> q;
+	Vertex* currentVertex = NULL;
+	//for(std::map<int, Vertex*>::iterator it = m_vertexes.begin(); it != m_vertexes.end(); ++it)
+	{
+		currentVertex = this->getVertex(startVertexId);
+
+		currentVertex->Level = 0;
+		q.push(currentVertex);
+		int fanOut;
+		Edge* outEdge = NULL;
+		Vertex* outVertex = NULL;
+		while(!q.empty() && currentVertex->Level < length)
+		{
+			currentVertex = q.front();
+			q.pop();
+			fanOut = currentVertex->fanOut();
+			for(int i = 0; i < fanOut; i++)
+			{
+				outEdge = currentVertex->getOutEdge(i);
+
+				if(outEdge->eProp > eSelectivity)
+				{
+					continue;
+				}
+
+				outVertex = outEdge->getEndVertex();
+
+				if(outVertex->vProp > vSelectivity)
+				{
+					continue;
+				}
+
+				outVertex->Level = currentVertex->Level + 1;
+				if(outVertex->Level == length)
+				{
+					//we found a loop of the desired length
+					if(outVertex->getId() == startVertexId)
+					{
+						//Now, we reached the destination vertexes, where we should add tuples into the output table
+						TableTuple temp_tuple = m_pathTable->tempTuple();
+						//start vertex, end vertex, length, cost, path
+						//set the start vertex to the vertex having an edge that closes the loop (for debugging purposes)
+						temp_tuple.setNValue(0, ValueFactory::getIntegerValue(outEdge->getStartVertex()->getId()));
+						temp_tuple.setNValue(1, ValueFactory::getIntegerValue(startVertexId));
+						temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
+						temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
+						//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+						m_pathTable->insertTempTuple(temp_tuple);
+					}
+				}
+				else
+				{
+					//add to the queue, as currentDepth is less than depth
+					q.push(outVertex);
+				}
+			}
+		}
+
+		//empty the queue
+		while(!q.empty())
+		{
+			q.pop();
+		}
+	}
+
+	std::stringstream paramsToPrint;
+	paramsToPrint << "SubGraphLoop from a specific vertex: length = " << length << ", vSelectivity = " << vSelectivity
+			<< ", eSelectivity = " << eSelectivity
+			<< ", numOfRowsAdded = " << m_pathTable->activeTupleCount();
+	LogManager::GLog("GraphView", "SubGraphLoop", 703, paramsToPrint.str());
+}
+
 
 void GraphView::SubGraphLoop(int length, int vSelectivity, int eSelectivity)
 {

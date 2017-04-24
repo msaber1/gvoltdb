@@ -101,12 +101,14 @@ public:
 	void BFS_Reachability_ByDepth_eSelectivity(int startVertexId, int depth, int eSelectivity);
 	void SP_TopK(int src, int dest, int k);
 	void SP_EdgeSelectivity(int src, int dest, int edgeSelectivity);
+	void SP_ToAllVertexes_EdgeSelectivity(int src, int edgeSelectivity);
 	int fromVertexId, toVertexId, queryType, pathLength, topK, vSelectivity, eSelectivity;
 
 	//Topology query, i.e., connected sub-graph of
 
 	//to select all vertexes, set vSelectivty to 100, same for the edges
 	void SubGraphLoop(int length, int vSelectivity, int eSelectivity);
+	void SubGraphLoopFromStartVertex(int startVertexId, int length, int vSelectivity, int eSelectivity); //14
 	void SubGraphLoop(int startVertexId, int length); //startVertexId of -1 means to try all the vertexes as the start of the loop
 
 
