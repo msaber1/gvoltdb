@@ -322,6 +322,7 @@ void GraphView::SP_TopK(int src, int dest, int k)
 			temp_tuple.setNValue(2, ValueFactory::getIntegerValue(minCost));
 			temp_tuple.setNValue(3, ValueFactory::getDoubleValue(minCost));
 			//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+			if(m_pathTable->activeTupleCount() <= 100)
 			m_pathTable->insertTempTuple(temp_tuple);
 		}
 		iterationNum++;
@@ -386,6 +387,7 @@ void GraphView::SP_ToAllVertexes_EdgeSelectivity(int src, int edgeSelectivity)
 			temp_tuple.setNValue(2, ValueFactory::getIntegerValue(minCost));
 			temp_tuple.setNValue(3, ValueFactory::getDoubleValue(minCost));
 			//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+			if(m_pathTable->activeTupleCount() <= 100)
 			m_pathTable->insertTempTuple(temp_tuple);
 			break;
 		}
@@ -449,7 +451,8 @@ void GraphView::SP_EdgeSelectivity(int src, int dest, int edgeSelectivity)
 			temp_tuple.setNValue(2, ValueFactory::getIntegerValue(minCost));
 			temp_tuple.setNValue(3, ValueFactory::getDoubleValue(minCost));
 			//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
-			m_pathTable->insertTempTuple(temp_tuple);
+			if(m_pathTable->activeTupleCount() <= 100)
+				m_pathTable->insertTempTuple(temp_tuple);
 			break;
 		}
 		pq.pop();
@@ -519,6 +522,7 @@ void GraphView::BFS_Reachability_ByDepth_eSelectivity(int startVertexId, int dep
 					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
 					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(outVertex->Level + 1)));
 					//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+					if(m_pathTable->activeTupleCount() <= 100)
 					m_pathTable->insertTempTuple(temp_tuple);
 				}
 				else
@@ -566,6 +570,7 @@ void GraphView::BFS_Reachability_ByDepth(int startVertexId, int depth)
 					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
 					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(outVertex->Level + 1)));
 					//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+					if(m_pathTable->activeTupleCount() <= 100)
 					m_pathTable->insertTempTuple(temp_tuple);
 				}
 				else
@@ -613,6 +618,7 @@ void GraphView::BFS_Reachability_ByDestination(int startVertexId, int destVerexI
 					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
 					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(outVertex->Level + 1)));
 					temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+					if(m_pathTable->activeTupleCount() <= 100)
 					m_pathTable->insertTempTuple(temp_tuple);
 
 					found = true;
@@ -682,6 +688,7 @@ void GraphView::SubGraphLoopFromStartVertex(int startVertexId, int length, int v
 						temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
 						temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
 						//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+						if(m_pathTable->activeTupleCount() <= 100)
 						m_pathTable->insertTempTuple(temp_tuple);
 					}
 				}
@@ -756,6 +763,7 @@ void GraphView::SubGraphLoop(int length, int vSelectivity, int eSelectivity)
 						temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
 						temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
 						//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+						if(m_pathTable->activeTupleCount() <= 100)
 						m_pathTable->insertTempTuple(temp_tuple);
 					}
 				}
@@ -819,6 +827,7 @@ void GraphView::SubGraphLoop(int startVertexId, int length)
 						temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
 						temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
 						//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+						if(m_pathTable->activeTupleCount() <= 100)
 						m_pathTable->insertTempTuple(temp_tuple);
 					}
 				}
@@ -863,6 +872,7 @@ void GraphView::SubGraphLoop(int startVertexId, int length)
 							temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
 							temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
 							//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
+							if(m_pathTable->activeTupleCount() <= 100)
 							m_pathTable->insertTempTuple(temp_tuple);
 						}
 					}
