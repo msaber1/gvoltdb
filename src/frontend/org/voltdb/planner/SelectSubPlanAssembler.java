@@ -27,7 +27,9 @@ import java.util.Set;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.parseinfo.BranchNode;
 import org.voltdb.planner.parseinfo.JoinNode;
@@ -37,10 +39,14 @@ import org.voltdb.planner.parseinfo.SubqueryLeafNode;
 import org.voltdb.plannodes.AbstractJoinPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractReceivePlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPathPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.NestLoopPathPlanNode;
+import org.voltdb.plannodes.PathScanPlanNode;
 import org.voltdb.types.JoinType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.PermutationGenerator;
@@ -702,15 +708,92 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             canHaveNLJ = false;
         }
 
+        // Sigmod Demo
+        boolean isInnerPathNode = false;
+        boolean isOuterPathNode = false;
+        if ((innerPlan instanceof PathScanPlanNode) ||
+        	(innerPlan instanceof NestLoopPathPlanNode) ||
+        	(innerPlan instanceof NestLoopIndexPathPlanNode)
+           ){
+        	isInnerPathNode = true;
+        }
+        else if ((outerPlan instanceof PathScanPlanNode) ||
+        		 (outerPlan instanceof NestLoopPathPlanNode) ||
+            	 (outerPlan instanceof NestLoopIndexPathPlanNode)
+        		)
+        {
+        	isOuterPathNode = true;
+        }
+        
+        if ((isInnerPathNode && ((outerPlan instanceof NestLoopPlanNode) || (outerPlan instanceof NestLoopIndexPlanNode))) ||
+            (isOuterPathNode && ((innerPlan instanceof NestLoopPlanNode) || (innerPlan instanceof NestLoopIndexPlanNode)))
+           ) {
+        	return null;
+        }
+        
+        //
         AbstractJoinPlanNode ajNode = null;
         if (canHaveNLJ) {
-            NestLoopPlanNode nljNode = new NestLoopPlanNode();
+            //NestLoopPlanNode nljNode = new NestLoopPlanNode();
+            
+            AbstractJoinPlanNode nljNode;
+            //Sigmod Demo
+            if (isInnerPathNode || isOuterPathNode) {
+            	AbstractPlanNode tablePlan;
+            	AbstractPlanNode pathPlan;
+            	if (isInnerPathNode) {
+            		pathPlan = innerPlan;
+            		tablePlan = outerPlan;
+            	}
+            	else {
+            		tablePlan = innerPlan;
+            		pathPlan = outerPlan;
+            	}
+            	
+            	nljNode = new NestLoopPathPlanNode();
+            	nljNode.setGraph(true);
+            	
+            	if (pathPlan instanceof AbstractJoinPlanNode) {
+            		nljNode.set_targetGraphName(((AbstractJoinPlanNode)pathPlan).get_targetGraphName());
+            	} else {
+            		nljNode.set_targetGraphName(((AbstractScanPlanNode)pathPlan).getTargetTableName());
+            	}
+            
+            	nljNode.set_outerTable(((AbstractScanPlanNode)tablePlan).getTargetTableName());
+            	
+            	for(AbstractExpression e: innerAccessPath.joinExprs) {
+            		for (int i=0; i < e.getLeft().findAllTupleValueSubexpressions().size();i++) {
+            			String PathColumn = ((TupleValueExpression)e.getLeft().findAllTupleValueSubexpressions().get(i)).getColumnName();
+            			String TableColumn = ((TupleValueExpression)e.getRight().findAllTupleValueSubexpressions().get(i)).getColumnName();
+            			if (PathColumn == "STARTVERTEXID") {
+            				nljNode.set_startVertexColumn(TableColumn);
+            			}
+            			else if (PathColumn == "ENDVERTEXID") {
+            				nljNode.set_endVertexColumn(TableColumn);
+            			}
+            		}
+            	}
+            	
+            	for(AbstractExpression e: innerAccessPath.otherExprs) {
+            		if (e instanceof ComparisonExpression) {
+	            		String PathColumn = ((TupleValueExpression)e.getLeft()).getColumnName();
+	            		if (PathColumn == "LENGTH") {	
+	            			String Value = ((ParameterValueExpression)e.getRight()).getOriginalValue().getValue();
+	            			nljNode.set_pathLength(Value);	            			
+	            		}
+            		}
+            	}
+            } else {
+            	nljNode = new NestLoopPlanNode();
+            }
+            
             // get all the clauses that join the applicable two tables
             // Copy innerAccessPath.joinExprs to leave it unchanged,
             // avoiding accumulation of redundant expressions when
             // joinClauses gets built up for various alternative plans.
             ArrayList<AbstractExpression> joinClauses = new ArrayList<>(innerAccessPath.joinExprs);
             if ((innerPlan instanceof IndexScanPlanNode) ||
+            		
                 (innerPlan instanceof NestLoopIndexPlanNode
                     && innerPlan.getChild(0) instanceof MaterializedScanPlanNode)) {
                 // InnerPlan is an IndexScan OR an NLIJ of a MaterializedScan
@@ -766,7 +849,64 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
             ajNode = nljNode;
         }
         else if (canHaveNLIJ) {
-            NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
+            //NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
+            
+            AbstractJoinPlanNode nlijNode;
+            //Sigmod Demo
+            if (isInnerPathNode || isOuterPathNode) {
+            	AbstractPlanNode tablePlan;
+            	AbstractPlanNode pathPlan;
+            	if (isInnerPathNode) {
+            		pathPlan = innerPlan;
+            		tablePlan = outerPlan;
+            	}
+            	else {
+            		tablePlan = innerPlan;
+            		pathPlan = outerPlan;
+            	}
+            	
+            	assert(joinNode.getLeftNode() != null);
+                JoinNode outerJoinNode = joinNode.getLeftNode();
+                AccessPath outerAccessPath = outerJoinNode.m_currentAccessPath;
+                
+                //Sigmod Demo
+            	
+            	nlijNode = new NestLoopIndexPathPlanNode();
+            	nlijNode.setGraph(true);
+            	if (pathPlan instanceof AbstractJoinPlanNode) {
+            		nlijNode.set_targetGraphName(((AbstractJoinPlanNode)pathPlan).get_targetGraphName());
+            	} else {
+            		nlijNode.set_targetGraphName(((AbstractScanPlanNode)pathPlan).getTargetTableName());
+            	}
+            	
+            	nlijNode.set_outerTable(((AbstractScanPlanNode)tablePlan).getTargetTableName());
+            	
+            	for(AbstractExpression e: joinNode.m_joinInnerOuterList) {//innerAccessPath.joinExprs) {
+            		for (int i=0; i < e.getLeft().findAllTupleValueSubexpressions().size();i++) {
+            			String PathColumn = ((TupleValueExpression)e.getLeft().findAllTupleValueSubexpressions().get(i)).getColumnName();
+            			String TableColumn = ((TupleValueExpression)e.getRight().findAllTupleValueSubexpressions().get(i)).getColumnName();
+            			if (PathColumn == "STARTVERTEXID") {
+            				nlijNode.set_startVertexColumn(TableColumn);
+            			}
+            			else if (PathColumn == "ENDVERTEXID") {
+            				nlijNode.set_endVertexColumn(TableColumn);
+            			}
+            		}
+            	}
+            	
+            	for(AbstractExpression e: outerAccessPath.otherExprs) {
+            		if (e instanceof ComparisonExpression) {
+	            		String PathColumn = ((TupleValueExpression)e.getLeft()).getColumnName();
+	            		if (PathColumn == "LENGTH") {	
+	            			String Value = ((ParameterValueExpression)e.getRight()).getOriginalValue().getValue();
+	            			nlijNode.set_pathLength(Value);	            			
+	            		}
+            		}
+            	}
+            } else {
+            	nlijNode = new NestLoopIndexPlanNode();
+            }
+            
 
             IndexScanPlanNode innerNode = (IndexScanPlanNode) innerPlan;
             // Set IndexScan predicate. The INNER join expressions for a FULL join come from

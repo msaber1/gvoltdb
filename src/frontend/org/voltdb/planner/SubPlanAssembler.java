@@ -1592,7 +1592,7 @@ public abstract class SubPlanAssembler {
 
     // Generate a plan for an IN-LIST-driven index scan
     private static AbstractPlanNode injectIndexedJoinWithMaterializedScan(AbstractExpression listElements,
-                                                                   IndexScanPlanNode scanNode)
+                                                                          IndexScanPlanNode scanNode)
     {
         MaterializedScanPlanNode matScan = new MaterializedScanPlanNode();
         assert(listElements instanceof VectorValueExpression || listElements instanceof ParameterValueExpression);

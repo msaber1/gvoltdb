@@ -63,8 +63,8 @@ public class TestGraphPlannerTool extends TestCase {
 
         AdHocPlannedStatement result = null;
         
-        result = m_pt.planSqlForTest("select * from SocialNetwork.Vertexes;");
-        System.out.println(result);
+        //result = m_pt.planSqlForTest("select * from SocialNetwork.Vertexes;");
+        //System.out.println(result);
 
         /*
         result = null;
@@ -79,8 +79,26 @@ public class TestGraphPlannerTool extends TestCase {
         System.out.println(result);
 		*/
         
+        //result = null;
+        //result = m_pt.planSqlForTest("select V.isRelative, R.lName from Ralationships V JOIN USERS R ON V.uId = R.UID;");
+        //System.out.println(result);
+        
+        // Sigmod Demo
+        //result = null;
+        //result = m_pt.planSqlForTest("Select * from Users U, SocialNetwork.Paths P " + 
+        //                             "Where P.StartVertexID = U.UId and P.Length = 2;");
+        //System.out.println(result);
+        
+        
+        //result = null;
+        //result = m_pt.planSqlForTest("Select * from Users U, Users U2, SocialNetwork.Paths P "+
+        //							 "Where P.StartVertexID = U.UId And P.EndVertexId = U2.UId and P.Length = 2;");
+        //System.out.println(result);
+        
+        
         result = null;
-        result = m_pt.planSqlForTest("select V.isRelative, R.lName from Ralationships V JOIN USERS R ON V.uId = R.UID;");
+        result = m_pt.planSqlForTest("Select * from Users U, Users U2, SocialNetwork.Paths P Hint(SHORTESTPATH(Weight)) " + 
+		                             "Where P.StartVertexID = U.UId And P.EndVertexId = U2.UId;");
         System.out.println(result);
         
         /*

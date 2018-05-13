@@ -33,7 +33,9 @@ import org.voltdb.plannodes.MaterializePlanNode;
 import org.voltdb.plannodes.MaterializedScanPlanNode;
 import org.voltdb.plannodes.MergeReceivePlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
+import org.voltdb.plannodes.NestLoopIndexPathPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.NestLoopPathPlanNode;
 import org.voltdb.plannodes.OrderByPlanNode;
 import org.voltdb.plannodes.PartialAggregatePlanNode;
 import org.voltdb.plannodes.PartitionByPlanNode;
@@ -71,9 +73,11 @@ public enum PlanNodeType {
     //
     // Join Nodes
     //
-    NESTLOOP        (20, NestLoopPlanNode.class),
-    NESTLOOPINDEX   (21, NestLoopIndexPlanNode.class),
-
+    NESTLOOP           (20, NestLoopPlanNode.class),
+    NESTLOOPINDEX      (21, NestLoopIndexPlanNode.class),
+    NESTLOOPINDEXPATH  (22, NestLoopIndexPathPlanNode.class),
+    NESTLOOPPATH       (23, NestLoopPathPlanNode.class),
+    
     //
     // Operator Nodes
     //

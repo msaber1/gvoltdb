@@ -83,16 +83,32 @@ public class TestGraphPlanner extends TestCase {
         //        + " from Users " 
         //        + " WHERE lName = 'Smith';");
     	
-    	runSQLTest("1", "select * from SocialNetwork.Vertexes;"); // 
+    	//runSQLTest("1", "select * from SocialNetwork.Vertexes;"); // 
         
     	//runSQLTest("1", "select fanOut "
         //              + " from SocialNetwork.Vertexes " 
         //              + " WHERE lstName = 'Smith';");
         
-    	runSQLTest("1", "select * from SocialNetwork.Edges;"); //
+    	//runSQLTest("1", "select * from SocialNetwork.Edges;"); //
     	
-    	runSQLTest("1", "select V.FanOut, R.lName from SocialNetwork.Vertexes V JOIN USERS R ON V.ID = R.UID;");
+    	//runSQLTest("1", "select V.FanOut, R.lName from SocialNetwork.Vertexes V JOIN USERS R ON V.ID = R.UID;");
     	
+    	// Sigmod Demo
+    	//runSQLTest("1", "Select * from Users U, SocialNetwork.Paths P " + 
+    	//                "Where P.StartVertexID = U.UId and P.Length = 2;");
+    	
+    	//runSQLTest("1", "Select * from Users U, Users U2, SocialNetwork.Paths P "+
+        //				"Where P.StartVertexID = U.UId And P.EndVertexId = U2.UId and P.Length = 2;");
+        
+        
+    	runSQLTest("1", "Select * from Users U, Users U2, SocialNetwork.Paths P Hint(SHORTESTPATH(Weight)) " + 
+        		        "Where P.StartVertexID = U.UId And P.EndVertexId = U2.UId;");
+    	
+    	
+    	
+    	
+    	//runSQLTest("1", "select * from SocialNetwork.Paths P Hint(SHORTESTPATH(Weight)) " + 
+    	//                "where P.StartVertexID = 1 and P.EndVertexID = 2;");
     	
     	//runSQLTest("1", "select PS.EndVertex.ID "
     	//			  + "from SocialNetwork.Paths PS "

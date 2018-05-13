@@ -43,7 +43,13 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         PRE_JOIN_PREDICATE,
         JOIN_PREDICATE,
         WHERE_PREDICATE,
-        OUTPUT_SCHEMA_PRE_AGG;
+        OUTPUT_SCHEMA_PRE_AGG,
+        // GRFusion Sigmod Demo (tkuznets) 05/09/2018
+        OUTER_TABLE,
+        TARGET_GRAPH_NAME,
+        START_VERTEX_COLUMN, 
+        END_VERTEX_COLUMN, 
+        PATH_LENGTH;
     }
 
     protected JoinType m_joinType = JoinType.INNER;
@@ -56,11 +62,103 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
     protected NodeSchema m_outputSchemaPreInlineAgg = null;
 
+    // GRFusion Sigmod Demo (tkuznets) 05/09/2018
+    protected String m_outerTable;
+    protected String m_targetGraphName;
+    protected String m_startVertexColumn;
+    protected String m_endVertexColumn;
+    protected String m_pathLength;
+    protected boolean isGraph;
+    
     protected AbstractJoinPlanNode() {
         super();
     }
+    
+    
 
-    @Override
+    public String get_outerTable() {
+		assert(isGraph == true);
+    	return m_outerTable;
+	}
+
+
+
+    public void set_outerTable(String m_outerTable) {
+		assert(isGraph == true);
+		this.m_outerTable = m_outerTable;
+	}
+
+
+
+    public String get_targetGraphName() {
+		assert(isGraph == true);
+		return m_targetGraphName;
+	}
+
+
+
+	public void set_targetGraphName(String m_targetGraphName) {
+		assert(isGraph == true);
+		this.m_targetGraphName = m_targetGraphName;
+	}
+
+
+
+	public String get_startVertexColumn() {
+		assert(isGraph == true);
+		return m_startVertexColumn;
+	}
+
+
+
+	public void set_startVertexColumn(String m_startVertexColumn) {
+		assert(isGraph == true);
+		this.m_startVertexColumn = m_startVertexColumn;
+	}
+
+
+
+	public String get_endVertexColumn() {
+		assert(isGraph == true);
+		return m_endVertexColumn;
+	}
+
+
+
+	public void set_endVertexColumn(String m_endVertexColumn) {
+		assert(isGraph == true);
+		this.m_endVertexColumn = m_endVertexColumn;
+	}
+
+
+
+	public String get_pathLength() {
+		assert(isGraph == true);
+		return m_pathLength;
+	}
+
+
+
+	public void set_pathLength(String m_pathLength) {
+		assert(isGraph == true);
+		this.m_pathLength = m_pathLength;
+	}
+
+
+
+	public boolean isGraph() {
+		return isGraph;
+	}
+
+
+
+	public void setGraph(boolean isGraph) {
+		this.isGraph = isGraph;
+	}
+
+
+
+	@Override
     public void validate() throws Exception {
         super.validate();
 
@@ -305,6 +403,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         stringer.key(Members.PRE_JOIN_PREDICATE.name()).value(m_preJoinPredicate);
         stringer.key(Members.JOIN_PREDICATE.name()).value(m_joinPredicate);
         stringer.key(Members.WHERE_PREDICATE.name()).value(m_wherePredicate);
+        
+        if (isGraph) {
+        	stringer.key(Members.OUTER_TABLE.name()).value(m_outerTable);
+        	stringer.key(Members.TARGET_GRAPH_NAME.name()).value(m_targetGraphName);
+        	stringer.key(Members.START_VERTEX_COLUMN.name()).value(m_startVertexColumn);
+        	stringer.key(Members.END_VERTEX_COLUMN.name()).value(m_endVertexColumn);
+        	stringer.key(Members.PATH_LENGTH.name()).value(m_pathLength);
+        }
 
         if (m_outputSchemaPreInlineAgg != m_outputSchema) {
             stringer.key(Members.OUTPUT_SCHEMA_PRE_AGG.name());
@@ -420,8 +526,14 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
             predicate = ((AbstractScanPlanNode) childNode).getPredicate();
         } else if (childNode instanceof NestLoopPlanNode) {
             predicate = ((NestLoopPlanNode) childNode).getWherePredicate();
+        } else if (childNode instanceof NestLoopPathPlanNode) {
+            predicate = ((NestLoopPathPlanNode) childNode).getWherePredicate();
         } else if (childNode instanceof NestLoopIndexPlanNode) {
             AbstractPlanNode inlineIndexScan = ((NestLoopIndexPlanNode) childNode).getInlinePlanNode(PlanNodeType.INDEXSCAN);
+            assert(inlineIndexScan != null);
+            predicate = ((AbstractScanPlanNode) inlineIndexScan).getPredicate();
+        } else if (childNode instanceof NestLoopIndexPathPlanNode) {
+        	AbstractPlanNode inlineIndexScan = ((NestLoopIndexPathPlanNode) childNode).getInlinePlanNode(PlanNodeType.INDEXSCAN);
             assert(inlineIndexScan != null);
             predicate = ((AbstractScanPlanNode) inlineIndexScan).getPredicate();
         } else {
