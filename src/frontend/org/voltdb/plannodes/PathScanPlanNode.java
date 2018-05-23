@@ -156,4 +156,13 @@ public class PathScanPlanNode extends SeqScanPlanNode {
         stringer.key(Members.PROP4.name()).value(prop4);
         stringer.key(Members.PROP5.name()).value(prop5);
     }
+    
+    @Override
+    protected String explainPlanForNode(String indent) {
+        String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
+        if (m_targetTableAlias != null && !m_targetTableAlias.equals(tableName)) {
+            tableName += " (" + m_targetTableAlias +")";
+        }
+        return "SEQUENTIAL PATHSCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
+    }
 }

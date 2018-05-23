@@ -53,7 +53,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         PREDICATE_FALSE,
         TARGET_GRAPH_NAME,
         TARGET_GRAPH_ALIAS,
-        TARGET_OBJECT_NAME;
+        TARGET_OBJECT_NAME,
+    	ISGRAPH;
     }
 
     // Store the columns from the table as an internal NodeSchema
@@ -540,6 +541,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             stringer.key(Members.PREDICATE.name());
             stringer.value(m_predicate);
         }
+        stringer.key(Members.ISGRAPH.name()).value(String.valueOf(isGraph).toUpperCase());
         if (!isGraph) {
         	stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
         	stringer.key(Members.TARGET_TABLE_ALIAS.name()).value(m_targetTableAlias);
@@ -556,14 +558,20 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         helpLoadFromJSONObject(jobj, db);
         m_predicate = AbstractExpression.fromJSONChild(jobj, Members.PREDICATE.name(), m_tableScan);
-        m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
-        m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
-        if (m_targetTableName == null) {
+        isGraph = Boolean.valueOf( jobj.getString( Members.ISGRAPH.name() ));
+        if (!isGraph) {
+        	m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
+        	m_targetTableAlias = jobj.getString( Members.TARGET_TABLE_ALIAS.name() );
+        } else {
         	m_targetTableName = jobj.getString( Members.TARGET_GRAPH_NAME.name() );
-        	//m_targetObjectName = jobj.getString( Members.TARGET_OBJECT_NAME.name() );
-        	m_targetTableAlias = jobj.getString( Members.TARGET_GRAPH_ALIAS.name() );            
-            isGraph = true;
+        	m_targetTableAlias = jobj.getString( Members.TARGET_GRAPH_ALIAS.name() );
         }
+        //if (m_targetTableName == null) {
+        //	m_targetTableName = jobj.getString( Members.TARGET_GRAPH_NAME.name() );
+        //	m_targetTableAlias = jobj.getString( Members.TARGET_GRAPH_ALIAS.name() );   
+        //  m_targetObjectName = jobj.getString( Members.TARGET_OBJECT_NAME.name() );
+        //    isGraph = true;
+        //}
         if (jobj.has("SUBQUERY_INDICATOR")) {
             m_isSubQuery = "TRUE".equals(jobj.getString( Members.SUBQUERY_INDICATOR.name() ));
         }
