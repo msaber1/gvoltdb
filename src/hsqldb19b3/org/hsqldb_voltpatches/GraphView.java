@@ -125,7 +125,7 @@ public class GraphView implements SchemaObject {
     	addPathPropNoCheck(pathLength);    	
     	
     	Name = database.nameManager.newColumnHsqlName(schema, "COST", isDelimitedIdentifier);
-    	ColumnSchema pathCost = new ColumnSchema(Name, new NumberType(Types.SQL_INTEGER, DefPrecision, 0), false, false, null);
+    	ColumnSchema pathCost = new ColumnSchema(Name, new NumberType(Types.SQL_DOUBLE, DefPrecision, 0), false, false, null);
     	addPathPropNoCheck(pathCost);
     	
     	Name = database.nameManager.newColumnHsqlName(schema, "PATH", isDelimitedIdentifier);

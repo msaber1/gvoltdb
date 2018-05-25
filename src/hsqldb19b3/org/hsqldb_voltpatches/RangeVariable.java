@@ -62,6 +62,7 @@ final class RangeVariable {
 	private final String c_PROP3 = "PROP3";
 	private final String c_PROP4 = "PROP4";
 	private final String c_PROP5 = "PROP5";
+	private final String c_LENGTH = "LENGTH";
 	//
 	
     static final RangeVariable[] emptyArray = new RangeVariable[]{};
@@ -1554,6 +1555,11 @@ final class RangeVariable {
 							 ccc.attributes.get("column").equals(c_PROP5)) {
 						VoltXMLElement value = c.children.get(i+1);
 						scan.attributes.put("prop5", value.attributes.get("value"));
+					}
+					else if (ccc.attributes.containsKey("column") && 
+							 ccc.attributes.get("column").equals(c_LENGTH)) {
+						VoltXMLElement value = c.children.get(i+1);
+						scan.attributes.put("length", value.attributes.get("value"));
 					}
 					i++;
 				}
