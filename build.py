@@ -287,6 +287,7 @@ CTX.INPUT['executors'] = """
  VertexScanExecutor.cpp
  EdgeScanExecutor.cpp
  PathScanExecutor.cpp
+ NestedLoopPathExecutor.cpp
 """
 
 CTX.INPUT['expressions'] = """
@@ -335,6 +336,7 @@ CTX.INPUT['plannodes'] = """
  VertexScanNode.cpp
  EdgeScanNode.cpp
  PathScanNode.cpp
+ NestedLoopPathNode.cpp
 """
 
 CTX.INPUT['indexes'] = """

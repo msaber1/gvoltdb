@@ -94,6 +94,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     }
 
     NestLoopIndexPlanNode* node = dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode);
+
     assert(node);
     m_indexNode =
         dynamic_cast<IndexScanPlanNode*>(m_abstractNode->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
@@ -147,6 +148,16 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     p_init_null_tuples(node->getInputTable(), m_indexNode->getTargetTable());
 
     m_indexValues.init(index->getKeySchema());
+
+    std::stringstream paramsToPrint;
+    paramsToPrint << "Input table = " << node->getInputTable()->name()
+    					<< ", inner table = " << inner_table->name();
+    					//<< ", Join predicate = " << node->getJoinPredicate()->debug(true);
+
+    LogManager::GLog("NestedLoopIndex", "p_init", 160, paramsToPrint.str());
+
+    //Debugging code to understand how nested-loop index works
+
     return true;
 }
 

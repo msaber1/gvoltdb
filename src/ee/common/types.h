@@ -225,7 +225,8 @@ enum PlanNodeType {
 	//
 	PLAN_NODE_TYPE_VERTEXSCAN          = 70,
 	PLAN_NODE_TYPE_EDGESCAN            = 71,
-	PLAN_NODE_TYPE_PATHSCAN            = 72
+	PLAN_NODE_TYPE_PATHSCAN            = 72,
+	PLAN_NODE_TYPE_NESTEDLOOPPATH      = 73
 };
 
 // ------------------------------------------------------------------

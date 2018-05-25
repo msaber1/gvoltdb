@@ -67,7 +67,7 @@ public:
     void getOutputColumnExpressions(std::vector<AbstractExpression*>& outputExpressions) const;
 
 protected:
-    void loadFromJSONObject(PlannerDomValue obj);
+    virtual void loadFromJSONObject(PlannerDomValue obj) = 0;
 
     // This is the outer-table-only join expression. If the outer tuple fails it,
     // it may still be part of the result set (pending other filtering)

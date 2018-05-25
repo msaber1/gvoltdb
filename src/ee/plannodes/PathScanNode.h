@@ -38,6 +38,9 @@ public:
 	int getTopK() const { return m_t_topK; }
 	int getVertexSelectivity() const { return m_t_vSelectivity; }
 	int getEdgeSelectivity() const { return m_t_eSelectivity; }
+	std::string getSPColumnName() const { return m_sp_column_name; }
+	int getSPColumnIdInEdgesTable() const;
+
 
 	bool isSubQuery() const { return m_isSubQuery; }
 
@@ -47,11 +50,12 @@ protected:
     void loadFromJSONObject(PlannerDomValue obj);
 
     std::string m_target_graph_name;
+    std::string m_sp_column_name;
 	GraphViewCatalogDelegate* m_gcd;
 	int m_t_startVertexId = -1;
 	int m_t_endVertexId = -1;
 	int m_t_queryType = -1; //prop1
-	int m_t_pathLength= -1; //prop2
+	int m_t_pathLength= -1; //length (used to be prop2 in the past)
 	int m_t_topK= -1; //prop3
 	int m_t_vSelectivity= -1; //prop4
 	int m_t_eSelectivity= -1; //prop5

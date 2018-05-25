@@ -56,6 +56,9 @@ public:
     NestLoopPlanNode() { }
     ~NestLoopPlanNode();
     PlanNodeType getPlanNodeType() const;
+
+protected:
+    void loadFromJSONObject(PlannerDomValue obj);
 };
 
 } // namespace voltdb

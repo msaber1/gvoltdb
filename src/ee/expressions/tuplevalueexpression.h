@@ -90,6 +90,7 @@ class TupleValueExpression : public AbstractExpression {
     }
 
     int getColumnId() const {return this->value_idx;}
+    int getTableId() const {return this->tuple_idx;}
 
   protected:
 

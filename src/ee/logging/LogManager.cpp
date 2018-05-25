@@ -26,7 +26,7 @@ namespace voltdb {
 
 
 
-bool LogManager::GDebug = false;
+bool LogManager::GDebug = true;
 void LogManager::GLog(string className, string methodName, int lineNo, string message)
 {
 	if(LogManager::GDebug)

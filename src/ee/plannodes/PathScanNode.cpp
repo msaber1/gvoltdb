@@ -41,16 +41,46 @@ GraphView* PathScanPlanNode::getTargetGraphView() const
 	return m_gcd->getGraphView();
 }
 
+int PathScanPlanNode::getSPColumnIdInEdgesTable() const
+{
+	int id = -1;
+
+	if (!this->getSPColumnName().empty())
+	{
+		GraphView* gv = this->getTargetGraphView();
+		if (gv != NULL)
+		{
+			id = gv->getEdgeTable()->columnIndex(this->getSPColumnName());
+		}
+	}
+
+	return id;
+}
+
 void PathScanPlanNode::loadFromJSONObject(PlannerDomValue obj)
 {
 	m_target_graph_name = obj.valueForKey("TARGET_GRAPH_NAME").asStr();
 	m_t_startVertexId = obj.valueForKey("STARTVERTEX").asInt();
 	m_t_endVertexId = obj.valueForKey("ENDVERTEX").asInt();
 	m_t_queryType = obj.valueForKey("PROP1").asInt();
-	m_t_pathLength = obj.valueForKey("PROP2").asInt();
+	m_t_pathLength = obj.valueForKey("LENGTH").asInt(); //used to be PROP2 before
 	m_t_topK = obj.valueForKey("PROP3").asInt();
 	m_t_vSelectivity = obj.valueForKey("PROP4").asInt();
 	m_t_eSelectivity = obj.valueForKey("PROP5").asInt();
+	m_sp_column_name = "";
+
+	if (obj.hasNonNullKey("HINT"))
+	{
+		m_sp_column_name = obj.valueForKey("HINT").asStr();
+		if (!m_sp_column_name.empty())
+		{
+			std::size_t openParenthesesPosition  = m_sp_column_name.find("(");
+			if (openParenthesesPosition !=  string::npos)
+			{
+				m_sp_column_name = m_sp_column_name.substr(openParenthesesPosition+1, m_sp_column_name.length()-openParenthesesPosition-2);
+			}
+		}
+	}
 
 	m_isEmptyScan = obj.hasNonNullKey("PREDICATE_FALSE");
 

@@ -11,6 +11,7 @@ import org.voltdb.planner.parseinfo.StmtTargetGraphScan;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.AbstractPlanNode.Members;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.types.SortDirectionType;
 
 public class PathScanPlanNode extends SeqScanPlanNode {
 
@@ -22,7 +23,8 @@ public class PathScanPlanNode extends SeqScanPlanNode {
     	PROP2,
     	PROP3,
     	PROP4,
-    	PROP5,;
+    	PROP5,
+    	LENGTH,;
     }
     
     String hint;
@@ -33,6 +35,8 @@ public class PathScanPlanNode extends SeqScanPlanNode {
     int prop3;
     int prop4;
     int prop5;
+    int length;
+    String graphName = "";
 	
     public PathScanPlanNode() {
         super();
@@ -42,6 +46,7 @@ public class PathScanPlanNode extends SeqScanPlanNode {
         super(tableScan);
         
         StmtTargetGraphScan graphScan = (StmtTargetGraphScan)tableScan;
+        graphName = graphScan.getTableName();
         hint = graphScan.getHint();
         startvertexid = graphScan.getStartvertexid();
         endverexid = graphScan.getEndvertexid();
@@ -50,6 +55,7 @@ public class PathScanPlanNode extends SeqScanPlanNode {
         prop3 = graphScan.getProp3();
         prop4 = graphScan.getProp4();
         prop5 = graphScan.getProp5();
+        length = graphScan.getLength();
     }
 
     public PathScanPlanNode(String tableName, String tableAlias) {
@@ -155,5 +161,17 @@ public class PathScanPlanNode extends SeqScanPlanNode {
         stringer.key(Members.PROP3.name()).value(prop3);
         stringer.key(Members.PROP4.name()).value(prop4);
         stringer.key(Members.PROP5.name()).value(prop5);
+        stringer.key(Members.LENGTH.name()).value(length);
     }
+   
+    @Override
+    protected String explainPlanForNode(String indent) {
+        String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
+        if (m_targetTableAlias != null && !m_targetTableAlias.equals(tableName)) {
+            tableName += " (" + m_targetTableAlias +")";
+        }
+        return "PATHSCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
+    }    
+    
+    
 }

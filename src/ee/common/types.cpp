@@ -467,6 +467,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_PATHSCAN: {
             return "PATHSCAN";
     }
+    case PLAN_NODE_TYPE_NESTEDLOOPPATH: {
+    	return "NESTEDLOOPPATH";
+    }
     } // END OF SWITCH
     return "UNDEFINED";
 }

@@ -50,4 +50,28 @@ NestLoopIndexPlanNode::~NestLoopIndexPlanNode() { }
 
 PlanNodeType NestLoopIndexPlanNode::getPlanNodeType() const { return PLAN_NODE_TYPE_NESTLOOPINDEX; }
 
+void
+NestLoopIndexPlanNode::loadFromJSONObject(PlannerDomValue obj)
+{
+    m_joinType = stringToJoin(obj.valueForKey("JOIN_TYPE").asStr());
+
+    m_preJoinPredicate.reset(loadExpressionFromJSONObject("PRE_JOIN_PREDICATE", obj));
+    m_joinPredicate.reset(loadExpressionFromJSONObject("JOIN_PREDICATE", obj));
+    m_wherePredicate.reset(loadExpressionFromJSONObject("WHERE_PREDICATE", obj));
+
+    if (obj.hasKey("OUTPUT_SCHEMA_PRE_AGG")) {
+        PlannerDomValue outputSchemaArray = obj.valueForKey("OUTPUT_SCHEMA_PRE_AGG");
+        for (int i = 0; i < outputSchemaArray.arrayLen(); i++) {
+            PlannerDomValue outputColumnValue = outputSchemaArray.valueAtIndex(i);
+            SchemaColumn* outputColumn = new SchemaColumn(outputColumnValue, i);
+            m_outputSchemaPreAgg.push_back(outputColumn);
+        }
+        m_tupleSchemaPreAgg = AbstractPlanNode::generateTupleSchema(m_outputSchemaPreAgg);
+    }
+    else {
+        m_tupleSchemaPreAgg = NULL;
+    }
+
+}
+
 } // namespace voltdb

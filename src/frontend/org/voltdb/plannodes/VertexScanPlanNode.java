@@ -23,4 +23,13 @@ public class VertexScanPlanNode extends SeqScanPlanNode {
         return PlanNodeType.VERTEXSCAN;
     }
     
+    @Override
+    protected String explainPlanForNode(String indent) {
+        String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
+        if (m_targetTableAlias != null && !m_targetTableAlias.equals(tableName)) {
+            tableName += " (" + m_targetTableAlias +")";
+        }
+        return "VERTEXSCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
+    }
+    
 }

@@ -11,6 +11,7 @@
 #include "Vertex.h"
 #include "Edge.h"
 #include <string>
+#include <map>
 
 #include <queue>
 using namespace std;
@@ -49,6 +50,11 @@ TableTuple* GraphView::getEdgeTuple(int id)
 {
 	Edge* e = this->getEdge(id);
 	return new TableTuple(e->getTupleData(), this->m_edgeTable->schema());
+}
+
+TableTuple* GraphView::getEdgeTuple(char* data)
+{
+	return new TableTuple(data, this->m_edgeTable->schema());
 }
 
 void GraphView::addVertex(int id, Vertex* vertex)
@@ -221,6 +227,19 @@ PathIterator& GraphView::iteratorDeletingAsWeGo(GraphOperationType opType)
 	return *m_pathIterator;
 }
 
+PathIterator& GraphView::iteratorDeletingAsWeGo()
+{
+	//empty the paths table, which is the staging memory for the paths to be explored
+	dummyPathExapansionState = 0;
+	executeTraversal = true;
+	m_pathTable->deleteAllTempTupleDeepCopies();
+	//set the iterator for the temp table
+	//create new tuple in the paths temp table
+	//m_pathTableIterator = &(m_pathTable->iteratorDeletingAsWeGo());
+	m_pathTableIterator = NULL;
+	return *m_pathIterator;
+}
+
 void GraphView::expandCurrentPathOperation()
 {
 	//Check the current path operation type, and
@@ -294,21 +313,26 @@ void GraphView::SP_TopK(int src, int dest, int k)
 {
 	int minCost = INT_MAX;
 	int foundPathsSoFar = 0;
-	priority_queue<PQEntry, vector<PQEntry>, std::greater<PQEntry>> pq;
+	//PQEntryWithLength.first is the cost, PQEntryWithLength.second.first is the vertexId, PQEntryWithLength.second.second is the path length
+	priority_queue<PQEntryWithLength, vector<PQEntryWithLength>, std::greater<PQEntryWithLength>> pq;
 	//map<int, int> costMap;
 	//costMap[src] = 0;
-	pq.push(make_pair(0, src)); //zero cost to reach Vertex from
+	pq.push(make_pair(0, make_pair(src, 0))); //zero cost to reach Vertex from
 	Vertex* v = NULL;
 	Edge* e = NULL;
 	int currVId, fanOut = -1, candVertexId = -1;
 	
-	int maxPQOperations = this->numOfVertexes();
+	//upper-bound to avoid loops (considering an average fan-out of 10
+	int maxPQOperations = this->numOfVertexes() * 10;
 	int iterationNum = 0;
+	TableTuple* edgeTuple;
+	int length;
 
 	while(!pq.empty())
 	{
 		//select next vertex to explore
-		currVId = pq.top().second;
+		currVId = ((pair<int, int >)( pq.top().second)).first;
+		length = ((pair<int, int >)( pq.top().second)).second;
 		minCost = pq.top().first;
 		if(currVId == dest)
 		{
@@ -319,10 +343,10 @@ void GraphView::SP_TopK(int src, int dest, int k)
 			//start vertex, end vertex, length, cost, path
 			temp_tuple.setNValue(0, ValueFactory::getIntegerValue(src));
 			temp_tuple.setNValue(1, ValueFactory::getIntegerValue(dest));
-			temp_tuple.setNValue(2, ValueFactory::getIntegerValue(minCost));
-			temp_tuple.setNValue(3, ValueFactory::getDoubleValue(minCost));
+			temp_tuple.setNValue(2, ValueFactory::getIntegerValue(length));
+			temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)minCost));
 			//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
-			if(m_pathTable->activeTupleCount() <= 100)
+			if(m_pathTable->activeTupleCount() <= 1000)
 			m_pathTable->insertTempTuple(temp_tuple);
 		}
 		iterationNum++;
@@ -336,17 +360,25 @@ void GraphView::SP_TopK(int src, int dest, int k)
 		//explore the outgoing vertexes
 		v = this->getVertex(currVId);
 		fanOut = v->fanOut();
+		int edgeCost = 1;
 		for(int i = 0; i < fanOut; i++)
 		{
 			e = v->getOutEdge(i);
 			candVertexId = e->getEndVertex()->getId();
+
+			if (spColumnIndexInEdgesTable >= 0)
+			{
+				edgeTuple = this->getEdgeTuple(e->getTupleData());
+				edgeCost = ValuePeeker::peekAsInteger(edgeTuple->getNValue(spColumnIndexInEdgesTable));
+			}
+
 
 			//these lines are commented to allow top k search
 			//if ( (costMap.find(candVertexId) == costMap.end()) ||
 			//	 (costMap[candVertexId] > minCost + 1) )
 			{
 				//costMap[candVertexId] = minCost + 1;
-				pq.push(make_pair(minCost + 1, candVertexId));
+				pq.push(make_pair(minCost + edgeCost, make_pair(candVertexId, length+1)));
 			}
 
 		}
@@ -543,14 +575,16 @@ void GraphView::BFS_Reachability_ByDepth(int startVertexId, int depth)
 {
 	queue<Vertex*> q;
 	Vertex* currentVertex = this->m_vertexes[startVertexId];
+	std::map<int, int> vertexToLevel;
 	if(NULL != currentVertex)
 	{
-		currentVertex->Level = 0;
+		vertexToLevel[currentVertex->getId()] = 0;
 		q.push(currentVertex);
 		int fanOut;
 		Edge* outEdge = NULL;
 		Vertex* outVertex = NULL;
-		while(!q.empty() && currentVertex->Level < depth)
+
+		while(!q.empty() && vertexToLevel[currentVertex->getId()] < depth)
 		{
 			currentVertex = q.front();
 			q.pop();
@@ -559,18 +593,19 @@ void GraphView::BFS_Reachability_ByDepth(int startVertexId, int depth)
 			{
 				outEdge = currentVertex->getOutEdge(i);
 				outVertex = outEdge->getEndVertex();
-				outVertex->Level = currentVertex->Level + 1;
-				if( (depth > 0 && outVertex->Level == depth))
+				//outVertex->Level = currentVertex->Level + 1;
+				vertexToLevel[outVertex->getId()] = vertexToLevel[currentVertex->getId()] + 1;
+				if( (depth > 0 && vertexToLevel[outVertex->getId()] == depth))
 				{
 					//Now, we reached the destination vertexes, where we should add tuples into the output table
 					TableTuple temp_tuple = m_pathTable->tempTuple();
 					//start vertex, end vertex, length, cost, path
 					temp_tuple.setNValue(0, ValueFactory::getIntegerValue(startVertexId));
 					temp_tuple.setNValue(1, ValueFactory::getIntegerValue(outVertex->getId()));
-					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
-					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(outVertex->Level + 1)));
+					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(vertexToLevel[outVertex->getId()]));
+					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(vertexToLevel[outVertex->getId()])));
 					//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
-					if(m_pathTable->activeTupleCount() <= 100)
+					if(m_pathTable->activeTupleCount() <= 1000)
 					m_pathTable->insertTempTuple(temp_tuple);
 				}
 				else
@@ -591,14 +626,17 @@ void GraphView::BFS_Reachability_ByDestination(int startVertexId, int destVerexI
 {
 	queue<Vertex*> q;
 	Vertex* currentVertex = this->m_vertexes[startVertexId];
+	std::map<int, int> vertexToLevel;
+
 	if(NULL != currentVertex)
 	{
-		currentVertex->Level = 0;
+		vertexToLevel[currentVertex->getId()] = 0;
 		q.push(currentVertex);
 		int fanOut;
 		Edge* outEdge = NULL;
 		Vertex* outVertex = NULL;
 		bool found = false;
+		int level;
 		while(!q.empty() && !found)
 		{
 			currentVertex = q.front();
@@ -610,17 +648,20 @@ void GraphView::BFS_Reachability_ByDestination(int startVertexId, int destVerexI
 				outVertex = outEdge->getEndVertex();
 				if(outVertex->getId() == destVerexId)
 				{
+					level = vertexToLevel[outVertex->getId()] + 1;
 					//Now, we reached the destination vertexes, where we should add tuples into the output table
 					TableTuple temp_tuple = m_pathTable->tempTuple();
 					//start vertex, end vertex, length, cost, path
 					temp_tuple.setNValue(0, ValueFactory::getIntegerValue(startVertexId));
 					temp_tuple.setNValue(1, ValueFactory::getIntegerValue(outVertex->getId()));
-					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
-					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)(outVertex->Level + 1)));
+					temp_tuple.setNValue(2, ValueFactory::getIntegerValue(level));
+					temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)level));
 					temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
-					if(m_pathTable->activeTupleCount() <= 100)
+					if(m_pathTable->activeTupleCount() <= 1000)
 					m_pathTable->insertTempTuple(temp_tuple);
 
+					//outVertex->Level = outVertex->Level + 1;
+					vertexToLevel[outVertex->getId()] = level;
 					found = true;
 					break;
 				}
@@ -688,7 +729,7 @@ void GraphView::SubGraphLoopFromStartVertex(int startVertexId, int length, int v
 						temp_tuple.setNValue(2, ValueFactory::getIntegerValue(outVertex->Level));
 						temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)outVertex->Level));
 						//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
-						if(m_pathTable->activeTupleCount() <= 100)
+						if(m_pathTable->activeTupleCount() <= 1000)
 						m_pathTable->insertTempTuple(temp_tuple);
 					}
 				}

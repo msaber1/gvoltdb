@@ -73,6 +73,7 @@
 #include "EdgeScanNode.h"
 #include "PathScanNode.h"
 #include "VertexScanNode.h"
+#include "NestedLoopPathNode.h"
 
 namespace plannodeutil {
 
@@ -229,6 +230,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_PATHSCAN):
         	ret = new voltdb::PathScanPlanNode();
+            break;
+            // ------------------------------------------------------------------
+            // msaber: PathScan
+            // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_NESTEDLOOPPATH):
+            ret = new voltdb::NestedLoopPathNode();
             break;
         // default: Don't provide a default, let the compiler enforce complete coverage.
     }

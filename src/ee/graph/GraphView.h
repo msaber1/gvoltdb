@@ -32,7 +32,9 @@ class GraphView
 	friend class Edge;
 
 public:
-	typedef pair<int, int> PQEntry;
+	//PQEntryWithLength.first is the cost, PQEntryWithLength.second.first is the vertexId, PQEntryWithLength.second.second is the path length
+	typedef pair<int, pair<int, int> > PQEntryWithLength;
+	typedef pair<int, int > PQEntry;
 	~GraphView(void);
 
 	/*
@@ -61,6 +63,7 @@ public:
 	TableTuple* getVertexTuple(int id);
 	Edge* getEdge(int id);
 	TableTuple* getEdgeTuple(int id);
+	TableTuple* getEdgeTuple(char* data);
 	void addVertex(int id, Vertex* vertex);
 	void addEdge(int id, Edge* edge);
 	int numOfVertexes();
@@ -92,6 +95,7 @@ public:
 	//Notice that VoltDB allows one operation or query / one thread per time
 	//Hence, we assume that a single path traversal query is active at any point in time
 	PathIterator& iteratorDeletingAsWeGo(GraphOperationType opType);
+	PathIterator& iteratorDeletingAsWeGo();
 
 	void expandCurrentPathOperation();
 
@@ -102,7 +106,7 @@ public:
 	void SP_TopK(int src, int dest, int k);
 	void SP_EdgeSelectivity(int src, int dest, int edgeSelectivity);
 	void SP_ToAllVertexes_EdgeSelectivity(int src, int edgeSelectivity);
-	int fromVertexId, toVertexId, queryType, pathLength, topK, vSelectivity, eSelectivity;
+	int fromVertexId, toVertexId, queryType, pathLength, topK, vSelectivity, eSelectivity, spColumnIndexInEdgesTable;
 
 	//Topology query, i.e., connected sub-graph of
 

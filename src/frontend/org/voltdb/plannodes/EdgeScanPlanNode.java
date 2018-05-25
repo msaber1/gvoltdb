@@ -23,4 +23,12 @@ public class EdgeScanPlanNode extends SeqScanPlanNode {
         return PlanNodeType.EDGESCAN;
     }
     
+    @Override
+    protected String explainPlanForNode(String indent) {
+        String tableName = m_targetTableName == null? m_targetTableAlias: m_targetTableName;
+        if (m_targetTableAlias != null && !m_targetTableAlias.equals(tableName)) {
+            tableName += " (" + m_targetTableAlias +")";
+        }
+        return "EDGESCAN of \"" + tableName + "\"" + explainPredicate("\n" + indent + " filter by ");
+    }
 }

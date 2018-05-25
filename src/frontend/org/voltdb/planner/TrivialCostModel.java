@@ -30,6 +30,8 @@ public class TrivialCostModel extends AbstractCostModel {
     public double getPlanCost(PlanStatistics stats) {
         double cost = 0;
 
+        //TODO: Mohamed: Temporary disabling the planner to enforce the join order as specified by the query (to make sure that PathScan is the most inner)
+        /*
         // just add up the total tuples read for the plan
         for (int i = 0; i < stats.getLevelCount(); i++) {
             HashMap<StatsField, Long> level = stats.getStatisticsForLevel(i);
@@ -37,6 +39,7 @@ public class TrivialCostModel extends AbstractCostModel {
             long levelValue = (levelValueObj == null) ? 0 : levelValueObj.longValue();
             cost += levelValue;
         }
+        */
 
         return cost;
     }
