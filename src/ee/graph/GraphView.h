@@ -33,7 +33,7 @@ class GraphView
 
 public:
 	//PQEntryWithLength.first is the cost, PQEntryWithLength.second.first is the vertexId, PQEntryWithLength.second.second is the path length
-	typedef pair<int, pair<int, int> > PQEntryWithLength;
+	typedef pair<double, pair<int, int> > PQEntryWithLength;
 	typedef pair<int, int > PQEntry;
 	~GraphView(void);
 

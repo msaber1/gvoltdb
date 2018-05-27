@@ -12,6 +12,7 @@
 #include "Edge.h"
 #include <string>
 #include <map>
+#include <unordered_set>
 
 #include <queue>
 using namespace std;
@@ -311,7 +312,7 @@ void GraphView::expandCurrentPathOperation()
 
 void GraphView::SP_TopK(int src, int dest, int k)
 {
-	int minCost = INT_MAX;
+	double minCost = DBL_MAX;
 	int foundPathsSoFar = 0;
 	//PQEntryWithLength.first is the cost, PQEntryWithLength.second.first is the vertexId, PQEntryWithLength.second.second is the path length
 	priority_queue<PQEntryWithLength, vector<PQEntryWithLength>, std::greater<PQEntryWithLength>> pq;
@@ -344,7 +345,7 @@ void GraphView::SP_TopK(int src, int dest, int k)
 			temp_tuple.setNValue(0, ValueFactory::getIntegerValue(src));
 			temp_tuple.setNValue(1, ValueFactory::getIntegerValue(dest));
 			temp_tuple.setNValue(2, ValueFactory::getIntegerValue(length));
-			temp_tuple.setNValue(3, ValueFactory::getDoubleValue((double)minCost));
+			temp_tuple.setNValue(3, ValueFactory::getDoubleValue(minCost));
 			//temp_tuple.setNValue(4, ValueFactory::getStringValue("Test", NULL) );
 			if(m_pathTable->activeTupleCount() <= 1000)
 			m_pathTable->insertTempTuple(temp_tuple);
@@ -360,7 +361,7 @@ void GraphView::SP_TopK(int src, int dest, int k)
 		//explore the outgoing vertexes
 		v = this->getVertex(currVId);
 		fanOut = v->fanOut();
-		int edgeCost = 1;
+		double edgeCost = 1;
 		for(int i = 0; i < fanOut; i++)
 		{
 			e = v->getOutEdge(i);
@@ -369,7 +370,7 @@ void GraphView::SP_TopK(int src, int dest, int k)
 			if (spColumnIndexInEdgesTable >= 0)
 			{
 				edgeTuple = this->getEdgeTuple(e->getTupleData());
-				edgeCost = ValuePeeker::peekAsInteger(edgeTuple->getNValue(spColumnIndexInEdgesTable));
+				edgeCost = ValuePeeker::peekDouble(edgeTuple->getNValue(spColumnIndexInEdgesTable));
 			}
 
 
@@ -576,6 +577,7 @@ void GraphView::BFS_Reachability_ByDepth(int startVertexId, int depth)
 	queue<Vertex*> q;
 	Vertex* currentVertex = this->m_vertexes[startVertexId];
 	std::map<int, int> vertexToLevel;
+	std::unordered_set<int> visited;
 	if(NULL != currentVertex)
 	{
 		vertexToLevel[currentVertex->getId()] = 0;
@@ -588,11 +590,27 @@ void GraphView::BFS_Reachability_ByDepth(int startVertexId, int depth)
 		{
 			currentVertex = q.front();
 			q.pop();
+
+			if (visited.find(currentVertex->getId()) == visited.end())
+			{
+				visited.insert(currentVertex->getId());
+			}
+			else
+			{
+				continue;
+			}
+
 			fanOut = currentVertex->fanOut();
 			for(int i = 0; i < fanOut; i++)
 			{
 				outEdge = currentVertex->getOutEdge(i);
 				outVertex = outEdge->getEndVertex();
+
+				if (visited.find(outVertex->getId()) != visited.end())
+				{
+					continue;
+				}
+
 				//outVertex->Level = currentVertex->Level + 1;
 				vertexToLevel[outVertex->getId()] = vertexToLevel[currentVertex->getId()] + 1;
 				if( (depth > 0 && vertexToLevel[outVertex->getId()] == depth))
@@ -627,6 +645,7 @@ void GraphView::BFS_Reachability_ByDestination(int startVertexId, int destVerexI
 	queue<Vertex*> q;
 	Vertex* currentVertex = this->m_vertexes[startVertexId];
 	std::map<int, int> vertexToLevel;
+	std::unordered_set<int> visited;
 
 	if(NULL != currentVertex)
 	{
@@ -641,11 +660,28 @@ void GraphView::BFS_Reachability_ByDestination(int startVertexId, int destVerexI
 		{
 			currentVertex = q.front();
 			q.pop();
+
+			if (visited.find(currentVertex->getId()) == visited.end())
+			{
+				visited.insert(currentVertex->getId());
+			}
+			else
+			{
+				continue;
+			}
+
 			fanOut = currentVertex->fanOut();
 			for(int i = 0; i < fanOut; i++)
 			{
 				outEdge = currentVertex->getOutEdge(i);
 				outVertex = outEdge->getEndVertex();
+
+				if (visited.find(outVertex->getId()) != visited.end())
+				{
+					continue;
+				}
+
+				vertexToLevel[outVertex->getId()] = vertexToLevel[currentVertex->getId()] + 1;
 				if(outVertex->getId() == destVerexId)
 				{
 					level = vertexToLevel[outVertex->getId()] + 1;

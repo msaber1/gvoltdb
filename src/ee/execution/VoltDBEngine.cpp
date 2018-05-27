@@ -438,8 +438,8 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
     m_tuplesProcessedInFragment = 0;
     m_tuplesProcessedSinceReport = 0;
 
-    timeval begin, end;
-    gettimeofday (&begin, NULL);
+    //timeval begin, end;
+    //gettimeofday (&begin, NULL);
 
     for (m_currentIndexInBatch = 0; m_currentIndexInBatch < numFragments; ++m_currentIndexInBatch) {
 
@@ -474,14 +474,15 @@ int VoltDBEngine::executePlanFragments(int32_t numFragments,
         m_stringPool.purge();
     }
 
-    gettimeofday (&end, NULL);
+    //gettimeofday (&end, NULL);
 
-    double totalTimeInMilliSeconds =  ((double)(end.tv_usec - begin.tv_usec) / 1000.0) + ((double)(end.tv_sec - begin.tv_sec) * 1000.0);
+    //double totalTimeInMilliSeconds =  ((double)(end.tv_usec - begin.tv_usec) / 1000.0) + ((double)(end.tv_sec - begin.tv_sec) * 1000.0);
     //std::stringstream execTimeString;
     //execTimeString << "msec," << totalTimeInMilliSeconds;
 
+    //TODO: toggle the display of the execution time
     //write the time in
-    cout << totalTimeInMilliSeconds << endl;
+    //cout << totalTimeInMilliSeconds << endl;
     //LogManager::GLog("VoltDBEngine", "executePlanFragment(s)!", 483, "End of execution!");
     //LogManager::getThreadLogger(LOGGERID_HOST)->log(voltdb::LOGLEVEL_WARN, execTimeString.str().c_str());
     //LogManager::GLog("VoltDBEngine", "executePlanFragment(s)!", 485, execTimeString.str());
